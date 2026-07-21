@@ -117,10 +117,13 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://anylang.uz
+        ADMIN_BASE_PATH: /admin
     restart: unless-stopped
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: https://anylang.uz
+      ADMIN_BASE_PATH: /admin
+      NEXT_PUBLIC_BASE_PATH: /admin
     ports:
       - "127.0.0.1:3105:3000"
     depends_on:

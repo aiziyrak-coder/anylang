@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
+  // Production: served at https://anylang.uz/admin (landing owns /)
+  basePath: process.env.ADMIN_BASE_PATH || (isProd ? "/admin" : ""),
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },

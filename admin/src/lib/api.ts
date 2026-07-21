@@ -3,6 +3,8 @@
  * JWT is stored in HttpOnly cookie — never in localStorage.
  */
 
+import { withBase } from "@/lib/base-path";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -43,7 +45,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
-      window.location.href = "/login";
+      window.location.href = withBase("/login");
     }
     throw await parseError(res);
   }
@@ -56,7 +58,7 @@ export async function apiFetchBlob(path: string): Promise<{ blob: Blob; filename
   const res = await fetch(proxyUrl(path));
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
-      window.location.href = "/login";
+      window.location.href = withBase("/login");
     }
     throw await parseError(res);
   }

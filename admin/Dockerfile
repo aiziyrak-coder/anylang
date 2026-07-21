@@ -9,7 +9,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN mkdir -p public
 ARG NEXT_PUBLIC_API_URL=https://anylang.uz
+ARG ADMIN_BASE_PATH=/admin
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV ADMIN_BASE_PATH=$ADMIN_BASE_PATH
+ENV NEXT_PUBLIC_BASE_PATH=$ADMIN_BASE_PATH
 ENV NODE_ENV=production
 RUN npm run build
 
