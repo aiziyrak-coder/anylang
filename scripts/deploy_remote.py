@@ -132,9 +132,9 @@ TRUSTED_HOSTS=anylang.uz,www.anylang.uz,127.0.0.1,localhost
         f"docker compose -f docker-compose.prod.yml --env-file .env up -d --build"
     )
     code, out, err = run(client, compose_cmd, timeout=2400, sudo=True)
-    print(out[-12000:])
+    sys.stdout.buffer.write(out.encode("utf-8", errors="replace")[-12000:])
     if code != 0:
-        print("ERR:", err[-6000:], file=sys.stderr)
+        sys.stderr.buffer.write(err.encode("utf-8", errors="replace")[-6000:])
         return code
 
     print("==> Nginx...")
