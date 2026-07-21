@@ -30,5 +30,5 @@ class WorkerSettings:
     functions = [purge_expired_accounts_job, expire_subscriptions_job]
     cron_jobs = [
         cron(purge_expired_accounts_job, hour=3, minute=0, run_at_startup=False),
-        cron(expire_subscriptions_job, hour="*/1", minute=15, run_at_startup=False),
+        cron(expire_subscriptions_job, minute=15, run_at_startup=False),
     ]
