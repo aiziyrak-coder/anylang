@@ -46,7 +46,8 @@ def sudo(c: paramiko.SSHClient, cmd: str, timeout: int = 600) -> str:
     o = out.read().decode(errors="replace")
     e = err.read().decode(errors="replace")
     text = (o + e).strip()
-    print(text[-2500:] if len(text) > 2500 else text)
+    safe = (text[-2500:] if len(text) > 2500 else text).encode("ascii", "replace").decode("ascii")
+    print(safe)
     return text
 
 
@@ -72,6 +73,11 @@ def main() -> None:
     os.unlink(tar_path)
 
     sudo(c, f"mkdir -p {REMOTE} && tar -xzf /tmp/anylang-landing-deploy.tgz -C {REMOTE}")
+    sudo(
+        c,
+        "mkdir -p /var/www/anylang && rsync -a --delete /home/admin_root/anylang/landing/ /var/www/anylang/ "
+        "&& chown -R www-data:www-data /var/www/anylang && chmod -R a+rX /var/www/anylang",
+    )
     sudo(c, "python3 /tmp/patch_landing_nginx.py")
     sudo(c, "nginx -t && systemctl reload nginx")
     print("\n=== Rebuild admin ===")

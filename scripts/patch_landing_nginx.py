@@ -11,7 +11,7 @@ BACKUP = Path(f"/etc/nginx/sites-available/anylang.uz.bak.landing.{datetime.now(
 LOCATIONS = r"""
     # Public marketing site
     location / {
-        root /home/admin_root/anylang/landing;
+        root /var/www/anylang;
         index index.html;
         try_files $uri $uri/ /index.html;
     }
