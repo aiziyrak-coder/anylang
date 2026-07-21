@@ -1,0 +1,123 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'theme/colors.dart';
+import '../utils/size_controller.dart';
+
+/// Qayta ishlatiladigan OTP (kod) kiritish maydoni — [length] ta katakcha.
+/// Ichkarida bitta yashirin `TextField`, kataklar shu qiymatni aks ettiradi.
+class OtpField extends StatefulWidget {
+  final int length;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onCompleted;
+
+  const OtpField({
+    super.key,
+    this.length = 6,
+    this.onChanged,
+    this.onCompleted,
+  });
+
+  @override
+  State<OtpField> createState() => _OtpFieldState();
+}
+
+class _OtpFieldState extends State<OtpField> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focus = FocusNode();
+
+  String get _value => _controller.text;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    setState(() {});
+    widget.onChanged?.call(_value);
+    if (_value.length == widget.length) {
+      widget.onCompleted?.call(_value);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+
+    return Stack(
+      children: [
+        // Ko'rinadigan kataklar.
+        Row(
+          children: List.generate(widget.length, (i) {
+              final filled = i < _value.length;
+              final active = i == _value.length && _focus.hasFocus;
+              final highlighted = filled || active;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i == widget.length - 1 ? 0 : 10.dp),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(14.dp),
+                        border: Border.all(
+                          color: highlighted ? c.accent : c.surfaceBorder,
+                          width: highlighted ? 1.6 : 1,
+                        ),
+                        boxShadow: active
+                            ? [
+                                BoxShadow(
+                                  color: kLime.withValues(alpha: 0.25),
+                                  blurRadius: 12.dp,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Text(
+                        filled ? _value[i] : '',
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 24.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          // Ustidagi shaffof kiritish maydoni — bosilganda fokus oladi.
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0,
+              child: TextField(
+                controller: _controller,
+                focusNode: _focus,
+                keyboardType: TextInputType.number,
+                maxLength: widget.length,
+                showCursor: false,
+                enableInteractiveSelection: false,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: const TextStyle(color: Colors.transparent),
+                decoration: const InputDecoration(
+                  counterText: '',
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+  }
+}

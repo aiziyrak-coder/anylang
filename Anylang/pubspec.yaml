@@ -1,0 +1,46 @@
+name: anylang
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  get: ^4.7.3
+  dio: ^5.9.2
+  flutter_svg: ^2.2.3
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  url_launcher: ^6.3.2
+  calendar_date_picker2: ^2.0.1
+  animated_custom_dropdown: ^3.1.1
+  time_picker_spinner_pop_up: ^3.0.0
+  sqflite: ^2.3.0
+  lottie: ^3.3.1
+  geolocator: ^14.0.2
+  permission_handler: ^11.0.0
+  web_socket_channel: ^3.0.3
+  image_picker: ^1.2.1
+  google_sign_in: ^6.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/

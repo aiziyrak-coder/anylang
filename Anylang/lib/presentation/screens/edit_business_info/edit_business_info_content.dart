@@ -1,0 +1,218 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../modal/simple_list_picker_bottom_sheet.dart';
+import '../../ui/app_top_bar.dart';
+import '../../ui/buttons/primary_button.dart';
+import '../../ui/gradient_background.dart';
+import '../../ui/items/media_tile.dart';
+import '../../ui/items/removable_chip.dart';
+import '../../ui/profile_avatar.dart';
+import '../../ui/textfields/app_picker_field.dart';
+import '../../ui/textfields/app_text_field.dart';
+import '../../ui/theme/colors.dart';
+import '../../ui/theme/gradients.dart';
+import '../../utils/screen_options/my_action.dart';
+import '../../utils/screen_options/screen_content.dart';
+import '../../utils/size_controller.dart';
+import '../register/country_picker_bottom_sheet.dart';
+import 'edit_business_info_action.dart';
+import 'edit_business_info_state.dart';
+
+const List<String> kBusinessRoles = [
+  'Ishlab chiqaruvchi',
+  'Distributor',
+  'Chakana savdo',
+  'Xizmat ko‘rsatuvchi',
+];
+
+/// S17 — Biznes ma'lumot tahrirlash. Logotip, kompaniya ma'lumotlari,
+/// sertifikatlar va zavod rasmlari tahrirlanadi.
+class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
+
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _websiteCtrl;
+  late final TextEditingController _descriptionCtrl;
+
+  @override
+  void initContent() {
+    _nameCtrl = TextEditingController(text: 'Anadolu Craft Co.');
+    _websiteCtrl = TextEditingController(text: 'anadolucraft.com');
+    _descriptionCtrl = TextEditingController(
+      text: 'Turkiyada 12 yildan beri qo‘lda to‘qilgan gazlama va charm mahsulotlar ishlab chiqaruvchi oilaviy korxona.',
+    );
+  }
+
+  @override
+  void onClose() {
+    _nameCtrl.dispose();
+    _websiteCtrl.dispose();
+    _descriptionCtrl.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context, EditBusinessInfoState state, void Function(MyAction action) sendAction) {
+    final c = context.appColors;
+
+    return GradientBackground(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(16.dp, 4.dp, 16.dp, 0),
+              child: AppTopBar(
+                title: 'business_edit_title'.tr,
+                onBack: () => sendAction(Back()),
+                trailing: Obx(() => InkWell(
+                      onTap: state.isSaving.value ? null : () => _save(state, sendAction),
+                      child: Text(
+                        'business_save'.tr,
+                        style: TextStyle(color: c.accentText, fontSize: 15.sp, fontWeight: FontWeight.w700),
+                      ),
+                    )),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(20.dp, 16.dp, 20.dp, 24.dp),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: ProfileAvatar(
+                        initial: 'A',
+                        gradient: avatarBrownGradient,
+                        shape: ProfileAvatarShape.roundedSquare,
+                        onEdit: () => sendAction(ChangeLogo()),
+                      ),
+                    ),
+                    SizedBox(height: 8.dp),
+                    Center(
+                      child: InkWell(
+                        onTap: () => sendAction(ChangeLogo()),
+                        child: Text(
+                          'business_change_logo'.tr,
+                          style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 22.dp),
+                    AppTextField(
+                      label: 'business_company_name'.tr,
+                      hint: 'business_company_name_hint'.tr,
+                      controller: _nameCtrl,
+                    ),
+                    SizedBox(height: 16.dp),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Obx(() => AppPickerField(
+                                label: 'country'.tr,
+                                hint: 'country'.tr,
+                                value: state.country.value.isEmpty ? null : state.country.value,
+                                icon: Icons.keyboard_arrow_down_rounded,
+                                onTap: () => _pickCountry(context, sendAction),
+                              )),
+                        ),
+                        SizedBox(width: 12.dp),
+                        Expanded(
+                          child: Obx(() => AppPickerField(
+                                label: 'business_role'.tr,
+                                hint: 'business_role'.tr,
+                                value: state.role.value.isEmpty ? null : state.role.value,
+                                icon: Icons.keyboard_arrow_down_rounded,
+                                onTap: () => _pickRole(context, state, sendAction),
+                              )),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.dp),
+                    AppTextField(
+                      label: 'business_website'.tr,
+                      hint: 'anadolucraft.com',
+                      controller: _websiteCtrl,
+                      keyboardType: TextInputType.url,
+                    ),
+                    SizedBox(height: 16.dp),
+                    AppTextField(
+                      label: 'business_description'.tr,
+                      hint: 'business_description_hint'.tr,
+                      controller: _descriptionCtrl,
+                      maxLines: 4,
+                      minLines: 3,
+                      textInputAction: TextInputAction.newline,
+                    ),
+                    SizedBox(height: 20.dp),
+                    Text(
+                      'business_certificates'.tr,
+                      style: TextStyle(color: c.textPrimary, fontSize: 14.sp, fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 10.dp),
+                    Obx(() => Wrap(
+                          spacing: 10.dp,
+                          runSpacing: 10.dp,
+                          children: [
+                            for (final cert in state.certificates)
+                              RemovableChip(label: cert, onRemove: () => sendAction(RemoveCertificate(cert))),
+                            RemovableChip.add(
+                              label: 'business_add_certificate'.tr,
+                              onTap: () => sendAction(AddCertificateRequested()),
+                            ),
+                          ],
+                        )),
+                    SizedBox(height: 20.dp),
+                    Text(
+                      'business_factory_images'.tr,
+                      style: TextStyle(color: c.textPrimary, fontSize: 14.sp, fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 10.dp),
+                    Obx(() => Wrap(
+                          spacing: 10.dp,
+                          runSpacing: 10.dp,
+                          children: [
+                            for (final g in state.factoryImages) MediaTile.image(gradient: g),
+                            MediaTile.upload(
+                              uploadLabel: 'business_upload'.tr,
+                              onTap: () => sendAction(AddFactoryImageRequested()),
+                            ),
+                          ],
+                        )),
+                    SizedBox(height: 28.dp),
+                    Obx(() => PrimaryButton(
+                          text: 'business_save'.tr,
+                          isLoading: state.isSaving.value,
+                          onTap: () => _save(state, sendAction),
+                        )),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _save(EditBusinessInfoState state, void Function(MyAction) sendAction) {
+    sendAction(SaveBusinessInfo(
+      companyName: _nameCtrl.text,
+      website: _websiteCtrl.text,
+      description: _descriptionCtrl.text,
+    ));
+  }
+
+  Future<void> _pickCountry(BuildContext context, void Function(MyAction) sendAction) async {
+    final picked = await showCountryPickerBottomSheet(context);
+    if (picked != null) sendAction(SelectBusinessCountry(picked.name));
+  }
+
+  Future<void> _pickRole(BuildContext context, EditBusinessInfoState state, void Function(MyAction) sendAction) async {
+    final picked = await showSimpleListPickerBottomSheet(
+      context,
+      title: 'business_role'.tr,
+      items: kBusinessRoles,
+      selected: state.role.value,
+    );
+    if (picked != null) sendAction(SelectBusinessRole(picked));
+  }
+}
