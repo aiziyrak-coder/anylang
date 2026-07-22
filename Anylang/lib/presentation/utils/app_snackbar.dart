@@ -9,7 +9,7 @@ void showAppError(Object? message) {
     status: SnackBarStatus.error,
     title: 'error'.tr,
     message: text,
-    duration: Duration(milliseconds: text.length > 80 ? 4500 : 3200),
+    duration: Duration(milliseconds: text.length > 80 ? 3500 : 2500),
   );
 }
 
@@ -20,7 +20,7 @@ void showAppMessage(Object? message) {
     status: SnackBarStatus.success,
     title: 'success'.tr,
     message: text,
-    duration: Duration(milliseconds: text.length > 80 ? 4500 : 3200),
+    duration: const Duration(milliseconds: 1800),
   );
 }
 
@@ -31,7 +31,7 @@ void showAppWarning(Object? message) {
     status: SnackBarStatus.warning,
     title: 'warning'.tr,
     message: text,
-    duration: Duration(milliseconds: text.length > 80 ? 4500 : 3200),
+    duration: const Duration(milliseconds: 2200),
   );
 }
 

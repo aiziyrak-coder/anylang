@@ -9,8 +9,7 @@ import '../ui/search_field.dart';
 import '../ui/theme/colors.dart';
 import '../utils/size_controller.dart';
 
-/// Davlat tanlash — til dialogi bilan bir xil UI.
-/// [title]/[desc] chaqiruvchi joyda dinamik beriladi.
+/// Davlat tanlash — sheet o‘zi joyida qoladi, faqat ro‘yxat scroll bo‘ladi.
 Future<CountryOption?> showCountryPickerBottomSheet(
   BuildContext context, {
   String? title,
@@ -21,6 +20,7 @@ Future<CountryOption?> showCountryPickerBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    enableDrag: false,
     builder: (ctx) => _CountryBottomSheet(
       title: title ?? 'country_picker_title'.tr,
       desc: desc ?? 'country_picker_desc'.tr,
@@ -63,10 +63,8 @@ class _CountryBottomSheetState extends State<_CountryBottomSheet> {
     setState(() {
       _all = items;
       _loading = false;
-      // Tanlangan kod cache'da bo'lmasa ham saqlaymiz
       _selectedCode ??= widget.selectedCode;
     });
-    // Dialog ochiqligida fon yangilanishi — version o'zgarsa UI yangilanadi
     await service.refresh(force: false);
     if (!mounted) return;
     final refreshed = service.cached;
@@ -89,124 +87,147 @@ class _CountryBottomSheetState extends State<_CountryBottomSheet> {
           o.code.toLowerCase().contains(query);
     }).toList();
 
-    final bottomInset =
-        MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom;
+    final viewInsets = MediaQuery.viewInsetsOf(context).bottom;
+    final viewPad = MediaQuery.viewPaddingOf(context).bottom;
+    final maxH = MediaQuery.sizeOf(context).height * 0.86;
 
-    return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.86),
-      decoration: BoxDecoration(
-        gradient: c.backgroundGradient,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28.dp)),
-        border: Border(top: BorderSide(color: c.outline)),
-      ),
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 20.dp),
+    return Padding(
+      padding: EdgeInsets.only(bottom: viewInsets),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxH),
+        decoration: BoxDecoration(
+          gradient: c.backgroundGradient,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28.dp)),
+          border: Border(top: BorderSide(color: c.outline)),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Container(
-                width: 40.dp,
-                height: 4.dp,
-                decoration: BoxDecoration(
-                  color: c.outline,
-                  borderRadius: BorderRadius.circular(2.dp),
-                ),
-              ),
-            ),
-            SizedBox(height: 18.dp),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40.dp,
+                      height: 4.dp,
+                      decoration: BoxDecoration(
+                        color: c.outline,
+                        borderRadius: BorderRadius.circular(2.dp),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 18.dp),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        widget.title,
-                        style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 20.sp,
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: TextStyle(
+                                color: c.textPrimary,
+                                fontSize: 20.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(height: 6.dp),
+                            Text(
+                              widget.desc,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: c.textSecondary,
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 6.dp),
-                      Text(
-                        widget.desc,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: c.textSecondary,
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w500,
+                      SizedBox(width: 12.dp),
+                      IntrinsicWidth(
+                        child: PrimaryButton(
+                          text: 'select_language_confirm'.tr,
+                          enabled: _selectedCode != null,
+                          onTap: () {
+                            final code = _selectedCode;
+                            if (code == null) return;
+                            CountryOption? match;
+                            for (final o in _all) {
+                              if (o.code == code) {
+                                match = o;
+                                break;
+                              }
+                            }
+                            Navigator.pop(
+                              context,
+                              match ??
+                                  CountryOption(
+                                    code: code,
+                                    nameUz: code,
+                                    nameRu: code,
+                                    nameEn: code,
+                                  ),
+                            );
+                          },
                         ),
                       ),
                     ],
                   ),
-                ),
-                SizedBox(width: 12.dp),
-                IntrinsicWidth(
-                  child: PrimaryButton(
-                    text: 'select_language_confirm'.tr,
-                    enabled: _selectedCode != null,
-                    onTap: () {
-                      final code = _selectedCode;
-                      if (code == null) return;
-                      CountryOption? match;
-                      for (final o in _all) {
-                        if (o.code == code) {
-                          match = o;
-                          break;
-                        }
-                      }
-                      Navigator.pop(
-                        context,
-                        match ??
-                            CountryOption(
-                              code: code,
-                              nameUz: code,
-                              nameRu: code,
-                              nameEn: code,
-                            ),
-                      );
-                    },
+                  SizedBox(height: 18.dp),
+                  SearchField(
+                    hint: 'country_search_hint'.tr,
+                    onChanged: (v) => setState(() => _query = v),
                   ),
-                ),
-              ],
+                  SizedBox(height: 10.dp),
+                ],
+              ),
             ),
-            SizedBox(height: 18.dp),
-            SearchField(
-              hint: 'country_search_hint'.tr,
-              onChanged: (v) => setState(() => _query = v),
+            Flexible(
+              child: _loading
+                  ? Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32.dp),
+                      child: const Center(child: CircularProgressIndicator()),
+                    )
+                  : items.isEmpty
+                      ? Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24.dp),
+                          child: Text(
+                            'empty_no_results'.tr,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: c.textSecondary,
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.fromLTRB(
+                            20.dp,
+                            4.dp,
+                            20.dp,
+                            20.dp + viewPad,
+                          ),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => SizedBox(height: 10.dp),
+                          itemBuilder: (_, i) {
+                            final o = items[i];
+                            return CountryListItem(
+                              flagEmoji: o.flagEmoji,
+                              title: o.localizedName,
+                              subtitle: o.code,
+                              selected: o.code == _selectedCode,
+                              onTap: () =>
+                                  setState(() => _selectedCode = o.code),
+                            );
+                          },
+                        ),
             ),
-            SizedBox(height: 14.dp),
-            if (_loading)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 32.dp),
-                child: const Center(child: CircularProgressIndicator()),
-              )
-            else if (items.isEmpty)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 24.dp),
-                child: Text(
-                  'empty_no_results'.tr,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
-                ),
-              )
-            else
-              for (final o in items) ...[
-                CountryListItem(
-                  flagEmoji: o.flagEmoji,
-                  title: o.localizedName,
-                  subtitle: o.code,
-                  selected: o.code == _selectedCode,
-                  onTap: () => setState(() => _selectedCode = o.code),
-                ),
-                if (o != items.last) SizedBox(height: 10.dp),
-              ],
           ],
         ),
       ),

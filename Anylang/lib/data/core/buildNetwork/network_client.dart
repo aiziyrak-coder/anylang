@@ -29,7 +29,7 @@ class NetworkClient {
     required String api,
     Object? data,
     Map<String, dynamic>? queryParameters,
-    SnackNotify notify = SnackNotify.all,
+    SnackNotify notify = SnackNotify.errors,
   }) async {
     return _mutate(
       notify: notify,
@@ -64,7 +64,7 @@ class NetworkClient {
     required String api,
     Object? data,
     Map<String, dynamic>? queryParameters,
-    SnackNotify notify = SnackNotify.all,
+    SnackNotify notify = SnackNotify.errors,
   }) async {
     return _mutate(
       notify: notify,
@@ -80,7 +80,7 @@ class NetworkClient {
     required String api,
     Object? data,
     Map<String, dynamic>? queryParameters,
-    SnackNotify notify = SnackNotify.all,
+    SnackNotify notify = SnackNotify.errors,
   }) async {
     return _mutate(
       notify: notify,
@@ -96,7 +96,7 @@ class NetworkClient {
     required String api,
     Object? data,
     Map<String, dynamic>? queryParameters,
-    SnackNotify notify = SnackNotify.all,
+    SnackNotify notify = SnackNotify.errors,
   }) async {
     return _mutate(
       notify: notify,

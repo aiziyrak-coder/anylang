@@ -233,48 +233,124 @@ class ChatMessageItem extends StatelessWidget {
 
   Widget _image(AppColors c) {
     final url = message.imageUrl;
-    ImageProvider? provider;
-    if (url != null && url.isNotEmpty) {
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        provider = NetworkImage(url);
-      } else {
-        provider = FileImage(File(url));
-      }
-    }
-    return ClipRRect(
-      borderRadius: _bubbleRadius,
-      child: Stack(
-        children: [
-          Ink(
+    final isNet = url != null &&
+        (url.startsWith('http://') || url.startsWith('https://'));
+    final isFile = url != null && url.isNotEmpty && !isNet;
+
+    Widget media;
+    if (isNet) {
+      media = Image.network(
+        url!,
+        width: 220.dp,
+        height: 150.dp,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Container(
             width: 220.dp,
             height: 150.dp,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               gradient: message.imageGradient ?? prodTealGradient,
-              image: provider != null
-                  ? DecorationImage(image: provider, fit: BoxFit.cover)
-                  : null,
             ),
-            child: provider == null
-                ? Icon(
-                    Icons.image_outlined,
-                    size: 36.dp,
-                    color: c.onAccent.withValues(alpha: 0.35),
-                  )
-                : null,
-          ),
-          Positioned(
-            right: 8.dp,
-            bottom: 8.dp,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 3.dp),
-              decoration: BoxDecoration(
-                color: kNavy.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(10.dp),
+            child: SizedBox(
+              width: 22.dp,
+              height: 22.dp,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: c.onAccent.withValues(alpha: 0.7),
               ),
-              child: _meta(c.copyWith(onAccent: kAvatarFg, textFaint: kAvatarFg)),
             ),
+          );
+        },
+        errorBuilder: (_, __, ___) => Container(
+          width: 220.dp,
+          height: 150.dp,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: message.imageGradient ?? prodTealGradient,
           ),
-        ],
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 36.dp,
+            color: c.onAccent.withValues(alpha: 0.45),
+          ),
+        ),
+      );
+    } else if (isFile) {
+      media = Image.file(
+        File(url!),
+        width: 220.dp,
+        height: 150.dp,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: 220.dp,
+          height: 150.dp,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: message.imageGradient ?? prodTealGradient,
+          ),
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 36.dp,
+            color: c.onAccent.withValues(alpha: 0.45),
+          ),
+        ),
+      );
+    } else {
+      media = Container(
+        width: 220.dp,
+        height: 150.dp,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          gradient: message.imageGradient ?? prodTealGradient,
+        ),
+        child: Icon(
+          Icons.image_outlined,
+          size: 36.dp,
+          color: c.onAccent.withValues(alpha: 0.35),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: (isNet || isFile)
+          ? () => _openImageViewer(url!)
+          : null,
+      child: ClipRRect(
+        borderRadius: _bubbleRadius,
+        child: Stack(
+          children: [
+            media,
+            Positioned(
+              right: 8.dp,
+              bottom: 8.dp,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 3.dp),
+                decoration: BoxDecoration(
+                  color: kNavy.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(10.dp),
+                ),
+                child: _meta(
+                  c.copyWith(onAccent: kAvatarFg, textFaint: kAvatarFg),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openImageViewer(String url) {
+    final ctx = Get.context;
+    if (ctx == null) return;
+    Navigator.of(ctx).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withValues(alpha: 0.92),
+        pageBuilder: (_, __, ___) => _ChatImageViewer(url: url),
       ),
     );
   }
@@ -632,6 +708,46 @@ class ChatMessageItem extends StatelessWidget {
           SizedBox(height: 6.dp),
           Align(alignment: Alignment.centerRight, child: _meta(c)),
         ],
+      ),
+    );
+  }
+}
+
+class _ChatImageViewer extends StatelessWidget {
+  final String url;
+
+  const _ChatImageViewer({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    final isNet = url.startsWith('http://') || url.startsWith('https://');
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4,
+                  child: isNet
+                      ? Image.network(url, fit: BoxFit.contain)
+                      : Image.file(File(url), fit: BoxFit.contain),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

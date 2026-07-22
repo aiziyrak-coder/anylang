@@ -28,7 +28,7 @@ class MySnackBar {
     final now = DateTime.now();
     if (_lastMessage == text &&
         _lastAt != null &&
-        now.difference(_lastAt!) < const Duration(milliseconds: 800)) {
+        now.difference(_lastAt!) < const Duration(milliseconds: 1600)) {
       return;
     }
     _lastMessage = text;
