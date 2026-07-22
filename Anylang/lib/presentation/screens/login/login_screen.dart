@@ -10,6 +10,7 @@ import '../forgot_password/forgot_password_screen.dart';
 import '../main/main_screen.dart';
 import '../register/register_screen.dart';
 import '../restore_account/restore_account_screen.dart';
+import '../verify/verify_payload.dart';
 import '../verify/verify_screen.dart';
 import 'login_action.dart';
 import 'login_content.dart';
@@ -46,7 +47,10 @@ class LoginScreen extends Screen<LoginState, void> {
           final body = outcome.body;
           if (body != null && body['error_code'] == 'ACCOUNT_NOT_VERIFIED') {
             showAppMessage('verify_required'.tr);
-            navigate(VerifyScreen(), payload: a.email.trim().toLowerCase());
+            navigate(
+              VerifyScreen(),
+              payload: VerifyPayload(email: a.email.trim().toLowerCase()),
+            );
             return;
           }
 

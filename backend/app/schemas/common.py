@@ -11,6 +11,7 @@ class MessageResponse(BaseModel):
 
 class ResendMessageResponse(MessageResponse):
     resend_after_seconds: int = Field(ge=0)
+    debug_otp: str | None = None
 
 
 class PaginationOut(BaseModel, Generic[T]):

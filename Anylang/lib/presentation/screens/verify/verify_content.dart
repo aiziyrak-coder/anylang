@@ -79,9 +79,51 @@ class VerifyContent extends ScreenContent<VerifyState> {
                     style: TextStyle(color: c.textSecondary, fontSize: 14.sp, height: 1.4),
                   )),
               SizedBox(height: 28.dp),
-              OtpField(
-                length: 6,
-                onChanged: (v) => sendAction(CodeChanged(v)),
+              Obx(() {
+                final otp = state.debugOtp.value;
+                if (otp.isEmpty) return const SizedBox.shrink();
+                return Container(
+                  margin: EdgeInsets.only(bottom: 16.dp),
+                  padding: EdgeInsets.all(14.dp),
+                  decoration: BoxDecoration(
+                    color: c.accentSoft,
+                    borderRadius: BorderRadius.circular(14.dp),
+                    border: Border.all(color: c.accent),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'register_otp_hint'.tr,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: c.textSecondary,
+                          fontSize: 13.sp,
+                        ),
+                      ),
+                      SizedBox(height: 6.dp),
+                      Text(
+                        otp,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 28.sp,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 6,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              Obx(
+                () => OtpField(
+                  key: ValueKey(state.debugOtp.value),
+                  length: 6,
+                  initialValue: state.code.value.isNotEmpty
+                      ? state.code.value
+                      : state.debugOtp.value,
+                  onChanged: (v) => sendAction(CodeChanged(v)),
+                ),
               ),
               SizedBox(height: 24.dp),
               Obx(() => PrimaryButton(

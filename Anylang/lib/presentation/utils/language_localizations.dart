@@ -106,6 +106,9 @@ class LanguageLocalizations extends Translations {
       // Register
       'register_title': 'Ro‘yxatdan o‘tish',
       'register_subtitle': 'Yangi hisob yarating',
+      'register_otp_dialog':
+          'Emailga kod yuborilmadi. Tasdiqlash kodingiz:\n\n@code\n\nKeyingi oynada shu kodni kiriting.',
+      'register_otp_hint': 'Vaqtincha tasdiqlash kodi (email sozlanmagan)',
       'full_name': 'To‘liq ism',
       'full_name_hint': 'Dilnoza Karimova',
       'birth_date': 'Tug‘ilgan sana',
@@ -455,6 +458,9 @@ class LanguageLocalizations extends Translations {
 
       'register_title': 'Регистрация',
       'register_subtitle': 'Создайте новый аккаунт',
+      'register_otp_dialog':
+          'Код на email не отправлен. Ваш код подтверждения:\n\n@code\n\nВведите его на следующем экране.',
+      'register_otp_hint': 'Временный код (email не настроен)',
       'full_name': 'Полное имя',
       'full_name_hint': 'Дилноза Каримова',
       'birth_date': 'Дата рождения',
@@ -803,6 +809,9 @@ class LanguageLocalizations extends Translations {
 
       'register_title': 'Sign up',
       'register_subtitle': 'Create a new account',
+      'register_otp_dialog':
+          'Email was not sent. Your verification code:\n\n@code\n\nEnter it on the next screen.',
+      'register_otp_hint': 'Temporary code (email not configured)',
       'full_name': 'Full name',
       'full_name_hint': 'Dilnoza Karimova',
       'birth_date': 'Date of birth',

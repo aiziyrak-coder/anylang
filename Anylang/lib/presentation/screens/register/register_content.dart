@@ -118,7 +118,6 @@ class RegisterContent extends ScreenContent<RegisterState> {
               Obx(() => PrimaryButton(
                     text: 'register_title'.tr,
                     isLoading: state.isLoading.value,
-                    enabled: state.termsAccepted.value,
                     onTap: () => sendAction(
                       RegisterSubmit(_nameCtrl.text, _emailCtrl.text, _passCtrl.text),
                     ),

@@ -192,7 +192,7 @@ async def resend_verification(
             "resend_after_seconds": RESEND_COOLDOWN_SECONDS,
         }
 
-    _, resend_after, _ = await create_and_send_otp(
+    code, resend_after, emailed = await create_and_send_otp(
         db,
         redis,
         email=email_norm,
@@ -200,7 +200,14 @@ async def resend_verification(
         app_language=app_language,
         enforce_cooldown=True,
     )
-    return {"message": "Kod qayta yuborildi", "resend_after_seconds": resend_after}
+    out: dict[str, Any] = {
+        "message": "Kod qayta yuborildi",
+        "resend_after_seconds": resend_after,
+    }
+    settings = get_settings()
+    if settings.allow_otp_in_response and ((not emailed) or settings.debug):
+        out["debug_otp"] = code
+    return out
 
 
 async def login(

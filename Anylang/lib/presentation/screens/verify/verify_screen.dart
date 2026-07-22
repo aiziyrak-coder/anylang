@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../../data/core/mappers.dart';
 import '../../../data/network/auth_repository.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
@@ -8,14 +9,23 @@ import '../../utils/screen_options/screen.dart';
 import '../main/main_screen.dart';
 import 'verify_action.dart';
 import 'verify_content.dart';
+import 'verify_payload.dart';
 import 'verify_state.dart';
 
-class VerifyScreen extends Screen<VerifyState, String> {
+class VerifyScreen extends Screen<VerifyState, Object?> {
   VerifyScreen() : super(mobileContent: VerifyContent());
 
   @override
-  void initState(String? payload) {
-    state.email.value = payload ?? '';
+  void initState(Object? payload) {
+    if (payload is VerifyPayload) {
+      state.email.value = payload.email;
+      state.debugOtp.value = payload.debugOtp ?? '';
+      if (payload.debugOtp != null && payload.debugOtp!.length == 6) {
+        state.code.value = payload.debugOtp!;
+      }
+    } else if (payload is String) {
+      state.email.value = payload;
+    }
   }
 
   @override
@@ -29,10 +39,20 @@ class VerifyScreen extends Screen<VerifyState, String> {
         try {
           final repo = Get.find<AuthRepository>();
           final result = await repo.resendVerification(email: state.email.value);
-          result.when(
-            success: (_) => showAppMessage('code_sent'.tr),
-            failure: showAppError,
-          );
+          final data = result.dataOrNull;
+          if (data == null) {
+            showAppError(result.errorOrNull);
+            return;
+          }
+          final map = asMap(data);
+          final otp = map?['debug_otp']?.toString();
+          if (otp != null && otp.isNotEmpty) {
+            state.debugOtp.value = otp;
+            state.code.value = otp;
+            showAppMessage('Tasdiqlash kodi: $otp');
+          } else {
+            showAppMessage('code_sent'.tr);
+          }
         } finally {
           state.isLoading.value = false;
         }

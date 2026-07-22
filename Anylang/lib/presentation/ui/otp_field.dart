@@ -7,12 +7,14 @@ import '../utils/size_controller.dart';
 /// Ichkarida bitta yashirin `TextField`, kataklar shu qiymatni aks ettiradi.
 class OtpField extends StatefulWidget {
   final int length;
+  final String? initialValue;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onCompleted;
 
   const OtpField({
     super.key,
     this.length = 6,
+    this.initialValue,
     this.onChanged,
     this.onCompleted,
   });
@@ -22,7 +24,7 @@ class OtpField extends StatefulWidget {
 }
 
 class _OtpFieldState extends State<OtpField> {
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller;
   final FocusNode _focus = FocusNode();
 
   String get _value => _controller.text;
@@ -30,8 +32,35 @@ class _OtpFieldState extends State<OtpField> {
   @override
   void initState() {
     super.initState();
+    final initial = (widget.initialValue ?? '').replaceAll(RegExp(r'\D'), '');
+    _controller = TextEditingController(
+      text: initial.length > widget.length
+          ? initial.substring(0, widget.length)
+          : initial,
+    );
     _controller.addListener(_onChanged);
     _focus.addListener(_onFocusChange);
+    if (_controller.text.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onChanged?.call(_controller.text);
+        if (_controller.text.length == widget.length) {
+          widget.onCompleted?.call(_controller.text);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant OtpField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = (widget.initialValue ?? '').replaceAll(RegExp(r'\D'), '');
+    final clipped = next.length > widget.length
+        ? next.substring(0, widget.length)
+        : next;
+    if (clipped.isNotEmpty && clipped != _controller.text) {
+      _controller.text = clipped;
+      _controller.selection = TextSelection.collapsed(offset: clipped.length);
+    }
   }
 
   void _onFocusChange() {
