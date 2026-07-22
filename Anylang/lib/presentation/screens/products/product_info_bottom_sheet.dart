@@ -30,14 +30,8 @@ Future<void> showProductInfoBottomSheet(
   );
 }
 
-// Demo galereya (rasm o'rniga gradientlar) — birinchisi mahsulotning o'zi.
-List<LinearGradient> _gallery(Product p) => [p.tileGradient, prodBlueGradient, prodPurpleGradient];
-
-// Mock atribut/tavsif/biznes — keyinchalik backenddan.
-const List<String> _attributes = ['Material: 100% jun', 'Rang: Bej', 'Uzunlik: 180 sm'];
-const String _description =
-    'Anadolu tog‘larida qo‘lda to‘qilgan tabiiy jun sharf. Yumshoq, issiq va nafas '
-    'oladi. Har bir dona alohida ustalar tomonidan tayyorlanadi — naqshlar takrorlanmas.';
+// Demo galereya — rasm URL bo'lmasa gradient.
+List<LinearGradient> _gallery(Product p) => [p.tileGradient];
 
 class _ProductInfoSheet extends StatefulWidget {
   final Product product;
@@ -53,16 +47,62 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   late bool _fav;
   bool _favLoading = false;
   bool _contacting = false;
+  late Product _product;
+  String _description = '';
+  List<String> _attributes = const [];
+  String? _sellerName;
+  String? _sellerRole;
+  String? _sellerAvatar;
 
   @override
   void initState() {
     super.initState();
+    _product = widget.product;
     _fav = widget.product.isFavorited;
+    _description = widget.product.subtitle ?? '';
+    _loadDetail();
+  }
+
+  Future<void> _loadDetail() async {
+    final result = await Get.find<ProductsRepository>().detail(_product.id);
+    final map = asMap(result.dataOrNull);
+    if (map != null && mounted) {
+      setState(() {
+        _product = Product.fromApi(map);
+        _description = (map['description'] as String?)?.trim().isNotEmpty == true
+            ? map['description'] as String
+            : (_product.subtitle ?? '');
+        final attrs = map['attributes'];
+        if (attrs is List) {
+          _attributes = attrs.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+        }
+        _fav = _product.isFavorited;
+      });
+    }
+    final sellerId = _product.sellerId;
+    if (sellerId > 0) {
+      final profile = await Get.find<ProfileRepository>().getPublicUser(sellerId);
+      final pmap = asMap(profile.dataOrNull);
+      if (pmap != null && mounted) {
+        setState(() {
+          _sellerName = (pmap['full_name'] as String?) ??
+              (pmap['name'] as String?) ??
+              'Seller';
+          final biz = pmap['business'] as Map?;
+          _sellerRole = biz?['business_role']?.toString() ??
+              pmap['subtitle_role']?.toString() ??
+              '';
+          _sellerAvatar = pmap['is_business'] == true
+              ? (biz?['logo_url'] as String?)
+              : (pmap['avatar_url'] as String?);
+        });
+      }
+    }
   }
 
   Future<void> _contactSeller() async {
     if (_contacting) return;
-    final sellerId = widget.product.sellerId;
+    final sellerId = _product.sellerId;
     if (sellerId <= 0) {
       showAppError('product_contact_unavailable'.tr);
       return;
@@ -125,7 +165,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   }
 
   Future<void> _toggleFavorite() async {
-    if (_favLoading || widget.product.id <= 0) return;
+    if (_favLoading || _product.id <= 0) return;
     final wasFav = _fav;
     setState(() {
       _fav = !wasFav;
@@ -133,8 +173,8 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
     });
     final repo = Get.find<ProductsRepository>();
     final result = wasFav
-        ? await repo.unfavorite(widget.product.id)
-        : await repo.favorite(widget.product.id);
+        ? await repo.unfavorite(_product.id)
+        : await repo.favorite(_product.id);
     if (!mounted) return;
     result.when(
       success: (_) {},
@@ -149,7 +189,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final gallery = _gallery(widget.product);
+    final gallery = _gallery(_product);
     final maxH = MediaQuery.of(context).size.height * 0.92;
 
     return Container(
@@ -183,13 +223,17 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                     _thumbnails(c, gallery),
                     SizedBox(height: 18.dp),
                     _titlePrice(c),
-                    SizedBox(height: 12.dp),
-                    _chips(c),
-                    SizedBox(height: 14.dp),
-                    Text(
-                      _description,
-                      style: TextStyle(color: c.textSecondary, fontSize: 14.sp, height: 1.5),
-                    ),
+                    if (_attributes.isNotEmpty) ...[
+                      SizedBox(height: 12.dp),
+                      _chips(c),
+                    ],
+                    if (_description.isNotEmpty) ...[
+                      SizedBox(height: 14.dp),
+                      Text(
+                        _description,
+                        style: TextStyle(color: c.textSecondary, fontSize: 14.sp, height: 1.5),
+                      ),
+                    ],
                     SizedBox(height: 16.dp),
                     _businessCard(c),
                   ],
@@ -204,16 +248,35 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   }
 
   Widget _image(AppColors c, LinearGradient g) {
+    final url = _product.imageUrl?.trim();
     return AspectRatio(
       aspectRatio: 364 / 210,
-      child: DecoratedBox(
-        decoration: BoxDecoration(gradient: g, borderRadius: BorderRadius.circular(18.dp)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18.dp),
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            Center(
-              child: SvgPicture.asset('assets/icons/ic_prod_image.svg', width: 46.dp, height: 46.dp),
-            ),
-            // Ko'rishlar belgisi
+            DecoratedBox(decoration: BoxDecoration(gradient: g)),
+            if (url != null && url.isNotEmpty)
+              Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(
+                  child: SvgPicture.asset(
+                    'assets/icons/ic_prod_image.svg',
+                    width: 46.dp,
+                    height: 46.dp,
+                  ),
+                ),
+              )
+            else
+              Center(
+                child: SvgPicture.asset(
+                  'assets/icons/ic_prod_image.svg',
+                  width: 46.dp,
+                  height: 46.dp,
+                ),
+              ),
             Positioned(
               top: 12.dp,
               right: 12.dp,
@@ -234,33 +297,11 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                     ),
                     SizedBox(width: 5.dp),
                     Text(
-                      '${widget.product.views} ${'products_views'.tr}',
+                      '${_product.views} ${'products_views'.tr}',
                       style: TextStyle(color: kAvatarFg, fontSize: 12.sp),
                     ),
                   ],
                 ),
-              ),
-            ),
-            // Sahifa nuqtalari
-            Positioned(
-              bottom: 10.dp,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(_gallery(widget.product).length, (i) {
-                  final active = i == _selected;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: EdgeInsets.symmetric(horizontal: 3.dp),
-                    width: active ? 18.dp : 6.dp,
-                    height: 6.dp,
-                    decoration: BoxDecoration(
-                      color: active ? c.accent : Colors.white.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(99.dp),
-                    ),
-                  );
-                }),
               ),
             ),
           ],
@@ -304,13 +345,13 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       children: [
         Expanded(
           child: Text(
-            widget.product.name,
+            _product.name,
             style: TextStyle(color: c.textPrimary, fontSize: 20.sp, fontWeight: FontWeight.w700),
           ),
         ),
         SizedBox(width: 12.dp),
         Text(
-          widget.product.price,
+          _product.price,
           style: TextStyle(color: c.textPrimary, fontSize: 22.sp, fontWeight: FontWeight.w700),
         ),
       ],
@@ -337,14 +378,18 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   }
 
   Widget _businessCard(AppColors c) {
+    final name = _sellerName ?? 'Seller #${_product.sellerId}';
+    final role = _sellerRole ?? '';
+    final initial = initialsOf(name);
+    final gradient = avatarGradientFor(_product.sellerId);
     return Material(
       color: c.surface,
       borderRadius: BorderRadius.circular(16.dp),
       child: InkWell(
         borderRadius: BorderRadius.circular(16.dp),
         onTap: () {
-          Navigator.pop(context); // sheet yopiladi
-          widget.onOpenBusiness(); // biznes profiliga o'tiladi (S12)
+          Navigator.pop(context);
+          widget.onOpenBusiness();
         },
         child: Ink(
           decoration: BoxDecoration(
@@ -358,49 +403,53 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                 width: 44.dp,
                 height: 44.dp,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(shape: BoxShape.circle, gradient: avatarBrownGradient),
-                child: Text(
-                  'A',
-                  style: TextStyle(color: kLime, fontSize: 16.sp, fontWeight: FontWeight.w700),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: gradient,
+                  image: _sellerAvatar != null && _sellerAvatar!.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(_sellerAvatar!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
+                child: _sellerAvatar == null || _sellerAvatar!.isEmpty
+                    ? Text(
+                        initial,
+                        style: TextStyle(
+                          color: kLime,
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    : null,
               ),
               SizedBox(width: 12.dp),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Anadolu Craft Co.',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: c.textPrimary, fontSize: 15.sp, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        SizedBox(width: 5.dp),
-                        SvgPicture.asset('assets/icons/ic_verified.svg', width: 15.dp, height: 15.dp),
-                      ],
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    SizedBox(height: 2.dp),
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(3.dp),
-                          child: Image.asset('assets/images/flag_tr.png', width: 18.dp, height: 13.dp, fit: BoxFit.cover),
-                        ),
-                        SizedBox(width: 6.dp),
-                        Text(
-                          'Turkiya · Ishlab chiqaruvchi',
-                          style: TextStyle(color: c.textFaint, fontSize: 12.sp),
-                        ),
-                      ],
-                    ),
+                    if (role.isNotEmpty)
+                      Text(
+                        role,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                      ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: c.textFaint, size: 22.dp),
+              Icon(Icons.chevron_right_rounded, color: c.textFaint),
             ],
           ),
         ),

@@ -18,6 +18,7 @@ class UserProfilePayload {
   final int? completeness;
   final List<String> certificates;
   final int listings;
+  final String? avatarUrl;
 
   const UserProfilePayload({
     required this.business,
@@ -35,15 +36,21 @@ class UserProfilePayload {
     this.completeness,
     this.certificates = const [],
     this.listings = 0,
+    this.avatarUrl,
   });
 
   factory UserProfilePayload.fromApi(Map<String, dynamic> json) {
     final id = (json['id'] as num?)?.toInt() ?? 0;
     final isBusiness = json['is_business'] == true;
-    final name = (json['name'] as String?) ?? 'User';
+    final name = (json['name'] as String?) ??
+        (json['full_name'] as String?) ??
+        'User';
     final country = (json['country'] as String?) ?? '';
     final biz = json['business'] as Map?;
     final number = json['number']?.toString() ?? '';
+    final avatar = isBusiness
+        ? (biz?['logo_url'] as String?)
+        : (json['avatar_url'] as String?);
     return UserProfilePayload(
       id: id,
       business: isBusiness,
@@ -66,6 +73,7 @@ class UserProfilePayload {
           : 0,
       flagAsset: flagAssetForCountry(country),
       verified: json['verified_badge'] == true,
+      avatarUrl: avatar,
     );
   }
 }

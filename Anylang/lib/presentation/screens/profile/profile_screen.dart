@@ -9,6 +9,7 @@ import '../../utils/screen_options/screen.dart';
 import '../add_product/add_product_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
 import '../products/product.dart';
+import '../products/product_info_bottom_sheet.dart';
 import '../profile_edit/profile_edit_screen.dart';
 import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
@@ -68,9 +69,11 @@ class ProfileScreen extends Screen<ProfileState, void> {
   Future<void> actionHandler(ProfileState state, MyAction action) async {
     switch (action) {
       case OpenSubscription _:
-        navigate(SubscriptionScreen());
+        await navigate(SubscriptionScreen());
+        await _load();
       case OpenSettings _:
-        navigate(SettingsScreen());
+        await navigate(SettingsScreen());
+        await _load();
       case EditPersonalProfile _:
         await navigate(ProfileEditScreen(), payload: state.account.value);
         await _load();
@@ -85,7 +88,24 @@ class ProfileScreen extends Screen<ProfileState, void> {
         final n = state.account.value?.listings.length ?? 0;
         showAppMessage(n == 0 ? 'Hali e’lon yo‘q' : '$n ta e’lon yangilandi');
       case OpenOwnListing a:
-        showAppMessage(a.listing.name);
+        final id = a.listing.id;
+        if (id <= 0) {
+          showAppMessage(a.listing.name);
+          return;
+        }
+        final result = await Get.find<ProductsRepository>().detail(id);
+        final map = asMap(result.dataOrNull);
+        if (map == null) {
+          showAppError(result.errorOrNull ?? 'Mahsulot topilmadi');
+          return;
+        }
+        final product = Product.fromApi(map);
+        await showProductInfoBottomSheet(
+          context,
+          product,
+          onOpenBusiness: () {},
+        );
+        await _loadListings();
     }
   }
 }

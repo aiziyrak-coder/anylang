@@ -122,6 +122,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
                           subtitle: p.subtitle,
                           price: p.price,
                           views: p.views,
+                          imageUrl: p.imageUrl,
                           onTap: () => sendAction(OpenProduct(p)),
                         );
                       },

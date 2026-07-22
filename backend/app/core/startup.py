@@ -31,8 +31,10 @@ def validate_settings(settings: Settings) -> None:
         if len(settings.secret_key) < 48:
             errors.append("SECRET_KEY must be at least 48 characters in production")
         if not settings.google_client_id_list:
-            # Google login will be disabled; warn but don't fail if unused
-            logger.warning("GOOGLE_CLIENT_IDS empty — Google Sign-In disabled in production")
+            # Tokens rejected in auth.py when production; login button should stay disabled.
+            logger.warning(
+                "GOOGLE_CLIENT_IDS empty — Google Sign-In will reject tokens in production"
+            )
         if settings.payment_provider == "mock" and not settings.allow_mock_payments:
             errors.append(
                 "PAYMENT_PROVIDER=mock is forbidden in production "

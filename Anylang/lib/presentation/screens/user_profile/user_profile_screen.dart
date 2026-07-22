@@ -3,11 +3,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/core/mappers.dart';
 import '../../../data/network/chat_repository.dart';
+import '../../../data/network/products_repository.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
+import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
 import 'user_profile_action.dart';
 import 'user_profile_content.dart';
@@ -20,6 +22,21 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
   @override
   void initState(UserProfilePayload? payload) {
     state.data = payload;
+    _loadListings();
+  }
+
+  Future<void> _loadListings() async {
+    final data = state.data;
+    if (data == null || data.id <= 0 || !data.business) return;
+    state.listingsLoading.value = true;
+    final result =
+        await Get.find<ProductsRepository>().listByUser(data.id, limit: 20);
+    final items = asList(result.dataOrNull)
+        .whereType<Map>()
+        .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))
+        .toList();
+    state.listings.assignAll(items);
+    state.listingsLoading.value = false;
   }
 
   @override
@@ -43,13 +60,21 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
                 name: data.name,
                 initial: data.initial,
                 avatarGradient: data.avatarGradient,
+                avatarUrl: data.avatarUrl,
               ),
             );
           },
           failure: showAppError,
         );
       case CallUser _:
-        break;
+        final phone = state.data?.phone.replaceAll(RegExp(r'\s+'), '') ?? '';
+        if (phone.isEmpty) {
+          showAppMessage('call_unavailable'.tr);
+          return;
+        }
+        final uri = Uri(scheme: 'tel', path: phone);
+        final ok = await launchUrl(uri);
+        if (!ok) showAppError('call_unavailable'.tr);
       case OpenWebsite _:
         final url = state.data?.website;
         if (url == null || url.isEmpty) return;

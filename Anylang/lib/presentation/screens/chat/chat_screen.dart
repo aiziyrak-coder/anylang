@@ -515,9 +515,24 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           danger: true,
         );
         if (!ok) return;
+        final chatId = state.chatId;
+        if (chatId > 0) {
+          final hide = await Get.find<ChatRepository>().hideChat(chatId);
+          if (hide.errorOrNull != null) {
+            showAppError(hide.errorOrNull);
+            return;
+          }
+        }
         await _clearHistory(showToast: false);
-        await Get.find<VoiceRecorderService>().cancel();
-        await Get.find<VoicePlayerService>().stop(save: true);
+        if (Get.isRegistered<MessagesState>()) {
+          Get.find<MessagesState>().conversations.removeWhere((c) => c.id == chatId);
+        }
+        if (Get.isRegistered<VoiceRecorderService>()) {
+          await Get.find<VoiceRecorderService>().cancel();
+        }
+        if (Get.isRegistered<VoicePlayerService>()) {
+          await Get.find<VoicePlayerService>().stop(save: true);
+        }
         popBackNavigate();
         _toast('chat_deleted'.tr);
 

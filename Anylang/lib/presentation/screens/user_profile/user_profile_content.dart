@@ -14,7 +14,6 @@ import '../../ui/theme/gradients.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
-import '../products/product.dart';
 import 'user_profile_action.dart';
 import 'user_profile_payload.dart';
 import 'user_profile_state.dart';
@@ -68,7 +67,7 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
                             SizedBox(height: 20.dp),
                             _sectionTitle(c, '${'profile_listings'.tr} · ${d.listings}'),
                             SizedBox(height: 12.dp),
-                            _listings(sendAction),
+                            _listings(state, sendAction),
                           ],
                         ],
                       ),
@@ -85,6 +84,7 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
       initial: d.initial,
       gradient: d.avatarGradient,
       shape: d.business ? ProfileAvatarShape.roundedSquare : ProfileAvatarShape.circle,
+      imageUrl: d.avatarUrl,
     );
   }
 
@@ -307,34 +307,43 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
     );
   }
 
-  Widget _listings(void Function(MyAction) sendAction) {
-    final items = <Product>[];
-    if (items.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12.dp,
-        mainAxisSpacing: 12.dp,
-        childAspectRatio: 0.9,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final p = items[i];
-        return ProductGridCard(
-          iconAsset: p.iconAsset,
-          tileGradient: p.tileGradient,
-          name: p.name,
-          subtitle: p.subtitle,
-          price: p.price,
-          views: p.views,
-          onTap: () => sendAction(OpenListing(p)),
+  Widget _listings(UserProfileState state, void Function(MyAction) sendAction) {
+    return Obx(() {
+      final items = state.listings.toList();
+      if (state.listingsLoading.value && items.isEmpty) {
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: 12.dp),
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         );
-      },
-    );
+      }
+      if (items.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12.dp,
+          mainAxisSpacing: 12.dp,
+          childAspectRatio: 0.9,
+        ),
+        itemCount: items.length,
+        itemBuilder: (_, i) {
+          final p = items[i];
+          return ProductGridCard(
+            iconAsset: p.iconAsset,
+            tileGradient: p.tileGradient,
+            name: p.name,
+            subtitle: p.subtitle,
+            price: p.price,
+            views: p.views,
+            imageUrl: p.imageUrl,
+            onTap: () => sendAction(OpenListing(p)),
+          );
+        },
+      );
+    });
   }
 }

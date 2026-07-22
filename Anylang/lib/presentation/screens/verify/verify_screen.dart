@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
@@ -46,7 +47,7 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
           }
           final map = asMap(data);
           final otp = map?['debug_otp']?.toString();
-          if (otp != null && otp.isNotEmpty) {
+          if (kDebugMode && otp != null && otp.isNotEmpty) {
             state.debugOtp.value = otp;
             state.code.value = otp;
             showAppMessage('Tasdiqlash kodi: $otp');

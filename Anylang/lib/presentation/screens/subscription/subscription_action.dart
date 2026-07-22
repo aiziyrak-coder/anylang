@@ -13,3 +13,5 @@ class SelectPlan extends SubscriptionAction {
   final SubscriptionPlan plan;
   SelectPlan(this.plan);
 }
+
+class CancelSubscription extends SubscriptionAction {}

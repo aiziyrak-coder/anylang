@@ -24,3 +24,9 @@ class RefreshFriends extends FriendsAction {}
 
 /// Kiruvchi do'stlik so'rovlarini ochish.
 class OpenFriendRequests extends FriendsAction {}
+
+/// Do'stni o'chirish.
+class RemoveFriend extends FriendsAction {
+  final Friend friend;
+  RemoveFriend(this.friend);
+}

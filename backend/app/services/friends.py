@@ -377,7 +377,11 @@ async def cancel_friend_request(
             status_code=403,
         )
 
-    await db.delete(friendship)
+    # Soft-cancel: keep decline_count / last_declined_at so cooldown cannot be bypassed.
+    friendship.status = "declined"
+    friendship.accepted_at = None
+    if friendship.last_declined_at is None:
+        friendship.last_declined_at = datetime.now(UTC)
     await db.flush()
     return {"id": request_id, "status": "none"}
 

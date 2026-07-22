@@ -65,6 +65,14 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                               _planCard(plan, state.billingCycle.value, sendAction),
                               SizedBox(height: 16.dp),
                             ],
+                            SizedBox(height: 8.dp),
+                            TextButton(
+                              onPressed: () => sendAction(CancelSubscription()),
+                              child: Text(
+                                'subscription_cancel'.tr,
+                                style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
+                              ),
+                            ),
                           ],
                         )),
                   ],

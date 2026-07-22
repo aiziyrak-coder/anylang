@@ -131,7 +131,7 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
             success: (_) {
               popBackNavigate();
             },
-            failure: (_) {},
+            failure: showAppError,
           );
         } finally {
           state.isSaving.value = false;

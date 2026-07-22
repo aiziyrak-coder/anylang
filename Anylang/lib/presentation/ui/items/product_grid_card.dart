@@ -12,6 +12,7 @@ class ProductGridCard extends StatelessWidget {
   final String? subtitle;
   final String price;
   final String views;
+  final String? imageUrl;
   final VoidCallback onTap;
 
   const ProductGridCard({
@@ -23,12 +24,14 @@ class ProductGridCard extends StatelessWidget {
     required this.views,
     required this.onTap,
     this.subtitle,
+    this.imageUrl,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
     final radius = BorderRadius.circular(16.dp);
+    final url = imageUrl?.trim();
 
     return Material(
       color: c.surface,
@@ -39,14 +42,21 @@ class ProductGridCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Rasm (gradient) + placeholder ikon — mavjud balandlikni to'ldiradi.
             Expanded(
               child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Positioned.fill(
-                    child: DecoratedBox(decoration: BoxDecoration(gradient: tileGradient)),
-                  ),
-                  Center(child: SvgPicture.asset(iconAsset, width: 28.dp, height: 28.dp)),
+                  DecoratedBox(decoration: BoxDecoration(gradient: tileGradient)),
+                  if (url != null && url.isNotEmpty)
+                    Image.network(
+                      url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(
+                        child: SvgPicture.asset(iconAsset, width: 28.dp, height: 28.dp),
+                      ),
+                    )
+                  else
+                    Center(child: SvgPicture.asset(iconAsset, width: 28.dp, height: 28.dp)),
                 ],
               ),
             ),

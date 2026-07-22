@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
@@ -142,6 +143,35 @@ class FriendsScreen extends Screen<FriendsState, void> {
           payload: const AddFriendPayload(mode: AddFriendMode.friends),
         );
         await _load();
+      case RemoveFriend a:
+        final ok = await Get.dialog<bool>(
+          AlertDialog(
+            title: Text('friends_remove_title'.tr),
+            content: Text(a.friend.name),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('settings_cancel'.tr),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text(
+                  'friends_remove'.tr,
+                  style: const TextStyle(color: Color(0xFFB42318)),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (ok != true) return;
+        final r = await Get.find<FriendsRepository>().removeFriend(a.friend.id);
+        r.when(
+          success: (_) {
+            state.friends.removeWhere((f) => f.id == a.friend.id);
+            showAppMessage('friends_removed'.tr);
+          },
+          failure: showAppError,
+        );
     }
   }
 }

@@ -75,6 +75,21 @@ async def search_chats(
     return ChatSearchOut.model_validate(data)
 
 
+@router.post("/{chat_id}/hide", status_code=status.HTTP_200_OK)
+async def hide_chat(
+    chat_id: int,
+    db: DbSession,
+    redis: RedisClient,
+    current_user: CurrentUser,
+) -> dict:
+    return await chats_service.hide_chat(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        redis=redis,
+    )
+
+
 @router.get("/{chat_id}/messages", response_model=MessageListOut)
 async def list_chat_messages(
     chat_id: int,

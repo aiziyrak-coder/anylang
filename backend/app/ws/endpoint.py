@@ -142,6 +142,16 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(def
                     continue
                 is_typing = bool(data.get("is_typing"))
 
+                # Flood control: at most one typing event per ~400ms per chat.
+                allowed = await redis.set(
+                    f"ws:typing:{user_id}:{chat_id}",
+                    "1",
+                    nx=True,
+                    px=400,
+                )
+                if not allowed:
+                    continue
+
                 factory = get_session_factory()
                 async with factory() as db:
                     result = await db.execute(select(Chat).where(Chat.id == chat_id))

@@ -157,17 +157,20 @@ class FriendsContent extends ScreenContent<FriendsState> {
   }
 
   Widget _item(Friend f, void Function(MyAction) sendAction) {
-    return ConversationItem(
-      initial: f.initial,
-      avatarGradient: f.avatarGradient,
-      initialColor: kAvatarFg,
-      name: f.name,
-      lastMessage: f.status,
-      time: '',
-      online: f.online,
-      unread: 0,
-      highlighted: false,
-      onTap: () => sendAction(OpenChat(f)),
+    return GestureDetector(
+      onLongPress: () => sendAction(RemoveFriend(f)),
+      child: ConversationItem(
+        initial: f.initial,
+        avatarGradient: f.avatarGradient,
+        initialColor: kAvatarFg,
+        name: f.name,
+        lastMessage: f.status,
+        time: '',
+        online: f.online,
+        unread: 0,
+        highlighted: false,
+        onTap: () => sendAction(OpenChat(f)),
+      ),
     );
   }
 }

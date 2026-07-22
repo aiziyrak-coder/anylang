@@ -106,7 +106,7 @@ class SettingsScreen extends Screen<SettingsState, void> {
               _clearLocalSession();
               navigateAndRemoveUntil(LoginScreen());
             },
-            failure: (_) {},
+            failure: showAppError,
           );
         } catch (e) {
           showAppError(e.toString());

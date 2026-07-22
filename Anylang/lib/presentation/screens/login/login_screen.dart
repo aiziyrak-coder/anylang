@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../data/network/auth_repository.dart';
+import '../../../data/network/google_auth_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -72,8 +74,41 @@ class LoginScreen extends Screen<LoginState, void> {
       case GoToRegister _:
         navigate(RegisterScreen());
       case GoogleLogin _:
-        showAppMessage('google_coming_soon'.tr);
-        return;
+        if (GoogleAuthService.serverClientId.isEmpty && !kDebugMode) {
+          showAppMessage('google_coming_soon'.tr);
+          return;
+        }
+        state.isLoading.value = true;
+        try {
+          final idToken =
+              await Get.find<GoogleAuthService>().signInForIdToken();
+          if (idToken == null || idToken.isEmpty) return;
+          final repo = Get.find<AuthRepository>();
+          final outcome =
+              await repo.loginWithGoogleDetailed(idToken: idToken);
+          final body = outcome.body;
+          if (body != null && body['error_code'] == 'ACCOUNT_NOT_VERIFIED') {
+            showAppMessage('verify_required'.tr);
+            navigate(
+              VerifyScreen(),
+              payload: VerifyPayload(
+                email: body['email']?.toString() ?? '',
+              ),
+            );
+            return;
+          }
+          outcome.result.when(
+            success: (_) async {
+              await connectRealtimeIfNeeded();
+              navigateAndRemoveUntil(MainScreen());
+            },
+            failure: showAppError,
+          );
+        } catch (e) {
+          showAppError(e.toString());
+        } finally {
+          state.isLoading.value = false;
+        }
       case ForgotPassword _:
         navigate(ForgotPasswordScreen());
       case GoToRestoreAccount _:

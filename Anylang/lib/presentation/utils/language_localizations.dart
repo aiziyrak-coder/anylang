@@ -323,6 +323,12 @@ class LanguageLocalizations extends Translations {
 
       // Tariflar / Obuna (S16)
       'subscription_title': 'Tariflar',
+      'subscription_cancel': 'Obunani bekor qilish',
+      'subscription_cancelled': 'Obuna bekor qilindi',
+      'call_unavailable': 'Qo‘ng‘iroq mavjud emas',
+      'friends_remove_title': 'Do‘stni o‘chirish',
+      'friends_remove': 'O‘chirish',
+      'friends_removed': 'Do‘st o‘chirildi',
       'subscription_headline': 'O‘zingizga mos tarif',
       'subscription_subtitle': 'Istalgan vaqtda bekor qilishingiz mumkin',
       'subscription_monthly': 'Oylik',
@@ -697,6 +703,12 @@ class LanguageLocalizations extends Translations {
 
       // Тарифы / Подписка (S16)
       'subscription_title': 'Тарифы',
+      'subscription_cancel': 'Отменить подписку',
+      'subscription_cancelled': 'Подписка отменена',
+      'call_unavailable': 'Звонок недоступен',
+      'friends_remove_title': 'Удалить друга',
+      'friends_remove': 'Удалить',
+      'friends_removed': 'Друг удалён',
       'subscription_headline': 'Подходящий вам тариф',
       'subscription_subtitle': 'Отменить можно в любой момент',
       'subscription_monthly': 'Ежемесячно',
@@ -1071,6 +1083,12 @@ class LanguageLocalizations extends Translations {
 
       // Subscription (S16)
       'subscription_title': 'Plans',
+      'subscription_cancel': 'Cancel subscription',
+      'subscription_cancelled': 'Subscription cancelled',
+      'call_unavailable': 'Call unavailable',
+      'friends_remove_title': 'Remove friend',
+      'friends_remove': 'Remove',
+      'friends_removed': 'Friend removed',
       'subscription_headline': 'A plan that fits you',
       'subscription_subtitle': 'Cancel anytime',
       'subscription_monthly': 'Monthly',

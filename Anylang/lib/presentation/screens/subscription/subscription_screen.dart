@@ -59,7 +59,12 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
             ..addAll(items);
         }
       },
-      failure: (_) {},
+      failure: (err) {
+        showAppError(err);
+        if (state.plans.isEmpty) {
+          state.plans.assignAll(kMockSubscriptionPlans);
+        }
+      },
     );
   }
 
@@ -72,6 +77,16 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         state.billingCycle.value = a.cycle;
       case SelectPlan a:
         await _selectPlan(a.plan);
+      case CancelSubscription _:
+        final client = Get.find<NetworkClient>();
+        final result = await client.post(api: 'api/v1/subscription/cancel');
+        result.when(
+          success: (_) {
+            showAppMessage('subscription_cancelled'.tr);
+            popBackNavigate();
+          },
+          failure: showAppError,
+        );
     }
   }
 

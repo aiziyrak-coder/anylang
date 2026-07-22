@@ -137,6 +137,10 @@ class ChatRepository {
     );
   }
 
+  Future<BaseResult> hideChat(int chatId) {
+    return _client.post(api: 'api/v1/chats/$chatId/hide');
+  }
+
   Future<BaseResult> deleteMessage(int messageId, {bool forEveryone = false}) {
     return _client.delete(
       api: 'api/v1/messages/$messageId',

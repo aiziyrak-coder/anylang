@@ -57,6 +57,20 @@ class ProductsRepository {
     return _client.post(api: 'api/v1/products', data: body);
   }
 
+  Future<BaseResult> listByUser(int userId, {int page = 1, int limit = 40}) {
+    return _client.get(
+      api: 'api/v1/users/$userId/products',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+  }
+
+  Future<BaseResult> listFavorites({int page = 1, int limit = 40}) {
+    return _client.get(
+      api: 'api/v1/users/me/favorites',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+  }
+
   Future<BaseResult> favorite(int id) {
     return _client.post(api: 'api/v1/products/$id/favorite');
   }

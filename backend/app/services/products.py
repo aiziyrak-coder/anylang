@@ -804,7 +804,13 @@ async def list_user_products(
 
 
 async def add_favorite(db: AsyncSession, *, user: User, product_id: int) -> dict:
-    await _get_product_or_404(db, product_id, viewer=user)
+    product = await _get_product_or_404(db, product_id, viewer=user)
+    if product.status != "published":
+        raise AppError(
+            message="Faqat nashr qilingan mahsulotni sevimlilarga qo'shish mumkin",
+            error_code="PRODUCT_NOT_PUBLISHED",
+            status_code=400,
+        )
     existing = await db.execute(
         select(ProductFavorite).where(
             ProductFavorite.user_id == user.id,

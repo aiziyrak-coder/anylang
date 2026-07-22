@@ -75,13 +75,18 @@ async def _serialize_interlocutor(
     }
 
 
+def _normalize_lang(code: str) -> str:
+    return (code or "").split("_")[0].split("-")[0].lower()
+
+
 def _preview_text(message: Message, *, viewer_id: int, viewer_language: str) -> str | None:
     if message.type != "text":
         return None
     if message.sender_id == viewer_id:
         return message.text_original
+    lang = _normalize_lang(viewer_language)
     for translation in message.translations or []:
-        if translation.language == viewer_language:
+        if _normalize_lang(translation.language) == lang:
             return translation.text
     return message.text_original
 
@@ -217,6 +222,15 @@ async def list_chats(
     )
     result = await db.execute(query)
     chats = list(result.scalars().all())
+    hidden_raw = await redis.smembers(f"chat_hidden:{user.id}")
+    hidden_ids: set[int] = set()
+    for x in hidden_raw or []:
+        try:
+            hidden_ids.add(int(x if not isinstance(x, bytes) else x.decode()))
+        except (TypeError, ValueError):
+            continue
+    if hidden_ids:
+        chats = [c for c in chats if c.id not in hidden_ids]
     total = len(chats)
     page_chats = chats[params.offset : params.offset + params.limit]
 
@@ -288,6 +302,15 @@ async def search_chats(
         .order_by(Chat.last_message_at.desc().nullslast())
     )
     chats = list(chats_result.scalars().all())
+    hidden_raw = await redis.smembers(f"chat_hidden:{user.id}")
+    hidden_ids: set[int] = set()
+    for x in hidden_raw or []:
+        try:
+            hidden_ids.add(int(x if not isinstance(x, bytes) else x.decode()))
+        except (TypeError, ValueError):
+            continue
+    if hidden_ids:
+        chats = [c for c in chats if c.id not in hidden_ids]
     if not chats:
         return {"items": []}
 
@@ -317,6 +340,18 @@ async def search_chats(
         )
 
     return {"items": items}
+
+
+async def hide_chat(
+    db: AsyncSession,
+    *,
+    user: User,
+    chat_id: int,
+    redis: Redis,
+) -> dict:
+    await _get_chat_for_user(db, chat_id, user.id)
+    await redis.sadd(f"chat_hidden:{user.id}", chat_id)
+    return {"id": chat_id, "hidden": True}
 
 
 async def require_chat_access(db: AsyncSession, chat_id: int, user_id: int) -> Chat:

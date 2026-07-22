@@ -313,6 +313,12 @@ def _verify_google_id_token(id_token_str: str) -> dict[str, Any]:
     client_ids = settings.google_client_id_list
 
     if not client_ids:
+        if settings.is_production:
+            raise AppError(
+                message="Google Sign-In sozlanmagan",
+                error_code="INVALID_GOOGLE_TOKEN",
+                status_code=401,
+            )
         logger.warning(
             "GOOGLE_CLIENT_IDS is empty — decoding id_token without verification "
             "(bootstrap; set GOOGLE_CLIENT_IDS for real Google Sign-In)"

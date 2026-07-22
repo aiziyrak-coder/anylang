@@ -49,7 +49,12 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
         color: c.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.dp)),
       ),
-      padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 24.dp),
+      padding: EdgeInsets.fromLTRB(
+        20.dp,
+        12.dp,
+        20.dp,
+        24.dp + MediaQuery.viewPaddingOf(context).bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
