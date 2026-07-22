@@ -32,13 +32,19 @@ class ChatMessageItem extends StatelessWidget {
 
     return Align(
       alignment: _out ? Alignment.centerRight : Alignment.centerLeft,
-      child: GestureDetector(
-        onLongPress: onLongPress,
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 4.dp),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxW),
-            child: _body(c),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 4.dp),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxW),
+          // Material ota sifatida — ichkaridagi reply-sitata tap'i ishlayveradi.
+          // Pufakcha foni `Ink` — ripple ustida ko'rinadi.
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: _bubbleRadius,
+              onLongPress: onLongPress,
+              child: _body(c),
+            ),
           ),
         ),
       ),
@@ -76,7 +82,7 @@ class ChatMessageItem extends StatelessWidget {
       );
 
   Widget _bubble(AppColors c, Widget child) {
-    return Container(
+    return Ink(
       padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
       decoration: BoxDecoration(
         color: _out ? c.accent : c.surface,
@@ -228,7 +234,7 @@ class ChatMessageItem extends StatelessWidget {
       borderRadius: _bubbleRadius,
       child: Stack(
         children: [
-          Container(
+          Ink(
             width: 220.dp,
             height: 150.dp,
             decoration: BoxDecoration(
@@ -392,7 +398,7 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Widget _product(AppColors c) {
-    return Container(
+    return Ink(
       padding: EdgeInsets.all(12.dp),
       decoration: BoxDecoration(
         color: c.accentSoft,

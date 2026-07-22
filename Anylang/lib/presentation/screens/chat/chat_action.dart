@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import '../../utils/screen_options/my_action.dart';
 import 'chat_message.dart';
 
@@ -25,10 +27,12 @@ class PickAttachment extends ChatAction {
   PickAttachment(this.kind);
 }
 
-/// Xabar ustiga uzoq bosilganda — kontekst menyusi (3c).
+/// Xabar ustiga uzoq bosilganda — kontekst menyusi (3c / 3g). `anchor` —
+/// bosilgan xabar pufakchasining ekrandagi joylashuvi.
 class LongPressMessage extends ChatAction {
   final ChatMessage message;
-  LongPressMessage(this.message);
+  final Rect anchor;
+  LongPressMessage(this.message, this.anchor);
 }
 
 /// "Javob berish" — reply rejimini yoqish.

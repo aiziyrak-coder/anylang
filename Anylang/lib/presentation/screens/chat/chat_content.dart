@@ -147,11 +147,17 @@ class ChatContent extends ScreenContent<ChatState> {
         itemBuilder: (_, i) {
           if (i == 0) return _dateChip(c);
           final msg = state.messages[i - 1];
+          final key = _keyFor(msg.id);
           return KeyedSubtree(
-            key: _keyFor(msg.id),
+            key: key,
             child: ChatMessageItem(
               message: msg,
-              onLongPress: () => sendAction(LongPressMessage(msg)),
+              onLongPress: () {
+                final box = key.currentContext?.findRenderObject() as RenderBox?;
+                if (box == null || !box.hasSize) return;
+                final anchor = box.localToGlobal(Offset.zero) & box.size;
+                sendAction(LongPressMessage(msg, anchor));
+              },
               onReplyTap: _scrollToMessage,
             ),
           );

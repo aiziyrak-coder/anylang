@@ -8,7 +8,7 @@ import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../modal/attachment_bottom_sheet.dart';
-import '../../modal/message_actions_sheet.dart';
+import '../../modal/message_actions_dialog.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -288,8 +288,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         final msg = a.message;
         final showTranslate =
             msg.type == ChatMsgType.text && !msg.isOutgoing;
-        final chosen = await showMessageActionsSheet(
+        final chosen = await showMessageActionsDialog(
           context,
+          message: msg,
+          anchor: a.anchor,
           showTranslate: showTranslate,
         );
         switch (chosen) {
