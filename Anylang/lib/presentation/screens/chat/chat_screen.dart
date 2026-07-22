@@ -31,6 +31,7 @@ import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
 import '../messages/messages_state.dart';
 import '../products/product.dart';
+import '../products/product_info_bottom_sheet.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
 import 'chat_action.dart';
@@ -254,6 +255,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               meta['product_name']?.toString() ??
               'chat_preview_product'.tr,
           price: meta['price']?.toString() ?? '—',
+          productId: (meta['product_id'] as num?)?.toInt(),
           status: status,
         );
       case 'location':
@@ -267,7 +269,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           status: status,
         );
       case 'contact':
-        final name = meta['contact_name']?.toString() ?? 'Kontakt';
+        final name = meta['contact_name']?.toString() ?? 'chat_contact_fallback'.tr;
         return ChatMessage.contact(
           id: id,
           dir: dir,
@@ -451,13 +453,30 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         _toast('chat_copied'.tr);
 
       case DeleteMessage a:
-        final id = int.tryParse(a.message.id);
-        state.messages.removeWhere((m) => m.id == a.message.id);
-        if (state.replyTo.value?.id == a.message.id) {
+        final ok = await _confirm(
+          title: 'common_delete'.tr,
+          body: 'chat_msg_delete_confirm'.tr,
+          confirmLabel: 'common_delete'.tr,
+          danger: true,
+        );
+        if (!ok) return;
+        final msg = a.message;
+        final id = int.tryParse(msg.id);
+        final idx = state.messages.indexWhere((m) => m.id == msg.id);
+        state.messages.removeWhere((m) => m.id == msg.id);
+        if (state.replyTo.value?.id == msg.id) {
           state.replyTo.value = null;
         }
         if (id != null) {
-          await Get.find<ChatRepository>().deleteMessage(id);
+          final result = await Get.find<ChatRepository>().deleteMessage(id);
+          result.when(
+            success: (_) {},
+            failure: (err) {
+              final insertAt = idx >= 0 ? idx.clamp(0, state.messages.length) : state.messages.length;
+              state.messages.insert(insertAt, msg);
+              showAppError(err);
+            },
+          );
         }
 
       case OpenChatMenu _:
@@ -554,12 +573,15 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         popBackNavigate();
         _toast('chat_blocked'.tr);
 
+      case OpenChatProduct a:
+        await _openChatProduct(a.message);
+
       case StartRecording _:
         final player = Get.find<VoicePlayerService>();
         if (player.isPlaying.value) await player.stop(save: true);
         final ok = await Get.find<VoiceRecorderService>().start();
         if (!ok) {
-          showAppMessage('Mikrofon uchun ruxsat berilmadi');
+          showAppMessage('mic_permission_denied'.tr);
           return;
         }
         state.recording.value = true;
@@ -605,7 +627,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           if (err != null) {
             showAppError(err);
           } else {
-            showAppMessage('Ovoz yuklanmadi');
+            showAppMessage('voice_upload_failed'.tr);
           }
           state.sending.value = false;
           return;
@@ -754,9 +776,13 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       _sendTyping(state, isTyping: false);
       return;
     }
-    _typingDebounce?.cancel();
-    _typingDebounce = Timer(const Duration(milliseconds: 1200), () {
+    // Birinchi belgi — darhol typing; keyin keep-alive debounced.
+    if (!_lastTypingSent) {
       _sendTyping(state, isTyping: true);
+    }
+    _typingDebounce?.cancel();
+    _typingDebounce = Timer(const Duration(milliseconds: 2500), () {
+      _sendTyping(state, isTyping: false);
     });
   }
 
@@ -843,6 +869,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       createdAt: DateTime.now(),
       title: product.name,
       price: product.price,
+      productId: product.id,
       status: ChatStatus.sent,
     );
     await _sendMetaMessage(
@@ -860,12 +887,29 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   Future<void> _attachLocation() async {
     final status = await Permission.locationWhenInUse.request();
     if (!status.isGranted) {
-      showAppMessage('Joylashuv ruxsati kerak');
+      showAppMessage('location_permission_needed'.tr);
       return;
     }
     final serviceOn = await Geolocator.isLocationServiceEnabled();
     if (!serviceOn) {
-      showAppMessage('GPS yoqilmagan');
+      if (!context.mounted) return;
+      final open = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          content: Text('location_gps_off'.tr),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('common_cancel'.tr),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('open_settings'.tr),
+            ),
+          ],
+        ),
+      );
+      if (open == true) await openAppSettings();
       return;
     }
     Position pos;
@@ -877,7 +921,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         ),
       );
     } catch (_) {
-      showAppMessage('Joylashuv olinmadi');
+      showAppMessage('location_fetch_failed'.tr);
       return;
     }
     final label =
@@ -1159,7 +1203,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             TextField(
               controller: nameCtrl,
               decoration: InputDecoration(
-                labelText: 'Ism',
+                labelText: 'full_name'.tr,
+
                 labelStyle: TextStyle(color: c.textSecondary),
               ),
               style: TextStyle(color: c.textPrimary),
@@ -1169,7 +1214,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               controller: phoneCtrl,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
-                labelText: 'Telefon',
+                labelText: 'profile_phone'.tr,
                 labelStyle: TextStyle(color: c.textSecondary),
               ),
               style: TextStyle(color: c.textPrimary),
@@ -1179,11 +1224,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Bekor'),
+            child: Text('common_cancel'.tr),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Yuborish'),
+            child: Text('chat_contact_send'.tr),
           ),
         ],
       ),
@@ -1194,6 +1239,39 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     phoneCtrl.dispose();
     if (ok != true || name.isEmpty) return null;
     return (name, phone);
+  }
+
+  Future<void> _openChatProduct(ChatMessage msg) async {
+    final id = msg.productId;
+    if (id == null || id <= 0) return;
+    final result = await Get.find<ProductsRepository>().detail(id);
+    final map = asMap(result.dataOrNull);
+    if (map == null) {
+      if (result.errorOrNull != null) showAppError(result.errorOrNull!);
+      return;
+    }
+    final product = Product.fromApi(map);
+    if (!context.mounted) return;
+    await showProductInfoBottomSheet(
+      context,
+      product,
+      onOpenBusiness: () async {
+        if (product.sellerId <= 0) return;
+        final profile =
+            await Get.find<ProfileRepository>().getPublicUser(product.sellerId);
+        profile.when(
+          success: (data) {
+            final profileMap = asMap(data);
+            if (profileMap == null) return;
+            navigate(
+              UserProfileScreen(),
+              payload: UserProfilePayload.fromApi(profileMap),
+            );
+          },
+          failure: showAppError,
+        );
+      },
+    );
   }
 
   void _toast(String msg) => showAppMessage(msg);

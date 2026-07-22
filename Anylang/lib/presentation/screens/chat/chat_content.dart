@@ -7,6 +7,7 @@ import '../../ui/app_loading.dart';
 import '../../ui/chat_wallpaper_background.dart';
 import '../../ui/items/chat_message_item.dart';
 import '../../ui/theme/colors.dart';
+import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -25,6 +26,7 @@ class ChatContent extends ScreenContent<ChatState> {
   Worker? _messagesWorker;
   Worker? _inputWorker;
   Worker? _searchWorker;
+  int _lastMessageCount = 0;
 
   @override
   void onClose() {
@@ -41,8 +43,15 @@ class ChatContent extends ScreenContent<ChatState> {
 
   @override
   void uiBuildFinished(ChatState state) {
-    // Yangi xabar qo'shilganda ro'yxatni pastga surish.
-    _messagesWorker = ever(state.messages, (_) => _scrollToBottom());
+    _lastMessageCount = state.messages.length;
+    // Faqat yangi xabar qo'shilganda pastga — status yangilanishida sakramasin.
+    _messagesWorker = ever(state.messages, (list) {
+      final n = list.length;
+      if (n > _lastMessageCount) {
+        _scrollToBottom();
+      }
+      _lastMessageCount = n;
+    });
     // Yuborish xatosida matnni qaytarish — controller bilan sync.
     _inputWorker = ever(state.input, (v) {
       if (_input.text != v) {
@@ -175,6 +184,7 @@ class ChatContent extends ScreenContent<ChatState> {
                     onCancelReply: () => sendAction(CancelReply()),
                     onCancelRecording: () => sendAction(CancelRecording()),
                     onSendVoice: () => sendAction(SendVoice()),
+                    onMicTapHint: () => showAppMessage('chat_mic_hold_hint'.tr),
                   );
                 },
               ),
@@ -232,6 +242,9 @@ class ChatContent extends ScreenContent<ChatState> {
                 sendAction(LongPressMessage(msg, anchor));
               },
               onReplyTap: _scrollToMessage,
+              onProductTap: msg.type == ChatMsgType.product
+                  ? () => sendAction(OpenChatProduct(msg))
+                  : null,
             ),
           );
         },

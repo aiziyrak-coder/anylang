@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../data/audio/voice_player_service.dart';
 import '../../screens/chat/chat_message.dart';
@@ -17,12 +18,14 @@ class ChatMessageItem extends StatelessWidget {
   final ChatMessage message;
   final VoidCallback onLongPress;
   final ValueChanged<String>? onReplyTap;
+  final VoidCallback? onProductTap;
 
   const ChatMessageItem({
     super.key,
     required this.message,
     required this.onLongPress,
     this.onReplyTap,
+    this.onProductTap,
   });
 
   bool get _out => message.isOutgoing;
@@ -239,48 +242,17 @@ class ChatMessageItem extends StatelessWidget {
 
     Widget media;
     if (isNet) {
-      media = Image.network(
-        url!,
-        width: 220.dp,
-        height: 150.dp,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return Container(
-            width: 220.dp,
-            height: 150.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: message.imageGradient ?? prodTealGradient,
-            ),
-            child: SizedBox(
-              width: 22.dp,
-              height: 22.dp,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: c.onAccent.withValues(alpha: 0.7),
-              ),
-            ),
-          );
+      media = _ChatNetworkImage(
+        url: url,
+        gradient: message.imageGradient ?? prodTealGradient,
+        onOpen: () {
+          HapticFeedback.selectionClick();
+          _openImageViewer(url);
         },
-        errorBuilder: (_, __, ___) => Container(
-          width: 220.dp,
-          height: 150.dp,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: message.imageGradient ?? prodTealGradient,
-          ),
-          child: Icon(
-            Icons.broken_image_outlined,
-            size: 36.dp,
-            color: c.onAccent.withValues(alpha: 0.45),
-          ),
-        ),
       );
     } else if (isFile) {
       media = Image.file(
-        File(url!),
+        File(url),
         width: 220.dp,
         height: 150.dp,
         fit: BoxFit.cover,
@@ -315,8 +287,11 @@ class ChatMessageItem extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: (isNet || isFile)
-          ? () => _openImageViewer(url!)
+      onTap: isFile
+          ? () {
+              HapticFeedback.selectionClick();
+              _openImageViewer(url);
+            }
           : null,
       child: ClipRRect(
         borderRadius: _bubbleRadius,
@@ -368,11 +343,8 @@ class ChatMessageItem extends StatelessWidget {
     return _bubble(
       c,
       Obx(() {
-        final active = player.isActive(message.id);
+        final active = player.activeId.value == message.id;
         final playing = active && player.isPlaying.value;
-        // Obx trigger
-        player.activeId.value;
-        player.isPlaying.value;
 
         Widget wave(double p) => WaveformBars(
               color: waveColor,
@@ -395,6 +367,7 @@ class ChatMessageItem extends StatelessWidget {
                 GestureDetector(
                   onTap: () {
                     if (!canPlay || path == null) return;
+                    HapticFeedback.selectionClick();
                     player.toggle(
                       id: message.id,
                       path: path,
@@ -490,56 +463,68 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Widget _product(AppColors c) {
-    return Ink(
-      padding: EdgeInsets.all(12.dp),
-      decoration: BoxDecoration(
-        color: c.accentSoft,
-        border: Border.all(color: c.accent.withValues(alpha: 0.3)),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: _bubbleRadius,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'chat_product_label'.tr,
-            style: TextStyle(
-              color: c.accentText,
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-            ),
+        onTap: onProductTap == null
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                onProductTap!();
+              },
+        child: Ink(
+          padding: EdgeInsets.all(12.dp),
+          decoration: BoxDecoration(
+            color: c.accentSoft,
+            border: Border.all(color: c.accent.withValues(alpha: 0.3)),
+            borderRadius: _bubbleRadius,
           ),
-          SizedBox(height: 6.dp),
-          Text(
-            message.productTitle ?? '',
-            style: TextStyle(
-              color: c.textPrimary,
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'chat_product_label'.tr,
+                style: TextStyle(
+                  color: c.accentText,
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              SizedBox(height: 6.dp),
+              Text(
+                message.productTitle ?? '',
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 2.dp),
+              Text(
+                message.productPrice ?? '',
+                style: TextStyle(
+                  color: c.accentText,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 8.dp),
+              Text(
+                'chat_product_view'.tr,
+                style: TextStyle(
+                  color: c.accentText,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 6.dp),
+              Align(alignment: Alignment.centerRight, child: _meta(c)),
+            ],
           ),
-          SizedBox(height: 2.dp),
-          Text(
-            message.productPrice ?? '',
-            style: TextStyle(
-              color: c.accentText,
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(height: 8.dp),
-          Text(
-            'chat_product_view'.tr,
-            style: TextStyle(
-              color: c.accentText,
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 6.dp),
-          Align(alignment: Alignment.centerRight, child: _meta(c)),
-        ],
+        ),
       ),
     );
   }
@@ -708,6 +693,96 @@ class ChatMessageItem extends StatelessWidget {
           SizedBox(height: 6.dp),
           Align(alignment: Alignment.centerRight, child: _meta(c)),
         ],
+      ),
+    );
+  }
+}
+
+class _ChatNetworkImage extends StatefulWidget {
+  final String url;
+  final LinearGradient gradient;
+  final VoidCallback onOpen;
+
+  const _ChatNetworkImage({
+    required this.url,
+    required this.gradient,
+    required this.onOpen,
+  });
+
+  @override
+  State<_ChatNetworkImage> createState() => _ChatNetworkImageState();
+}
+
+class _ChatNetworkImageState extends State<_ChatNetworkImage> {
+  int _retryKey = 0;
+  bool _failed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+
+    if (_failed) {
+      return GestureDetector(
+        onTap: () => setState(() {
+          _failed = false;
+          _retryKey++;
+        }),
+        child: Container(
+          width: 220.dp,
+          height: 150.dp,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(gradient: widget.gradient),
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 36.dp,
+            color: c.onAccent.withValues(alpha: 0.45),
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: widget.onOpen,
+      child: Image.network(
+        widget.url,
+        key: ValueKey('${widget.url}_$_retryKey'),
+        width: 220.dp,
+        height: 150.dp,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            width: 220.dp,
+            height: 150.dp,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(gradient: widget.gradient),
+            child: SizedBox(
+              width: 22.dp,
+              height: 22.dp,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: c.onAccent.withValues(alpha: 0.7),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _failed = true);
+          });
+          return Container(
+            width: 220.dp,
+            height: 150.dp,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(gradient: widget.gradient),
+            child: Icon(
+              Icons.broken_image_outlined,
+              size: 36.dp,
+              color: c.onAccent.withValues(alpha: 0.45),
+            ),
+          );
+        },
       ),
     );
   }

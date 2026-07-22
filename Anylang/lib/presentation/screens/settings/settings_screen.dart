@@ -73,9 +73,10 @@ class SettingsScreen extends Screen<SettingsState, void> {
           LanguageLocalizations.changeLocale(a.language.localeCode!);
         }
       case SettingsLogoutRequested _:
-        try {
-          await Get.find<AuthRepository>().logout();
-        } catch (_) {}
+        final logout = await Get.find<AuthRepository>().logout();
+        if (logout.errorOrNull != null) {
+          showAppWarning('logout_failed'.tr);
+        }
         _clearLocalSession();
         navigateAndRemoveUntil(LoginScreen());
       case SettingsDeleteAccountRequested _:

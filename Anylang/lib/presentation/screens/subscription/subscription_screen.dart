@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -17,10 +18,12 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
 
   @override
   void initState(void payload) {
+    state.loading.value = true;
     _loadPlans();
   }
 
   Future<void> _loadPlans() async {
+    state.loading.value = true;
     final client = Get.find<NetworkClient>();
     final result = await client.get(api: 'api/v1/subscription/plans');
     result.when(
@@ -66,6 +69,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         }
       },
     );
+    state.loading.value = false;
   }
 
   @override
@@ -78,6 +82,26 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
       case SelectPlan a:
         await _selectPlan(a.plan);
       case CancelSubscription _:
+        final ok = await Get.dialog<bool>(
+          AlertDialog(
+            title: Text('subscription_cancel'.tr),
+            content: Text('subscription_cancel_confirm'.tr),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('common_cancel'.tr),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text(
+                  'subscription_cancel'.tr,
+                  style: const TextStyle(color: Color(0xFFB42318)),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (ok != true) return;
         final client = Get.find<NetworkClient>();
         final result = await client.post(api: 'api/v1/subscription/cancel');
         result.when(

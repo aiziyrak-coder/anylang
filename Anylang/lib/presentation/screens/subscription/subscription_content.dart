@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/app_loading.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/items/plan_card.dart';
@@ -59,22 +60,30 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                           ],
                         )),
                     SizedBox(height: 24.dp),
-                    Obx(() => Column(
-                          children: [
-                            for (final plan in state.plans) ...[
-                              _planCard(plan, state.billingCycle.value, sendAction),
-                              SizedBox(height: 16.dp),
-                            ],
-                            SizedBox(height: 8.dp),
-                            TextButton(
-                              onPressed: () => sendAction(CancelSubscription()),
-                              child: Text(
-                                'subscription_cancel'.tr,
-                                style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
-                              ),
-                            ),
+                    Obx(() {
+                      if (state.loading.value && state.plans.isEmpty) {
+                        return Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32.dp),
+                          child: const AppLoading(),
+                        );
+                      }
+                      return Column(
+                        children: [
+                          for (final plan in state.plans) ...[
+                            _planCard(plan, state.billingCycle.value, sendAction),
+                            SizedBox(height: 16.dp),
                           ],
-                        )),
+                          SizedBox(height: 8.dp),
+                          TextButton(
+                            onPressed: () => sendAction(CancelSubscription()),
+                            child: Text(
+                              'subscription_cancel'.tr,
+                              style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
                   ],
                 ),
               ),

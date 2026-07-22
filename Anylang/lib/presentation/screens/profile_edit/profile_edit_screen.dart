@@ -89,7 +89,7 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
       case SaveProfileEdit a:
         final name = a.fullName.trim();
         if (name.length < 2) {
-          showAppError('Ism juda qisqa');
+          showAppError('name_too_short'.tr);
           return;
         }
         state.isSaving.value = true;

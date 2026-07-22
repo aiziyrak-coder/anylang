@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/app_loading.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/secondary_button.dart';
 import '../../ui/items/info_row.dart';
@@ -30,7 +31,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
       padding: EdgeInsets.only(top: 8.dp),
       child: Obx(() {
         final d = state.account.value;
-        if (d == null) return const SizedBox.shrink();
+        if (d == null) return const AppLoading();
 
         return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 24.dp),

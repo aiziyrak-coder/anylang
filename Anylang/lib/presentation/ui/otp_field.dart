@@ -38,6 +38,9 @@ class _OtpFieldState extends State<OtpField> {
           ? initial.substring(0, widget.length)
           : initial,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
     _controller.addListener(_onChanged);
     _focus.addListener(_onFocusChange);
     if (_controller.text.isNotEmpty) {

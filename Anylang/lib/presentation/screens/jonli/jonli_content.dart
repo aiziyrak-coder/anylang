@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../../../data/audio/voice_recorder_service.dart';
@@ -356,37 +357,60 @@ class JonliContent extends ScreenContent<JonliState> {
       final lang = isMe ? state.myLanguage.value.nativeName : state.otherLanguage.value.nativeName;
       final labelColor = active ? c.onAccent : c.textSecondary;
 
-      return GestureDetector(
-        onTapDown: (_) => sendAction(StartSpeaking(isMe)),
-        onTapUp: (_) => sendAction(StopSpeaking()),
-        onTapCancel: () => sendAction(StopSpeaking()),
-        child: Container(
-          height: 104.dp,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active ? null : c.surface,
-            gradient: gradient,
-            borderRadius: BorderRadius.circular(20.dp),
-            border: active ? null : Border.all(color: c.outline),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset(
-                'assets/icons/ic_mic.svg',
-                width: 26.dp,
-                height: 26.dp,
-                colorFilter: ColorFilter.mode(active ? c.onAccent : c.textFaint, BlendMode.srcIn),
+      return Material(
+        color: active ? null : c.surface,
+        borderRadius: BorderRadius.circular(20.dp),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20.dp),
+          onTap: () {},
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) {
+              HapticFeedback.lightImpact();
+              sendAction(StartSpeaking(isMe));
+            },
+            onTapUp: (_) => sendAction(StopSpeaking()),
+            onTapCancel: () => sendAction(StopSpeaking()),
+            child: Ink(
+              height: 104.dp,
+              decoration: BoxDecoration(
+                color: active ? null : c.surface,
+                gradient: gradient,
+                borderRadius: BorderRadius.circular(20.dp),
+                border: active ? null : Border.all(color: c.outline),
               ),
-              SizedBox(height: 6.dp),
-              Text(
-                (isMe ? 'jonli_you' : 'jonli_interlocutor').tr,
-                style: TextStyle(color: labelColor, fontSize: 16.sp, fontWeight: FontWeight.w700),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    'assets/icons/ic_mic.svg',
+                    width: 26.dp,
+                    height: 26.dp,
+                    colorFilter: ColorFilter.mode(active ? c.onAccent : c.textFaint, BlendMode.srcIn),
+                  ),
+                  SizedBox(height: 6.dp),
+                  Text(
+                    (isMe ? 'jonli_you' : 'jonli_interlocutor').tr,
+                    style: TextStyle(color: labelColor, fontSize: 16.sp, fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 2.dp),
+                  Text(
+                    '$flag $lang',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: labelColor.withValues(alpha: 0.75),
+                      fontSize: 11.sp,
+                    ),
+                  ),
+                  SizedBox(height: 3.dp),
+                  if (active)
+                    Text('jonli_holding'.tr, style: TextStyle(color: labelColor.withValues(alpha: 0.8), fontSize: 11.sp))
+                ],
               ),
-              SizedBox(height: 3.dp),
-              if (active)
-                Text('jonli_holding'.tr, style: TextStyle(color: labelColor.withValues(alpha: 0.8), fontSize: 11.sp))
-            ],
+            ),
           ),
         ),
       );

@@ -25,6 +25,7 @@ class ChatComposer extends StatelessWidget {
   final VoidCallback onCancelReply;
   final VoidCallback onCancelRecording;
   final VoidCallback onSendVoice;
+  final VoidCallback? onMicTapHint;
 
   const ChatComposer({
     super.key,
@@ -42,6 +43,7 @@ class ChatComposer extends StatelessWidget {
     this.peerName = '',
     this.recordElapsed = '0:00',
     this.recordSamples = const [],
+    this.onMicTapHint,
   });
 
   @override
@@ -169,16 +171,43 @@ class ChatComposer extends StatelessWidget {
           ),
         ),
         SizedBox(width: 8.dp),
-        MyIconButton(
-          onClick: showSend ? onSend : onMic,
-          icon: showSend ? Icons.send_rounded : Icons.mic_rounded,
-          iconColor: c.onAccent,
-          iconSize: 22.dp,
-          backgroundGradient: limeButtonGradient,
-          borderRadius: 22.dp,
-          padding: EdgeInsets.all(11.dp),
-        ),
+        showSend ? _sendButton(c) : _micButton(c),
       ],
+    );
+  }
+
+  Widget _sendButton(AppColors c) {
+    return MyIconButton(
+      onClick: onSend,
+      icon: Icons.send_rounded,
+      iconColor: c.onAccent,
+      iconSize: 22.dp,
+      backgroundGradient: limeButtonGradient,
+      borderRadius: 22.dp,
+      padding: EdgeInsets.all(11.dp),
+    );
+  }
+
+  Widget _micButton(AppColors c) {
+    return Semantics(
+      label: 'chat_mic_hold'.tr,
+      button: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22.dp),
+          onLongPress: onMic,
+          onTap: onMicTapHint,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: limeButtonGradient,
+              borderRadius: BorderRadius.circular(22.dp),
+            ),
+            padding: EdgeInsets.all(11.dp),
+            child: Icon(Icons.mic_rounded, color: c.onAccent, size: 22.dp),
+          ),
+        ),
+      ),
     );
   }
 

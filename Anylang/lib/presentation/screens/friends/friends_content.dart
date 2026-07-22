@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
@@ -158,7 +159,10 @@ class FriendsContent extends ScreenContent<FriendsState> {
 
   Widget _item(Friend f, void Function(MyAction) sendAction) {
     return GestureDetector(
-      onLongPress: () => sendAction(RemoveFriend(f)),
+      onLongPress: () {
+        HapticFeedback.mediumImpact();
+        sendAction(RemoveFriend(f));
+      },
       child: ConversationItem(
         initial: f.initial,
         avatarGradient: f.avatarGradient,

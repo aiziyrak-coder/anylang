@@ -25,11 +25,11 @@ const List<LinearGradient> _kImageGradientPool = [
 ];
 
 const Map<String, String> _kCategoryCodes = {
-  'Kiyim & aksessuar': 'clothing_accessories',
-  'Kulolchilik': 'pottery',
-  "Yog‘och buyumlar": 'woodwork',
-  'Taqinchoq': 'jewelry',
-  'Boshqa': 'other',
+  'add_product_cat_clothing': 'clothing_accessories',
+  'add_product_cat_pottery': 'pottery',
+  'add_product_cat_wood': 'woodwork',
+  'add_product_cat_jewelry': 'jewelry',
+  'add_product_cat_other': 'other',
 };
 
 class AddProductScreen extends Screen<AddProductState, void> {
@@ -38,7 +38,7 @@ class AddProductScreen extends Screen<AddProductState, void> {
   @override
   void initState(void payload) {
     state.images.clear();
-    state.category.value = kProductCategories.first;
+    state.category.value = kProductCategoryKeys.first;
   }
 
   @override

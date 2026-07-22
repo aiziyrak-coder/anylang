@@ -78,11 +78,14 @@ class LoginScreen extends Screen<LoginState, void> {
           showAppMessage('google_coming_soon'.tr);
           return;
         }
-        state.isLoading.value = true;
+        state.isGoogleLoading.value = true;
         try {
           final idToken =
               await Get.find<GoogleAuthService>().signInForIdToken();
-          if (idToken == null || idToken.isEmpty) return;
+          if (idToken == null || idToken.isEmpty) {
+            showAppMessage('google_cancelled'.tr);
+            return;
+          }
           final repo = Get.find<AuthRepository>();
           final outcome =
               await repo.loginWithGoogleDetailed(idToken: idToken);
@@ -107,7 +110,7 @@ class LoginScreen extends Screen<LoginState, void> {
         } catch (e) {
           showAppError(e.toString());
         } finally {
-          state.isLoading.value = false;
+          state.isGoogleLoading.value = false;
         }
       case ForgotPassword _:
         navigate(ForgotPasswordScreen());

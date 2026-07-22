@@ -91,3 +91,9 @@ class DeleteChat extends ChatAction {}
 
 /// Foydalanuvchini bloklash.
 class BlockPeer extends ChatAction {}
+
+/// Chat xabaridagi mahsulot kartasini ochish.
+class OpenChatProduct extends ChatAction {
+  final ChatMessage message;
+  OpenChatProduct(this.message);
+}

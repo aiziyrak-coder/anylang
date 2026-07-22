@@ -78,7 +78,10 @@ class MessagesScreen extends Screen<MessagesState, void> {
               .toList();
           state.userResults.assignAll(items);
         },
-        failure: (_) => state.userResults.clear(),
+        failure: (err) {
+          state.userResults.clear();
+          showAppError(err);
+        },
       );
     } else {
       state.userResults.clear();

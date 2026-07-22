@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
@@ -150,9 +151,22 @@ class ProductsContent extends ScreenContent<ProductsState> {
             style: TextStyle(color: c.textPrimary, fontSize: 15.sp, fontWeight: FontWeight.w700),
           ),
           const Spacer(),
-          Text(
-            'products_see_all'.tr,
-            style: TextStyle(color: c.textFaint, fontSize: 13.sp),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                sendAction(ProductsSearchChanged(''));
+              },
+              borderRadius: BorderRadius.circular(8.dp),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.dp, vertical: 2.dp),
+                child: Text(
+                  'products_see_all'.tr,
+                  style: TextStyle(color: c.textFaint, fontSize: 13.sp),
+                ),
+              ),
+            ),
           ),
         ],
       ),

@@ -83,6 +83,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
               return RefreshIndicator(
                 onRefresh: () async => sendAction(RefreshConversations()),
                 child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
                   itemCount: items.length,
                   itemBuilder: (_, i) {
@@ -121,6 +122,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
       return AppEmptyState(
         icon: Icons.search_off_rounded,
         title: 'empty_no_results'.tr,
+        subtitle: 'messages_search_empty_hint'.tr,
       );
     }
     return RefreshIndicator(

@@ -56,6 +56,7 @@ class ChatMessage {
   // product
   final String? productTitle;
   final String? productPrice;
+  final int? productId;
 
   // location
   final String? locationLabel; // "Do'kon manzili"
@@ -91,6 +92,7 @@ class ChatMessage {
     this.voiceDurationMs,
     this.productTitle,
     this.productPrice,
+    this.productId,
     this.locationLabel,
     this.locationDistance,
     this.fileName,
@@ -133,6 +135,7 @@ class ChatMessage {
         voiceDurationMs: voiceDurationMs,
         productTitle: productTitle,
         productPrice: productPrice,
+        productId: productId,
         locationLabel: locationLabel,
         locationDistance: locationDistance,
         fileName: fileName,
@@ -163,6 +166,7 @@ class ChatMessage {
         voiceDurationMs: voiceDurationMs,
         productTitle: productTitle,
         productPrice: productPrice,
+        productId: productId,
         locationLabel: locationLabel,
         locationDistance: locationDistance,
         fileName: fileName,
@@ -254,6 +258,7 @@ class ChatMessage {
     required String title,
     required String price,
     DateTime? createdAt,
+    int? productId,
     ChatStatus status = ChatStatus.read,
   }) =>
       ChatMessage(
@@ -265,6 +270,7 @@ class ChatMessage {
         status: status,
         productTitle: title,
         productPrice: price,
+        productId: productId,
       );
 
   factory ChatMessage.location({

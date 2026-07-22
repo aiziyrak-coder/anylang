@@ -67,7 +67,7 @@ class JonliScreen extends Screen<JonliState, void> {
         if (recorded == null) return;
         final sessionId = state.sessionId.value;
         if (sessionId == null) {
-          showAppError('Sessiya ochilmadi');
+          showAppError('jonli_session_failed'.tr);
           return;
         }
         state.busy.value = true;
@@ -80,7 +80,7 @@ class JonliScreen extends Screen<JonliState, void> {
           );
           final map = asMap(result.dataOrNull);
           if (map == null) {
-            showAppError(result.errorOrNull ?? 'Tarjima bo‘lmadi');
+            showAppError(result.errorOrNull ?? 'jonli_translate_failed'.tr);
             return;
           }
           state.lastOriginal.value =

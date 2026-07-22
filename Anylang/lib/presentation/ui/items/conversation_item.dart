@@ -167,7 +167,7 @@ class ConversationItem extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(
-        '$unread',
+        unread > 99 ? '99+' : '$unread',
         style: TextStyle(
           color: c.onAccent,
           fontSize: 12.sp,

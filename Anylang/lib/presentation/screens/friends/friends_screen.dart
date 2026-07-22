@@ -33,7 +33,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
       success: (data) {
         state.pendingCount.value = asList(data).whereType<Map>().length;
       },
-      failure: (_) {},
+      failure: showAppError,
     );
   }
 
@@ -119,7 +119,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
             final map = asMap(data);
             final chatId = (map?['id'] as num?)?.toInt() ?? 0;
             if (chatId <= 0) {
-              showAppError('Suhbat ochilmadi');
+              showAppError('chat_open_failed'.tr);
               return;
             }
             navigate(

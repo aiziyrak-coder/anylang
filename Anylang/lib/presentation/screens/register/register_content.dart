@@ -126,16 +126,16 @@ class RegisterContent extends ScreenContent<RegisterState> {
                       vertical: 10.dp,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFB42318).withValues(alpha: 0.12),
+                      color: kListenRed.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12.dp),
                       border: Border.all(
-                        color: const Color(0xFFB42318).withValues(alpha: 0.35),
+                        color: kListenRed.withValues(alpha: 0.35),
                       ),
                     ),
                     child: Text(
                       err,
                       style: TextStyle(
-                        color: const Color(0xFFB42318),
+                        color: kListenRed,
                         fontSize: 13.sp,
                         fontWeight: FontWeight.w600,
                         height: 1.35,

@@ -5,6 +5,7 @@ import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/secondary_button.dart';
 import '../../ui/gradient_background.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/items/media_tile.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
@@ -17,12 +18,12 @@ import 'add_product_state.dart';
 
 const List<String> kProductCurrencies = ['USD', 'EUR', 'RUB', 'UZS'];
 
-const List<String> kProductCategories = [
-  'Kiyim & aksessuar',
-  'Kulolchilik',
-  'Yog‘och buyumlar',
-  'Taqinchoq',
-  'Boshqa',
+const List<String> kProductCategoryKeys = [
+  'add_product_cat_clothing',
+  'add_product_cat_pottery',
+  'add_product_cat_wood',
+  'add_product_cat_jewelry',
+  'add_product_cat_other',
 ];
 
 /// S18 — Mahsulot qo'shish. Rasmlar, nom, narx/valyuta, kategoriya,
@@ -67,7 +68,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
+              child: KeyboardAwareScrollView(
                 padding: EdgeInsets.fromLTRB(20.dp, 16.dp, 20.dp, 24.dp),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,7 +129,9 @@ class AddProductContent extends ScreenContent<AddProductState> {
                     Obx(() => AppPickerField(
                           label: 'add_product_category'.tr,
                           hint: 'add_product_category_hint'.tr,
-                          value: state.category.value.isEmpty ? null : state.category.value,
+                          value: state.category.value.isEmpty
+                              ? null
+                              : state.category.value.tr,
                           icon: Icons.keyboard_arrow_down_rounded,
                           onTap: () => _pickCategory(context, state, sendAction),
                         )),
@@ -194,12 +197,15 @@ class AddProductContent extends ScreenContent<AddProductState> {
   }
 
   Future<void> _pickCategory(BuildContext context, AddProductState state, void Function(MyAction) sendAction) async {
+    final labels = kProductCategoryKeys.map((k) => k.tr).toList();
     final picked = await showSimpleListPickerBottomSheet(
       context,
       title: 'add_product_category'.tr,
-      items: kProductCategories,
-      selected: state.category.value,
+      items: labels,
+      selected: state.category.value.isEmpty ? null : state.category.value.tr,
     );
-    if (picked != null) sendAction(SelectCategory(picked));
+    if (picked == null) return;
+    final idx = labels.indexOf(picked);
+    if (idx >= 0) sendAction(SelectCategory(kProductCategoryKeys[idx]));
   }
 }

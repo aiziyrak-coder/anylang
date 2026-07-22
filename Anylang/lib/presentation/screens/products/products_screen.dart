@@ -36,7 +36,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
             .toList();
         state.top.assignAll(items);
       },
-      failure: (_) {},
+      failure: showAppError,
     );
     final all = await repo.list();
     all.when(

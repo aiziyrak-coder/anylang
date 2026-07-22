@@ -51,6 +51,19 @@ class ProductGridCard extends StatelessWidget {
                     Image.network(
                       url,
                       fit: BoxFit.cover,
+                      loadingBuilder: (_, child, progress) {
+                        if (progress == null) return child;
+                        return Center(
+                          child: SizedBox(
+                            width: 22.dp,
+                            height: 22.dp,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.dp,
+                              color: c.textFaint,
+                            ),
+                          ),
+                        );
+                      },
                       errorBuilder: (_, __, ___) => Center(
                         child: SvgPicture.asset(iconAsset, width: 28.dp, height: 28.dp),
                       ),

@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/primary_button.dart';
@@ -81,7 +83,7 @@ class VerifyContent extends ScreenContent<VerifyState> {
               SizedBox(height: 28.dp),
               Obx(() {
                 final otp = state.debugOtp.value;
-                if (otp.isEmpty) return const SizedBox.shrink();
+                if (!kDebugMode || otp.isEmpty) return const SizedBox.shrink();
                 return Container(
                   margin: EdgeInsets.only(bottom: 16.dp),
                   padding: EdgeInsets.all(14.dp),
@@ -123,6 +125,11 @@ class VerifyContent extends ScreenContent<VerifyState> {
                       ? state.code.value
                       : state.debugOtp.value,
                   onChanged: (v) => sendAction(CodeChanged(v)),
+                  onCompleted: (v) {
+                    if (v.length == 6 && !state.isLoading.value) {
+                      sendAction(VerifySubmit(v));
+                    }
+                  },
                 ),
               ),
               SizedBox(height: 24.dp),

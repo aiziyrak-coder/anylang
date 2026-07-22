@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import '../../ui/app_empty_state.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/my_icon_button.dart';
 import '../../ui/buttons/rich_button.dart';
@@ -317,7 +318,10 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
         );
       }
       if (items.isEmpty) {
-        return const SizedBox.shrink();
+        return AppEmptyState(
+          icon: Icons.inventory_2_outlined,
+          title: 'profile_listings_empty'.tr,
+        );
       }
       return GridView.builder(
         shrinkWrap: true,

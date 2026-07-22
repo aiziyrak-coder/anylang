@@ -1,7 +1,11 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/countries_service.dart';
+import '../../../domain/models/country_option.dart';
 import '../../../data/network/auth_repository.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
@@ -22,9 +26,42 @@ class RegisterScreen extends Screen<RegisterState, void> {
     state.formError.value = '';
     state.isLoading.value = false;
     if (state.countryCode.value.isEmpty) {
-      state.countryCode.value = 'UZ';
-      state.country.value = 'O‘zbekiston';
+      _applyDefaultCountry();
     }
+  }
+
+  String? _deviceCountryCode() {
+    final fromGet = Get.deviceLocale?.countryCode;
+    if (fromGet != null && fromGet.length == 2) {
+      return fromGet.toUpperCase();
+    }
+    try {
+      final segments = Platform.localeName.split(RegExp(r'[_-]'));
+      if (segments.length >= 2) {
+        final tail = segments.last.toUpperCase();
+        if (tail.length == 2) return tail;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  void _applyDefaultCountry() {
+    final code = _deviceCountryCode() ?? 'UZ';
+    CountryOption picked;
+    if (Get.isRegistered<CountriesService>()) {
+      picked = Get.find<CountriesService>().findByCode(code) ??
+          kFallbackCountries.firstWhere(
+            (c) => c.code == code,
+            orElse: () => kFallbackCountries.first,
+          );
+    } else {
+      picked = kFallbackCountries.firstWhere(
+        (c) => c.code == code,
+        orElse: () => kFallbackCountries.first,
+      );
+    }
+    state.countryCode.value = picked.code;
+    state.country.value = picked.localizedName;
   }
 
   String _fmtDate(DateTime d) {

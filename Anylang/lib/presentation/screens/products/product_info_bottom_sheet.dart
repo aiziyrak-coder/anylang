@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
@@ -30,8 +31,13 @@ Future<void> showProductInfoBottomSheet(
   );
 }
 
-// Demo galereya — rasm URL bo'lmasa gradient.
-List<LinearGradient> _gallery(Product p) => [p.tileGradient];
+// Galereya — rasm URL'lari; bo'sh bo'lsa gradient fallback.
+List<String> _galleryUrls(Product p) {
+  if (p.imageUrls.isNotEmpty) return p.imageUrls;
+  final primary = p.imageUrl?.trim();
+  if (primary != null && primary.isNotEmpty) return [primary];
+  return const [];
+}
 
 class _ProductInfoSheet extends StatefulWidget {
   final Product product;
@@ -53,6 +59,8 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   String? _sellerName;
   String? _sellerRole;
   String? _sellerAvatar;
+  bool _sellerLoading = false;
+  bool _detailErrorShown = false;
 
   @override
   void initState() {
@@ -78,16 +86,22 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
         }
         _fav = _product.isFavorited;
       });
+    } else if (result.errorOrNull != null && mounted && !_detailErrorShown) {
+      _detailErrorShown = true;
+      showAppError(result.errorOrNull!);
     }
     final sellerId = _product.sellerId;
     if (sellerId > 0) {
+      setState(() => _sellerLoading = true);
       final profile = await Get.find<ProfileRepository>().getPublicUser(sellerId);
       final pmap = asMap(profile.dataOrNull);
-      if (pmap != null && mounted) {
-        setState(() {
+      if (!mounted) return;
+      setState(() {
+        _sellerLoading = false;
+        if (pmap != null) {
           _sellerName = (pmap['full_name'] as String?) ??
               (pmap['name'] as String?) ??
-              'Seller';
+              'product_seller_unknown'.tr;
           final biz = pmap['business'] as Map?;
           _sellerRole = biz?['business_role']?.toString() ??
               pmap['subtitle_role']?.toString() ??
@@ -95,8 +109,10 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
           _sellerAvatar = pmap['is_business'] == true
               ? (biz?['logo_url'] as String?)
               : (pmap['avatar_url'] as String?);
-        });
-      }
+        } else if (profile.errorOrNull != null) {
+          _sellerName = 'product_seller_unknown'.tr;
+        }
+      });
     }
   }
 
@@ -166,6 +182,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
 
   Future<void> _toggleFavorite() async {
     if (_favLoading || _product.id <= 0) return;
+    HapticFeedback.lightImpact();
     final wasFav = _fav;
     setState(() {
       _fav = !wasFav;
@@ -189,7 +206,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final gallery = _gallery(_product);
+    final gallery = _galleryUrls(_product);
     final maxH = MediaQuery.of(context).size.height * 0.92;
 
     return Container(
@@ -218,7 +235,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _image(c, gallery[_selected]),
+                    _image(c, gallery, _selected),
                     SizedBox(height: 12.dp),
                     _thumbnails(c, gallery),
                     SizedBox(height: 18.dp),
@@ -247,8 +264,8 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
     );
   }
 
-  Widget _image(AppColors c, LinearGradient g) {
-    final url = _product.imageUrl?.trim();
+  Widget _image(AppColors c, List<String> gallery, int selectedIndex) {
+    final url = gallery.isNotEmpty ? gallery[selectedIndex.clamp(0, gallery.length - 1)] : null;
     return AspectRatio(
       aspectRatio: 364 / 210,
       child: ClipRRect(
@@ -256,7 +273,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            DecoratedBox(decoration: BoxDecoration(gradient: g)),
+            DecoratedBox(decoration: BoxDecoration(gradient: _product.tileGradient)),
             if (url != null && url.isNotEmpty)
               Image.network(
                 url,
@@ -310,7 +327,22 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
     );
   }
 
-  Widget _thumbnails(AppColors c, List<LinearGradient> gallery) {
+  Widget _thumbnails(AppColors c, List<String> gallery) {
+    if (gallery.isEmpty) {
+      return Row(
+        children: [
+          Container(
+            width: 58.dp,
+            height: 58.dp,
+            decoration: BoxDecoration(
+              gradient: _product.tileGradient,
+              borderRadius: BorderRadius.circular(12.dp),
+              border: Border.all(color: c.accent, width: 2.dp),
+            ),
+          ),
+        ],
+      );
+    }
     return Row(
       children: [
         for (int i = 0; i < gallery.length; i++) ...[
@@ -323,12 +355,24 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
               child: Container(
                 width: 58.dp,
                 height: 58.dp,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  gradient: gallery[i],
+                  gradient: _product.tileGradient,
                   borderRadius: BorderRadius.circular(12.dp),
                   border: Border.all(
                     color: i == _selected ? c.accent : Colors.transparent,
                     width: 2.dp,
+                  ),
+                ),
+                child: Image.network(
+                  gallery[i],
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: SvgPicture.asset(
+                      'assets/icons/ic_prod_image.svg',
+                      width: 22.dp,
+                      height: 22.dp,
+                    ),
                   ),
                 ),
               ),
@@ -378,7 +422,9 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   }
 
   Widget _businessCard(AppColors c) {
-    final name = _sellerName ?? 'Seller #${_product.sellerId}';
+    final name = _sellerLoading
+        ? '…'
+        : (_sellerName ?? 'product_seller_unknown'.tr);
     final role = _sellerRole ?? '';
     final initial = initialsOf(name);
     final gradient = avatarGradientFor(_product.sellerId);

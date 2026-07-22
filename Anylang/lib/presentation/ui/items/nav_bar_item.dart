@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
@@ -29,7 +30,10 @@ class NavBarItem extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(12.dp),
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 6.dp, horizontal: 4.dp),

@@ -84,6 +84,8 @@ class LanguageLocalizations extends Translations {
       'search': 'Qidirish',
       'cancel': 'Bekor qilish',
       'confirm': 'Tasdiqlash',
+      'common_cancel': 'Bekor qilish',
+      'common_delete': 'O‘chirish',
       'phone_number': 'Telefon raqami',
       'email_invalid': 'Email manzilini to‘g‘ri kiriting',
       'password_short': 'Parol kamida 8 belgidan iborat bo‘lishi kerak',
@@ -91,6 +93,8 @@ class LanguageLocalizations extends Translations {
       'full_name_required': 'Ismni to‘liq kiriting',
       'verify_required': 'Emailni tasdiqlash kerak',
       'google_failed': 'Google orqali kirib bo‘lmadi',
+      'google_cancelled': 'Google orqali kirish bekor qilindi',
+      'name_too_short': 'Ism juda qisqa',
       'terms_required': 'Shartlarni qabul qilish majburiy',
       'birth_required': 'Tug‘ilgan sanani tanlang',
       'birth_too_young': 'Ro‘yxatdan o‘tish uchun kamida 13 yosh bo‘lishingiz kerak',
@@ -147,6 +151,7 @@ class LanguageLocalizations extends Translations {
       'messages_empty': 'Hali suhbat yo‘q',
       'messages_empty_hint': 'Do‘stlaringizga yozishni boshlang',
       'empty_no_results': 'Natija topilmadi',
+      'messages_search_empty_hint': 'Boshqa ism yoki telefon bilan qidiring',
 
       // Chat (suhbat)
       'chat_empty': 'Hali xabar yo‘q',
@@ -208,6 +213,17 @@ class LanguageLocalizations extends Translations {
       'chat_muted': 'Bildirishnomalar o‘chirildi',
       'chat_unmuted': 'Bildirishnomalar yoqildi',
       'chat_profile_unavailable': 'Profil ochilmadi',
+      'chat_msg_delete_confirm': 'Bu xabarni o‘chirishni xohlaysizmi?',
+      'chat_open_failed': 'Suhbat ochilmadi',
+      'mic_permission_denied': 'Mikrofon uchun ruxsat berilmadi',
+      'voice_upload_failed': 'Ovoz yuklanmadi',
+      'location_permission_needed': 'Joylashuv ruxsati kerak',
+      'location_gps_off': 'GPS yoqilmagan. Sozlamalardan yoqasizmi?',
+      'location_fetch_failed': 'Joylashuv olinmadi',
+      'open_settings': 'Sozlamalar',
+      'chat_contact_fallback': 'Kontakt',
+      'chat_mic_hold': 'Ovoz yozish uchun ushlab turing',
+      'chat_mic_hold_hint': 'Ovoz yozish uchun mikrofonni uzoq bosing',
 
       // Friends
       'friends_search_hint': 'Do‘stlarni qidiring',
@@ -244,6 +260,7 @@ class LanguageLocalizations extends Translations {
       'products_empty': 'Hali mahsulot yo‘q',
       'product_contact': 'Bog‘lanish',
       'product_contact_unavailable': 'Sotuvchi bilan bog‘lanib bo‘lmadi',
+      'product_seller_unknown': 'Sotuvchi noma’lum',
 
       // User / business profile
       'profile_title': 'Profil',
@@ -258,6 +275,7 @@ class LanguageLocalizations extends Translations {
       'profile_certificates': 'Sertifikatlar',
       'profile_factory_images': 'Zavod rasmlari',
       'profile_listings': 'E‘lonlari',
+      'profile_listings_empty': 'Hali e’lon yo‘q',
 
       // O'z profili (S14-S18)
       'profile_native_language': 'Ona tili',
@@ -300,6 +318,7 @@ class LanguageLocalizations extends Translations {
       'settings_unblock': 'Blokdan chiqarish',
       'settings_change_password': 'Parolni o‘zgartirish',
       'settings_logout': 'Hisobdan chiqish',
+      'logout_failed': 'Serverdan chiqib bo‘lmadi, lekin mahalliy sessiya tozalandi',
       'settings_delete_account': 'Akkountni o‘chirish',
       'settings_delete_account_confirm':
           'Akkount soft-delete qilinadi va 365 kun ichida ariza orqali tiklash mumkin. Davom etasizmi?',
@@ -324,6 +343,7 @@ class LanguageLocalizations extends Translations {
       // Tariflar / Obuna (S16)
       'subscription_title': 'Tariflar',
       'subscription_cancel': 'Obunani bekor qilish',
+      'subscription_cancel_confirm': 'Obunani bekor qilishni xohlaysizmi?',
       'subscription_cancelled': 'Obuna bekor qilindi',
       'call_unavailable': 'Qo‘ng‘iroq mavjud emas',
       'friends_remove_title': 'Do‘stni o‘chirish',
@@ -379,6 +399,11 @@ class LanguageLocalizations extends Translations {
       'add_product_currency': 'Valyuta',
       'add_product_category': 'Kategoriya',
       'add_product_category_hint': 'Kategoriyani tanlang',
+      'add_product_cat_clothing': 'Kiyim & aksessuar',
+      'add_product_cat_pottery': 'Kulolchilik',
+      'add_product_cat_wood': 'Yog‘och buyumlar',
+      'add_product_cat_jewelry': 'Taqinchoq',
+      'add_product_cat_other': 'Boshqa',
       'add_product_short_desc': 'Qisqa tavsif',
       'add_product_short_desc_hint': 'Bir jumlada tavsiflang',
       'add_product_detailed_desc': 'Batafsil tavsif',
@@ -409,6 +434,8 @@ class LanguageLocalizations extends Translations {
       'jonli_translating': 'Tarjima qilinmoqda…',
       'jonli_reading_to_you': 'SIZGA O‘QILMOQDA',
       'jonli_placeholder': 'Gapiring — tarjima shu yerda chiqadi',
+      'jonli_session_failed': 'Sessiya ochilmadi',
+      'jonli_translate_failed': 'Tarjima bo‘lmadi',
     },
     'ru_RU': {
       'app_name': 'AnyLang',
@@ -466,6 +493,8 @@ class LanguageLocalizations extends Translations {
       'search': 'Поиск',
       'cancel': 'Отмена',
       'confirm': 'Подтвердить',
+      'common_cancel': 'Отмена',
+      'common_delete': 'Удалить',
       'phone_number': 'Номер телефона',
       'email_invalid': 'Введите корректный email',
       'password_short': 'Пароль должен быть не короче 8 символов',
@@ -473,6 +502,8 @@ class LanguageLocalizations extends Translations {
       'full_name_required': 'Введите полное имя',
       'verify_required': 'Подтвердите email',
       'google_failed': 'Не удалось войти через Google',
+      'google_cancelled': 'Вход через Google отменён',
+      'name_too_short': 'Имя слишком короткое',
       'terms_required': 'Необходимо принять условия',
       'birth_required': 'Выберите дату рождения',
       'birth_too_young': 'Для регистрации вам должно быть не менее 13 лет',
@@ -527,6 +558,7 @@ class LanguageLocalizations extends Translations {
       'messages_empty': 'Пока нет бесед',
       'messages_empty_hint': 'Начните переписку с друзьями',
       'empty_no_results': 'Ничего не найдено',
+      'messages_search_empty_hint': 'Попробуйте другое имя или номер',
 
       // Chat (беседа)
       'chat_empty': 'Пока нет сообщений',
@@ -588,6 +620,17 @@ class LanguageLocalizations extends Translations {
       'chat_muted': 'Уведомления отключены',
       'chat_unmuted': 'Уведомления включены',
       'chat_profile_unavailable': 'Профиль недоступен',
+      'chat_msg_delete_confirm': 'Удалить это сообщение?',
+      'chat_open_failed': 'Не удалось открыть чат',
+      'mic_permission_denied': 'Нет доступа к микрофону',
+      'voice_upload_failed': 'Не удалось загрузить голосовое сообщение',
+      'location_permission_needed': 'Нужен доступ к геолокации',
+      'location_gps_off': 'GPS выключен. Открыть настройки?',
+      'location_fetch_failed': 'Не удалось получить местоположение',
+      'open_settings': 'Настройки',
+      'chat_contact_fallback': 'Контакт',
+      'chat_mic_hold': 'Удерживайте для записи голоса',
+      'chat_mic_hold_hint': 'Удерживайте микрофон для записи голоса',
 
       // Friends
       'friends_search_hint': 'Поиск друзей',
@@ -624,6 +667,7 @@ class LanguageLocalizations extends Translations {
       'products_empty': 'Пока нет товаров',
       'product_contact': 'Связаться',
       'product_contact_unavailable': 'Не удалось связаться с продавцом',
+      'product_seller_unknown': 'Продавец неизвестен',
 
       // User / business profile
       'profile_title': 'Профиль',
@@ -638,6 +682,7 @@ class LanguageLocalizations extends Translations {
       'profile_certificates': 'Сертификаты',
       'profile_factory_images': 'Фото производства',
       'profile_listings': 'Объявления',
+      'profile_listings_empty': 'Пока нет объявлений',
 
       // Свой профиль (S14-S18)
       'profile_native_language': 'Родной язык',
@@ -680,6 +725,7 @@ class LanguageLocalizations extends Translations {
       'settings_unblock': 'Разблокировать',
       'settings_change_password': 'Изменить пароль',
       'settings_logout': 'Выйти из аккаунта',
+      'logout_failed': 'Не удалось выйти на сервере, но локальная сессия очищена',
       'settings_delete_account': 'Удалить аккаунт',
       'settings_delete_account_confirm':
           'Аккаунт будет мягко удалён. Восстановление по заявке возможно в течение 365 дней. Продолжить?',
@@ -704,6 +750,7 @@ class LanguageLocalizations extends Translations {
       // Тарифы / Подписка (S16)
       'subscription_title': 'Тарифы',
       'subscription_cancel': 'Отменить подписку',
+      'subscription_cancel_confirm': 'Отменить подписку?',
       'subscription_cancelled': 'Подписка отменена',
       'call_unavailable': 'Звонок недоступен',
       'friends_remove_title': 'Удалить друга',
@@ -759,6 +806,11 @@ class LanguageLocalizations extends Translations {
       'add_product_currency': 'Валюта',
       'add_product_category': 'Категория',
       'add_product_category_hint': 'Выберите категорию',
+      'add_product_cat_clothing': 'Одежда и аксессуары',
+      'add_product_cat_pottery': 'Керамика',
+      'add_product_cat_wood': 'Деревянные изделия',
+      'add_product_cat_jewelry': 'Украшения',
+      'add_product_cat_other': 'Другое',
       'add_product_short_desc': 'Краткое описание',
       'add_product_short_desc_hint': 'Опишите одним предложением',
       'add_product_detailed_desc': 'Подробное описание',
@@ -789,6 +841,8 @@ class LanguageLocalizations extends Translations {
       'jonli_translating': 'Переводится…',
       'jonli_reading_to_you': 'ОЗВУЧИВАЕТСЯ ВАМ',
       'jonli_placeholder': 'Говорите — перевод появится здесь',
+      'jonli_session_failed': 'Не удалось открыть сессию',
+      'jonli_translate_failed': 'Не удалось перевести',
     },
     'us_US': {
       'app_name': 'AnyLang',
@@ -846,6 +900,8 @@ class LanguageLocalizations extends Translations {
       'search': 'Search',
       'cancel': 'Cancel',
       'confirm': 'Confirm',
+      'common_cancel': 'Cancel',
+      'common_delete': 'Delete',
       'phone_number': 'Phone number',
       'email_invalid': 'Enter a valid email',
       'password_short': 'Password must be at least 8 characters',
@@ -853,6 +909,8 @@ class LanguageLocalizations extends Translations {
       'full_name_required': 'Enter your full name',
       'verify_required': 'Please verify your email',
       'google_failed': 'Google sign-in failed',
+      'google_cancelled': 'Google sign-in was cancelled',
+      'name_too_short': 'Name is too short',
       'terms_required': 'You must accept the terms',
       'birth_required': 'Select your birth date',
       'birth_too_young': 'You must be at least 13 years old to sign up',
@@ -907,6 +965,7 @@ class LanguageLocalizations extends Translations {
       'messages_empty': 'No conversations yet',
       'messages_empty_hint': 'Start chatting with your friends',
       'empty_no_results': 'No results',
+      'messages_search_empty_hint': 'Try a different name or phone number',
 
       // Chat
       'chat_empty': 'No messages yet',
@@ -968,6 +1027,17 @@ class LanguageLocalizations extends Translations {
       'chat_muted': 'Notifications muted',
       'chat_unmuted': 'Notifications unmuted',
       'chat_profile_unavailable': 'Profile unavailable',
+      'chat_msg_delete_confirm': 'Delete this message?',
+      'chat_open_failed': 'Could not open chat',
+      'mic_permission_denied': 'Microphone permission denied',
+      'voice_upload_failed': 'Voice upload failed',
+      'location_permission_needed': 'Location permission required',
+      'location_gps_off': 'GPS is off. Open settings?',
+      'location_fetch_failed': 'Could not get location',
+      'open_settings': 'Settings',
+      'chat_contact_fallback': 'Contact',
+      'chat_mic_hold': 'Hold to record voice',
+      'chat_mic_hold_hint': 'Hold the mic button to record voice',
 
       // Friends
       'friends_search_hint': 'Search friends',
@@ -1004,6 +1074,7 @@ class LanguageLocalizations extends Translations {
       'products_empty': 'No products yet',
       'product_contact': 'Contact',
       'product_contact_unavailable': 'Could not contact seller',
+      'product_seller_unknown': 'Unknown seller',
 
       // User / business profile
       'profile_title': 'Profile',
@@ -1018,6 +1089,7 @@ class LanguageLocalizations extends Translations {
       'profile_certificates': 'Certificates',
       'profile_factory_images': 'Factory photos',
       'profile_listings': 'Listings',
+      'profile_listings_empty': 'No listings yet',
 
       // Own profile (S14-S18)
       'profile_native_language': 'Native language',
@@ -1060,6 +1132,7 @@ class LanguageLocalizations extends Translations {
       'settings_unblock': 'Unblock',
       'settings_change_password': 'Change password',
       'settings_logout': 'Log out',
+      'logout_failed': 'Server logout failed, but local session was cleared',
       'settings_delete_account': 'Delete account',
       'settings_delete_account_confirm':
           'Your account will be soft-deleted and can be restored via application within 365 days. Continue?',
@@ -1084,6 +1157,7 @@ class LanguageLocalizations extends Translations {
       // Subscription (S16)
       'subscription_title': 'Plans',
       'subscription_cancel': 'Cancel subscription',
+      'subscription_cancel_confirm': 'Cancel your subscription?',
       'subscription_cancelled': 'Subscription cancelled',
       'call_unavailable': 'Call unavailable',
       'friends_remove_title': 'Remove friend',
@@ -1139,6 +1213,11 @@ class LanguageLocalizations extends Translations {
       'add_product_currency': 'Currency',
       'add_product_category': 'Category',
       'add_product_category_hint': 'Select a category',
+      'add_product_cat_clothing': 'Clothing & accessories',
+      'add_product_cat_pottery': 'Pottery',
+      'add_product_cat_wood': 'Woodwork',
+      'add_product_cat_jewelry': 'Jewelry',
+      'add_product_cat_other': 'Other',
       'add_product_short_desc': 'Short description',
       'add_product_short_desc_hint': 'Describe it in one sentence',
       'add_product_detailed_desc': 'Detailed description',
@@ -1169,6 +1248,8 @@ class LanguageLocalizations extends Translations {
       'jonli_translating': 'Translating…',
       'jonli_reading_to_you': 'READING TO YOU',
       'jonli_placeholder': 'Speak — translation appears here',
+      'jonli_session_failed': 'Could not start session',
+      'jonli_translate_failed': 'Translation failed',
     },
   };
 
