@@ -110,42 +110,49 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
     );
   }
 
-  void _markRequested(AddFriendResult source) {
-    final updated = source.copyWith(action: FriendActionState.requested);
+  void _upsertResult(AddFriendResult updated) {
+    final next = state.results.map((e) {
+      return e.id == updated.id ? updated : e;
+    }).toList();
+    // Yangi list — Obx kafolatlangan rebuild.
+    state.results.assignAll(next);
 
-    final resultsIdx = state.results.indexWhere((e) => e.id == source.id);
-    if (resultsIdx >= 0) {
-      state.results[resultsIdx] = updated;
-      state.results.refresh();
-    }
-
-    final sentIdx = state.sentRequests.indexWhere((e) => e.id == source.id);
-    if (sentIdx >= 0) {
-      state.sentRequests[sentIdx] = updated;
-      state.sentRequests.refresh();
+    final sent = state.sentRequests.toList();
+    final sentIdx = sent.indexWhere((e) => e.id == updated.id);
+    if (updated.action == FriendActionState.requested ||
+        updated.action == FriendActionState.message) {
+      if (sentIdx >= 0) {
+        sent[sentIdx] = updated;
+      } else {
+        sent.insert(0, updated);
+      }
     } else {
-      state.sentRequests.insert(0, updated);
+      sent.removeWhere((e) => e.id == updated.id);
     }
+    state.sentRequests.assignAll(sent);
+  }
+
+  void _markRequested(AddFriendResult source, {int? requestId}) {
+    _upsertResult(
+      source.copyWith(
+        action: FriendActionState.requested,
+        requestId: requestId ?? source.requestId,
+      ),
+    );
   }
 
   void _markCancelled(AddFriendResult source) {
-    final updated = AddFriendResult(
-      id: source.id,
-      initial: source.initial,
-      avatarGradient: source.avatarGradient,
-      name: source.name,
-      subtitle: source.subtitle,
-      online: source.online,
-      action: FriendActionState.add,
+    _upsertResult(
+      AddFriendResult(
+        id: source.id,
+        initial: source.initial,
+        avatarGradient: source.avatarGradient,
+        name: source.name,
+        subtitle: source.subtitle,
+        online: source.online,
+        action: FriendActionState.add,
+      ),
     );
-
-    final resultsIdx = state.results.indexWhere((e) => e.id == source.id);
-    if (resultsIdx >= 0) {
-      state.results[resultsIdx] = updated;
-      state.results.refresh();
-    }
-
-    state.sentRequests.removeWhere((e) => e.id == source.id);
   }
 
   @override
@@ -163,42 +170,56 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
         await _openChat(a.result);
       case SendFriendRequest a:
         if (_sendingRequest) return;
+        if (a.result.action == FriendActionState.requested) return;
         _sendingRequest = true;
-        final result = await Get.find<FriendsRepository>().sendRequest(a.result.id);
+        // Optimistic: tugma darhol "So'rov yuborildi".
+        _markRequested(a.result);
+        final result =
+            await Get.find<FriendsRepository>().sendRequest(a.result.id);
         result.when(
           success: (data) {
             final map = asMap(data);
             final requestId = (map?['id'] as num?)?.toInt();
             final status = map?['status']?.toString();
-            if (status == 'accepted') {
-              final updated = a.result.copyWith(action: FriendActionState.message);
-              final resultsIdx =
-                  state.results.indexWhere((e) => e.id == a.result.id);
-              if (resultsIdx >= 0) {
-                state.results[resultsIdx] = updated;
-                state.results.refresh();
-              }
+            if (status == 'accepted' || map?['auto_accepted'] == true) {
+              _upsertResult(
+                a.result.copyWith(action: FriendActionState.message),
+              );
               return;
             }
-            _markRequested(
-              requestId != null
-                  ? a.result.copyWith(requestId: requestId)
-                  : a.result,
-            );
+            _markRequested(a.result, requestId: requestId);
           },
-          failure: showAppError,
+          failure: (err) {
+            final msg = err?.toString() ?? '';
+            // Allaqachon yuborilgan — UI requested holatida qolsin.
+            if (msg.contains('REQUEST_ALREADY_SENT') ||
+                msg.contains('allaqachon')) {
+              _markRequested(a.result);
+              return;
+            }
+            // Boshqa xato — tugmani qaytarish.
+            _markCancelled(a.result);
+            showAppError(err);
+          },
         );
         _sendingRequest = false;
       case CancelFriendRequest a:
         if (_sendingRequest) return;
         final requestId = a.result.requestId;
-        if (requestId == null) return;
+        if (requestId == null) {
+          // requestId yo'q bo'lsa ham UI ni qaytarib, so'rovlarni yangilaymiz.
+          _markCancelled(a.result);
+          await _loadSentRequests();
+          return;
+        }
         _sendingRequest = true;
         final result =
             await Get.find<FriendsRepository>().cancelRequest(requestId);
         result.when(
           success: (_) => _markCancelled(a.result),
-          failure: showAppError,
+          failure: (err) {
+            showAppError(err);
+          },
         );
         _sendingRequest = false;
     }

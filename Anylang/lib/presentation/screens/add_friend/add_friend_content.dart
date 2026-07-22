@@ -116,7 +116,10 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
       itemBuilder: (_, i) {
         final r = items[i];
         if (isFriendsMode) {
-          return _friendItem(r, sendAction);
+          return KeyedSubtree(
+            key: ValueKey('friend-${r.id}-${r.action.name}-${r.requestId}'),
+            child: _friendItem(r, sendAction),
+          );
         }
         return UserSearchItem(
           initial: r.initial,
@@ -135,7 +138,9 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
     final isRequested = r.action == FriendActionState.requested;
     final label = isFriend
         ? 'add_friend_message'.tr
-        : (isRequested ? 'add_friend_cancel_request'.tr : 'add_friend_add'.tr);
+        : (isRequested
+            ? 'add_friend_requested'.tr
+            : 'add_friend_add'.tr);
 
     return FriendResultItem(
       initial: r.initial,
@@ -149,6 +154,7 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
         if (isFriend) {
           sendAction(MessageResult(r));
         } else if (isRequested) {
+          // Status: "So'rov yuborildi" — bekor qilish uchun qayta bosish.
           sendAction(CancelFriendRequest(r));
         } else {
           sendAction(SendFriendRequest(r));
