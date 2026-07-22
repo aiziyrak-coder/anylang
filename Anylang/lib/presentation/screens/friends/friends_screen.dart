@@ -26,7 +26,6 @@ class FriendsScreen extends Screen<FriendsState, void> {
 
   Future<void> _load() async {
     state.loading.value = true;
-    state.friends.clear();
     final result = await Get.find<FriendsRepository>().listFriends();
     result.when(
       success: (data) {
@@ -47,6 +46,8 @@ class FriendsScreen extends Screen<FriendsState, void> {
     switch (action) {
       case FriendsSearchChanged a:
         state.query.value = a.text;
+      case RefreshFriends _:
+        await _load();
       case OpenChat a:
         if (SessionStore.isUserBlocked(a.friend.id)) {
           showAppWarning('chat_blocked'.tr);
@@ -77,10 +78,11 @@ class FriendsScreen extends Screen<FriendsState, void> {
           failure: showAppError,
         );
       case AddFriend _:
-        navigate(
+        await navigate(
           AddFriendScreen(),
           payload: const AddFriendPayload(mode: AddFriendMode.friends),
         );
+        await _load();
     }
   }
 }

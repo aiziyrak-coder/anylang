@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
+import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -96,7 +97,15 @@ class MessagesScreen extends Screen<MessagesState, void> {
           showAppWarning('chat_blocked'.tr);
           return;
         }
-        navigate(
+        // Unread darhol tozalansin.
+        final idx = state.conversations.indexWhere((c) => c.id == conv.id);
+        if (idx >= 0 && state.conversations[idx].unread > 0) {
+          state.conversations[idx] = state.conversations[idx].copyWith(
+            unread: 0,
+            highlighted: false,
+          );
+        }
+        await navigate(
           ChatScreen(),
           payload: ChatPayload(
             chatId: conv.id,
@@ -108,11 +117,16 @@ class MessagesScreen extends Screen<MessagesState, void> {
             avatarUrl: conv.avatarUrl,
           ),
         );
+        if (Get.isRegistered<RealtimeSyncService>()) {
+          Get.find<RealtimeSyncService>().setActiveChat(null);
+        }
+        await _load();
       case NewConversation _:
-        navigate(
+        await navigate(
           AddFriendScreen(),
           payload: const AddFriendPayload(mode: AddFriendMode.chat),
         );
+        await _load();
       case RefreshConversations _:
         await _load();
     }

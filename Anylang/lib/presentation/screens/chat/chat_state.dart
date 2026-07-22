@@ -5,11 +5,10 @@ import 'chat_message.dart';
 
 class ChatState extends GetxController {
   // Suhbatdosh ma'lumoti — Screen.initState'da payload'dan beriladi
-  // (o'zgarmas, shuning uchun oddiy maydonlar).
   String peerName = '';
   String peerInitial = '';
   LinearGradient peerAvatar = avatarTealGradient;
-  bool peerOnline = false;
+  final RxBool peerOnline = false.obs;
   int chatId = 0;
   int peerId = 0;
 

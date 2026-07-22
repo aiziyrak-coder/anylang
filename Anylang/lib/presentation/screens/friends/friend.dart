@@ -46,4 +46,19 @@ class Friend {
       number: json['number'] as String?,
     );
   }
+
+  Friend copyWithOnline(bool online) {
+    final lang = nativeLanguage ?? '';
+    return Friend(
+      id: id,
+      initial: initial,
+      avatarGradient: avatarGradient,
+      name: name,
+      status: online ? 'Onlayn · $lang' : lang,
+      online: online,
+      avatarUrl: avatarUrl,
+      nativeLanguage: nativeLanguage,
+      number: number,
+    );
+  }
 }

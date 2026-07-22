@@ -13,6 +13,7 @@ from app.db.redis import get_redis
 from app.db.session import get_session_factory
 from app.models.user import User
 from app.ws.hub import get_hub
+from app.ws.presence import broadcast_presence
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(def
     redis = await get_redis()
     hub = get_hub()
     await hub.set_online(redis, user_id)
+    await broadcast_presence(user_id, is_online=True)
 
     pubsub = await hub.subscribe(user_id)
     listen_task: asyncio.Task | None = None
@@ -143,3 +145,4 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(def
         except Exception:
             logger.exception("Failed to close pubsub for user %s", user_id)
         await hub.set_offline(redis, user_id)
+        await broadcast_presence(user_id, is_online=False)

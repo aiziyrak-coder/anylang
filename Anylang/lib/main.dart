@@ -10,6 +10,7 @@ import 'data/core/buildNetwork/api_config.dart';
 import 'data/core/buildNetwork/api_service.dart';
 import 'data/core/buildNetwork/token_refresher.dart';
 import 'data/local/session_store.dart';
+import 'data/network/session_bootstrap.dart';
 import 'di/main_module.dart';
 import 'presentation/ui/theme/app_theme.dart';
 import 'presentation/ui/theme/theme_controller.dart';
@@ -129,6 +130,7 @@ class _BootstrapHomeState extends State<_BootstrapHome> {
     try {
       final token = await Get.find<TokenRefresher>().getNewToken();
       if (token != 'none' && token.isNotEmpty) {
+        await connectRealtimeIfNeeded();
         setState(() => _child = MainScreen().build());
         return;
       }

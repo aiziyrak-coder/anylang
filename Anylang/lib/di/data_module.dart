@@ -15,6 +15,7 @@ import '../data/network/live_repository.dart';
 import '../data/network/payment_repository.dart';
 import '../data/network/products_repository.dart';
 import '../data/network/profile_repository.dart';
+import '../data/network/realtime_sync_service.dart';
 import '../data/network/socket_service.dart';
 
 class DataModule {
@@ -64,6 +65,7 @@ class DataModule {
     );
     Get.put<GoogleAuthService>(GoogleAuthService(), permanent: true);
     Get.put<SocketService>(SocketService(), permanent: true);
+    Get.put<RealtimeSyncService>(RealtimeSyncService(), permanent: true);
     Get.put<VoiceRecorderService>(VoiceRecorderService(), permanent: true);
     Get.put<VoicePlayerService>(VoicePlayerService(), permanent: true);
   }

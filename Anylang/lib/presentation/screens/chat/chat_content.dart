@@ -123,7 +123,7 @@ class ChatContent extends ScreenContent<ChatState> {
                   name: state.peerName,
                   initial: state.peerInitial,
                   avatarGradient: state.peerAvatar,
-                  online: state.peerOnline,
+                  online: state.peerOnline.value,
                   searching: state.searching.value,
                   hasSearchQuery: state.searchQuery.value.trim().isNotEmpty,
                   searchController: _search,

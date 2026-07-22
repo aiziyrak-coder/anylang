@@ -18,3 +18,6 @@ class OpenChat extends FriendsAction {
 
 /// Yangi do'st qo'shish tugmasi.
 class AddFriend extends FriendsAction {}
+
+/// Ro'yxatni yangilash (pull-to-refresh / tab).
+class RefreshFriends extends FriendsAction {}

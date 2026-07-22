@@ -15,6 +15,7 @@ import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../../data/network/realtime_sync_service.dart';
 import '../../modal/attachment_bottom_sheet.dart';
 import '../../modal/chat_overflow_sheet.dart';
 import '../../modal/image_picker.dart';
@@ -25,6 +26,7 @@ import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
+import '../messages/messages_state.dart';
 import '../products/product.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
@@ -49,9 +51,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     state.peerName = p.name;
     state.peerInitial = p.initial;
     state.peerAvatar = p.avatarGradient;
-    state.peerOnline = p.online;
+    state.peerOnline.value = p.online;
     state.chatId = p.chatId;
     state.peerId = p.peerId;
+    if (Get.isRegistered<RealtimeSyncService>()) {
+      Get.find<RealtimeSyncService>().setActiveChat(p.chatId);
+    }
     state.muted.value = SessionStore.isChatMuted(p.chatId);
     state.searching.value = false;
     state.searchQuery.value = '';
@@ -611,6 +616,19 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           state.searching.value = false;
           state.searchQuery.value = '';
           return;
+        }
+        if (Get.isRegistered<RealtimeSyncService>()) {
+          Get.find<RealtimeSyncService>().setActiveChat(null);
+        }
+        // Open chat'dan chiqganda unread tozalangan ko‘rinsin.
+        if (Get.isRegistered<MessagesState>() && state.chatId > 0) {
+          final ms = Get.find<MessagesState>();
+          final list = ms.conversations.toList();
+          final i = list.indexWhere((c) => c.id == state.chatId);
+          if (i >= 0 && list[i].unread > 0) {
+            list[i] = list[i].copyWith(unread: 0, highlighted: false);
+            ms.conversations.assignAll(list);
+          }
         }
         await Get.find<VoiceRecorderService>().cancel();
         await Get.find<VoicePlayerService>().stop(save: true);

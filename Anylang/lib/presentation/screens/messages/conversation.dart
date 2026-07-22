@@ -61,4 +61,27 @@ class Conversation {
       avatarUrl: peer['avatar_url'] as String?,
     );
   }
+
+  Conversation copyWith({
+    String? lastMessage,
+    String? time,
+    bool? online,
+    int? unread,
+    bool? highlighted,
+  }) {
+    return Conversation(
+      id: id,
+      peerId: peerId,
+      initial: initial,
+      avatarGradient: avatarGradient,
+      initialColor: initialColor,
+      name: name,
+      lastMessage: lastMessage ?? this.lastMessage,
+      time: time ?? this.time,
+      online: online ?? this.online,
+      unread: unread ?? this.unread,
+      highlighted: highlighted ?? this.highlighted,
+      avatarUrl: avatarUrl,
+    );
+  }
 }

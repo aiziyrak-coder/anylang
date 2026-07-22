@@ -96,6 +96,33 @@ class ChatMessage {
 
   bool get isOutgoing => dir == ChatDir.outgoing;
 
+  ChatMessage withStatus(ChatStatus status) => ChatMessage(
+        id: id,
+        type: type,
+        dir: dir,
+        time: time,
+        status: status,
+        reply: reply,
+        text: text,
+        imageGradient: imageGradient,
+        imageUrl: imageUrl,
+        voiceDuration: voiceDuration,
+        voiceDownloaded: voiceDownloaded,
+        voicePath: voicePath,
+        voiceSamples: voiceSamples,
+        voiceDurationMs: voiceDurationMs,
+        productTitle: productTitle,
+        productPrice: productPrice,
+        locationLabel: locationLabel,
+        locationDistance: locationDistance,
+        fileName: fileName,
+        fileSize: fileSize,
+        fileExt: fileExt,
+        contactName: contactName,
+        contactPhone: contactPhone,
+        contactInitial: contactInitial,
+      );
+
   factory ChatMessage.text({
     required String id,
     required ChatDir dir,

@@ -86,9 +86,13 @@ class FriendsContent extends ScreenContent<FriendsState> {
                 children.addAll(others.map((f) => _item(f, sendAction)));
               }
 
-              return ListView(
-                padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
-                children: children,
+              return RefreshIndicator(
+                onRefresh: () async => sendAction(RefreshFriends()),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
+                  children: children,
+                ),
               );
             }),
           ),
