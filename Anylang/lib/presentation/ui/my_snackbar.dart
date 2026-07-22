@@ -35,9 +35,14 @@ class MySnackBar {
     _lastAt = now;
 
     final ctx = context ?? Get.overlayContext ?? Get.context;
-    if (ctx == null) return;
+    if (ctx == null) {
+      debugPrint('MySnackBar: no context — $title: $text');
+      return;
+    }
 
-    _current?.remove();
+    try {
+      _current?.remove();
+    } catch (_) {}
 
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
@@ -51,14 +56,41 @@ class MySnackBar {
             if (_current == overlayEntry) {
               _current = null;
             }
-            overlayEntry.remove();
+            try {
+              overlayEntry.remove();
+            } catch (_) {}
           },
         );
       },
     );
 
-    _current = overlayEntry;
-    Overlay.of(ctx, rootOverlay: true).insert(overlayEntry);
+    try {
+      _current = overlayEntry;
+      Overlay.of(ctx, rootOverlay: true).insert(overlayEntry);
+      return;
+    } catch (e) {
+      debugPrint('MySnackBar overlay failed: $e');
+      _current = null;
+    }
+
+    // Fallback — Overlay bo‘lmasa ham xabar ko‘rinsin.
+    try {
+      final color = switch (status) {
+        SnackBarStatus.success => const Color(0xFF027A48),
+        SnackBarStatus.error => const Color(0xFFB42318),
+        SnackBarStatus.warning => const Color(0xFFB54708),
+      };
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          content: Text('$title\n$text'),
+          backgroundColor: color,
+          behavior: SnackBarBehavior.floating,
+          duration: duration,
+        ),
+      );
+    } catch (e) {
+      debugPrint('MySnackBar scaffold fallback failed: $e — $title: $text');
+    }
   }
 }
 

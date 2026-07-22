@@ -114,6 +114,36 @@ class RegisterContent extends ScreenContent<RegisterState> {
               ),
               SizedBox(height: 18.dp),
               _terms(context, state, sendAction),
+              Obx(() {
+                final err = state.formError.value;
+                if (err.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: EdgeInsets.only(top: 14.dp),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.dp,
+                      vertical: 10.dp,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB42318).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12.dp),
+                      border: Border.all(
+                        color: const Color(0xFFB42318).withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Text(
+                      err,
+                      style: TextStyle(
+                        color: const Color(0xFFB42318),
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                );
+              }),
               SizedBox(height: 22.dp),
               Obx(() => PrimaryButton(
                     text: 'register_title'.tr,
@@ -122,6 +152,27 @@ class RegisterContent extends ScreenContent<RegisterState> {
                       RegisterSubmit(_nameCtrl.text, _emailCtrl.text, _passCtrl.text),
                     ),
                   )),
+              SizedBox(height: 18.dp),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'have_account'.tr,
+                    style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: Text(
+                      'login'.tr,
+                      style: TextStyle(
+                        color: c.accentText,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
@@ -18,6 +19,8 @@ class RegisterScreen extends Screen<RegisterState, void> {
 
   @override
   void initState(void payload) {
+    state.formError.value = '';
+    state.isLoading.value = false;
     if (state.countryCode.value.isEmpty) {
       state.countryCode.value = 'UZ';
       state.country.value = 'O‘zbekiston';
@@ -30,18 +33,27 @@ class RegisterScreen extends Screen<RegisterState, void> {
     return '${d.year}-$m-$day';
   }
 
+  void _fail(String message) {
+    state.formError.value = message;
+    showAppError(message);
+  }
+
   @override
   Future<void> actionHandler(RegisterState state, MyAction action) async {
     switch (action) {
       case SelectGender a:
         state.gender.value = a.gender;
+        state.formError.value = '';
       case SelectBirthDate a:
         state.birthDate.value = a.date;
+        state.formError.value = '';
       case SelectCountry a:
         state.country.value = a.name;
         state.countryCode.value = a.code.toUpperCase();
+        state.formError.value = '';
       case ToggleTerms a:
         state.termsAccepted.value = a.value;
+        state.formError.value = '';
       case RegisterSubmit a:
         await _submit(state, a);
     }
@@ -51,41 +63,42 @@ class RegisterScreen extends Screen<RegisterState, void> {
     final name = a.fullName.trim();
     final email = a.email.trim().toLowerCase();
     final password = a.password;
+    state.formError.value = '';
 
     if (!state.termsAccepted.value) {
-      showAppError('terms_required'.tr);
+      _fail('terms_required'.tr);
       return;
     }
     if (name.length < 2) {
-      showAppError('full_name_required'.tr);
+      _fail('full_name_required'.tr);
       return;
     }
     if (state.birthDate.value == null) {
-      showAppError('birth_required'.tr);
+      _fail('birth_required'.tr);
       return;
     }
     final ageYears =
         DateTime.now().difference(state.birthDate.value!).inDays / 365.25;
     if (ageYears < 13) {
-      showAppError('birth_too_young'.tr);
+      _fail('birth_too_young'.tr);
       return;
     }
     final country = state.countryCode.value.trim().toUpperCase();
     if (country.length != 2) {
-      showAppError('country_required'.tr);
+      _fail('country_required'.tr);
       return;
     }
     if (!email.contains('@') || !email.contains('.')) {
-      showAppError('email_invalid'.tr);
+      _fail('email_invalid'.tr);
       return;
     }
     if (password.length < 8) {
-      showAppError('password_short'.tr);
+      _fail('password_short'.tr);
       return;
     }
     if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
         !RegExp(r'\d').hasMatch(password)) {
-      showAppError('password_weak'.tr);
+      _fail('password_weak'.tr);
       return;
     }
 
@@ -104,37 +117,62 @@ class RegisterScreen extends Screen<RegisterState, void> {
 
       final data = result.dataOrNull;
       if (data == null) {
-        showAppError(result.errorOrNull ?? 'error'.tr);
+        final err = result.errorOrNull?.toString() ?? 'error'.tr;
+        _fail(err);
         return;
       }
 
       final map = asMap(data);
       final otp = map?['debug_otp']?.toString().trim();
+      final serverMsg = map?['message']?.toString();
 
-      // SMTP yo‘q: OTP bilan darhol verify → asosiy ekran.
+      // SMTP yo‘q / bootstrap: OTP bilan darhol verify → asosiy ekran.
       if (otp != null && otp.length == 6) {
         final verified = await repo.verifyEmail(email: email, code: otp);
         if (verified.dataOrNull != null) {
           showAppMessage('register_done'.tr);
           await connectRealtimeIfNeeded();
-          navigateAndRemoveUntil(MainScreen());
+          _goHome();
           return;
         }
-        showAppError(verified.errorOrNull);
-        navigate(
-          VerifyScreen(),
-          payload: VerifyPayload(email: email, debugOtp: otp),
-        );
+        final verifyErr = verified.errorOrNull?.toString();
+        if (verifyErr != null && verifyErr.isNotEmpty) {
+          _fail(verifyErr);
+        }
+        _goVerify(email, otp);
         return;
       }
 
-      showAppMessage('code_sent'.tr);
+      showAppMessage(serverMsg ?? 'code_sent'.tr);
+      _goVerify(email, otp);
+    } catch (e, st) {
+      debugPrint('register submit error: $e\n$st');
+      _fail(e.toString());
+    } finally {
+      state.isLoading.value = false;
+    }
+  }
+
+  void _goHome() {
+    try {
+      navigateAndRemoveUntil(MainScreen());
+    } catch (e) {
+      debugPrint('navigate home failed: $e');
+      Get.offAll(() => MainScreen().build());
+    }
+  }
+
+  void _goVerify(String email, String? otp) {
+    try {
       navigate(
         VerifyScreen(),
         payload: VerifyPayload(email: email, debugOtp: otp),
       );
-    } finally {
-      state.isLoading.value = false;
+    } catch (e) {
+      debugPrint('navigate verify failed: $e');
+      final screen = VerifyScreen();
+      screen.payload = VerifyPayload(email: email, debugOtp: otp);
+      Get.to(() => screen.build());
     }
   }
 }

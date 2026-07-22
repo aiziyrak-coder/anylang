@@ -148,8 +148,9 @@ async def register(
         else "Ro'yxatdan o'tdingiz. Tasdiqlash kodi emailga yuborilmadi — keyinroq qayta yuboring",
         "resend_after_seconds": resend_after,
     }
-    # Bootstrap / SMTP fail-open: return OTP so the app can complete verify.
-    if settings.allow_otp_in_response and ((not emailed) or settings.debug):
+    # When enabled, always return OTP so the mobile app can finish signup
+    # even if SMTP is misconfigured or "succeeds" without delivery.
+    if settings.allow_otp_in_response:
         out["debug_otp"] = code
     return out
 
@@ -205,7 +206,7 @@ async def resend_verification(
         "resend_after_seconds": resend_after,
     }
     settings = get_settings()
-    if settings.allow_otp_in_response and ((not emailed) or settings.debug):
+    if settings.allow_otp_in_response:
         out["debug_otp"] = code
     return out
 

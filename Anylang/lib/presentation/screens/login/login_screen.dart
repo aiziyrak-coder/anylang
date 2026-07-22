@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 
 import '../../../data/network/auth_repository.dart';
-import '../../../data/network/google_auth_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -73,36 +72,8 @@ class LoginScreen extends Screen<LoginState, void> {
       case GoToRegister _:
         navigate(RegisterScreen());
       case GoogleLogin _:
-        if (state.isGoogleLoading.value || state.isLoading.value) return;
-        state.isGoogleLoading.value = true;
-        try {
-          final google = Get.find<GoogleAuthService>();
-          final idToken = await google.signInForIdToken();
-          if (idToken == null) return; // cancelled
-
-          final repo = Get.find<AuthRepository>();
-          final outcome = await repo.loginWithGoogleDetailed(idToken: idToken);
-          final body = outcome.body;
-          if (body != null && body['error_code'] == 'ACCOUNT_DELETED') {
-            showAppMessage('account_deleted_restore'.tr);
-            final email = body['email']?.toString() ?? '';
-            navigate(RestoreAccountScreen(), payload: email);
-            return;
-          }
-          outcome.result.when(
-            success: (_) async {
-              await connectRealtimeIfNeeded();
-              navigateAndRemoveUntil(MainScreen());
-            },
-            failure: showAppError,
-          );
-        } catch (e) {
-          showAppError(e.toString().contains('GOOGLE') || e.toString().contains('Google')
-              ? 'google_failed'.tr
-              : e.toString());
-        } finally {
-          state.isGoogleLoading.value = false;
-        }
+        showAppMessage('google_coming_soon'.tr);
+        return;
       case ForgotPassword _:
         navigate(ForgotPasswordScreen());
       case GoToRestoreAccount _:

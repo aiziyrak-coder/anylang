@@ -34,9 +34,9 @@ async def register(
     await enforce_rate_limit(
         redis,
         f"auth:register:ip:{ip}",
-        limit=10,
+        limit=30,
         window_seconds=3600,
-        message="Juda ko'p ro'yxatdan o'tish urinishi",
+        message="Juda ko'p ro'yxatdan o'tish urinishi. Biroz kutib qayta urinib ko'ring",
     )
     data = await auth_service.register(
         db,

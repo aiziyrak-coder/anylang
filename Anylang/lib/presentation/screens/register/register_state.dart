@@ -7,4 +7,6 @@ class RegisterState extends GetxController {
   RxString countryCode = ''.obs; // ISO alpha-2
   RxBool termsAccepted = false.obs;
   RxBool isLoading = false.obs;
+  /// Inline xato — snackbar ishlamasa ham tugma ostida ko‘rinadi.
+  RxString formError = ''.obs;
 }
