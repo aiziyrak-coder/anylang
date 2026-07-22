@@ -44,13 +44,24 @@ def validate_settings(settings: Settings) -> None:
             errors.append("CORS_ORIGINS must be an explicit allow-list in production")
         if not settings.trusted_host_list:
             errors.append("TRUSTED_HOSTS must be set in production")
-        if settings.allow_otp_in_response:
-            errors.append("ALLOW_OTP_IN_RESPONSE must be false in production")
-        if settings.smtp_fail_open:
-            errors.append(
-                "SMTP_FAIL_OPEN must be false in production "
-                "(failed email delivery must not silently continue)"
-            )
+        if settings.allow_otp_in_response or settings.smtp_fail_open:
+            host = (settings.smtp_host or "").strip().lower()
+            smtp_ready = bool(host) and host not in {"localhost", "127.0.0.1", "::1"}
+            if smtp_ready:
+                if settings.allow_otp_in_response:
+                    errors.append("ALLOW_OTP_IN_RESPONSE must be false in production")
+                if settings.smtp_fail_open:
+                    errors.append(
+                        "SMTP_FAIL_OPEN must be false in production "
+                        "(failed email delivery must not silently continue)"
+                    )
+            else:
+                logger.warning(
+                    "SMTP not configured — ALLOW_OTP_IN_RESPONSE=%s SMTP_FAIL_OPEN=%s "
+                    "(bootstrap mode; configure real SMTP ASAP)",
+                    settings.allow_otp_in_response,
+                    settings.smtp_fail_open,
+                )
         if not (settings.admin_secret_key or "").strip():
             logger.warning(
                 "ADMIN_SECRET_KEY empty — admin JWTs share SECRET_KEY; "

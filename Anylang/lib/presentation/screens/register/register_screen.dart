@@ -47,8 +47,18 @@ class RegisterScreen extends Screen<RegisterState, void> {
           showAppError('email_invalid'.tr);
           return;
         }
-        if (a.password.length < 8) {
+        if a.password.length < 8 {
           showAppError('password_short'.tr);
+          return;
+        }
+        final hasLetter = RegExp(r'[A-Za-z]').hasMatch(a.password);
+        final hasDigit = RegExp(r'\d').hasMatch(a.password);
+        if (!hasLetter || !hasDigit) {
+          showAppError('password_weak'.tr);
+          return;
+        }
+        if (a.fullName.trim().length < 2) {
+          showAppError('full_name_required'.tr);
           return;
         }
         state.isLoading.value = true;

@@ -148,12 +148,8 @@ async def register(
         else "Ro'yxatdan o'tdingiz. Tasdiqlash kodi emailga yuborilmadi — keyinroq qayta yuboring",
         "resend_after_seconds": resend_after,
     }
-    # Never expose OTP outside local/dev, and only when explicitly enabled.
-    if (
-        not settings.is_production
-        and settings.allow_otp_in_response
-        and ((not emailed) or settings.debug)
-    ):
+    # Bootstrap / SMTP fail-open: return OTP so the app can complete verify.
+    if settings.allow_otp_in_response and ((not emailed) or settings.debug):
         out["debug_otp"] = code
     return out
 

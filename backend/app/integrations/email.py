@@ -50,6 +50,17 @@ async def send_otp_email(to_email: str, code: str, app_language: str = "uz_UZ") 
     """Send OTP via SMTP. Returns True if delivered; False if logged/fallback."""
     settings = get_settings()
     msg = _build_message(to_email, code, app_language)
+    host = (settings.smtp_host or "").strip()
+
+    if not host or host in {"localhost", "127.0.0.1", "::1"}:
+        logger.warning(
+            "SMTP not configured (host=%r); OTP not emailed — email=%s",
+            host,
+            to_email,
+        )
+        if settings.is_production and not settings.smtp_fail_open:
+            raise RuntimeError("SMTP is not configured")
+        return False
 
     try:
         await asyncio.to_thread(_send_smtp_sync, msg)
