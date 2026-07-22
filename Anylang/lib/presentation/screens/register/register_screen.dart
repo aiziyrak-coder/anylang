@@ -47,7 +47,7 @@ class RegisterScreen extends Screen<RegisterState, void> {
           showAppError('email_invalid'.tr);
           return;
         }
-        if a.password.length < 8 {
+        if (a.password.length < 8) {
           showAppError('password_short'.tr);
           return;
         }
