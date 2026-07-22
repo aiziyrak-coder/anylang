@@ -24,6 +24,9 @@ class ProfileAccount {
   final LinearGradient avatarGradient;
   final bool verified;
   final String flagAsset;
+  /// ISO alpha-2 (API uchun).
+  final String countryCode;
+  /// Ko'rinadigan nom (Oʻzbekiston).
   final String country;
   final String? username;
   final String? nativeLanguage;
@@ -48,6 +51,7 @@ class ProfileAccount {
     required this.initial,
     required this.avatarGradient,
     required this.flagAsset,
+    required this.countryCode,
     required this.country,
     this.id = 0,
     this.verified = false,
@@ -98,6 +102,7 @@ class ProfileAccount {
       avatarGradient: avatarGradientFor(id),
       verified: json['verified_badge'] == true,
       flagAsset: flagAssetForCountry(countryCode),
+      countryCode: countryCode.toUpperCase(),
       country: formatCountryName(countryCode),
       username: number.isEmpty ? null : formatNumber(number),
       nativeLanguage: formatLanguageName(json['native_language'] as String?),

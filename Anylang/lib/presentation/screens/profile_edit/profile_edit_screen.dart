@@ -17,7 +17,7 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
   @override
   void initState(ProfileAccount? payload) {
     state.account = payload;
-    state.country.value = payload?.country ?? '';
+    state.country.value = payload?.countryCode ?? '';
     state.gender.value = 'male';
     _hydrateFromApi();
   }
@@ -29,7 +29,12 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
         final map = asMap(data);
         if (map == null) return;
         state.account = ProfileAccount.fromApi(map);
-        state.country.value = (map['country'] as String?) ?? state.country.value;
+        final code = (map['country'] as String?)?.trim().toUpperCase() ?? '';
+        if (code.length == 2) {
+          state.country.value = code;
+        } else if (state.account?.countryCode.isNotEmpty == true) {
+          state.country.value = state.account!.countryCode;
+        }
         state.gender.value = (map['gender'] as String?) ?? 'male';
         final bd = map['birth_date']?.toString();
         if (bd != null && bd.isNotEmpty) {

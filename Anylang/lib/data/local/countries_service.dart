@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 
 import '../../domain/models/country_option.dart';
-import '../core/mappers.dart';
+import '../core/country_names.dart';
 import '../network/countries_repository.dart';
 
 /// Davlatlar katalogi: birinchi ochilishda API → Hive, keyin cache,
@@ -52,11 +52,8 @@ class CountriesService extends GetxService {
 
   String displayName(String? code) {
     if (code == null || code.isEmpty) return '';
-    final c = code.toUpperCase();
-    for (final o in cached) {
-      if (o.code == c) return o.localizedName;
-    }
-    return c;
+    final name = resolveCountryName(code, catalog: cached);
+    return name == '—' ? '' : name;
   }
 
   CountryOption? findByCode(String? code) {
@@ -77,10 +74,13 @@ class CountriesService extends GetxService {
       final result = await _repo.listCountries();
       result.when(
         success: (data) {
-          final map = asMap(data);
+          final map = data is Map<String, dynamic>
+              ? data
+              : (data is Map ? Map<String, dynamic>.from(data) : null);
           if (map == null) return;
           final version = map['version']?.toString();
-          final items = asList(data)
+          final rawItems = map['items'];
+          final items = (rawItems is List ? rawItems : const <dynamic>[])
               .whereType<Map>()
               .map((e) => CountryOption.fromJson(Map<String, dynamic>.from(e)))
               .where((e) => e.code.length == 2)

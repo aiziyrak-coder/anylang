@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../data/local/countries_service.dart';
+import '../../../data/core/mappers.dart';
 import '../../modal/country_picker_bottom_sheet.dart';
 import '../../modal/simple_list_picker_bottom_sheet.dart';
 import '../../ui/app_top_bar.dart';
@@ -123,13 +123,10 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                         Expanded(
                           child: Obx(() {
                             final code = state.country.value;
-                            final label = code.isEmpty
-                                ? null
-                                : Get.find<CountriesService>().displayName(code);
                             return AppPickerField(
                               label: 'country'.tr,
                               hint: 'country'.tr,
-                              value: label,
+                              value: code.isEmpty ? null : formatCountryName(code),
                               icon: Icons.keyboard_arrow_down_rounded,
                               onTap: () => _pickCountry(context, state, sendAction),
                             );

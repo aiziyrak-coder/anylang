@@ -4,6 +4,10 @@ import 'package:get/get.dart';
 import '../../presentation/ui/theme/colors.dart';
 import '../../presentation/ui/theme/gradients.dart';
 import '../local/countries_service.dart';
+import '../../domain/models/country_option.dart';
+import 'country_names.dart';
+
+export 'country_names.dart' show resolveCountryName;
 
 final List<LinearGradient> kAvatarGradients = [
   avatarTealGradient,
@@ -82,15 +86,13 @@ String formatNumber(String number) {
   return '${number.substring(0, 3)} ${number.substring(3, 5)} ${number.substring(5)}';
 }
 
-/// ISO alpha-2 → lokalizatsiyalangan davlat nomi (cache yoki kod).
-String formatCountryName(String? code) {
-  if (code == null || code.trim().isEmpty) return '—';
-  final c = code.trim().toUpperCase();
+/// ISO alpha-2 → lokalizatsiyalangan davlat nomi (hech qachon faqat kod emas).
+String formatCountryName(String? codeOrName) {
+  List<CountryOption>? catalog;
   if (Get.isRegistered<CountriesService>()) {
-    final name = Get.find<CountriesService>().displayName(c);
-    if (name.isNotEmpty) return name;
+    catalog = Get.find<CountriesService>().cached;
   }
-  return c;
+  return resolveCountryName(codeOrName, catalog: catalog);
 }
 
 /// ISO 639-1 → lokalizatsiya kaliti (`lang_name_uz` va h.k.).

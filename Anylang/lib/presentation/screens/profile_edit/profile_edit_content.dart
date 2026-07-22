@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../data/local/countries_service.dart';
+import '../../../data/core/mappers.dart';
 import '../../modal/country_picker_bottom_sheet.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/primary_button.dart';
@@ -108,14 +108,11 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                         Expanded(
                           child: Obx(() {
                             final code = state.country.value;
-                            final label = code.isEmpty
-                                ? null
-                                : Get.find<CountriesService>().displayName(code);
                             return AppPickerField(
                               label: 'country'.tr,
                               hint: 'O‘zbekiston',
                               icon: Icons.keyboard_arrow_down_rounded,
-                              value: label,
+                              value: code.isEmpty ? null : formatCountryName(code),
                               onTap: () => _pickCountry(context, state, sendAction),
                             );
                           }),
