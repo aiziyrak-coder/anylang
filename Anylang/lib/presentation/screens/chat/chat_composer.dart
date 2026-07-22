@@ -49,6 +49,9 @@ class ChatComposer extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
+        color: c.isDark
+            ? const Color(0xCC07111F)
+            : const Color(0xE6F5F8FC),
         border: Border(top: BorderSide(color: c.outline)),
       ),
       padding: EdgeInsets.fromLTRB(12.dp, 8.dp, 12.dp, 12.dp),

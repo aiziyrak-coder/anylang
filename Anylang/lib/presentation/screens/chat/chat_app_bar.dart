@@ -46,6 +46,9 @@ class ChatAppBar extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(6.dp, 6.dp, 10.dp, 10.dp),
       decoration: BoxDecoration(
+        color: c.isDark
+            ? const Color(0xCC07111F)
+            : const Color(0xE6F5F8FC),
         border: Border(bottom: BorderSide(color: c.outline)),
       ),
       child: searching ? _searchRow(c) : _peerRow(c),

@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import '../../../data/audio/voice_recorder_service.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
-import '../../ui/gradient_background.dart';
+import '../../ui/chat_wallpaper_background.dart';
 import '../../ui/items/chat_message_item.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -97,7 +97,7 @@ class ChatContent extends ScreenContent<ChatState> {
     final c = context.appColors;
     final recorder = Get.find<VoiceRecorderService>();
 
-    return GradientBackground(
+    return ChatWallpaperBackground(
       child: SafeArea(
         child: Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
