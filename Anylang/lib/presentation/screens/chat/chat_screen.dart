@@ -719,7 +719,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _attachFile() async {
-    final picked = await FilePicker.pickFiles(withData: false);
+    final picked = await FilePicker.platform.pickFiles(withData: false);
     if (picked == null || picked.files.isEmpty) return;
     final file = picked.files.first;
     final path = file.path;
