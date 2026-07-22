@@ -5,7 +5,17 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-MessageType = Literal["text", "image", "video", "audio", "file", "voice"]
+MessageType = Literal[
+    "text",
+    "image",
+    "video",
+    "audio",
+    "file",
+    "voice",
+    "product",
+    "location",
+    "contact",
+]
 
 
 class InterlocutorOut(BaseModel):

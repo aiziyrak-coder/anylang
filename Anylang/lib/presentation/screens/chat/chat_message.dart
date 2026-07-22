@@ -38,8 +38,9 @@ class ChatMessage {
   // text
   final String? text;
 
-  // image (placeholder gradient)
+  // image
   final LinearGradient? imageGradient;
+  final String? imageUrl;
 
   // voice
   final String? voiceDuration; // "0:21"
@@ -75,6 +76,7 @@ class ChatMessage {
     this.reply,
     this.text,
     this.imageGradient,
+    this.imageUrl,
     this.voiceDuration,
     this.voiceDownloaded = true,
     this.voicePath,
@@ -116,8 +118,10 @@ class ChatMessage {
     required String id,
     required ChatDir dir,
     required String time,
-    required LinearGradient gradient,
+    LinearGradient? gradient,
+    String? url,
     ChatStatus status = ChatStatus.read,
+    ChatReply? reply,
   }) =>
       ChatMessage(
         id: id,
@@ -125,7 +129,9 @@ class ChatMessage {
         dir: dir,
         time: time,
         status: status,
+        reply: reply,
         imageGradient: gradient,
+        imageUrl: url,
       );
 
   factory ChatMessage.voice({

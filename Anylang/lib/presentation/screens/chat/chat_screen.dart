@@ -1,6 +1,10 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../data/audio/voice_player_service.dart';
 import '../../../data/audio/voice_recorder_service.dart';
@@ -9,14 +13,19 @@ import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
+import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/attachment_bottom_sheet.dart';
 import '../../modal/chat_overflow_sheet.dart';
+import '../../modal/image_picker.dart';
 import '../../modal/message_actions_dialog.dart';
+import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../../utils/size_controller.dart';
+import '../products/product.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
 import 'chat_action.dart';
@@ -187,14 +196,85 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         reply: reply,
       );
     }
-    return ChatMessage.text(
-      id: '${json['id']}',
-      dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
-      time: formatChatTime(created),
-      text: text,
-      status: status,
-      reply: reply,
-    );
+    final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
+    final dir = outgoing ? ChatDir.outgoing : ChatDir.incoming;
+    final time = formatChatTime(created);
+    final id = '${json['id']}';
+    switch (type) {
+      case 'image':
+        return ChatMessage.image(
+          id: id,
+          dir: dir,
+          time: time,
+          url: meta['url']?.toString(),
+          gradient: avatarTealGradient,
+          status: status,
+          reply: reply,
+        );
+      case 'file':
+        final name = meta['filename']?.toString() ?? 'file';
+        final size = meta['size'];
+        final ext = name.contains('.')
+            ? name.split('.').last.toUpperCase()
+            : 'FILE';
+        return ChatMessage.file(
+          id: id,
+          dir: dir,
+          time: time,
+          name: name,
+          size: size is num ? _formatBytes(size.toInt()) : '—',
+          ext: ext,
+          status: status,
+        );
+      case 'product':
+        return ChatMessage.product(
+          id: id,
+          dir: dir,
+          time: time,
+          title: meta['name']?.toString() ??
+              meta['product_name']?.toString() ??
+              'chat_preview_product'.tr,
+          price: meta['price']?.toString() ?? '—',
+          status: status,
+        );
+      case 'location':
+        return ChatMessage.location(
+          id: id,
+          dir: dir,
+          time: time,
+          label: meta['label']?.toString() ?? 'chat_preview_location'.tr,
+          distance: '',
+          status: status,
+        );
+      case 'contact':
+        final name = meta['contact_name']?.toString() ?? 'Kontakt';
+        return ChatMessage.contact(
+          id: id,
+          dir: dir,
+          time: time,
+          name: name,
+          phone: meta['contact_phone']?.toString() ?? '',
+          initial: initialsOf(name),
+          status: status,
+        );
+      default:
+        return ChatMessage.text(
+          id: id,
+          dir: dir,
+          time: time,
+          text: text,
+          status: status,
+          reply: reply,
+        );
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   ChatReply? _replyFromApi(Map<String, dynamic> json, int? me) {
@@ -290,8 +370,21 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         if (kind != null) sendAction(PickAttachment(kind));
 
       case PickAttachment a:
-        showAppMessage('Media yuklash tez orada');
-        state.messages.add(_attachmentMessage(a.kind));
+        if (state.chatId <= 0 || state.sending.value) return;
+        switch (a.kind) {
+          case AttachKind.gallery:
+            await _attachImage(ImageSource.gallery);
+          case AttachKind.camera:
+            await _attachImage(ImageSource.camera);
+          case AttachKind.file:
+            await _attachFile();
+          case AttachKind.product:
+            await _attachProduct();
+          case AttachKind.location:
+            await _attachLocation();
+          case AttachKind.contact:
+            await _attachContact();
+        }
 
       case LongPressMessage a:
         final msg = a.message;
@@ -605,58 +698,414 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     );
   }
 
-  ChatMessage _attachmentMessage(AttachKind kind) {
-    final id = _nextId();
-    final time = _now();
-    switch (kind) {
-      case AttachKind.gallery:
-      case AttachKind.camera:
-        return ChatMessage.image(
-          id: id,
-          dir: ChatDir.outgoing,
-          time: time,
-          gradient: avatarTealGradient,
-          status: ChatStatus.sent,
-        );
-      case AttachKind.product:
-        return ChatMessage.product(
-          id: id,
-          dir: ChatDir.outgoing,
-          time: time,
-          title: 'chat_preview_product'.tr,
-          price: '—',
-          status: ChatStatus.sent,
-        );
-      case AttachKind.file:
-        return ChatMessage.file(
-          id: id,
-          dir: ChatDir.outgoing,
-          time: time,
-          name: 'file.bin',
-          size: '—',
-          ext: 'BIN',
-          status: ChatStatus.sent,
-        );
-      case AttachKind.location:
-        return ChatMessage.location(
-          id: id,
-          dir: ChatDir.outgoing,
-          time: time,
-          label: 'Manzil',
-          distance: '',
-          status: ChatStatus.sent,
-        );
-      case AttachKind.contact:
-        return ChatMessage.contact(
-          id: id,
-          dir: ChatDir.outgoing,
-          time: time,
-          name: 'Kontakt',
-          phone: '',
-          initial: 'K',
-          status: ChatStatus.sent,
-        );
+  Future<void> _attachImage(ImageSource source) async {
+    final file = await pickImage(context, source: source);
+    if (file == null) return;
+    final optimistic = ChatMessage.image(
+      id: _nextId(),
+      dir: ChatDir.outgoing,
+      time: _now(),
+      url: file.path,
+      gradient: avatarTealGradient,
+      status: ChatStatus.sent,
+      reply: _replyFor(state),
+    );
+    await _uploadAndSendMedia(
+      filePath: file.path,
+      mediaType: 'image',
+      messageType: 'image',
+      optimistic: optimistic,
+    );
+  }
+
+  Future<void> _attachFile() async {
+    final picked = await FilePicker.pickFiles(withData: false);
+    if (picked == null || picked.files.isEmpty) return;
+    final file = picked.files.first;
+    final path = file.path;
+    if (path == null || path.isEmpty) {
+      showAppMessage('Fayl ochilmadi');
+      return;
     }
+    final name = file.name;
+    final ext = name.contains('.')
+        ? name.split('.').last.toUpperCase()
+        : 'FILE';
+    final optimistic = ChatMessage.file(
+      id: _nextId(),
+      dir: ChatDir.outgoing,
+      time: _now(),
+      name: name,
+      size: file.size > 0 ? _formatBytes(file.size) : '—',
+      ext: ext,
+      status: ChatStatus.sent,
+    );
+    await _uploadAndSendMedia(
+      filePath: path,
+      mediaType: 'file',
+      messageType: 'file',
+      optimistic: optimistic,
+      extraMeta: {'filename': name, if (file.size > 0) 'size': file.size},
+    );
+  }
+
+  Future<void> _attachProduct() async {
+    final product = await _pickProduct();
+    if (product == null) return;
+    final optimistic = ChatMessage.product(
+      id: _nextId(),
+      dir: ChatDir.outgoing,
+      time: _now(),
+      title: product.name,
+      price: product.price,
+      status: ChatStatus.sent,
+    );
+    await _sendMetaMessage(
+      type: 'product',
+      meta: {
+        'product_id': product.id,
+        'name': product.name,
+        'price': product.price,
+        if (product.imageUrl != null) 'image_url': product.imageUrl,
+      },
+      optimistic: optimistic,
+    );
+  }
+
+  Future<void> _attachLocation() async {
+    final status = await Permission.locationWhenInUse.request();
+    if (!status.isGranted) {
+      showAppMessage('Joylashuv ruxsati kerak');
+      return;
+    }
+    final serviceOn = await Geolocator.isLocationServiceEnabled();
+    if (!serviceOn) {
+      showAppMessage('GPS yoqilmagan');
+      return;
+    }
+    Position pos;
+    try {
+      pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+    } catch (_) {
+      showAppMessage('Joylashuv olinmadi');
+      return;
+    }
+    final label =
+        '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+    final optimistic = ChatMessage.location(
+      id: _nextId(),
+      dir: ChatDir.outgoing,
+      time: _now(),
+      label: label,
+      distance: '',
+      status: ChatStatus.sent,
+    );
+    await _sendMetaMessage(
+      type: 'location',
+      meta: {
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+        'label': label,
+      },
+      optimistic: optimistic,
+    );
+  }
+
+  Future<void> _attachContact() async {
+    final contact = await _pickContact();
+    if (contact == null) return;
+    final name = contact.$1;
+    final phone = contact.$2;
+    final optimistic = ChatMessage.contact(
+      id: _nextId(),
+      dir: ChatDir.outgoing,
+      time: _now(),
+      name: name,
+      phone: phone,
+      initial: initialsOf(name),
+      status: ChatStatus.sent,
+    );
+    await _sendMetaMessage(
+      type: 'contact',
+      meta: {
+        'contact_name': name,
+        'contact_phone': phone,
+      },
+      optimistic: optimistic,
+    );
+  }
+
+  Future<void> _uploadAndSendMedia({
+    required String filePath,
+    required String mediaType,
+    required String messageType,
+    required ChatMessage optimistic,
+    Map<String, dynamic>? extraMeta,
+  }) async {
+    if (state.sending.value || state.chatId <= 0) return;
+    state.sending.value = true;
+    final clientId = 'a${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
+    final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
+    final replyUi = optimistic.reply ?? _replyFor(state);
+    state.replyTo.value = null;
+    state.messages.add(optimistic);
+
+    final repo = Get.find<ChatRepository>();
+    final upload = await repo.uploadMedia(
+      filePath: filePath,
+      mediaType: mediaType,
+    );
+    final uploadMap = asMap(upload.dataOrNull);
+    final mediaId = (uploadMap?['id'] as num?)?.toInt();
+    if (mediaId == null) {
+      state.messages.removeWhere((m) => m.id == optimistic.id);
+      final err = upload.errorOrNull;
+      if (err != null) {
+        showAppError(err);
+      } else {
+        showAppMessage('Fayl yuklanmadi');
+      }
+      state.sending.value = false;
+      return;
+    }
+
+    final send = await repo.sendMessage(
+      chatId: state.chatId,
+      clientMessageId: clientId,
+      type: messageType,
+      mediaId: mediaId,
+      meta: extraMeta,
+      replyToId: replyToId,
+    );
+    send.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) return;
+        final real = _fromApi(
+          map,
+          SessionStore.userId(),
+          fallbackReply: replyUi,
+        );
+        final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+        if (idx >= 0) {
+          // Lokal fayl yo‘li bo‘lsa, tarmoq URL kelguncha saqlaymiz.
+          if (optimistic.type == ChatMsgType.image &&
+              (real.imageUrl == null || real.imageUrl!.isEmpty) &&
+              optimistic.imageUrl != null) {
+            state.messages[idx] = ChatMessage.image(
+              id: real.id,
+              dir: real.dir,
+              time: real.time,
+              url: optimistic.imageUrl,
+              gradient: avatarTealGradient,
+              status: real.status,
+              reply: real.reply ?? replyUi,
+            );
+          } else {
+            state.messages[idx] = real;
+          }
+        }
+      },
+      failure: (err) {
+        state.messages.removeWhere((m) => m.id == optimistic.id);
+        showAppError(err);
+      },
+    );
+    state.sending.value = false;
+  }
+
+  Future<void> _sendMetaMessage({
+    required String type,
+    required Map<String, dynamic> meta,
+    required ChatMessage optimistic,
+  }) async {
+    if (state.sending.value || state.chatId <= 0) return;
+    state.sending.value = true;
+    final clientId = 'a${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
+    final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
+    state.replyTo.value = null;
+    state.messages.add(optimistic);
+
+    final send = await Get.find<ChatRepository>().sendMessage(
+      chatId: state.chatId,
+      clientMessageId: clientId,
+      type: type,
+      meta: meta,
+      replyToId: replyToId,
+    );
+    send.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) return;
+        final real = _fromApi(map, SessionStore.userId());
+        final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+        if (idx >= 0) state.messages[idx] = real;
+      },
+      failure: (err) {
+        state.messages.removeWhere((m) => m.id == optimistic.id);
+        showAppError(err);
+      },
+    );
+    state.sending.value = false;
+  }
+
+  Future<Product?> _pickProduct() async {
+    final result = await Get.find<ProductsRepository>().list(limit: 40);
+    final items = asList(result.dataOrNull)
+        .whereType<Map>()
+        .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))
+        .toList();
+    if (items.isEmpty) {
+      if (result.errorOrNull != null) {
+        showAppError(result.errorOrNull!);
+      } else {
+        showAppMessage('Mahsulot topilmadi');
+      }
+      return null;
+    }
+    if (!context.mounted) return null;
+    return showModalBottomSheet<Product>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) {
+        final c = ctx.appColors;
+        final inset = MediaQuery.viewPaddingOf(ctx).bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: inset),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.55,
+            ),
+            decoration: BoxDecoration(
+              color: c.isDark ? const Color(0xFF0C2136) : Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24.dp)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 8.dp),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 44.dp,
+                        height: 5.dp,
+                        decoration: BoxDecoration(
+                          color: c.outline,
+                          borderRadius: BorderRadius.circular(5.dp),
+                        ),
+                      ),
+                      SizedBox(height: 14.dp),
+                      Text(
+                        'chat_attach_product'.tr,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 17.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.fromLTRB(12.dp, 0, 12.dp, 16.dp),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => SizedBox(height: 4.dp),
+                    itemBuilder: (_, i) {
+                      final p = items[i];
+                      return ListTile(
+                        title: Text(
+                          p.name,
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          p.price,
+                          style: TextStyle(color: c.textSecondary),
+                        ),
+                        onTap: () => Navigator.pop(ctx, p),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<(String, String)?> _pickContact() async {
+    final user = SessionStore.user();
+    final nameCtrl = TextEditingController(
+      text: user?['full_name']?.toString() ?? '',
+    );
+    final phoneCtrl = TextEditingController(
+      text: user?['phone']?.toString() ?? '',
+    );
+    if (!context.mounted) return null;
+    final c = context.appColors;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.isDark ? const Color(0xFF0C2136) : Colors.white,
+        title: Text(
+          'chat_attach_contact'.tr,
+          style: TextStyle(color: c.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'Ism',
+                labelStyle: TextStyle(color: c.textSecondary),
+              ),
+              style: TextStyle(color: c.textPrimary),
+            ),
+            SizedBox(height: 12.dp),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Telefon',
+                labelStyle: TextStyle(color: c.textSecondary),
+              ),
+              style: TextStyle(color: c.textPrimary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Bekor'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Yuborish'),
+          ),
+        ],
+      ),
+    );
+    final name = nameCtrl.text.trim();
+    final phone = phoneCtrl.text.trim();
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    if (ok != true || name.isEmpty) return null;
+    return (name, phone);
   }
 
   void _toast(String msg) => showAppMessage(msg);

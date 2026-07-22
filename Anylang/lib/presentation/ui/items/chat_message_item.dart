@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/audio/voice_player_service.dart';
@@ -230,6 +232,15 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Widget _image(AppColors c) {
+    final url = message.imageUrl;
+    ImageProvider? provider;
+    if (url != null && url.isNotEmpty) {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        provider = NetworkImage(url);
+      } else {
+        provider = FileImage(File(url));
+      }
+    }
     return ClipRRect(
       borderRadius: _bubbleRadius,
       child: Stack(
@@ -239,12 +250,17 @@ class ChatMessageItem extends StatelessWidget {
             height: 150.dp,
             decoration: BoxDecoration(
               gradient: message.imageGradient ?? prodTealGradient,
+              image: provider != null
+                  ? DecorationImage(image: provider, fit: BoxFit.cover)
+                  : null,
             ),
-            child: Icon(
-              Icons.image_outlined,
-              size: 36.dp,
-              color: c.onAccent.withValues(alpha: 0.35),
-            ),
+            child: provider == null
+                ? Icon(
+                    Icons.image_outlined,
+                    size: 36.dp,
+                    color: c.onAccent.withValues(alpha: 0.35),
+                  )
+                : null,
           ),
           Positioned(
             right: 8.dp,

@@ -297,6 +297,16 @@ async def create_message(
         text = text.strip()
         original_language = _normalize_lang(user.native_language)
         meta_payload = meta
+    elif msg_type in {"product", "location", "contact"}:
+        if not meta or not isinstance(meta, dict):
+            raise AppError(
+                message="Meta majburiy",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        meta_payload = dict(meta)
+        text = text.strip() if text else None
+        original_language = _normalize_lang(user.native_language) if text else None
     else:
         if media_id is not None:
             media_result = await db.execute(

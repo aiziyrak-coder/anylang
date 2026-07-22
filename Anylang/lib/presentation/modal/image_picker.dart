@@ -9,15 +9,18 @@ import '../utils/size_controller.dart';
 /// Kamera/galereyadan rasm tanlash — pastdan chiqadigan tanlov sheet'i.
 /// Loyihada rasm tanlash HAR DOIM shu funksiya orqali bajariladi
 /// (`ImagePicker()` to'g'ridan-to'g'ri ishlatilmaydi).
-Future<File?> pickImage(BuildContext context) async {
-  final source = await showModalBottomSheet<ImageSource>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => const _ImageSourceSheet(),
-  );
-  if (source == null) return null;
+/// [source] berilsa (masalan attach menyudan), qayta sheet ochilmaydi.
+Future<File?> pickImage(BuildContext context, {ImageSource? source}) async {
+  final resolved = source ??
+      await showModalBottomSheet<ImageSource>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => const _ImageSourceSheet(),
+      );
+  if (resolved == null) return null;
 
-  final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+  final picked =
+      await ImagePicker().pickImage(source: resolved, imageQuality: 85);
   if (picked == null) return null;
   return File(picked.path);
 }
