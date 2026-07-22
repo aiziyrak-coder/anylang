@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../data/network/auth_repository.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gradient_background.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
@@ -65,7 +66,7 @@ class RestoreAccountContent extends ScreenContent<RestoreAccountState> {
     }
     return GradientBackground(
       child: SafeArea(
-        child: Padding(
+        child: KeyboardAwareScrollView(
           padding: EdgeInsets.fromLTRB(24.dp, 16.dp, 24.dp, 24.dp),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

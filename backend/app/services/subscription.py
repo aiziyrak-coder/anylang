@@ -177,7 +177,7 @@ async def subscribe(
 
     if plan != "basic":
         raise AppError(
-            message="Pullik tarif uchun to'lov talab qilinadi. POST /payments/checkout dan foydalaning",
+            message="Pullik tarif uchun to'lov talab qilinadi",
             error_code="PAYMENT_REQUIRED",
             status_code=402,
             extra={"hint": "POST /api/v1/payments/checkout"},

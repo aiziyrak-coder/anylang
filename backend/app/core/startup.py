@@ -44,12 +44,24 @@ def validate_settings(settings: Settings) -> None:
             errors.append("CORS_ORIGINS must be an explicit allow-list in production")
         if not settings.trusted_host_list:
             errors.append("TRUSTED_HOSTS must be set in production")
-        if settings.translation_provider == "mock" or not settings.deepl_api_key:
+        provider = (settings.translation_provider or "mock").strip().lower()
+        if provider == "openai":
+            if not settings.openai_api_key:
+                errors.append("OPENAI_API_KEY required when TRANSLATION_PROVIDER=openai")
+        elif provider == "deepl":
+            if not settings.deepl_api_key:
+                errors.append("DEEPL_API_KEY required when TRANSLATION_PROVIDER=deepl")
+        elif provider == "mock":
             if not settings.allow_mock_translation:
                 errors.append(
-                    "TRANSLATION_PROVIDER must be deepl with DEEPL_API_KEY in production "
-                    "(or set ALLOW_MOCK_TRANSLATION=true explicitly)"
+                    "TRANSLATION_PROVIDER=mock forbidden in production "
+                    "(set TRANSLATION_PROVIDER=openai|deepl or ALLOW_MOCK_TRANSLATION=true)"
                 )
+        else:
+            errors.append(
+                f"Unknown TRANSLATION_PROVIDER={settings.translation_provider!r} "
+                "(use mock|deepl|openai)"
+            )
         if not settings.deepgram_api_key:
             logger.warning("DEEPGRAM_API_KEY empty — Live STT will be unavailable in production")
         if "localhost" in settings.cors_origins:

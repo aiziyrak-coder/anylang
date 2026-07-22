@@ -1,4 +1,3 @@
-import 'dart:developer';
 
 String formatSecondToMinute(int seconds) {
   final duration = Duration(seconds: seconds);

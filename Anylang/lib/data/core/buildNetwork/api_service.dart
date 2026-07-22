@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide FormData, MultipartFile, Response;
 
 import 'api_config.dart';
 import 'token_refresher.dart';
@@ -27,6 +27,9 @@ class ApiService {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          if (options.data is FormData) {
+            options.headers.remove('Content-Type');
+          }
           // Skip auth header for public auth endpoints
           final path = options.path;
           final skipAuth = path.contains('auth/login') ||
@@ -35,7 +38,8 @@ class ApiService {
               path.contains('auth/refresh') ||
               path.contains('auth/verify-email') ||
               path.contains('auth/resend') ||
-              path.contains('auth/password');
+              path.contains('auth/password') ||
+              path.contains('countries');
 
           if (!skipAuth) {
             final token = await this.tokenRefresher.getToken();

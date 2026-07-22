@@ -4,7 +4,7 @@ import '../utils/size_controller.dart';
 
 /// Umumiy bitta ustunli ro'yxatdan tanlash — pastdan chiqadigan sheet.
 /// Tanlangan nomni qaytaradi (Rol, Valyuta, Kategoriya kabi oddiy ro'yxatlar
-/// uchun). Davlat tanlash uchun `country_picker_bottom_sheet.dart` alohida.
+/// uchun). Davlat tanlash uchun `modal/country_picker_bottom_sheet.dart`.
 Future<String?> showSimpleListPickerBottomSheet(
   BuildContext context, {
   required String title,

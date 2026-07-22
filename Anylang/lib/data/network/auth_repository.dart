@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../presentation/utils/app_snackbar.dart';
 import '../core/buildNetwork/base_result.dart';
 import '../core/buildNetwork/error.dart';
 import '../core/buildNetwork/network_client.dart';
@@ -11,7 +12,7 @@ import '../local/session_store.dart';
 class AuthRepository {
   final NetworkClient _client;
 
-  AuthRepository({required NetworkClient client}) : _client = client;
+  AuthRepository({required this._client});
 
   Future<BaseResult> register({
     required String fullName,
@@ -37,6 +38,7 @@ class AuthRepository {
         'app_language': appLanguage ?? SessionStore.appLanguage(),
         'native_language': nativeLanguage ?? SessionStore.nativeLanguage(),
       },
+      notify: SnackNotify.errors,
     );
   }
 
@@ -47,6 +49,7 @@ class AuthRepository {
     final result = await _client.post(
       api: 'api/v1/auth/verify-email',
       data: {'email': email.trim().toLowerCase(), 'code': code},
+      notify: SnackNotify.errors,
     );
     await _persistSession(result);
     return result;
@@ -59,6 +62,7 @@ class AuthRepository {
         'email': email.trim().toLowerCase(),
         'app_language': SessionStore.appLanguage(),
       },
+      notify: SnackNotify.all,
     );
   }
 
@@ -81,8 +85,11 @@ class AuthRepository {
       await _persistSession(result);
       return (result: result, body: null);
     } on DioException catch (e) {
-      return (result: dioToError(e), body: dioErrorBody(e));
+      final result = dioToError(e);
+      showAppError(result.error);
+      return (result: result, body: dioErrorBody(e));
     } catch (e) {
+      showAppError("Noma'lum xatolik");
       return (result: Error("Noma'lum xatolik"), body: null);
     }
   }
@@ -108,8 +115,11 @@ class AuthRepository {
       await _persistSession(result);
       return (result: result, body: null);
     } on DioException catch (e) {
-      return (result: dioToError(e), body: dioErrorBody(e));
+      final result = dioToError(e);
+      showAppError(result.error);
+      return (result: result, body: dioErrorBody(e));
     } catch (e) {
+      showAppError("Google orqali kirib bo'lmadi");
       return (result: Error("Google orqali kirib bo'lmadi"), body: null);
     }
   }

@@ -225,7 +225,7 @@ async def admin_patch_user(
 
     if user.deleted_at is not None:
         raise AppError(
-            message="Deleted accounts can only be changed via restore",
+            message="O'chirilgan akkauntni faqat tiklash orqali o'zgartirish mumkin",
             error_code="USER_DELETED",
             status_code=400,
         )

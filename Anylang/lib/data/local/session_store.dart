@@ -55,6 +55,20 @@ class SessionStore {
     return app.split('_').first;
   }
 
+  static Map<String, dynamic>? user() {
+    final raw = _box.get('user');
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  static int? userId() {
+    final id = user()?['id'];
+    if (id is int) return id;
+    if (id is num) return id.toInt();
+    return null;
+  }
+
   static int? _jwtExpMillis(String token) {
     final parts = token.split('.');
     if (parts.length != 3) return null;

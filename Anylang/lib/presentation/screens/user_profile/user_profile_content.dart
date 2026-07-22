@@ -308,7 +308,10 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
   }
 
   Widget _listings(void Function(MyAction) sendAction) {
-    final items = kMockAllProducts.take(2).toList();
+    final items = <Product>[];
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

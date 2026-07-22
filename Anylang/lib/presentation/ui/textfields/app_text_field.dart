@@ -43,11 +43,31 @@ class _AppTextFieldState extends State<AppTextField> {
   @override
   void initState() {
     super.initState();
-    _focus.addListener(() => setState(() {}));
+    _focus.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() {});
+    if (!_focus.hasFocus) return;
+    // Klaviatura ochilguncha va ochilgandan keyin maydonni ko'rinadigan joyga.
+    void ensure() {
+      if (!mounted || !_focus.hasFocus) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: 0.15,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => ensure());
+    Future<void>.delayed(const Duration(milliseconds: 320), ensure);
   }
 
   @override
   void dispose() {
+    _focus.removeListener(_onFocusChange);
     _focus.dispose();
     super.dispose();
   }

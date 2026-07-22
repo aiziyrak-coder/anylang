@@ -1,20 +1,126 @@
+import 'dart:async';
+
+import 'package:get/get.dart';
+
+import '../../../data/core/mappers.dart';
+import '../../../data/network/chat_repository.dart';
+import '../../../data/network/friends_repository.dart';
+import '../../../data/network/profile_repository.dart';
+import '../../ui/items/friend_result_item.dart';
+import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../chat/chat_payload.dart';
+import '../chat/chat_screen.dart';
 import 'add_friend_action.dart';
 import 'add_friend_content.dart';
+import 'add_friend_payload.dart';
 import 'add_friend_result.dart';
 import 'add_friend_state.dart';
 
-class AddFriendScreen extends Screen<AddFriendState, void> {
+class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
+  AddFriendScreen() : super(mobileContent: AddFriendContent());
 
-  AddFriendScreen() : super(
-    mobileContent: AddFriendContent(),
-  );
+  Timer? _debounce;
+  bool _sendingRequest = false;
 
   @override
-  void initState(void payload) {
-    // TODO: natijalarni backenddan qidirish. Hozircha mock.
-    state.results.addAll(kMockAddFriendResults);
+  void initState(AddFriendPayload? payload) {
+    state.mode = payload?.mode ?? AddFriendMode.chat;
+    state.query.value = '';
+    state.searching.value = false;
+    state.results.clear();
+    state.sentRequests.clear();
+    if (state.mode == AddFriendMode.friends) {
+      _loadSentRequests();
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+  }
+
+  Future<void> _loadSentRequests() async {
+    state.loadingSent.value = true;
+    final result = await Get.find<FriendsRepository>().listRequests(
+      type: 'outgoing',
+      includeDeclined: true,
+    );
+    result.when(
+      success: (data) {
+        final items = asList(data)
+            .whereType<Map>()
+            .map((e) => AddFriendResult.fromRequestApi(Map<String, dynamic>.from(e)))
+            .toList();
+        state.sentRequests.assignAll(items);
+      },
+      failure: showAppError,
+    );
+    state.loadingSent.value = false;
+  }
+
+  Future<void> _search(String q) async {
+    final query = q.trim();
+    // Backend: kamida 3 raqam (NUMBER_QUERY_TOO_SHORT)
+    if (query.length < 3) {
+      state.searching.value = false;
+      state.results.clear();
+      return;
+    }
+    state.searching.value = true;
+    final result = await Get.find<ProfileRepository>().searchUsers(query);
+    result.when(
+      success: (data) {
+        final items = asList(data)
+            .whereType<Map>()
+            .map((e) => AddFriendResult.fromApi(Map<String, dynamic>.from(e)))
+            .toList();
+        state.results.assignAll(items);
+      },
+      failure: showAppError,
+    );
+    state.searching.value = false;
+  }
+
+  Future<void> _openChat(AddFriendResult user) async {
+    final chat = await Get.find<ChatRepository>().createChat(user.id);
+    chat.when(
+      success: (data) {
+        final map = asMap(data);
+        final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+        navigate(
+          ChatScreen(),
+          payload: ChatPayload(
+            chatId: chatId,
+            peerId: user.id,
+            name: user.name,
+            initial: user.initial,
+            avatarGradient: user.avatarGradient,
+            online: user.online,
+          ),
+        );
+      },
+      failure: showAppError,
+    );
+  }
+
+  void _markRequested(AddFriendResult source) {
+    final updated = source.copyWith(action: FriendActionState.requested);
+
+    final resultsIdx = state.results.indexWhere((e) => e.id == source.id);
+    if (resultsIdx >= 0) {
+      state.results[resultsIdx] = updated;
+      state.results.refresh();
+    }
+
+    final sentIdx = state.sentRequests.indexWhere((e) => e.id == source.id);
+    if (sentIdx >= 0) {
+      state.sentRequests[sentIdx] = updated;
+      state.sentRequests.refresh();
+    } else {
+      state.sentRequests.insert(0, updated);
+    }
   }
 
   @override
@@ -24,12 +130,21 @@ class AddFriendScreen extends Screen<AddFriendState, void> {
         popBackNavigate();
       case AddFriendSearchChanged a:
         state.query.value = a.text;
-      case SendFriendRequest _:
-        // TODO: do'stlik so'rovini yuborish.
-        break;
-      case MessageResult _:
-        // TODO: suhbat ekranini ochish.
-        break;
+        _debounce?.cancel();
+        _debounce = Timer(const Duration(milliseconds: 350), () => _search(a.text));
+      case OpenUserChat a:
+        await _openChat(a.result);
+      case MessageResult a:
+        await _openChat(a.result);
+      case SendFriendRequest a:
+        if (_sendingRequest) return;
+        _sendingRequest = true;
+        final result = await Get.find<FriendsRepository>().sendRequest(a.result.id);
+        result.when(
+          success: (_) => _markRequested(a.result),
+          failure: showAppError,
+        );
+        _sendingRequest = false;
     }
   }
 }

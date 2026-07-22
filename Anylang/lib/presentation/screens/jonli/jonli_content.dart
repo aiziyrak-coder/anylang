@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import '../../../data/audio/voice_recorder_service.dart';
 import '../../modal/language_bottom_sheet.dart';
-import '../../ui/buttons/my_icon_button.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
+import '../../ui/waveform_bars.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -12,10 +13,9 @@ import '../select_language/select_language_option.dart';
 import 'jonli_action.dart';
 import 'jonli_state.dart';
 
-// Demo suhbat matnlari (mock — keyin real STT/tarjimadan).
-const String _demoOriginal = 'Sure, we have one in your size.';
-const String _demoTranslated = 'Albatta, sizning o‘lchamingizda bor.';
-const List<double> _waveHeights = [18, 30, 44, 26, 40, 22, 34];
+// Jonli rejim — matnlar sessiya/STT dan keladi (bo'sh holat).
+const String _demoOriginal = '';
+const String _demoTranslated = '';
 
 class JonliContent extends ScreenContent<JonliState> {
 
@@ -217,20 +217,18 @@ class JonliContent extends ScreenContent<JonliState> {
   }
 
   Widget _waveform(Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        for (final h in _waveHeights) ...[
-          Container(
-            width: 4.dp,
-            height: h.dp,
-            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3.dp)),
-          ),
-          SizedBox(width: 5.dp),
-        ],
-      ],
-    );
+    final recorder = Get.find<VoiceRecorderService>();
+    return Obx(() {
+      final samples = List<double>.of(recorder.liveSamples);
+      return WaveformBars(
+        color: color,
+        maxHeight: 28,
+        barCount: 18,
+        barWidth: 4,
+        gap: 5,
+        samples: samples,
+      );
+    });
   }
 
   // ---- Variant C — tarjima / playback body ----
@@ -251,7 +249,10 @@ class JonliContent extends ScreenContent<JonliState> {
                 borderRadius: BorderRadius.circular(16.dp),
                 border: Border.all(color: c.outline),
               ),
-              child: Text(_demoOriginal, style: TextStyle(color: c.textPrimary, fontSize: 15.sp)),
+              child: Text(
+                _demoOriginal.isEmpty ? 'jonli_placeholder'.tr : _demoOriginal,
+                style: TextStyle(color: c.textPrimary, fontSize: 15.sp),
+              ),
             ),
           ),
           SizedBox(height: 12.dp),
@@ -308,7 +309,10 @@ class JonliContent extends ScreenContent<JonliState> {
             ],
           ),
           SizedBox(height: 12.dp),
-          Text('“$_demoTranslated”', style: TextStyle(color: c.textPrimary, fontSize: 16.sp, fontWeight: FontWeight.w600)),
+          Text(
+            _demoTranslated.isEmpty ? '“…”' : '“$_demoTranslated”',
+            style: TextStyle(color: c.textPrimary, fontSize: 16.sp, fontWeight: FontWeight.w600),
+          ),
           SizedBox(height: 14.dp),
           _waveform(c.accent),
         ],

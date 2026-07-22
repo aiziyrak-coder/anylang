@@ -46,21 +46,23 @@ def _send_smtp_sync(msg: EmailMessage) -> None:
             client.send_message(msg)
 
 
-async def send_otp_email(to_email: str, code: str, app_language: str = "uz_UZ") -> None:
-    """Send OTP via SMTP. In local/dev, logs the code if SMTP is unreachable."""
+async def send_otp_email(to_email: str, code: str, app_language: str = "uz_UZ") -> bool:
+    """Send OTP via SMTP. Returns True if delivered; False if logged/fallback."""
     settings = get_settings()
     msg = _build_message(to_email, code, app_language)
 
     try:
         await asyncio.to_thread(_send_smtp_sync, msg)
         logger.info("OTP email sent to %s", to_email)
+        return True
     except Exception as exc:
-        if settings.is_production:
-            raise
         logger.warning(
-            "SMTP send failed (%s); logging OTP for local dev — email=%s code=%s",
+            "SMTP send failed (%s); OTP fallback — email=%s code=%s",
             exc,
             to_email,
             code,
         )
         print(f"[AnyLang OTP] email={to_email} code={code} (SMTP unavailable: {exc})")
+        if settings.is_production and not settings.smtp_fail_open:
+            raise
+        return False

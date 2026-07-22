@@ -1,9 +1,16 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+
+import '../../../data/audio/voice_player_service.dart';
+import '../../../data/audio/voice_recorder_service.dart';
+import '../../../data/audio/waveform_utils.dart';
+import '../../../data/core/mappers.dart';
+import '../../../data/local/session_store.dart';
+import '../../../data/network/chat_repository.dart';
 import '../../modal/attachment_bottom_sheet.dart';
 import '../../modal/message_actions_sheet.dart';
 import '../../ui/theme/gradients.dart';
+import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import 'chat_action.dart';
@@ -13,30 +20,209 @@ import 'chat_payload.dart';
 import 'chat_state.dart';
 
 class ChatScreen extends Screen<ChatState, ChatPayload> {
-  ChatScreen()
-      : super(
-          mobileContent: ChatContent(),
-        );
+  ChatScreen() : super(mobileContent: ChatContent());
 
   int _seq = 0;
 
   @override
   void initState(ChatPayload? payload) {
-    final p = payload ?? kAnnaChat;
+    final p = payload;
+    if (p == null) {
+      popBackNavigate();
+      return;
+    }
     state.peerName = p.name;
     state.peerInitial = p.initial;
     state.peerAvatar = p.avatarGradient;
     state.peerOnline = p.online;
+    state.chatId = p.chatId;
+    state.peerId = p.peerId;
 
-    // ChatState fenix-singleton — har ochilishda avvalgi holatni tozalaymiz.
     state.input.value = '';
     state.replyTo.value = null;
     state.recording.value = false;
+    state.sending.value = false;
+    state.messages.clear();
+    state.loading.value = true;
+    _loadMessages(p.chatId);
+  }
 
-    // TODO: xabarlarni backend/DB'dan yuklash. Hozircha mock (dizayn holati).
-    state.messages
-      ..clear()
-      ..addAll(_mockThread(p));
+  Future<void> _loadMessages(int chatId) async {
+    final result = await Get.find<ChatRepository>().listMessages(chatId);
+    result.when(
+      success: (data) {
+        final me = SessionStore.userId();
+        final raw = asList(data)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        final items = raw.map((e) => _fromApi(e, me)).toList();
+        state.messages.assignAll(_fillMissingReplies(items, raw, me));
+        final ids = items
+            .where((m) => !m.isOutgoing)
+            .map((m) => int.tryParse(m.id))
+            .whereType<int>()
+            .toList();
+        if (ids.isNotEmpty) {
+          Get.find<ChatRepository>().markRead(chatId, ids);
+        }
+      },
+      failure: showAppError,
+    );
+    state.loading.value = false;
+  }
+
+  /// Eski API faqat `reply_to_id` bersa — lokal xabarlaridan sitata yig'iladi.
+  List<ChatMessage> _fillMissingReplies(
+    List<ChatMessage> items,
+    List<Map<String, dynamic>> raw,
+    int? me,
+  ) {
+    final byId = {for (final m in items) m.id: m};
+    final out = <ChatMessage>[];
+    for (var i = 0; i < items.length; i++) {
+      final msg = items[i];
+      if (msg.reply != null) {
+        out.add(msg);
+        continue;
+      }
+      final replyToId = raw[i]['reply_to_id'];
+      if (replyToId == null) {
+        out.add(msg);
+        continue;
+      }
+      final parent = byId['$replyToId'];
+      if (parent == null) {
+        out.add(msg);
+        continue;
+      }
+      final reply = ChatReply(
+        author: parent.isOutgoing ? 'chat_you'.tr : state.peerName,
+        preview: parent.previewText(),
+        messageId: parent.id,
+      );
+      out.add(_withReply(msg, reply));
+    }
+    return out;
+  }
+
+  ChatMessage _withReply(ChatMessage msg, ChatReply reply) {
+    if (msg.type == ChatMsgType.voice) {
+      return ChatMessage.voice(
+        id: msg.id,
+        dir: msg.dir,
+        time: msg.time,
+        duration: msg.voiceDuration ?? '0:00',
+        durationMs: msg.voiceDurationMs,
+        path: msg.voicePath,
+        samples: msg.voiceSamples,
+        downloaded: msg.voiceDownloaded,
+        status: msg.status,
+        reply: reply,
+      );
+    }
+    return ChatMessage.text(
+      id: msg.id,
+      dir: msg.dir,
+      time: msg.time,
+      text: msg.text ?? '',
+      status: msg.status,
+      reply: reply,
+    );
+  }
+
+  ChatStatus _statusFromApi(Map<String, dynamic> json, {required bool outgoing}) {
+    if (!outgoing) return ChatStatus.read;
+    if (json['read_by_recipient'] == true) return ChatStatus.read;
+    final status = json['status']?.toString();
+    if (status == 'read') return ChatStatus.read;
+    if (status == 'delivered') return ChatStatus.delivered;
+    return ChatStatus.sent;
+  }
+
+  ChatMessage _fromApi(
+    Map<String, dynamic> json,
+    int? me, {
+    ChatReply? fallbackReply,
+  }) {
+    final senderId = (json['sender_id'] as num?)?.toInt();
+    final outgoing = me != null && senderId == me;
+    final created = DateTime.tryParse(json['created_at']?.toString() ?? '');
+    final text = (json['text'] as String?) ??
+        (json['text_original'] as String?) ??
+        '';
+    final type = (json['type'] as String?) ?? 'text';
+    final reply = _replyFromApi(json, me) ?? fallbackReply;
+    final status = _statusFromApi(json, outgoing: outgoing);
+    if (type == 'voice' || type == 'audio') {
+      final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
+      final durationMs = (meta['duration_ms'] as num?)?.toInt();
+      final samples = (meta['samples'] as List?)
+              ?.whereType<num>()
+              .map((e) => e.toDouble())
+              .toList() ??
+          const <double>[];
+      final url = meta['url']?.toString();
+      return ChatMessage.voice(
+        id: '${json['id']}',
+        dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
+        time: formatChatTime(created),
+        duration: durationMs != null
+            ? WaveformUtils.formatDuration(Duration(milliseconds: durationMs))
+            : '0:00',
+        durationMs: durationMs,
+        path: url,
+        samples: samples,
+        downloaded: url != null && url.isNotEmpty,
+        status: status,
+        reply: reply,
+      );
+    }
+    return ChatMessage.text(
+      id: '${json['id']}',
+      dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
+      time: formatChatTime(created),
+      text: text,
+      status: status,
+      reply: reply,
+    );
+  }
+
+  ChatReply? _replyFromApi(Map<String, dynamic> json, int? me) {
+    final nested = asMap(json['reply_to']);
+    if (nested == null) return null;
+    final senderId = (nested['sender_id'] as num?)?.toInt();
+    final author = (me != null && senderId == me)
+        ? 'chat_you'.tr
+        : (nested['sender_name']?.toString().trim().isNotEmpty == true
+            ? nested['sender_name'].toString()
+            : state.peerName);
+    final type = nested['type']?.toString() ?? 'text';
+    final deleted = nested['is_deleted'] == true;
+    final previewRaw = nested['preview_text']?.toString().trim();
+    final previewText = deleted
+        ? 'chat_reply_deleted'.tr
+        : ((previewRaw != null && previewRaw.isNotEmpty)
+            ? previewRaw
+            : _previewForMsgType(type));
+    final id = nested['id'];
+    return ChatReply(
+      author: author,
+      preview: previewText,
+      messageId: id == null ? null : '$id',
+    );
+  }
+
+  String _previewForMsgType(String type) {
+    return switch (type) {
+      'image' => 'chat_preview_photo'.tr,
+      'voice' || 'audio' => 'chat_preview_voice'.tr,
+      'product' => 'chat_preview_product'.tr,
+      'location' => 'chat_preview_location'.tr,
+      'file' => 'chat_preview_file'.tr,
+      'contact' => 'chat_preview_contact'.tr,
+      _ => '',
+    };
   }
 
   @override
@@ -47,25 +233,55 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
       case SendText _:
         final text = state.input.value.trim();
-        if (text.isEmpty) return;
-        state.messages.add(
-          ChatMessage.text(
-            id: _nextId(),
-            dir: ChatDir.outgoing,
-            time: _now(),
-            text: text,
-            status: ChatStatus.sent,
-            reply: _replyFor(state),
-          ),
+        if (text.isEmpty || state.chatId <= 0 || state.sending.value) return;
+        state.sending.value = true;
+        final clientId = 'c${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
+        final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
+        final replyUi = _replyFor(state);
+        final optimistic = ChatMessage.text(
+          id: _nextId(),
+          dir: ChatDir.outgoing,
+          time: _now(),
+          text: text,
+          status: ChatStatus.sent,
+          reply: replyUi,
         );
+        state.messages.add(optimistic);
         state.input.value = '';
         state.replyTo.value = null;
+
+        final result = await Get.find<ChatRepository>().sendText(
+          chatId: state.chatId,
+          text: text,
+          clientMessageId: clientId,
+          replyToId: replyToId,
+        );
+        result.when(
+          success: (data) {
+            final map = asMap(data);
+            if (map == null) return;
+            final real = _fromApi(
+              map,
+              SessionStore.userId(),
+              fallbackReply: replyUi,
+            );
+            final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+            if (idx >= 0) state.messages[idx] = real;
+          },
+          failure: (err) {
+            state.messages.removeWhere((m) => m.id == optimistic.id);
+            state.input.value = text;
+            showAppError(err);
+          },
+        );
+        state.sending.value = false;
 
       case OpenAttachMenu _:
         final kind = await showAttachmentBottomSheet(context);
         if (kind != null) sendAction(PickAttachment(kind));
 
       case PickAttachment a:
+        showAppMessage('Media yuklash tez orada');
         state.messages.add(_attachmentMessage(a.kind));
 
       case LongPressMessage a:
@@ -100,33 +316,115 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
       case DeleteMessage a:
         state.messages.removeWhere((m) => m.id == a.message.id);
+        if (state.replyTo.value?.id == a.message.id) {
+          state.replyTo.value = null;
+        }
 
       case StartRecording _:
+        final player = Get.find<VoicePlayerService>();
+        if (player.isPlaying.value) await player.stop(save: true);
+        final ok = await Get.find<VoiceRecorderService>().start();
+        if (!ok) {
+          showAppMessage('Mikrofon uchun ruxsat berilmadi');
+          return;
+        }
         state.recording.value = true;
 
       case CancelRecording _:
+        await Get.find<VoiceRecorderService>().cancel();
         state.recording.value = false;
 
       case SendVoice _:
-        state.messages.add(
-          ChatMessage.voice(
-            id: _nextId(),
-            dir: ChatDir.outgoing,
-            time: _now(),
-            duration: '0:03',
-            status: ChatStatus.sent,
-          ),
-        );
+        if (state.sending.value) return;
+        final recorded = await Get.find<VoiceRecorderService>().stop();
         state.recording.value = false;
+        if (recorded == null || state.chatId <= 0) return;
+
+        state.sending.value = true;
+        final clientId = 'v${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
+        final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
+        final replyUi = _replyFor(state);
+        state.replyTo.value = null;
+        final optimistic = ChatMessage.voice(
+          id: _nextId(),
+          dir: ChatDir.outgoing,
+          time: _now(),
+          duration: WaveformUtils.formatDuration(recorded.duration),
+          durationMs: recorded.duration.inMilliseconds,
+          path: recorded.path,
+          samples: recorded.samples,
+          status: ChatStatus.sent,
+          reply: replyUi,
+        );
+        state.messages.add(optimistic);
+
+        final upload = await Get.find<ChatRepository>().uploadMedia(
+          filePath: recorded.path,
+          mediaType: 'voice',
+        );
+        final uploadMap = asMap(upload.dataOrNull);
+        final mediaId = (uploadMap?['id'] as num?)?.toInt();
+        if (mediaId == null) {
+          state.messages.removeWhere((m) => m.id == optimistic.id);
+          final err = upload.errorOrNull;
+          if (err != null) {
+            showAppError(err);
+          } else {
+            showAppMessage('Ovoz yuklanmadi');
+          }
+          state.sending.value = false;
+          return;
+        }
+
+        final downsampled = WaveformUtils.resampleBars(recorded.samples, 40);
+        final send = await Get.find<ChatRepository>().sendVoice(
+          chatId: state.chatId,
+          clientMessageId: clientId,
+          mediaId: mediaId,
+          meta: {
+            'duration_ms': recorded.duration.inMilliseconds,
+            'samples': downsampled,
+          },
+          replyToId: replyToId,
+        );
+        send.when(
+          success: (data) {
+            final map = asMap(data);
+            if (map == null) return;
+            final real = _fromApi(
+              map,
+              SessionStore.userId(),
+              fallbackReply: replyUi,
+            );
+            final merged = ChatMessage.voice(
+              id: real.id,
+              dir: real.dir,
+              time: real.time,
+              duration: optimistic.voiceDuration ?? real.voiceDuration ?? '0:00',
+              durationMs: optimistic.voiceDurationMs ?? real.voiceDurationMs,
+              path: optimistic.voicePath ?? real.voicePath,
+              samples: optimistic.voiceSamples.isNotEmpty
+                  ? optimistic.voiceSamples
+                  : real.voiceSamples,
+              status: real.status,
+              reply: real.reply ?? replyUi,
+            );
+            final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+            if (idx >= 0) state.messages[idx] = merged;
+          },
+          failure: (err) {
+            state.messages.removeWhere((m) => m.id == optimistic.id);
+            showAppError(err);
+          },
+        );
+        state.sending.value = false;
 
       case Back _:
+        await Get.find<VoiceRecorderService>().cancel();
+        await Get.find<VoicePlayerService>().stop(save: true);
         popBackNavigate();
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Yordamchilar
-  // ---------------------------------------------------------------------------
 
   String _nextId() => 'm${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
 
@@ -135,13 +433,13 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     return '${t.hour}:${t.minute.toString().padLeft(2, '0')}';
   }
 
-  /// Joriy reply holatidan `ChatReply` sitatasini yasaydi.
   ChatReply? _replyFor(ChatState state) {
     final r = state.replyTo.value;
     if (r == null) return null;
     return ChatReply(
       author: r.isOutgoing ? 'chat_you'.tr : state.peerName,
       preview: r.previewText(),
+      messageId: r.id,
     );
   }
 
@@ -155,17 +453,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: ChatDir.outgoing,
           time: time,
-          gradient: prodTealGradient,
-          status: ChatStatus.sent,
-        );
-      case AttachKind.file:
-        return ChatMessage.file(
-          id: id,
-          dir: ChatDir.outgoing,
-          time: time,
-          name: 'Hujjat.pdf',
-          size: '248 KB',
-          ext: 'PDF',
+          gradient: avatarTealGradient,
           status: ChatStatus.sent,
         );
       case AttachKind.product:
@@ -173,8 +461,18 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: ChatDir.outgoing,
           time: time,
-          title: 'Qo\'lda to\'qilgan sharf',
-          price: '\$24.00',
+          title: 'chat_preview_product'.tr,
+          price: '—',
+          status: ChatStatus.sent,
+        );
+      case AttachKind.file:
+        return ChatMessage.file(
+          id: id,
+          dir: ChatDir.outgoing,
+          time: time,
+          name: 'file.bin',
+          size: '—',
+          ext: 'BIN',
           status: ChatStatus.sent,
         );
       case AttachKind.location:
@@ -182,8 +480,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: ChatDir.outgoing,
           time: time,
-          label: 'chat_my_location'.tr,
-          distance: '1.2 km',
+          label: 'Manzil',
+          distance: '',
           status: ChatStatus.sent,
         );
       case AttachKind.contact:
@@ -191,68 +489,13 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: ChatDir.outgoing,
           time: time,
-          name: 'Doniyor Karimov',
-          phone: '+998 90 123 45 67',
-          initial: 'DK',
+          name: 'Kontakt',
+          phone: '',
+          initial: 'K',
           status: ChatStatus.sent,
         );
     }
   }
 
-  void _toast(String text) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
-      SnackBar(content: Text(text), duration: const Duration(seconds: 1)),
-    );
-  }
-
-  /// Namuna suhbat (dizayndagi barcha xabar turlari). Keyinchalik backend.
-  List<ChatMessage> _mockThread(ChatPayload p) {
-    final incoming = ChatMessage.text(
-      id: _nextId(),
-      dir: ChatDir.incoming,
-      time: '14:30',
-      text: 'Salom! Buyurtmangiz tayyor bo\'ldi 🎉',
-    );
-    return [
-      incoming,
-      ChatMessage.text(
-        id: _nextId(),
-        dir: ChatDir.outgoing,
-        time: '14:32',
-        text: 'Rahmat! Hoziroq yetib boraman.',
-        status: ChatStatus.read,
-        reply: ChatReply(author: p.name, preview: incoming.previewText()),
-      ),
-      ChatMessage.voice(
-        id: _nextId(),
-        dir: ChatDir.incoming,
-        time: '14:33',
-        duration: '0:21',
-        downloaded: false,
-      ),
-      ChatMessage.voice(
-        id: _nextId(),
-        dir: ChatDir.incoming,
-        time: '14:33',
-        duration: '0:38',
-      ),
-      ChatMessage.file(
-        id: _nextId(),
-        dir: ChatDir.incoming,
-        time: '14:34',
-        name: 'Shartnoma.pdf',
-        size: '248 KB',
-        ext: 'PDF',
-      ),
-      ChatMessage.contact(
-        id: _nextId(),
-        dir: ChatDir.incoming,
-        time: '14:35',
-        name: 'Doniyor Karimov',
-        phone: '+998 90 123 45 67',
-        initial: 'DK',
-      ),
-    ];
-  }
+  void _toast(String msg) => showAppMessage(msg);
 }

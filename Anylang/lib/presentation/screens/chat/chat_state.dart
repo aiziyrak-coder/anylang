@@ -10,6 +10,8 @@ class ChatState extends GetxController {
   String peerInitial = '';
   LinearGradient peerAvatar = avatarTealGradient;
   bool peerOnline = false;
+  int chatId = 0;
+  int peerId = 0;
 
   /// Suhbat xabarlari (eng eskisi tepada, eng yangisi pastda).
   final RxList<ChatMessage> messages = <ChatMessage>[].obs;
@@ -22,4 +24,8 @@ class ChatState extends GetxController {
 
   /// Ovoz yozish holati (composer record ko'rinishiga o'tadi).
   final RxBool recording = false.obs;
+  final RxBool loading = true.obs;
+
+  /// Matn yuborilmoqda — dubl yuborishni oldini oladi.
+  final RxBool sending = false.obs;
 }

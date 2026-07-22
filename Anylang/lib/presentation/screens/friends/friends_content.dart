@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/app_empty_state.dart';
+import '../../ui/app_loading.dart';
 import '../../ui/buttons/my_icon_button.dart';
 import '../../ui/items/conversation_item.dart';
 import '../../ui/search_field.dart';
@@ -12,8 +14,6 @@ import 'friends_action.dart';
 import 'friends_state.dart';
 
 class FriendsContent extends ScreenContent<FriendsState> {
-
-  // Asosiy ekran body'si ichida ochiladi — fon shaffof, tema gradienti ko'rinadi.
   FriendsContent() : super(color: Colors.transparent);
 
   @override
@@ -25,7 +25,6 @@ class FriendsContent extends ScreenContent<FriendsState> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Sarlavha + do'st qo'shish tugmasi (search tugmasi yo'q).
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.dp),
             child: Row(
@@ -53,7 +52,6 @@ class FriendsContent extends ScreenContent<FriendsState> {
             ),
           ),
           SizedBox(height: 16.dp),
-          // Qidiruv maydoni
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.dp),
             child: SearchField(
@@ -62,13 +60,21 @@ class FriendsContent extends ScreenContent<FriendsState> {
             ),
           ),
           SizedBox(height: 12.dp),
-          // Bo'limli ro'yxat (Onlayn / Boshqalar) — ConversationItem qayta ishlatiladi.
           Expanded(
             child: Obx(() {
+              if (state.loading.value) return const AppLoading();
               final q = state.query.value.trim().toLowerCase();
               bool match(Friend f) => q.isEmpty || f.name.toLowerCase().contains(q);
               final online = state.friends.where((f) => f.online && match(f)).toList();
               final others = state.friends.where((f) => !f.online && match(f)).toList();
+
+              if (online.isEmpty && others.isEmpty) {
+                return AppEmptyState(
+                  icon: q.isEmpty ? Icons.people_outline_rounded : Icons.search_off_rounded,
+                  title: q.isEmpty ? 'friends_empty'.tr : 'empty_no_results'.tr,
+                  subtitle: q.isEmpty ? 'friends_empty_hint'.tr : null,
+                );
+              }
 
               final children = <Widget>[];
               if (online.isNotEmpty) {

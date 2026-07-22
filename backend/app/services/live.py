@@ -231,7 +231,7 @@ async def create_turn(
 
     if speaker not in {"me", "other"}:
         raise AppError(
-            message="Speaker me yoki other bo'lishi kerak",
+            message="Spiker 'me' yoki 'other' bo'lishi kerak",
             error_code="VALIDATION_ERROR",
             status_code=400,
         )

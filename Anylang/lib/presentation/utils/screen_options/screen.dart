@@ -34,9 +34,9 @@ abstract class Screen<S extends GetxController, Payload> {
   Widget build() {
 
     return ScreenWidget(
-      mobileContent: this.mobileContent,
-      tabletContent: this.tabletContent,
-      state: this.state,
+      mobileContent: mobileContent,
+      tabletContent: tabletContent,
+      state: state,
       initState: ()=> initState(payload),
       dispose: dispose,
       uiBuildFinished: uiBuildFinished,

@@ -17,7 +17,12 @@ String mapDioError(DioException e) {
     case DioExceptionType.receiveTimeout:
       return "Server javob bermadi. Internetni tekshirib, qayta urinib ko'ring";
     case DioExceptionType.connectionError:
-      return "Serverga ulanib bo'lmadi. API ishlayotganini tekshiring";
+      final detail = e.message ?? e.error?.toString() ?? '';
+      if (detail.toLowerCase().contains('certificate') ||
+          detail.toLowerCase().contains('handshake')) {
+        return "SSL xatosi. Telefon vaqtini tekshiring yoki qayta urinib ko'ring";
+      }
+      return "Serverga ulanib bo'lmadi. Internetni yoqing va qayta urinib ko'ring";
     case DioExceptionType.cancel:
       return "So'rov bekor qilindi";
     case DioExceptionType.badResponse:
@@ -53,6 +58,9 @@ String? _messageFromBody(dynamic data) {
   if (data is String && data.trim().isNotEmpty) return data.trim();
   return null;
 }
+
+/// Muvaffaqiyatli mutatsiya javobidan foydalanuvchi matni.
+String? successMessageFromBody(dynamic data) => _messageFromBody(data);
 
 String? dioErrorCode(DioException e) {
   final data = e.response?.data;

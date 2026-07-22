@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gradient_background.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/otp_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -48,7 +49,7 @@ class VerifyContent extends ScreenContent<VerifyState> {
 
     return GradientBackground(
       child: SafeArea(
-        child: SingleChildScrollView(
+        child: KeyboardAwareScrollView(
           padding: EdgeInsets.fromLTRB(24.dp, 40.dp, 24.dp, 24.dp),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

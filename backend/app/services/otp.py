@@ -81,8 +81,11 @@ async def create_and_send_otp(
     purpose: str,
     app_language: str = "uz_UZ",
     enforce_cooldown: bool = True,
-) -> tuple[str, int]:
-    """Create OTP record, send email, apply rate limits. Returns (code, resend_after_seconds)."""
+) -> tuple[str, int, bool]:
+    """Create OTP record, send email, apply rate limits.
+
+    Returns (code, resend_after_seconds, emailed).
+    """
     email_norm = email.lower().strip()
 
     if enforce_cooldown:
@@ -113,10 +116,12 @@ async def create_and_send_otp(
     db.add(otp)
     await db.flush()
 
-    await send_otp_email(email_norm, code, app_language)
+    emailed = await send_otp_email(email_norm, code, app_language)
     await _set_resend_cooldown(redis, email_norm, purpose)
+    # Cache plaintext briefly so ops can recover when SMTP is down (hashed in DB).
+    await redis.setex(f"otp:last:{purpose}:{email_norm}", OTP_TTL_MINUTES * 60, code)
 
-    return code, RESEND_COOLDOWN_SECONDS
+    return code, RESEND_COOLDOWN_SECONDS, emailed
 
 
 async def verify_otp(

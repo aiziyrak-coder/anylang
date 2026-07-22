@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
+
+import '../../../data/core/mappers.dart';
 import '../../ui/theme/gradients.dart';
 
-/// Boshqa foydalanuvchi profili uchun payload. `business` true bo'lsa biznes
-/// ma'lumotlari (faoliyat, tajriba, sertifikat, e'lonlar) ko'rsatiladi.
 class UserProfilePayload {
+  final int id;
   final bool business;
   final String name;
   final String initial;
   final LinearGradient avatarGradient;
   final bool verified;
   final String flagAsset;
-  final String country;   // "Turkiya"
-  final String role;      // biznes: "Ishlab chiqaruvchi", user: til nomi
+  final String country;
+  final String role;
   final String phone;
-
-  // Faqat biznes:
-  final String? experience;    // "12 yildan beri"
-  final String? website;       // "anadolucraft.com"
-  final int? completeness;     // 92
+  final String? experience;
+  final String? website;
+  final int? completeness;
   final List<String> certificates;
   final int listings;
 
@@ -30,6 +29,7 @@ class UserProfilePayload {
     required this.country,
     required this.role,
     required this.phone,
+    this.id = 0,
     this.verified = false,
     this.experience,
     this.website,
@@ -37,22 +37,38 @@ class UserProfilePayload {
     this.certificates = const [],
     this.listings = 0,
   });
-}
 
-/// Namuna biznes profili (mahsulot info'sidagi biznesga mos).
-const UserProfilePayload kAnadoluBusinessProfile = UserProfilePayload(
-  business: true,
-  name: 'Anadolu Craft Co.',
-  initial: 'A',
-  avatarGradient: avatarBrownGradient,
-  verified: true,
-  flagAsset: 'assets/images/flag_tr.png',
-  country: 'Turkiya',
-  role: 'Ishlab chiqaruvchi',
-  phone: '+90 212 555 04 18',
-  experience: '12 yildan beri',
-  website: 'anadolucraft.com',
-  completeness: 92,
-  certificates: ['ISO 9001', 'CE Mark'],
-  listings: 8,
-);
+  factory UserProfilePayload.fromApi(Map<String, dynamic> json) {
+    final id = (json['id'] as num?)?.toInt() ?? 0;
+    final isBusiness = json['is_business'] == true;
+    final name = (json['name'] as String?) ?? 'User';
+    final country = (json['country'] as String?) ?? '';
+    final biz = json['business'] as Map?;
+    final number = json['number']?.toString() ?? '';
+    return UserProfilePayload(
+      id: id,
+      business: isBusiness,
+      name: name,
+      initial: initialsOf(name),
+      avatarGradient: avatarGradientFor(id),
+      verified: json['verified_badge'] == true,
+      flagAsset: country.toUpperCase() == 'TR'
+          ? 'assets/images/flag_tr.png'
+          : 'assets/images/flag_uz.png',
+      country: country.isEmpty ? '—' : country,
+      role: (json['subtitle_role'] as String?) ?? '',
+      phone: number.isEmpty ? '' : formatNumber(number),
+      experience: biz?['founded_year'] != null
+          ? '${biz!['founded_year']} yildan'
+          : null,
+      website: biz?['website'] as String?,
+      completeness: (biz?['completeness'] as num?)?.toInt(),
+      certificates: (biz?['certificates'] is List)
+          ? (biz!['certificates'] as List).map((e) => e.toString()).toList()
+          : const [],
+      listings: (biz?['stats'] is Map)
+          ? ((biz!['stats'] as Map)['listings_count'] as num?)?.toInt() ?? 0
+          : 0,
+    );
+  }
+}

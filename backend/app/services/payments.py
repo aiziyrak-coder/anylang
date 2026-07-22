@@ -103,7 +103,7 @@ async def create_checkout(
             )
         if billing_cycle not in ("monthly", "yearly"):
             raise AppError(
-                message="billing_cycle talab qilinadi",
+                message="To'lov davri (oylik/yillik) talab qilinadi",
                 error_code="VALIDATION_ERROR",
                 status_code=400,
             )

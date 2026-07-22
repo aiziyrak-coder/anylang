@@ -64,8 +64,13 @@ class RegisterScreen extends Screen<RegisterState, void> {
             termsAccepted: true,
           );
           result.when(
-            success: (_) {
-              showAppMessage('code_sent'.tr);
+            success: (data) {
+              final otp = data is Map ? data['debug_otp']?.toString() : null;
+              if (otp != null && otp.isNotEmpty) {
+                showAppMessage('Tasdiqlash kodi: $otp');
+              } else {
+                showAppMessage('code_sent'.tr);
+              }
               navigate(VerifyScreen(), payload: a.email.trim().toLowerCase());
             },
             failure: showAppError,

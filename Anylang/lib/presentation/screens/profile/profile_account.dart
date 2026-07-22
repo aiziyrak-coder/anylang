@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
+
+import '../../../data/core/mappers.dart';
 import '../../ui/theme/gradients.dart';
 
-/// Bitta o'z e'loni (biznes profilidagi "E'lonlarim" gridi). Umumiy `Product`
-/// modelidan farqli — bu yerda ko'rishlar soni ko'rsatilmaydi (S14b dizayni).
 class OwnListing {
+  final int id;
   final LinearGradient tileGradient;
   final String name;
   final String price;
 
-  const OwnListing({required this.tileGradient, required this.name, required this.price});
+  const OwnListing({
+    required this.tileGradient,
+    required this.name,
+    required this.price,
+    this.id = 0,
+  });
 }
 
-/// O'z profili ma'lumoti. `isBusiness=false` bo'lsa shaxsiy (obuna) profil
-/// (S14a), `true` bo'lsa biznes (e'lonlar/statistika) profili (S14b)
-/// ko'rsatiladi. Hozircha mock — keyin backenddan.
 class ProfileAccount {
+  final int id;
   final bool isBusiness;
   final String name;
   final String initial;
@@ -22,21 +26,19 @@ class ProfileAccount {
   final bool verified;
   final String flagAsset;
   final String country;
-
-  // Faqat shaxsiy:
   final String? username;
   final String? nativeLanguage;
   final String? memberSince;
   final String? subscriptionPlan;
   final String? subscriptionPeriod;
   final DateTime? subscriptionExpiresAt;
-
-  // Faqat biznes:
   final String? role;
   final int? listingsCount;
   final String? viewsCount;
   final double? rating;
   final List<OwnListing> listings;
+  final String? avatarUrl;
+  final String? email;
 
   const ProfileAccount({
     required this.isBusiness,
@@ -45,6 +47,7 @@ class ProfileAccount {
     required this.avatarGradient,
     required this.flagAsset,
     required this.country,
+    this.id = 0,
     this.verified = false,
     this.username,
     this.nativeLanguage,
@@ -57,40 +60,56 @@ class ProfileAccount {
     this.viewsCount,
     this.rating,
     this.listings = const [],
+    this.avatarUrl,
+    this.email,
   });
+
+  factory ProfileAccount.fromApi(Map<String, dynamic> json) {
+    final id = (json['id'] as num?)?.toInt() ?? 0;
+    final name = (json['full_name'] as String?) ?? 'User';
+    final number = json['number']?.toString() ?? '';
+    final isBusiness = json['is_business'] == true;
+    final biz = json['business'] as Map?;
+    final sub = json['subscription'] as Map?;
+    final created = DateTime.tryParse(json['created_at']?.toString() ?? '');
+    final expires = DateTime.tryParse(sub?['expires_at']?.toString() ?? '');
+    final plan = sub?['plan']?.toString();
+    final countryCode = (json['country'] as String?) ?? '';
+    return ProfileAccount(
+      id: id,
+      isBusiness: isBusiness,
+      name: isBusiness
+          ? ((biz?['company_name'] as String?)?.isNotEmpty == true
+              ? biz!['company_name'] as String
+              : name)
+          : name,
+      initial: initialsOf(name),
+      avatarGradient: avatarGradientFor(id),
+      verified: json['verified_badge'] == true,
+      flagAsset: countryCode.toUpperCase() == 'TR'
+          ? 'assets/images/flag_tr.png'
+          : 'assets/images/flag_uz.png',
+      country: countryCode.isEmpty ? '—' : countryCode,
+      username: number.isEmpty ? null : formatNumber(number),
+      nativeLanguage: json['native_language'] as String?,
+      memberSince: created == null ? null : '${created.month}.${created.year}',
+      subscriptionPlan: plan,
+      subscriptionPeriod: sub?['billing_cycle']?.toString(),
+      subscriptionExpiresAt: expires,
+      role: biz?['business_role']?.toString(),
+      listingsCount: (biz?['stats'] is Map)
+          ? ((biz!['stats'] as Map)['listings_count'] as num?)?.toInt()
+          : null,
+      viewsCount: (biz?['stats'] is Map)
+          ? formatViews(((biz!['stats'] as Map)['total_views'] as num?)?.toInt() ?? 0)
+          : null,
+      rating: (biz?['stats'] is Map)
+          ? ((biz!['stats'] as Map)['rating'] as num?)?.toDouble()
+          : null,
+      avatarUrl: isBusiness
+          ? (biz == null ? null : biz['logo_url'] as String?)
+          : json['avatar_url'] as String?,
+      email: json['email'] as String?,
+    );
+  }
 }
-
-final ProfileAccount kMockPersonalAccount = ProfileAccount(
-  isBusiness: false,
-  name: 'Sardor Aliyev',
-  initial: 'SA',
-  avatarGradient: avatarTealGradient,
-  flagAsset: 'assets/images/flag_uz.png',
-  country: 'O‘zbekiston',
-  username: '@sardor_a',
-  nativeLanguage: 'O‘zbek tili',
-  memberSince: 'Mart 2024',
-  subscriptionPlan: 'Premium',
-  subscriptionPeriod: '12 oy',
-  subscriptionExpiresAt: DateTime(2026, 9, 12),
-);
-
-const kMockBusinessAccount = ProfileAccount(
-  isBusiness: true,
-  name: 'Anadolu Craft Co.',
-  initial: 'A',
-  avatarGradient: avatarBrownGradient,
-  verified: true,
-  flagAsset: 'assets/images/flag_tr.png',
-  country: 'Turkiya',
-  role: 'Ishlab chiqaruvchi',
-  listingsCount: 8,
-  viewsCount: '3.4k',
-  rating: 4.9,
-  listings: [
-    OwnListing(tileGradient: prodTealGradient, name: 'Qo‘lda to‘qilgan sharf', price: '\$24.00'),
-    OwnListing(tileGradient: prodBrownGradient, name: 'Charm qo‘l sumka', price: '\$79.00'),
-    OwnListing(tileGradient: prodPurpleGradient, name: 'Mis choynak', price: '\$52.00'),
-    OwnListing(tileGradient: prodBlueGradient, name: 'Kulolchilik lagan', price: '\$38.00'),
-  ],
-);

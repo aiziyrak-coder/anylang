@@ -71,12 +71,77 @@ async def _load_recipient(db: AsyncSession, chat: Chat, sender_id: int) -> User:
     return user
 
 
+def _reply_preview_text(message: Message, viewer_language: str) -> str | None:
+    if message.is_deleted or message.deleted_for_everyone:
+        return None
+    if message.type != "text":
+        return None
+    text = message.text_original
+    lang = _normalize_lang(viewer_language)
+    for tr in message.translations or []:
+        if _normalize_lang(tr.language) == lang:
+            text = tr.text
+            break
+    return text
+
+
+def _serialize_reply_to(
+    reply: Message,
+    *,
+    sender_name: str,
+    viewer_language: str,
+) -> dict:
+    deleted = bool(reply.is_deleted or reply.deleted_for_everyone)
+    return {
+        "id": reply.id,
+        "sender_id": reply.sender_id,
+        "sender_name": sender_name,
+        "type": reply.type,
+        "preview_text": None if deleted else _reply_preview_text(reply, viewer_language),
+        "is_deleted": deleted,
+    }
+
+
+async def _load_reply_to_payloads(
+    db: AsyncSession,
+    messages: list[Message],
+    *,
+    viewer_language: str,
+) -> dict[int, dict]:
+    reply_ids = {m.reply_to_id for m in messages if m.reply_to_id is not None}
+    if not reply_ids:
+        return {}
+
+    result = await db.execute(
+        select(Message)
+        .where(Message.id.in_(reply_ids))
+        .options(selectinload(Message.translations))
+    )
+    replies = list(result.scalars().all())
+    if not replies:
+        return {}
+
+    sender_ids = {r.sender_id for r in replies}
+    users_result = await db.execute(select(User).where(User.id.in_(sender_ids)))
+    names = {u.id: u.full_name for u in users_result.scalars().all()}
+
+    return {
+        r.id: _serialize_reply_to(
+            r,
+            sender_name=names.get(r.sender_id, ""),
+            viewer_language=viewer_language,
+        )
+        for r in replies
+    }
+
+
 def _serialize_message(
     message: Message,
     *,
     viewer_id: int,
     viewer_language: str,
     read_message_ids: set[int] | None = None,
+    reply_to: dict | None = None,
 ) -> dict:
     if message.deleted_for_everyone:
         text_original = None
@@ -107,6 +172,7 @@ def _serialize_message(
         "original_language": message.original_language,
         "meta": meta,
         "reply_to_id": message.reply_to_id,
+        "reply_to": reply_to,
         "status": message.status,
         "delivered_at": message.delivered_at,
         "is_deleted": message.is_deleted,
@@ -187,12 +253,17 @@ async def list_messages(
         )
         read_ids = set(read_result.scalars().all())
 
+    reply_map = await _load_reply_to_payloads(
+        db, visible, viewer_language=user.native_language
+    )
+
     items = [
         _serialize_message(
             m,
             viewer_id=user.id,
             viewer_language=user.native_language,
             read_message_ids=read_ids if m.sender_id == user.id else None,
+            reply_to=reply_map.get(m.reply_to_id) if m.reply_to_id else None,
         )
         for m in visible
     ]
@@ -219,7 +290,7 @@ async def create_message(
     if msg_type == "text":
         if not text or not text.strip():
             raise AppError(
-                message="Matn xabari uchun text majburiy",
+                message="Matn xabari uchun matn majburiy",
                 error_code="VALIDATION_ERROR",
                 status_code=400,
             )
@@ -254,7 +325,7 @@ async def create_message(
             media.attached = True
         else:
             raise AppError(
-                message="Media xabari uchun media_id talab qilinadi",
+                message="Media xabari uchun media identifikatori talab qilinadi",
                 error_code="VALIDATION_ERROR",
                 status_code=400,
             )
@@ -274,10 +345,14 @@ async def create_message(
     )
     duplicate = existing.scalar_one_or_none()
     if duplicate is not None:
+        reply_map = await _load_reply_to_payloads(
+            db, [duplicate], viewer_language=user.native_language
+        )
         return _serialize_message(
             duplicate,
             viewer_id=user.id,
             viewer_language=user.native_language,
+            reply_to=reply_map.get(duplicate.reply_to_id) if duplicate.reply_to_id else None,
         )
 
     now = datetime.now(UTC)
@@ -299,13 +374,29 @@ async def create_message(
     translations: list[MessageTranslation] = []
     if msg_type == "text" and text:
         target_lang = _normalize_lang(recipient.native_language)
-        translated = await translate(text, target_lang, source_lang=original_language)
-        if translated != text or target_lang != original_language:
+        try:
+            translated = await translate(text, target_lang, source_lang=original_language)
+            status = "done"
+        except Exception as exc:  # noqa: BLE001 — keep message even if AI is down
+            logger = __import__("logging").getLogger(__name__)
+            logger.warning("Message translation failed (%s); keeping original", exc)
+            translated = text
+            status = "failed"
+        if translated != text or target_lang != (original_language or ""):
             tr = MessageTranslation(
                 message_id=message.id,
                 language=target_lang,
                 text=translated,
-                status="done",
+                status=status,
+            )
+            db.add(tr)
+            translations.append(tr)
+        elif status == "failed":
+            tr = MessageTranslation(
+                message_id=message.id,
+                language=target_lang,
+                text=text,
+                status=status,
             )
             db.add(tr)
             translations.append(tr)
@@ -319,10 +410,25 @@ async def create_message(
     if translations:
         message.translations = translations
 
+    reply_map = await _load_reply_to_payloads(
+        db, [message], viewer_language=user.native_language
+    )
+    reply_payload = reply_map.get(message.reply_to_id) if message.reply_to_id else None
+    if _normalize_lang(recipient.native_language) == _normalize_lang(user.native_language):
+        reply_payload_recipient = reply_payload
+    else:
+        reply_map_recipient = await _load_reply_to_payloads(
+            db, [message], viewer_language=recipient.native_language
+        )
+        reply_payload_recipient = (
+            reply_map_recipient.get(message.reply_to_id) if message.reply_to_id else None
+        )
+
     payload = _serialize_message(
         message,
         viewer_id=user.id,
         viewer_language=user.native_language,
+        reply_to=reply_payload,
     )
 
     hub = get_hub()
@@ -330,11 +436,13 @@ async def create_message(
         message,
         viewer_id=user.id,
         viewer_language=user.native_language,
+        reply_to=reply_payload,
     )
     recipient_payload = _serialize_message(
         message,
         viewer_id=recipient.id,
         viewer_language=recipient.native_language,
+        reply_to=reply_payload_recipient,
     )
     event_data = {
         "chat_id": chat_id,

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gradient_background.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
@@ -62,7 +63,7 @@ class ForgotPasswordContent extends ScreenContent<ForgotPasswordState> {
     final c = context.appColors;
     return GradientBackground(
       child: SafeArea(
-        child: Padding(
+        child: KeyboardAwareScrollView(
           padding: EdgeInsets.fromLTRB(24.dp, 16.dp, 24.dp, 24.dp),
           child: Obx(() {
             final step = state.step.value;

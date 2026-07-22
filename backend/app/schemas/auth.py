@@ -117,6 +117,8 @@ class RegisterOut(BaseModel):
     email: EmailStr
     message: str
     resend_after_seconds: int = Field(ge=0)
+    # Present only when SMTP failed / allow_otp_in_response — for bootstrap testing.
+    debug_otp: str | None = None
 
 
 class AuthSessionOut(TokenPairOut):

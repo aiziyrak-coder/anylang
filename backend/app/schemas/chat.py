@@ -66,6 +66,15 @@ class MessageTranslationOut(BaseModel):
     status: str
 
 
+class MessageReplyToOut(BaseModel):
+    id: int
+    sender_id: int
+    sender_name: str
+    type: str
+    preview_text: str | None = None
+    is_deleted: bool = False
+
+
 class MessageOut(BaseModel):
     id: int
     chat_id: int
@@ -77,6 +86,7 @@ class MessageOut(BaseModel):
     original_language: str | None = None
     meta: dict[str, Any] | None = None
     reply_to_id: int | None = None
+    reply_to: MessageReplyToOut | None = None
     status: str
     delivered_at: datetime | None = None
     is_deleted: bool = False

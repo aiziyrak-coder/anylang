@@ -20,7 +20,7 @@ async def get_current_user(
 ) -> User:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise AppError(
-            message="Authentication required",
+            message="Autentifikatsiya talab qilinadi",
             error_code="UNAUTHORIZED",
             status_code=401,
         )
@@ -29,14 +29,14 @@ async def get_current_user(
         payload = decode_token(credentials.credentials)
     except jwt.PyJWTError as exc:
         raise AppError(
-            message="Invalid or expired token",
+            message="Token yaroqsiz yoki muddati tugagan",
             error_code="UNAUTHORIZED",
             status_code=401,
         ) from exc
 
     if payload.get("type") != "access":
         raise AppError(
-            message="Invalid token type",
+            message="Token turi noto'g'ri",
             error_code="UNAUTHORIZED",
             status_code=401,
         )
@@ -54,7 +54,7 @@ async def get_current_user(
 
     if user is None:
         raise AppError(
-            message="User not found",
+            message="Foydalanuvchi topilmadi",
             error_code="UNAUTHORIZED",
             status_code=401,
         )

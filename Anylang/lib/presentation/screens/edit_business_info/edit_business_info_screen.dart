@@ -1,24 +1,58 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../../data/core/mappers.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../modal/image_picker.dart';
 import '../../ui/theme/gradients.dart';
+import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import 'edit_business_info_action.dart';
 import 'edit_business_info_content.dart';
 import 'edit_business_info_state.dart';
 
-class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
+const _roleToApi = {
+  'Ishlab chiqaruvchi': 'manufacturer',
+  'Distributor': 'distributor',
+  'Chakana savdo': 'retail',
+  'Xizmat ko‘rsatuvchi': 'service',
+};
 
-  EditBusinessInfoScreen() : super(
-    mobileContent: EditBusinessInfoContent(),
-  );
+const _apiToRole = {
+  'manufacturer': 'Ishlab chiqaruvchi',
+  'distributor': 'Distributor',
+  'retail': 'Chakana savdo',
+  'service': 'Xizmat ko‘rsatuvchi',
+};
+
+class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
+  EditBusinessInfoScreen() : super(mobileContent: EditBusinessInfoContent());
 
   @override
   void initState(void payload) {
-    // TODO: joriy biznes ma'lumotini backenddan yuklash. Hozircha mock.
-    state.country.value = 'Turkiya';
-    state.role.value = 'Ishlab chiqaruvchi';
-    state.certificates.addAll(['ISO 9001', 'CE Mark']);
-    state.factoryImages.addAll([prodBlueGradient, prodBrownGradient]);
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result = await Get.find<ProfileRepository>().getBusiness();
+    result.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) return;
+        state.companyName.value = (map['company_name'] as String?) ?? '';
+        state.country.value = (map['country'] as String?) ?? '';
+        state.role.value =
+            _apiToRole[(map['business_role'] as String?) ?? ''] ?? 'Ishlab chiqaruvchi';
+        state.website.value = (map['website'] as String?) ?? '';
+        state.description.value = (map['description'] as String?) ?? '';
+        final certs = map['certificates'];
+        if (certs is List) {
+          state.certificates.assignAll(certs.map((e) => e.toString()));
+        }
+      },
+      failure: showAppError,
+    );
   }
 
   @override
@@ -27,8 +61,9 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
       case Back _:
         popBackNavigate();
       case ChangeLogo _:
-        await pickImage(context);
-        // TODO: tanlangan logotipni yuklash so'rovi.
+        final file = await pickImage(context);
+        if (file == null) return;
+        showAppMessage('Logotip yuklash tez orada');
       case SelectBusinessCountry a:
         state.country.value = a.country;
       case SelectBusinessRole a:
@@ -36,18 +71,50 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
       case RemoveCertificate a:
         state.certificates.remove(a.certificate);
       case AddCertificateRequested _:
-        // TODO: sertifikat nomini kiritish dialogi.
-        break;
+        final ctrl = TextEditingController();
+        final name = await Get.dialog<String>(
+          AlertDialog(
+            title: const Text('Sertifikat'),
+            content: TextField(controller: ctrl, autofocus: true),
+            actions: [
+              TextButton(onPressed: () => Get.back(), child: Text('cancel'.tr)),
+              TextButton(
+                onPressed: () => Get.back(result: ctrl.text.trim()),
+                child: Text('confirm'.tr),
+              ),
+            ],
+          ),
+        );
+        if (name != null && name.isNotEmpty) state.certificates.add(name);
       case AddFactoryImageRequested _:
         final file = await pickImage(context);
         if (file != null) {
           state.factoryImages.add(prodOliveGradient);
+          showAppMessage('Rasm tanlandi — saqlashda yuklanadi');
         }
-      case SaveBusinessInfo _:
+      case SaveBusinessInfo a:
         state.isSaving.value = true;
-        // TODO: haqiqiy saqlash so'rovi.
-        state.isSaving.value = false;
-        popBackNavigate();
+        try {
+          final body = <String, dynamic>{
+            if (a.companyName.trim().isNotEmpty) 'company_name': a.companyName.trim(),
+            if (state.country.value.length == 2)
+              'country': state.country.value.toUpperCase(),
+            if (_roleToApi[state.role.value] != null)
+              'business_role': _roleToApi[state.role.value],
+            if (a.website.trim().isNotEmpty) 'website': a.website.trim(),
+            if (a.description.trim().isNotEmpty) 'description': a.description.trim(),
+            'certificates': state.certificates.toList(),
+          };
+          final result = await Get.find<ProfileRepository>().updateBusiness(body);
+          result.when(
+            success: (_) {
+              popBackNavigate();
+            },
+            failure: (_) {},
+          );
+        } finally {
+          state.isSaving.value = false;
+        }
     }
   }
 }

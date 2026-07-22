@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gender_selector.dart';
 import '../../ui/gradient_background.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
@@ -10,7 +11,7 @@ import '../../utils/formatters/time_formatter.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
-import 'country_picker_bottom_sheet.dart';
+import '../../modal/country_picker_bottom_sheet.dart';
 import 'register_action.dart';
 import 'register_state.dart';
 
@@ -40,7 +41,7 @@ class RegisterContent extends ScreenContent<RegisterState> {
 
     return GradientBackground(
       child: SafeArea(
-        child: SingleChildScrollView(
+        child: KeyboardAwareScrollView(
           padding: EdgeInsets.fromLTRB(24.dp, 20.dp, 24.dp, 24.dp),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -81,7 +82,7 @@ class RegisterContent extends ScreenContent<RegisterState> {
                           hint: 'O‘zbekiston',
                           icon: Icons.keyboard_arrow_down_rounded,
                           value: state.country.value.isEmpty ? null : state.country.value,
-                          onTap: () => _pickCountry(context, sendAction),
+                          onTap: () => _pickCountry(context, state, sendAction),
                         )),
                   ),
                 ],
@@ -173,8 +174,17 @@ class RegisterContent extends ScreenContent<RegisterState> {
     if (picked != null) sendAction(SelectBirthDate(picked));
   }
 
-  Future<void> _pickCountry(BuildContext context, void Function(MyAction) sendAction) async {
-    final picked = await showCountryPickerBottomSheet(context);
-    if (picked != null) sendAction(SelectCountry(picked.name, picked.code));
+  Future<void> _pickCountry(
+    BuildContext context,
+    RegisterState state,
+    void Function(MyAction) sendAction,
+  ) async {
+    final picked = await showCountryPickerBottomSheet(
+      context,
+      title: 'country_picker_title'.tr,
+      desc: 'country_picker_desc'.tr,
+      selectedCode: state.countryCode.value,
+    );
+    if (picked != null) sendAction(SelectCountry(picked.localizedName, picked.code));
   }
 }

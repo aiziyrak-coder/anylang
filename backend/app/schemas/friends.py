@@ -56,6 +56,8 @@ class FriendRequestListItemOut(BaseModel):
     id: int
     user: FriendOut
     created_at: datetime
+    # pending | none — `none` = rad etilgan (qayta yuborish mumkin); UI da "Qo'shish"
+    status: str = "pending"
 
 
 class FriendRequestListOut(BaseModel):

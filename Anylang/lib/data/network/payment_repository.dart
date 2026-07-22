@@ -4,7 +4,7 @@ import '../core/buildNetwork/network_client.dart';
 class PaymentRepository {
   final NetworkClient _client;
 
-  PaymentRepository({required NetworkClient client}) : _client = client;
+  PaymentRepository({required this._client});
 
   Future<BaseResult> checkoutSubscription({
     required String plan,

@@ -36,12 +36,17 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "AnyLang <noreply@anylang.local>"
     smtp_tls: bool = False
+    # If SMTP is down, still complete register/login OTP flow (code logged / optional response).
+    smtp_fail_open: bool = True
+    allow_otp_in_response: bool = False
 
     google_client_ids: str = ""
     deepl_api_key: str = ""
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
     deepgram_api_key: str = ""
     elevenlabs_api_key: str = ""
-    translation_provider: str = "mock"
+    translation_provider: str = "mock"  # mock | deepl | openai
 
     payment_provider: str = "mock"  # mock | stripe
     stripe_secret_key: str = ""

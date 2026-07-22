@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/local/countries_service.dart';
+import '../../modal/country_picker_bottom_sheet.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gender_selector.dart';
 import '../../ui/gradient_background.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
@@ -13,7 +16,6 @@ import '../../utils/formatters/time_formatter.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
-import '../register/country_picker_bottom_sheet.dart';
 import 'profile_edit_action.dart';
 import 'profile_edit_state.dart';
 
@@ -33,8 +35,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   @override
   void uiBuildFinished(ProfileEditState state) {
     _nameCtrl.text = state.account?.name ?? '';
-    // TODO: email hali ProfileAccount modelida yo'q — mock.
-    _emailCtrl.text = 'dilnoza@email.com';
+    _emailCtrl.text = state.account?.email ?? '';
   }
 
   @override
@@ -47,10 +48,6 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   Widget build(BuildContext context, ProfileEditState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
     final account = state.account;
-    // resizeToAvoidBottomInset Screen yadrosida false — klaviatura ochilganda
-    // pastdagi fieldlar/tugma ko'rinishi uchun scroll pastki paddingi shu
-    // qadar oshiriladi (screen o'zi siljimaydi, faqat scroll maydoni kengayadi).
-    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
 
     return GradientBackground(
       child: SafeArea(
@@ -64,8 +61,8 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(20.dp, 16.dp, 20.dp, 24.dp + keyboardInset),
+              child: KeyboardAwareScrollView(
+                padding: EdgeInsets.fromLTRB(20.dp, 16.dp, 20.dp, 24.dp),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -109,13 +106,19 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                         ),
                         SizedBox(width: 12.dp),
                         Expanded(
-                          child: Obx(() => AppPickerField(
-                                label: 'country'.tr,
-                                hint: 'O‘zbekiston',
-                                icon: Icons.keyboard_arrow_down_rounded,
-                                value: state.country.value.isEmpty ? null : state.country.value,
-                                onTap: () => _pickCountry(context, sendAction),
-                              )),
+                          child: Obx(() {
+                            final code = state.country.value;
+                            final label = code.isEmpty
+                                ? null
+                                : Get.find<CountriesService>().displayName(code);
+                            return AppPickerField(
+                              label: 'country'.tr,
+                              hint: 'O‘zbekiston',
+                              icon: Icons.keyboard_arrow_down_rounded,
+                              value: label,
+                              onTap: () => _pickCountry(context, state, sendAction),
+                            );
+                          }),
                         ),
                       ],
                     ),
@@ -167,8 +170,17 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
     if (picked != null) sendAction(SelectProfileBirthDate(picked));
   }
 
-  Future<void> _pickCountry(BuildContext context, void Function(MyAction) sendAction) async {
-    final picked = await showCountryPickerBottomSheet(context);
-    if (picked != null) sendAction(SelectProfileCountry(picked.name));
+  Future<void> _pickCountry(
+    BuildContext context,
+    ProfileEditState state,
+    void Function(MyAction) sendAction,
+  ) async {
+    final picked = await showCountryPickerBottomSheet(
+      context,
+      title: 'country_picker_title'.tr,
+      desc: 'country_picker_desc'.tr,
+      selectedCode: state.country.value,
+    );
+    if (picked != null) sendAction(SelectProfileCountry(picked.code));
   }
 }

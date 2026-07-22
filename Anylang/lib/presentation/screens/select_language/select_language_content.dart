@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/app_empty_state.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/items/language_item.dart';
@@ -63,7 +64,12 @@ class SelectLanguageContent extends ScreenContent<SelectLanguageState> {
                         o.key.tr.toLowerCase().contains(q);
                   }).toList();
 
-                  return ListView.separated(
+                  return items.isEmpty
+                      ? AppEmptyState(
+                          icon: Icons.search_off_rounded,
+                          title: 'empty_no_results'.tr,
+                        )
+                      : ListView.separated(
                     padding: EdgeInsets.zero,
                     itemCount: items.length,
                     separatorBuilder: (_, _) => SizedBox(height: 12.dp),

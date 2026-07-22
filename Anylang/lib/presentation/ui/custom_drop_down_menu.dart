@@ -80,8 +80,8 @@ class CustomDropDownMenu<T> extends StatelessWidget {
         searchHintText: '${'search'.tr} :',
         closedHeaderPadding: _padding,
         decoration: _decoration,
-        headerBuilder: (_, item, __) => _closed(item.toString(), isHint: false),
-        hintBuilder: (_, hint, __) => _closed(hint, isHint: true),
+        headerBuilder: (_, item, _) => _closed(item.toString(), isHint: false),
+        hintBuilder: (_, hint, _) => _closed(hint, isHint: true),
         onChanged: (value) {
           if (value != null) selectedItem(value);
         },
@@ -94,8 +94,8 @@ class CustomDropDownMenu<T> extends StatelessWidget {
       hintText: hintText,
       closedHeaderPadding: _padding,
       decoration: _decoration,
-      headerBuilder: (_, item, __) => _closed(item.toString(), isHint: false),
-      hintBuilder: (_, hint, __) => _closed(hint, isHint: true),
+      headerBuilder: (_, item, _) => _closed(item.toString(), isHint: false),
+      hintBuilder: (_, hint, _) => _closed(hint, isHint: true),
       onChanged: (value) {
         if (value != null) selectedItem(value);
       },

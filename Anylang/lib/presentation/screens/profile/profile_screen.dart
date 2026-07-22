@@ -1,3 +1,8 @@
+import 'package:get/get.dart';
+
+import '../../../data/core/mappers.dart';
+import '../../../data/network/profile_repository.dart';
+import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../add_product/add_product_screen.dart';
@@ -11,15 +16,23 @@ import 'profile_content.dart';
 import 'profile_state.dart';
 
 class ProfileScreen extends Screen<ProfileState, void> {
-
-  ProfileScreen() : super(
-    mobileContent: ProfileContent(),
-  );
+  ProfileScreen() : super(mobileContent: ProfileContent());
 
   @override
   void initState(void payload) {
-    // TODO: joriy foydalanuvchi profilini backenddan yuklash. Hozircha mock.
-    state.account.value = kMockPersonalAccount;
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result = await Get.find<ProfileRepository>().getMe();
+    result.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) return;
+        state.account.value = ProfileAccount.fromApi(map);
+      },
+      failure: showAppError,
+    );
   }
 
   @override
@@ -36,10 +49,8 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case AddProductRequested _:
         navigate(AddProductScreen());
       case SeeAllListings _:
-        // TODO: barcha e'lonlar ekrani.
         break;
       case OpenOwnListing _:
-        // TODO: e'lon tahrirlash/ko'rish ekrani.
         break;
     }
   }

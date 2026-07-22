@@ -14,8 +14,14 @@ enum ChatMsgType { text, image, voice, product, location, file, contact }
 class ChatReply {
   final String author;
   final String preview;
+  /// Asosiy xabar id (bosganda shu xabarga scroll).
+  final String? messageId;
 
-  const ChatReply({required this.author, required this.preview});
+  const ChatReply({
+    required this.author,
+    required this.preview,
+    this.messageId,
+  });
 }
 
 /// Bitta chat xabari. Barcha turlar bitta modelda — turi `type` bilan
@@ -38,6 +44,9 @@ class ChatMessage {
   // voice
   final String? voiceDuration; // "0:21"
   final bool voiceDownloaded; // play (true) yoki download (false) holati
+  final String? voicePath; // lokal fayl yoki remote URL
+  final List<double> voiceSamples; // waveform amplitude 0..1
+  final int? voiceDurationMs;
 
   // product
   final String? productTitle;
@@ -68,6 +77,9 @@ class ChatMessage {
     this.imageGradient,
     this.voiceDuration,
     this.voiceDownloaded = true,
+    this.voicePath,
+    this.voiceSamples = const [],
+    this.voiceDurationMs,
     this.productTitle,
     this.productPrice,
     this.locationLabel,
@@ -123,6 +135,10 @@ class ChatMessage {
     required String duration,
     bool downloaded = true,
     ChatStatus status = ChatStatus.read,
+    String? path,
+    List<double> samples = const [],
+    int? durationMs,
+    ChatReply? reply,
   }) =>
       ChatMessage(
         id: id,
@@ -130,8 +146,12 @@ class ChatMessage {
         dir: dir,
         time: time,
         status: status,
+        reply: reply,
         voiceDuration: duration,
         voiceDownloaded: downloaded,
+        voicePath: path,
+        voiceSamples: samples,
+        voiceDurationMs: durationMs,
       );
 
   factory ChatMessage.product({

@@ -40,6 +40,7 @@ class Product(Base, TimestampMixin):
     images: Mapped[list[ProductImage]] = relationship(
         back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.position"
     )
+    seller: Mapped[User] = relationship("User", foreign_keys=[seller_id])
 
 
 class ProductImage(Base, TimestampMixin):

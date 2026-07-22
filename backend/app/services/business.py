@@ -27,7 +27,7 @@ ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 def _require_business_account(user: User) -> None:
     if not user.is_business:
         raise AppError(
-            message="Business tarif talab qilinadi",
+            message="Biznes tarif talab qilinadi",
             error_code="NOT_A_BUSINESS_ACCOUNT",
             status_code=403,
         )

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/app_empty_state.dart';
+import '../../ui/app_loading.dart';
 import '../../ui/items/product_grid_card.dart';
 import '../../ui/items/product_top_card.dart';
 import '../../ui/search_field.dart';
@@ -43,12 +45,22 @@ class ProductsContent extends ScreenContent<ProductsState> {
           SizedBox(height: 18.dp),
           Expanded(
             child: Obx(() {
+              if (state.loading.value || state.searching.value) {
+                return const AppLoading();
+              }
               final q = state.query.value.trim().toLowerCase();
               final searching = q.isNotEmpty;
               bool match(Product p) =>
                   p.name.toLowerCase().contains(q) ||
                   (p.subtitle?.toLowerCase().contains(q) ?? false);
               final all = searching ? state.all.where(match).toList() : state.all.toList();
+
+              if (all.isEmpty && (searching || state.top.isEmpty)) {
+                return AppEmptyState(
+                  icon: searching ? Icons.search_off_rounded : Icons.storefront_outlined,
+                  title: searching ? 'empty_no_results'.tr : 'products_empty'.tr,
+                );
+              }
 
               return SingleChildScrollView(
                 child: Column(

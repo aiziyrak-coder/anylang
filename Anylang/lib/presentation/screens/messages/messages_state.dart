@@ -5,6 +5,10 @@ class MessagesState extends GetxController {
   /// Suhbatlar ro'yxati (Screen.initState'da yuklanadi).
   RxList<Conversation> conversations = <Conversation>[].obs;
 
-  /// Qidiruv matni.
+  /// Qidiruv natijalari (API).
+  RxList<Conversation> searchResults = <Conversation>[].obs;
+
   RxString query = ''.obs;
+  RxBool loading = true.obs;
+  RxBool searching = false.obs;
 }

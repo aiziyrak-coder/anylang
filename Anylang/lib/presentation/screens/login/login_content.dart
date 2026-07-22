@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/rich_button.dart';
 import '../../ui/gradient_background.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/labeled_divider.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
@@ -38,7 +39,7 @@ class LoginContent extends ScreenContent<LoginState> {
         child: Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
+              child: KeyboardAwareScrollView(
                 padding: EdgeInsets.fromLTRB(24.dp, 24.dp, 24.dp, 12.dp),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

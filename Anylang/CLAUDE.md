@@ -239,6 +239,8 @@ avval `ui/`da mosi bor-yo'qligi tekshiriladi; bo'lmasa — shu yerga umumiy widg
 | Komponent | Fayl | Vazifa |
 |---|---|---|
 | **`AppTopBar`** | `ui/app_top_bar.dart` | Orqaga qaytish tugmasi + sarlavhali yuqori panel. Ekranlar shuni ishlatadi (back+title kerak bo'lsa). `title` — chaqiruvchi tomonda `.tr` bilan beriladi, `onBack` — odatda `sendAction(Back())`, ixtiyoriy `trailing` va `titleStyle` bilan sozlanadi. |
+| **`KeyboardAwareScrollView`** | `ui/keyboard_aware_scroll.dart` | Form/auth ekranlari uchun scroll: klaviatura balandligini pastki paddingga qo'shadi (`ScreenWidget`da `resizeToAvoidBottomInset: false`). Fokusdagi maydon `AppTextField` / `OtpField` ichida `Scrollable.ensureVisible` bilan ko'rinadigan joyga suriladi. Yangi form ekranida `SingleChildScrollView` o'rniga shu ishlatiladi. |
+| **`UserSearchItem`** | `ui/items/user_search_item.dart` | Foydalanuvchi qidiruv natijasi (avatar + ism + subtitle). Butun qator bosiladi — chat ochish va h.k. |
 
 ## 9. Figma → Flutter: asset ko'chirish qoidasi
 

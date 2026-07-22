@@ -387,19 +387,33 @@ async def list_friend_requests(
     *,
     user: User,
     request_type: str,
+    include_declined: bool = False,
     page: int | None,
     limit: int | None,
 ) -> dict:
     params = normalize_page(page, limit, default_size=50, max_size=100)
 
-    query = select(Friendship).where(
-        Friendship.status == "pending",
-        or_(Friendship.user_low_id == user.id, Friendship.user_high_id == user.id),
-    )
+    pair_filter = or_(Friendship.user_low_id == user.id, Friendship.user_high_id == user.id)
+
     if request_type == "incoming":
-        query = query.where(Friendship.requester_id != user.id)
+        query = select(Friendship).where(
+            pair_filter,
+            Friendship.status == "pending",
+            Friendship.requester_id != user.id,
+        )
+    elif include_declined:
+        # Yuborilgan + hali qabul qilinmagan: pending yoki rad etilgan (qayta so'rov)
+        query = select(Friendship).where(
+            pair_filter,
+            Friendship.requester_id == user.id,
+            Friendship.status.in_(("pending", "declined")),
+        )
     else:
-        query = query.where(Friendship.requester_id == user.id)
+        query = select(Friendship).where(
+            pair_filter,
+            Friendship.status == "pending",
+            Friendship.requester_id == user.id,
+        )
 
     count_query = select(func.count()).select_from(query.subquery())
     total = int((await db.execute(count_query)).scalar() or 0)
@@ -412,11 +426,14 @@ async def list_friend_requests(
     items = []
     for friendship in friendships:
         other = await _other_user(db, friendship, user.id)
+        # API da declined → none (TZ 9.0); UI "Qo'shish" ko'rsatadi
+        public_status = "none" if friendship.status == "declined" else friendship.status
         items.append(
             {
                 "id": friendship.id,
                 "user": _serialize_friend(other),
                 "created_at": friendship.created_at,
+                "status": public_status,
             }
         )
 

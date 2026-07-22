@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/audio/voice_player_service.dart';
 import '../../screens/chat/chat_message.dart';
 import '../../utils/size_controller.dart';
 import '../theme/colors.dart';
@@ -13,11 +14,13 @@ import '../waveform_bars.dart';
 class ChatMessageItem extends StatelessWidget {
   final ChatMessage message;
   final VoidCallback onLongPress;
+  final ValueChanged<String>? onReplyTap;
 
   const ChatMessageItem({
     super.key,
     required this.message,
     required this.onLongPress,
+    this.onReplyTap,
   });
 
   bool get _out => message.isOutgoing;
@@ -113,14 +116,15 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   /// Reply (javob) sitatasi — chap akssent chizig'i + jo'natuvchi + snippet.
+  /// Chiquvchi bubble'da Telegram uslubi: to'qroq akssent (accentText) lime ustida.
   Widget _replyQuote(AppColors c, ChatReply r) {
-    final barColor = _out ? c.onAccent : c.accent;
-    final nameColor = _out ? c.onAccent : c.accentText;
+    final barColor = _out ? c.accentText : c.accent;
+    final nameColor = _out ? c.accentText : c.accentText;
     final prevColor =
         _out ? c.onAccent.withValues(alpha: 0.72) : c.textFaint;
     final bg = _out ? c.onAccent.withValues(alpha: 0.10) : c.accentSoft;
 
-    return Container(
+    final quote = Container(
       margin: EdgeInsets.only(bottom: 6.dp),
       padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 6.dp),
       decoration: BoxDecoration(
@@ -146,6 +150,8 @@ class ChatMessageItem extends StatelessWidget {
                 children: [
                   Text(
                     r.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: nameColor,
                       fontSize: 12.sp,
@@ -165,6 +171,14 @@ class ChatMessageItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    final targetId = r.messageId;
+    if (targetId == null || onReplyTap == null) return quote;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onReplyTap!(targetId),
+      child: quote,
     );
   }
 
@@ -244,56 +258,136 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Widget _voice(AppColors c) {
+    final player = Get.find<VoicePlayerService>();
     final waveColor = _out ? c.onAccent.withValues(alpha: 0.55) : c.textFaint;
+    final inactive = _out
+        ? c.onAccent.withValues(alpha: 0.28)
+        : c.textFaint.withValues(alpha: 0.45);
+    final path = message.voicePath;
+    final canPlay = VoicePlayerService.canPlay(path);
+    final duration = Duration(milliseconds: message.voiceDurationMs ?? 0);
+
     return _bubble(
       c,
-      Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 40.dp,
-            height: 40.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _out ? c.onAccent.withValues(alpha: 0.18) : c.accent,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              message.voiceDownloaded
-                  ? Icons.play_arrow_rounded
-                  : Icons.file_download_outlined,
-              size: 20.dp,
-              color: _out ? c.onAccent : c.onAccent,
-            ),
-          ),
-          SizedBox(width: 10.dp),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              WaveformBars(color: waveColor, maxHeight: 20, barCount: 22),
-              SizedBox(height: 6.dp),
-              SizedBox(
-                width: 150.dp,
-                child: Row(
+      Obx(() {
+        final active = player.isActive(message.id);
+        final playing = active && player.isPlaying.value;
+        // Obx trigger
+        player.activeId.value;
+        player.isPlaying.value;
+
+        Widget wave(double p) => WaveformBars(
+              color: waveColor,
+              inactiveColor: inactive,
+              maxHeight: 20,
+              barCount: 22,
+              samples: message.voiceSamples,
+              progress: p,
+            );
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (message.reply != null) _replyQuote(c, message.reply!),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    if (!canPlay || path == null) return;
+                    player.toggle(
+                      id: message.id,
+                      path: path,
+                      duration: duration.inMilliseconds > 0
+                          ? duration
+                          : const Duration(seconds: 1),
+                      samples: message.voiceSamples,
+                      barCount: 22,
+                    );
+                  },
+                  child: Container(
+                    width: 40.dp,
+                    height: 40.dp,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _out ? c.onAccent.withValues(alpha: 0.18) : c.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      !canPlay
+                          ? Icons.file_download_outlined
+                          : (playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                      size: 20.dp,
+                      color: c.onAccent,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10.dp),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      message.voiceDuration ?? '',
-                      style: TextStyle(
-                        color: _out ? c.onAccent : c.textSecondary,
-                        fontSize: 11.sp,
+                    SizedBox(
+                      width: 150.dp,
+                      height: 20.dp,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          void seek(Offset local) {
+                            if (!canPlay || path == null) return;
+                            final frac =
+                                (local.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                            player.seek(
+                              id: message.id,
+                              path: path,
+                              duration: duration.inMilliseconds > 0
+                                  ? duration
+                                  : const Duration(seconds: 1),
+                              frac: frac,
+                              samples: message.voiceSamples,
+                              barCount: 22,
+                            );
+                          }
+
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapDown: (d) => seek(d.localPosition),
+                            onHorizontalDragUpdate: (d) => seek(d.localPosition),
+                            child: active
+                                ? ValueListenableBuilder<double>(
+                                    valueListenable: player.progress,
+                                    builder: (_, p, _) => wave(p),
+                                  )
+                                : wave(player.restingProgress(message.id)),
+                          );
+                        },
                       ),
                     ),
-                    const Spacer(),
-                    _meta(c),
+                    SizedBox(height: 6.dp),
+                    SizedBox(
+                      width: 150.dp,
+                      child: Row(
+                        children: [
+                          Text(
+                            message.voiceDuration ?? '',
+                            style: TextStyle(
+                              color: _out ? c.onAccent : c.textSecondary,
+                              fontSize: 11.sp,
+                            ),
+                          ),
+                          const Spacer(),
+                          _meta(c),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
+          ],
+        );
+      }),
     );
   }
 

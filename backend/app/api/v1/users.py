@@ -83,7 +83,7 @@ async def public_restore_request(
         await redis.expire(ip_key, 3600)
     if email_n > 3 or ip_n > 20:
         raise AppError(
-            message="Too many restore requests — try again later",
+            message="Juda ko'p tiklash arizasi — keyinroq qayta urinib ko'ring",
             error_code="TOO_MANY_ATTEMPTS",
             status_code=429,
         )

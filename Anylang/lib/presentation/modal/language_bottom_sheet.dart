@@ -135,16 +135,26 @@ class _LanguageBottomSheetState extends State<_LanguageBottomSheet> {
               onChanged: (v) => setState(() => _query = v),
             ),
             SizedBox(height: 14.dp),
-            for (final o in items) ...[
-              LanguageItem(
-                flagAsset: o.flag,
-                nativeName: o.nativeName,
-                localizedName: o.key.tr,
-                selected: o.key == _selectedKey,
-                onTap: () => setState(() => _selectedKey = o.key),
-              ),
-              if (o != items.last) SizedBox(height: 10.dp),
-            ],
+            if (items.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 24.dp),
+                child: Text(
+                  'empty_no_results'.tr,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
+                ),
+              )
+            else
+              for (final o in items) ...[
+                LanguageItem(
+                  flagAsset: o.flag,
+                  nativeName: o.nativeName,
+                  localizedName: o.key.tr,
+                  selected: o.key == _selectedKey,
+                  onTap: () => setState(() => _selectedKey = o.key),
+                ),
+                if (o != items.last) SizedBox(height: 10.dp),
+              ],
           ],
         ),
       ),

@@ -99,6 +99,10 @@ async def list_friend_requests(
     db: DbSession,
     current_user: CurrentUser,
     type: str = Query(default="incoming", pattern="^(incoming|outgoing)$"),
+    include_declined: bool = Query(
+        default=False,
+        description="outgoing uchun: rad etilganlarni ham qaytarish (qayta so'rov uchun)",
+    ),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
 ) -> FriendRequestListOut:
@@ -106,6 +110,7 @@ async def list_friend_requests(
         db,
         user=current_user,
         request_type=type,
+        include_declined=include_declined,
         page=page,
         limit=limit,
     )

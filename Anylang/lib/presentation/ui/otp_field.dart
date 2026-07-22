@@ -31,6 +31,23 @@ class _OtpFieldState extends State<OtpField> {
   void initState() {
     super.initState();
     _controller.addListener(_onChanged);
+    _focus.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (!_focus.hasFocus) return;
+    void ensure() {
+      if (!mounted || !_focus.hasFocus) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: 0.2,
+      );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => ensure());
+    Future<void>.delayed(const Duration(milliseconds: 320), ensure);
   }
 
   void _onChanged() {
@@ -43,6 +60,7 @@ class _OtpFieldState extends State<OtpField> {
 
   @override
   void dispose() {
+    _focus.removeListener(_onFocusChange);
     _controller.dispose();
     _focus.dispose();
     super.dispose();

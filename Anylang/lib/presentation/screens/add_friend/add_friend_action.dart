@@ -1,7 +1,7 @@
 import '../../utils/screen_options/my_action.dart';
 import 'add_friend_result.dart';
 
-/// Faqat "Do'st qo'shish" ekraniga xos action'lar.
+/// Faqat "Qo'shish" ekraniga xos action'lar.
 class AddFriendAction extends MyAction {}
 
 /// Qidiruv matni o'zgarganda.
@@ -10,13 +10,19 @@ class AddFriendSearchChanged extends AddFriendAction {
   AddFriendSearchChanged(this.text);
 }
 
-/// "Qo'shish" tugmasi.
+/// Xabarlar rejimi: natija ustiga bosilganda chat.
+class OpenUserChat extends AddFriendAction {
+  final AddFriendResult result;
+  OpenUserChat(this.result);
+}
+
+/// Do'stlar rejimi: "Qo'shish" — so'rov yuborish.
 class SendFriendRequest extends AddFriendAction {
   final AddFriendResult result;
   SendFriendRequest(this.result);
 }
 
-/// "Yozish" tugmasi (allaqachon do'st).
+/// Do'stlar rejimi: "Yozish" (allaqachon do'st).
 class MessageResult extends AddFriendAction {
   final AddFriendResult result;
   MessageResult(this.result);

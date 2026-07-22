@@ -59,7 +59,7 @@ def _seller_filter():
 async def _require_business_account(user: User) -> None:
     if not _has_active_business(user.subscription):
         raise AppError(
-            message="Business hisob talab qilinadi",
+            message="Biznes hisob talab qilinadi",
             error_code="NOT_A_BUSINESS_ACCOUNT",
             status_code=403,
         )
@@ -584,7 +584,7 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
 
     if payload.status not in {"draft", "published"}:
         raise AppError(
-            message="Status draft yoki published bo'lishi kerak",
+            message="Status qoralama yoki e'lon qilingan bo'lishi kerak",
             error_code="VALIDATION_ERROR",
             status_code=400,
         )

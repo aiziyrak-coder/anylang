@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../ui/theme/colors.dart';
-import '../../ui/theme/gradients.dart';
+import '../../../data/core/mappers.dart';
 
-/// Bitta suhbat (Xabarlar ro'yxati elementi). Hozircha mock — keyinchalik
-/// backenddan keladi.
+/// Bitta suhbat (Xabarlar ro'yxati elementi).
 class Conversation {
+  final int id;
+  final int peerId;
   final String initial;
   final LinearGradient avatarGradient;
   final Color initialColor;
@@ -14,8 +14,11 @@ class Conversation {
   final bool online;
   final int unread;
   final bool highlighted;
+  final String? avatarUrl;
 
   const Conversation({
+    required this.id,
+    required this.peerId,
     required this.initial,
     required this.avatarGradient,
     required this.initialColor,
@@ -25,53 +28,37 @@ class Conversation {
     this.online = false,
     this.unread = 0,
     this.highlighted = false,
+    this.avatarUrl,
   });
-}
 
-/// Namuna suhbatlar (dizayndagi holat). Keyinchalik so'rov bilan almashtiriladi.
-const List<Conversation> kMockConversations = [
-  Conversation(
-    initial: 'A',
-    avatarGradient: avatarTealGradient,
-    initialColor: kLime,
-    name: 'Anna Müller',
-    lastMessage: 'Rahmat! Ertaga uchrashamizmi?',
-    time: '14:32',
-    online: true,
-    unread: 2,
-    highlighted: true,
-  ),
-  Conversation(
-    initial: 'R',
-    avatarGradient: avatarOliveGradient,
-    initialColor: kAvatarFg,
-    name: 'Ricardo Sánchez',
-    lastMessage: 'Ovozli xabar · 0:12',
-    time: '12:05',
-  ),
-  Conversation(
-    initial: 'Y',
-    avatarGradient: avatarMaroonGradient,
-    initialColor: kAvatarFg,
-    name: 'Yuki Tanaka',
-    lastMessage: 'ありがとう → tarjima qilindi',
-    time: 'Kecha',
-    online: true,
-  ),
-  Conversation(
-    initial: 'M',
-    avatarGradient: avatarGreenGradient,
-    initialColor: kAvatarFg,
-    name: 'Marco Rossi',
-    lastMessage: 'Ciao! Come stai?',
-    time: 'Yak',
-  ),
-  Conversation(
-    initial: 'S',
-    avatarGradient: avatarSlateGradient,
-    initialColor: kAvatarFg,
-    name: 'Sophie Laurent',
-    lastMessage: 'Merci beaucoup pour votre aide',
-    time: 'Sha',
-  ),
-];
+  factory Conversation.fromApi(Map<String, dynamic> json) {
+    final peer = Map<String, dynamic>.from(json['interlocutor'] as Map? ?? {});
+    final peerId = (peer['id'] as num?)?.toInt() ?? 0;
+    final name = (peer['full_name'] as String?)?.trim().isNotEmpty == true
+        ? peer['full_name'] as String
+        : 'User';
+    final last = json['last_message'] as Map?;
+    final lastText = last == null
+        ? ''
+        : (last['text'] as String?) ??
+            (last['type'] == 'voice' ? 'Ovozli xabar' : (last['type']?.toString() ?? ''));
+    final lastAt = json['last_message_at'] != null
+        ? DateTime.tryParse(json['last_message_at'].toString())
+        : null;
+    final unread = (json['unread_count'] as num?)?.toInt() ?? 0;
+    return Conversation(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      peerId: peerId,
+      initial: initialsOf(name),
+      avatarGradient: avatarGradientFor(peerId),
+      initialColor: initialColorFor(peerId),
+      name: name,
+      lastMessage: lastText,
+      time: formatChatTime(lastAt),
+      online: peer['is_online'] == true,
+      unread: unread,
+      highlighted: unread > 0,
+      avatarUrl: peer['avatar_url'] as String?,
+    );
+  }
+}

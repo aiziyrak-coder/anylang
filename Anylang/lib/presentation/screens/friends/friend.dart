@@ -1,67 +1,49 @@
 import 'package:flutter/material.dart';
 import '../../ui/theme/gradients.dart';
+import '../../../data/core/mappers.dart';
 
-/// Bitta do'st (Do'stlar ro'yxati elementi). Hozircha mock — keyin backenddan.
+/// Bitta do'st (Do'stlar ro'yxati elementi).
 class Friend {
+  final int id;
   final String initial;
   final LinearGradient avatarGradient;
   final String name;
-
-  /// Holat matni: "Onlayn · Nemis" yoki "5 daqiqa oldin · Yapon".
   final String status;
   final bool online;
+  final String? avatarUrl;
+  final String? nativeLanguage;
+  final String? number;
 
   const Friend({
+    required this.id,
     required this.initial,
     required this.avatarGradient,
     required this.name,
     required this.status,
     required this.online,
+    this.avatarUrl,
+    this.nativeLanguage,
+    this.number,
   });
-}
 
-/// Namuna do'stlar (dizayndagi holat). Keyinchalik so'rov bilan almashtiriladi.
-const List<Friend> kMockFriends = [
-  Friend(
-    initial: 'A',
-    avatarGradient: avatarTealGradient,
-    name: 'Anna Müller',
-    status: 'Onlayn · Nemis',
-    online: true,
-  ),
-  Friend(
-    initial: 'R',
-    avatarGradient: avatarOliveGradient,
-    name: 'Ricardo Sánchez',
-    status: 'Onlayn · Ispan',
-    online: true,
-  ),
-  Friend(
-    initial: 'L',
-    avatarGradient: avatarMaroonGradient,
-    name: 'Li Wei',
-    status: 'Onlayn · Xitoy',
-    online: true,
-  ),
-  Friend(
-    initial: 'Y',
-    avatarGradient: avatarGreenGradient,
-    name: 'Yuki Tanaka',
-    status: '5 daqiqa oldin · Yapon',
-    online: false,
-  ),
-  Friend(
-    initial: 'S',
-    avatarGradient: avatarSlateGradient,
-    name: 'Sophie Laurent',
-    status: '1 soat oldin · Fransuz',
-    online: false,
-  ),
-  Friend(
-    initial: 'M',
-    avatarGradient: avatarBrownGradient,
-    name: 'Marco Rossi',
-    status: 'Kecha · Italyan',
-    online: false,
-  ),
-];
+  factory Friend.fromApi(Map<String, dynamic> json) {
+    final id = (json['id'] as num?)?.toInt() ?? 0;
+    final name = (json['full_name'] as String?)?.trim().isNotEmpty == true
+        ? json['full_name'] as String
+        : 'User';
+    final online = json['is_online'] == true;
+    final lang = (json['native_language'] as String?) ?? '';
+    final status = online ? 'Onlayn · $lang' : lang;
+    return Friend(
+      id: id,
+      initial: initialsOf(name),
+      avatarGradient: avatarGradientFor(id),
+      name: name,
+      status: status,
+      online: online,
+      avatarUrl: json['avatar_url'] as String?,
+      nativeLanguage: lang,
+      number: json['number'] as String?,
+    );
+  }
+}

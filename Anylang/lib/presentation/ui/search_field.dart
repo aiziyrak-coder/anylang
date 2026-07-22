@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'theme/colors.dart';
 import '../utils/size_controller.dart';
 
-/// Umumiy qidiruv maydoni (ikonка + input).
+/// Umumiy qidiruv maydoni (ikonka + input).
 class SearchField extends StatelessWidget {
   final String hint;
   final ValueChanged<String> onChanged;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
 
-  const SearchField({super.key, required this.hint, required this.onChanged});
+  const SearchField({
+    super.key,
+    required this.hint,
+    required this.onChanged,
+    this.keyboardType,
+    this.inputFormatters,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +35,8 @@ class SearchField extends StatelessWidget {
           Expanded(
             child: TextField(
               onChanged: onChanged,
+              keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
               cursorColor: c.accent,
               style: TextStyle(color: c.textPrimary, fontSize: 15.sp),
               decoration: InputDecoration(

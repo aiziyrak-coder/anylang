@@ -1,12 +1,11 @@
-/// Backend manzili.
+/// Backend manzili (trailing slash Dio path join uchun muhim).
 ///
-/// Override majburiy productionda:
-/// `flutter run --dart-define=API_BASE_URL=https://api.example.com`
-///
-/// Local default faqat debug uchun.
+/// Production default: https://anylang.uz/
+/// Local override:
+/// `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/`
 const String kBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://127.0.0.1:8000',
+  defaultValue: 'https://anylang.uz/',
 );
 
 /// Token yangilash endpoint'i (baseUrl'ga nisbatan).

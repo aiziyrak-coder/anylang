@@ -302,7 +302,7 @@ class _CustomDateTImePickerState extends State<CustomDateTImePicker>
     );
   }
 
-  _showMenu() {
+  void _showMenu() {
     _overlayEntry = OverlayEntry(
       builder: (context) {
         double screenWidth = MediaQuery.of(context).size.width;
@@ -389,7 +389,7 @@ class _CustomDateTImePickerState extends State<CustomDateTImePicker>
             color: Theme.of(context).colorScheme.surface,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF000000).withOpacity(0.08),
+                color: const Color(0xFF000000).withValues(alpha: 0.08),
                 spreadRadius: 0,
                 blurRadius: 8,
                 offset: const Offset(0, 2), // changes position of shadow
@@ -543,14 +543,14 @@ class _CustomDateTImePickerState extends State<CustomDateTImePicker>
     }
   }
 
-  _hideMenu() {
+  void _hideMenu() {
     if (_overlayEntry != null) {
       _overlayEntry?.remove();
       _overlayEntry = null;
     }
   }
 
-  _updateView() {
+  void _updateView() {
     bool menuIsShowing = _controller?.menuIsShowing ?? false;
     if (menuIsShowing) {
       _showMenu();

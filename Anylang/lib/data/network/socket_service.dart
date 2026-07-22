@@ -69,7 +69,7 @@ class SocketService extends GetxService with WidgetsBindingObserver {
 
     _connecting = true;
     _reconnectTimer?.cancel();
-    final uri = Uri.parse('$_wsBase/ws');
+    final uri = Uri.parse('$_wsBase/ws/');
     _log('ulanmoqda... #${_retry + 1} -> $uri');
 
     try {

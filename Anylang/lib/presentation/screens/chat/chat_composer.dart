@@ -8,13 +8,14 @@ import '../../utils/size_controller.dart';
 import 'chat_message.dart';
 
 /// Suhbat pastki paneli: reply ko'rinishi + input/record almashinuvi.
-/// Holatga (`recording`, `showSend`, `reply`) qarab ikki ko'rinishdan birini
-/// chizadi. Barcha o'zaro ta'sir callback'lar orqali `ChatContent`'ga boradi.
 class ChatComposer extends StatelessWidget {
   final TextEditingController controller;
   final bool recording;
-  final bool showSend; // input bo'sh emas → yuborish, aks holda mikrofon
+  final bool showSend;
   final ChatMessage? reply;
+  final String peerName;
+  final String recordElapsed;
+  final List<double> recordSamples;
 
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
@@ -37,6 +38,9 @@ class ChatComposer extends StatelessWidget {
     required this.onCancelReply,
     required this.onCancelRecording,
     required this.onSendVoice,
+    this.peerName = '',
+    this.recordElapsed = '0:00',
+    this.recordSamples = const [],
   });
 
   @override
@@ -58,8 +62,9 @@ class ChatComposer extends StatelessWidget {
     );
   }
 
-  // Reply ko'rinishi (input ustida)
   Widget _replyPreview(AppColors c) {
+    final target = reply!;
+    final author = target.isOutgoing ? 'chat_you'.tr : peerName;
     return Container(
       margin: EdgeInsets.only(bottom: 8.dp),
       padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 8.dp),
@@ -71,9 +76,9 @@ class ChatComposer extends StatelessWidget {
         children: [
           Container(
             width: 3.dp,
-            height: 34.dp,
+            height: 36.dp,
             decoration: BoxDecoration(
-              color: c.accent,
+              color: c.accentText,
               borderRadius: BorderRadius.circular(2.dp),
             ),
           ),
@@ -84,7 +89,9 @@ class ChatComposer extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'chat_reply_to'.tr,
+                  author.isEmpty ? 'chat_reply_to'.tr : author,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: c.accentText,
                     fontSize: 12.sp,
@@ -93,7 +100,7 @@ class ChatComposer extends StatelessWidget {
                 ),
                 SizedBox(height: 2.dp),
                 Text(
-                  reply!.previewText(),
+                  target.previewText(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: c.textFaint, fontSize: 13.sp),
@@ -115,7 +122,6 @@ class ChatComposer extends StatelessWidget {
     );
   }
 
-  // Oddiy input qatori: "+", matn maydoni, mic/yuborish
   Widget _inputRow(AppColors c) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -172,7 +178,6 @@ class ChatComposer extends StatelessWidget {
     );
   }
 
-  // Ovoz yozish qatori: savat, to'lqin + timer, yuborish
   Widget _recordRow(AppColors c) {
     return Row(
       children: [
@@ -200,17 +205,25 @@ class ChatComposer extends StatelessWidget {
               children: [
                 Expanded(
                   child: ClipRect(
-                    child: WaveformBars(
-                      color: c.accent,
-                      maxHeight: 22,
-                      barCount: 30,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: WaveformBars(
+                        color: c.accent,
+                        maxHeight: 22,
+                        barCount: 30,
+                        samples: recordSamples,
+                      ),
                     ),
                   ),
                 ),
                 SizedBox(width: 10.dp),
                 Text(
-                  'chat_record_time'.tr,
-                  style: TextStyle(color: c.textPrimary, fontSize: 14.sp),
+                  recordElapsed,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 14.sp,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ],
             ),

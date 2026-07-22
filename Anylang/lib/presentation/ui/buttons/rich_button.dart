@@ -87,7 +87,7 @@ class RichButton extends StatelessWidget {
                     )
                   : Row(
                       children: [
-                        if (startIcon != null) startIcon!,
+                        ?startIcon,
 
                         if (startIcon != null) SizedBox(width: 10),
 
@@ -101,7 +101,7 @@ class RichButton extends StatelessWidget {
 
                         if (endIcon != null) SizedBox(width: 10),
 
-                        if (endIcon != null) endIcon!,
+                        ?endIcon,
                       ],
                     ),
             ),

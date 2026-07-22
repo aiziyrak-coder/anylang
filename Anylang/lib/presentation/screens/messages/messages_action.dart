@@ -18,3 +18,5 @@ class OpenConversation extends MessagesAction {
 
 /// "+" tugmasi — yangi suhbat.
 class NewConversation extends MessagesAction {}
+
+class RefreshConversations extends MessagesAction {}

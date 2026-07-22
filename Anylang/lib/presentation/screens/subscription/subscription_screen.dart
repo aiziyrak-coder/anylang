@@ -17,7 +17,6 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
 
   @override
   void initState(void payload) {
-    state.plans.addAll(kMockSubscriptionPlans);
     _loadPlans();
   }
 

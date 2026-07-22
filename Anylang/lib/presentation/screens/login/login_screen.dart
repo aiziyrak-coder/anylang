@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../data/network/auth_repository.dart';
 import '../../../data/network/google_auth_service.dart';
+import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -56,7 +57,10 @@ class LoginScreen extends Screen<LoginState, void> {
           }
 
           outcome.result.when(
-            success: (_) => navigateAndRemoveUntil(MainScreen()),
+            success: (_) async {
+              await connectRealtimeIfNeeded();
+              navigateAndRemoveUntil(MainScreen());
+            },
             failure: showAppError,
           );
         } finally {
@@ -82,7 +86,10 @@ class LoginScreen extends Screen<LoginState, void> {
             return;
           }
           outcome.result.when(
-            success: (_) => navigateAndRemoveUntil(MainScreen()),
+            success: (_) async {
+              await connectRealtimeIfNeeded();
+              navigateAndRemoveUntil(MainScreen());
+            },
             failure: showAppError,
           );
         } catch (e) {

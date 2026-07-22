@@ -662,7 +662,7 @@ async def purchase_number(db: AsyncSession, user: User, number: str) -> dict:
 
     if group.price > 0:
         raise AppError(
-            message="Pullik raqam uchun to'lov talab qilinadi. POST /payments/checkout dan foydalaning",
+            message="Pullik raqam uchun to'lov talab qilinadi",
             error_code="PAYMENT_REQUIRED",
             status_code=402,
             extra={"hint": "POST /api/v1/payments/checkout"},

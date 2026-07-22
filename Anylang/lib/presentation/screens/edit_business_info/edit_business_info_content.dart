@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/local/countries_service.dart';
+import '../../modal/country_picker_bottom_sheet.dart';
 import '../../modal/simple_list_picker_bottom_sheet.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/items/media_tile.dart';
 import '../../ui/items/removable_chip.dart';
+import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
@@ -14,7 +17,6 @@ import '../../ui/theme/gradients.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
-import '../register/country_picker_bottom_sheet.dart';
 import 'edit_business_info_action.dart';
 import 'edit_business_info_state.dart';
 
@@ -32,14 +34,26 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _websiteCtrl;
   late final TextEditingController _descriptionCtrl;
+  bool _hydrated = false;
 
   @override
   void initContent() {
-    _nameCtrl = TextEditingController(text: 'Anadolu Craft Co.');
-    _websiteCtrl = TextEditingController(text: 'anadolucraft.com');
-    _descriptionCtrl = TextEditingController(
-      text: 'Turkiyada 12 yildan beri qo‘lda to‘qilgan gazlama va charm mahsulotlar ishlab chiqaruvchi oilaviy korxona.',
-    );
+    _nameCtrl = TextEditingController();
+    _websiteCtrl = TextEditingController();
+    _descriptionCtrl = TextEditingController();
+  }
+
+  void _hydrate(EditBusinessInfoState state) {
+    if (_hydrated) return;
+    if (state.companyName.value.isEmpty &&
+        state.website.value.isEmpty &&
+        state.description.value.isEmpty) {
+      return;
+    }
+    _hydrated = true;
+    _nameCtrl.text = state.companyName.value;
+    _websiteCtrl.text = state.website.value;
+    _descriptionCtrl.text = state.description.value;
   }
 
   @override
@@ -52,6 +66,7 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
   @override
   Widget build(BuildContext context, EditBusinessInfoState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
+    _hydrate(state);
 
     return GradientBackground(
       child: SafeArea(
@@ -72,7 +87,7 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
+              child: KeyboardAwareScrollView(
                 padding: EdgeInsets.fromLTRB(20.dp, 16.dp, 20.dp, 24.dp),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -106,13 +121,19 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: Obx(() => AppPickerField(
-                                label: 'country'.tr,
-                                hint: 'country'.tr,
-                                value: state.country.value.isEmpty ? null : state.country.value,
-                                icon: Icons.keyboard_arrow_down_rounded,
-                                onTap: () => _pickCountry(context, sendAction),
-                              )),
+                          child: Obx(() {
+                            final code = state.country.value;
+                            final label = code.isEmpty
+                                ? null
+                                : Get.find<CountriesService>().displayName(code);
+                            return AppPickerField(
+                              label: 'country'.tr,
+                              hint: 'country'.tr,
+                              value: label,
+                              icon: Icons.keyboard_arrow_down_rounded,
+                              onTap: () => _pickCountry(context, state, sendAction),
+                            );
+                          }),
                         ),
                         SizedBox(width: 12.dp),
                         Expanded(
@@ -201,9 +222,18 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
     ));
   }
 
-  Future<void> _pickCountry(BuildContext context, void Function(MyAction) sendAction) async {
-    final picked = await showCountryPickerBottomSheet(context);
-    if (picked != null) sendAction(SelectBusinessCountry(picked.name));
+  Future<void> _pickCountry(
+    BuildContext context,
+    EditBusinessInfoState state,
+    void Function(MyAction) sendAction,
+  ) async {
+    final picked = await showCountryPickerBottomSheet(
+      context,
+      title: 'country_picker_title'.tr,
+      desc: 'country_picker_desc'.tr,
+      selectedCode: state.country.value,
+    );
+    if (picked != null) sendAction(SelectBusinessCountry(picked.code));
   }
 
   Future<void> _pickRole(BuildContext context, EditBusinessInfoState state, void Function(MyAction) sendAction) async {

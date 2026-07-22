@@ -55,7 +55,7 @@ async def _store_refresh_token(
 ) -> None:
     payload = decode_token(refresh_token)
     if payload.get("type") != "refresh":
-        raise AppError(message="Invalid token type", error_code="INVALID_REFRESH_TOKEN", status_code=401)
+        raise AppError(message="Token turi noto'g'ri", error_code="INVALID_REFRESH_TOKEN", status_code=401)
 
     record = RefreshToken(
         user_id=user_id,
@@ -128,7 +128,7 @@ async def register(
     )
 
     await ensure_basic_subscription(user, db)
-    await create_and_send_otp(
+    code, resend_after, emailed = await create_and_send_otp(
         db,
         redis,
         email=email_norm,
@@ -137,11 +137,17 @@ async def register(
         enforce_cooldown=False,
     )
 
-    return {
+    settings = get_settings()
+    out: dict[str, Any] = {
         "email": email_norm,
-        "message": "Tasdiqlash kodi emailingizga yuborildi",
-        "resend_after_seconds": await get_resend_after_seconds(redis, email_norm, PURPOSE_VERIFY_EMAIL),
+        "message": "Tasdiqlash kodi emailingizga yuborildi"
+        if emailed
+        else "Ro'yxatdan o'tdingiz. Tasdiqlash kodi emailga yuborilmadi — debug_otp dan foydalaning",
+        "resend_after_seconds": resend_after,
     }
+    if (not emailed) or settings.allow_otp_in_response:
+        out["debug_otp"] = code
+    return out
 
 
 async def verify_email(
@@ -182,7 +188,7 @@ async def resend_verification(
             "resend_after_seconds": RESEND_COOLDOWN_SECONDS,
         }
 
-    _, resend_after = await create_and_send_otp(
+    _, resend_after, _ = await create_and_send_otp(
         db,
         redis,
         email=email_norm,
@@ -563,7 +569,7 @@ async def forgot_password(
     resend_after = RESEND_COOLDOWN_SECONDS
     if user_exists:
         try:
-            _, resend_after = await create_and_send_otp(
+            _, resend_after, _ = await create_and_send_otp(
                 db,
                 redis,
                 email=email_norm,

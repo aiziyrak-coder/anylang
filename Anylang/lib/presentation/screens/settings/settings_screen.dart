@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/auth_repository.dart';
+import '../../../data/network/socket_service.dart';
 import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/language_localizations.dart';
@@ -14,10 +15,14 @@ import 'settings_content.dart';
 import 'settings_state.dart';
 
 class SettingsScreen extends Screen<SettingsState, void> {
+  SettingsScreen() : super(mobileContent: SettingsContent());
 
-  SettingsScreen() : super(
-    mobileContent: SettingsContent(),
-  );
+  void _clearLocalSession() {
+    if (Get.isRegistered<SocketService>()) {
+      Get.find<SocketService>().disconnect();
+    }
+    SessionStore.clear();
+  }
 
   @override
   void initState(void payload) {
@@ -55,11 +60,9 @@ class SettingsScreen extends Screen<SettingsState, void> {
         }
       case SettingsLogoutRequested _:
         try {
-          final repo = Get.find<AuthRepository>();
-          await repo.logout();
-        } catch (_) {
-          await SessionStore.clear();
-        }
+          await Get.find<AuthRepository>().logout();
+        } catch (_) {}
+        _clearLocalSession();
         navigateAndRemoveUntil(LoginScreen());
       case SettingsDeleteAccountRequested _:
         final confirmed = await Get.dialog<bool>(
@@ -83,14 +86,13 @@ class SettingsScreen extends Screen<SettingsState, void> {
         );
         if (confirmed != true) return;
         try {
-          final repo = Get.find<AuthRepository>();
-          final result = await repo.deleteAccount();
+          final result = await Get.find<AuthRepository>().deleteAccount();
           result.when(
             success: (_) {
-              showAppMessage('settings_delete_account_done'.tr);
+              _clearLocalSession();
               navigateAndRemoveUntil(LoginScreen());
             },
-            failure: showAppError,
+            failure: (_) {},
           );
         } catch (e) {
           showAppError(e.toString());
@@ -98,7 +100,7 @@ class SettingsScreen extends Screen<SettingsState, void> {
       case OpenProfileVisibility _:
       case OpenBlockedUsers _:
       case OpenChangePassword _:
-        break;
+        showAppMessage('Tez orada');
     }
   }
 }

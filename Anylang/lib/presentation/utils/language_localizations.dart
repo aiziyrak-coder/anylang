@@ -75,7 +75,14 @@ class LanguageLocalizations extends Translations {
       'register_action': 'Ro‘yxatdan o‘ting',
       'error': 'Xato',
       'success': 'OK',
+      'warning': 'Diqqat',
+      'action_done': 'Amal muvaffaqiyatli bajarildi',
       'loading': 'Yuklanmoqda…',
+      'select': 'Tanlang',
+      'search': 'Qidirish',
+      'cancel': 'Bekor qilish',
+      'confirm': 'Tasdiqlash',
+      'phone_number': 'Telefon raqami',
       'email_invalid': 'Email manzilini to‘g‘ri kiriting',
       'password_short': 'Parol kamida 8 belgidan iborat bo‘lishi kerak',
       'verify_required': 'Emailni tasdiqlash kerak',
@@ -101,6 +108,9 @@ class LanguageLocalizations extends Translations {
       'full_name_hint': 'Dilnoza Karimova',
       'birth_date': 'Tug‘ilgan sana',
       'country': 'Davlat',
+      'country_picker_title': 'Davlatni tanlang',
+      'country_picker_desc': 'Profilingizda ko‘rsatiladigan davlatni belgilang',
+      'country_search_hint': 'Davlatni qidiring',
       'gender': 'Jins',
       'female': 'Ayol',
       'male': 'Erkak',
@@ -122,13 +132,19 @@ class LanguageLocalizations extends Translations {
 
       // Messages
       'messages_search_hint': 'Suhbatlarni qidiring',
+      'messages_empty': 'Hali suhbat yo‘q',
+      'messages_empty_hint': 'Do‘stlaringizga yozishni boshlang',
+      'empty_no_results': 'Natija topilmadi',
 
       // Chat (suhbat)
+      'chat_empty': 'Hali xabar yo‘q',
+      'chat_empty_hint': 'Birinchi xabarni yozing',
       'chat_online': 'onlayn',
       'chat_offline': 'oxirgi faollik yaqinda',
       'chat_today': 'Bugun',
       'chat_input_hint': 'Xabar yozing...',
       'chat_reply_to': 'Javob berilmoqda',
+      'chat_reply_deleted': 'Xabar o‘chirilgan',
       'chat_record_time': '0:00',
       'chat_you': 'Siz',
       'chat_product_label': 'MAHSULOT',
@@ -157,15 +173,20 @@ class LanguageLocalizations extends Translations {
       'friends_search_hint': 'Do‘stlarni qidiring',
       'friends_online': 'Onlayn',
       'friends_others': 'Boshqalar',
+      'friends_empty': 'Hali do‘st yo‘q',
+      'friends_empty_hint': 'Qo‘shish tugmasini bosing',
+      'friends_add_title': 'Do‘st qo‘shish',
 
       // Add friend
-      'add_friend_title': 'Do‘st qo‘shish',
-      'add_friend_search_hint': 'ism, @username, telefon',
+      'add_friend_title': 'Qo‘shish',
+      'add_friend_search_hint': 'Raqam bilan qidiring',
       'add_friend_results': 'Natijalar',
       'add_friend_add': 'Qo‘shish',
       'add_friend_message': 'Yozish',
       'add_friend_requested': 'So‘rov yuborildi',
       'add_friend_is_friend': 'Do‘stingiz',
+      'add_friend_empty': '7 xonali AnyLang raqamini yozing',
+      'add_friend_no_results': 'Natija topilmadi',
 
       // Products (Bozor)
       'products_title': 'Bozor',
@@ -175,6 +196,7 @@ class LanguageLocalizations extends Translations {
       'products_results': 'Natijalar',
       'products_see_all': 'Barchasi',
       'products_views': 'ko‘rish',
+      'products_empty': 'Hali mahsulot yo‘q',
       'product_contact': 'Bog‘lanish',
 
       // User / business profile
@@ -313,6 +335,7 @@ class LanguageLocalizations extends Translations {
       'jonli_holding': 'Bosib turibsiz…',
       'jonli_translating': 'Tarjima qilinmoqda…',
       'jonli_reading_to_you': 'SIZGA O‘QILMOQDA',
+      'jonli_placeholder': 'Gapiring — tarjima shu yerda chiqadi',
     },
     'ru_RU': {
       'app_name': 'AnyLang',
@@ -361,7 +384,14 @@ class LanguageLocalizations extends Translations {
       'register_action': 'Зарегистрируйтесь',
       'error': 'Ошибка',
       'success': 'OK',
+      'warning': 'Внимание',
+      'action_done': 'Действие выполнено',
       'loading': 'Загрузка…',
+      'select': 'Выберите',
+      'search': 'Поиск',
+      'cancel': 'Отмена',
+      'confirm': 'Подтвердить',
+      'phone_number': 'Номер телефона',
       'email_invalid': 'Введите корректный email',
       'password_short': 'Пароль должен быть не короче 8 символов',
       'verify_required': 'Подтвердите email',
@@ -386,6 +416,9 @@ class LanguageLocalizations extends Translations {
       'full_name_hint': 'Дилноза Каримова',
       'birth_date': 'Дата рождения',
       'country': 'Страна',
+      'country_picker_title': 'Выберите страну',
+      'country_picker_desc': 'Укажите страну, которая будет отображаться в профиле',
+      'country_search_hint': 'Поиск страны',
       'gender': 'Пол',
       'female': 'Женский',
       'male': 'Мужской',
@@ -406,13 +439,19 @@ class LanguageLocalizations extends Translations {
 
       // Messages
       'messages_search_hint': 'Поиск бесед',
+      'messages_empty': 'Пока нет бесед',
+      'messages_empty_hint': 'Начните переписку с друзьями',
+      'empty_no_results': 'Ничего не найдено',
 
       // Chat (беседа)
+      'chat_empty': 'Пока нет сообщений',
+      'chat_empty_hint': 'Напишите первое сообщение',
       'chat_online': 'в сети',
       'chat_offline': 'был(а) недавно',
       'chat_today': 'Сегодня',
       'chat_input_hint': 'Напишите сообщение...',
       'chat_reply_to': 'Ответ',
+      'chat_reply_deleted': 'Сообщение удалено',
       'chat_record_time': '0:00',
       'chat_you': 'Вы',
       'chat_product_label': 'ТОВАР',
@@ -441,15 +480,20 @@ class LanguageLocalizations extends Translations {
       'friends_search_hint': 'Поиск друзей',
       'friends_online': 'Онлайн',
       'friends_others': 'Другие',
+      'friends_empty': 'Пока нет друзей',
+      'friends_empty_hint': 'Нажмите кнопку добавить',
+      'friends_add_title': 'Добавить друга',
 
       // Add friend
-      'add_friend_title': 'Добавить друга',
-      'add_friend_search_hint': 'имя, @username, телефон',
+      'add_friend_title': 'Добавить',
+      'add_friend_search_hint': 'Поиск по номеру',
       'add_friend_results': 'Результаты',
       'add_friend_add': 'Добавить',
       'add_friend_message': 'Написать',
       'add_friend_requested': 'Запрос отправлен',
       'add_friend_is_friend': 'Ваш друг',
+      'add_friend_empty': 'Введите 7-значный номер AnyLang',
+      'add_friend_no_results': 'Ничего не найдено',
 
       // Products (Базар)
       'products_title': 'Базар',
@@ -459,6 +503,7 @@ class LanguageLocalizations extends Translations {
       'products_results': 'Результаты',
       'products_see_all': 'Все',
       'products_views': 'просмотров',
+      'products_empty': 'Пока нет товаров',
       'product_contact': 'Связаться',
 
       // User / business profile
@@ -597,6 +642,7 @@ class LanguageLocalizations extends Translations {
       'jonli_holding': 'Удерживаете…',
       'jonli_translating': 'Переводится…',
       'jonli_reading_to_you': 'ОЗВУЧИВАЕТСЯ ВАМ',
+      'jonli_placeholder': 'Говорите — перевод появится здесь',
     },
     'us_US': {
       'app_name': 'AnyLang',
@@ -645,7 +691,14 @@ class LanguageLocalizations extends Translations {
       'register_action': 'Sign up',
       'error': 'Error',
       'success': 'OK',
+      'warning': 'Warning',
+      'action_done': 'Action completed',
       'loading': 'Loading…',
+      'select': 'Select',
+      'search': 'Search',
+      'cancel': 'Cancel',
+      'confirm': 'Confirm',
+      'phone_number': 'Phone number',
       'email_invalid': 'Enter a valid email',
       'password_short': 'Password must be at least 8 characters',
       'verify_required': 'Please verify your email',
@@ -670,6 +723,9 @@ class LanguageLocalizations extends Translations {
       'full_name_hint': 'Dilnoza Karimova',
       'birth_date': 'Date of birth',
       'country': 'Country',
+      'country_picker_title': 'Select country',
+      'country_picker_desc': 'Choose the country shown on your profile',
+      'country_search_hint': 'Search country',
       'gender': 'Gender',
       'female': 'Female',
       'male': 'Male',
@@ -690,13 +746,19 @@ class LanguageLocalizations extends Translations {
 
       // Messages
       'messages_search_hint': 'Search conversations',
+      'messages_empty': 'No conversations yet',
+      'messages_empty_hint': 'Start chatting with your friends',
+      'empty_no_results': 'No results',
 
       // Chat
+      'chat_empty': 'No messages yet',
+      'chat_empty_hint': 'Send the first message',
       'chat_online': 'online',
       'chat_offline': 'last seen recently',
       'chat_today': 'Today',
       'chat_input_hint': 'Message...',
       'chat_reply_to': 'Reply',
+      'chat_reply_deleted': 'Message deleted',
       'chat_record_time': '0:00',
       'chat_you': 'You',
       'chat_product_label': 'PRODUCT',
@@ -725,15 +787,20 @@ class LanguageLocalizations extends Translations {
       'friends_search_hint': 'Search friends',
       'friends_online': 'Online',
       'friends_others': 'Others',
+      'friends_empty': 'No friends yet',
+      'friends_empty_hint': 'Tap the add button',
+      'friends_add_title': 'Add friend',
 
       // Add friend
-      'add_friend_title': 'Add friend',
-      'add_friend_search_hint': 'name, @username, phone',
+      'add_friend_title': 'Add',
+      'add_friend_search_hint': 'Search by number',
       'add_friend_results': 'Results',
       'add_friend_add': 'Add',
       'add_friend_message': 'Message',
       'add_friend_requested': 'Requested',
       'add_friend_is_friend': 'Your friend',
+      'add_friend_empty': 'Enter a 7-digit AnyLang number',
+      'add_friend_no_results': 'No results',
 
       // Products (Market)
       'products_title': 'Market',
@@ -743,6 +810,7 @@ class LanguageLocalizations extends Translations {
       'products_results': 'Results',
       'products_see_all': 'See all',
       'products_views': 'views',
+      'products_empty': 'No products yet',
       'product_contact': 'Contact',
 
       // User / business profile
@@ -881,6 +949,7 @@ class LanguageLocalizations extends Translations {
       'jonli_holding': 'Holding…',
       'jonli_translating': 'Translating…',
       'jonli_reading_to_you': 'READING TO YOU',
+      'jonli_placeholder': 'Speak — translation appears here',
     },
   };
 
