@@ -169,6 +169,28 @@ class LanguageLocalizations extends Translations {
       'chat_preview_location': '📍 Joylashuv',
       'chat_preview_file': '📎 Fayl',
       'chat_preview_contact': '👤 Kontakt',
+      'chat_overflow_profile': 'Profilni ko‘rish',
+      'chat_overflow_search': 'Qidirish',
+      'chat_overflow_mute': 'Bildirishnomani o‘chirish',
+      'chat_overflow_unmute': 'Bildirishnomani yoqish',
+      'chat_overflow_clear': 'Tarixni tozalash',
+      'chat_overflow_delete_chat': 'Suhbatni o‘chirish',
+      'chat_overflow_block': 'Bloklash',
+      'chat_search_hint': 'Chatdan qidirish...',
+      'chat_search_empty': 'Hech narsa topilmadi',
+      'chat_search_empty_hint': 'Boshqa so‘z bilan urinib ko‘ring',
+      'chat_clear_confirm':
+          'Barcha xabarlar shu qurilmada va hisobingizda yashiriladi. Davom etasizmi?',
+      'chat_delete_confirm':
+          'Suhbat tarixi tozalanadi va suhbat yopiladi. Davom etasizmi?',
+      'chat_block_confirm':
+          'Bu foydalanuvchi bloklanadi, do‘stlik bekor qilinadi va suhbat yopiladi.',
+      'chat_history_cleared': 'Suhbat tarixi tozalandi',
+      'chat_deleted': 'Suhbat o‘chirildi',
+      'chat_blocked': 'Foydalanuvchi bloklandi',
+      'chat_muted': 'Bildirishnomalar o‘chirildi',
+      'chat_unmuted': 'Bildirishnomalar yoqildi',
+      'chat_profile_unavailable': 'Profil ochilmadi',
 
       // Friends
       'friends_search_hint': 'Do‘stlarni qidiring',
@@ -493,6 +515,28 @@ class LanguageLocalizations extends Translations {
       'chat_preview_location': '📍 Локация',
       'chat_preview_file': '📎 Файл',
       'chat_preview_contact': '👤 Контакт',
+      'chat_overflow_profile': 'Смотреть профиль',
+      'chat_overflow_search': 'Поиск',
+      'chat_overflow_mute': 'Отключить уведомления',
+      'chat_overflow_unmute': 'Включить уведомления',
+      'chat_overflow_clear': 'Очистить историю',
+      'chat_overflow_delete_chat': 'Удалить чат',
+      'chat_overflow_block': 'Заблокировать',
+      'chat_search_hint': 'Поиск в чате...',
+      'chat_search_empty': 'Ничего не найдено',
+      'chat_search_empty_hint': 'Попробуйте другой запрос',
+      'chat_clear_confirm':
+          'Все сообщения будут скрыты для вас. Продолжить?',
+      'chat_delete_confirm':
+          'История будет очищена и чат закроется. Продолжить?',
+      'chat_block_confirm':
+          'Пользователь будет заблокирован, дружба отменена и чат закроется.',
+      'chat_history_cleared': 'История чата очищена',
+      'chat_deleted': 'Чат удалён',
+      'chat_blocked': 'Пользователь заблокирован',
+      'chat_muted': 'Уведомления отключены',
+      'chat_unmuted': 'Уведомления включены',
+      'chat_profile_unavailable': 'Профиль недоступен',
 
       // Friends
       'friends_search_hint': 'Поиск друзей',
@@ -817,6 +861,28 @@ class LanguageLocalizations extends Translations {
       'chat_preview_location': '📍 Location',
       'chat_preview_file': '📎 File',
       'chat_preview_contact': '👤 Contact',
+      'chat_overflow_profile': 'View profile',
+      'chat_overflow_search': 'Search',
+      'chat_overflow_mute': 'Mute notifications',
+      'chat_overflow_unmute': 'Unmute notifications',
+      'chat_overflow_clear': 'Clear history',
+      'chat_overflow_delete_chat': 'Delete chat',
+      'chat_overflow_block': 'Block user',
+      'chat_search_hint': 'Search in chat...',
+      'chat_search_empty': 'Nothing found',
+      'chat_search_empty_hint': 'Try a different query',
+      'chat_clear_confirm':
+          'All messages will be hidden for you. Continue?',
+      'chat_delete_confirm':
+          'History will be cleared and the chat will close. Continue?',
+      'chat_block_confirm':
+          'This user will be blocked, friendship removed, and the chat closed.',
+      'chat_history_cleared': 'Chat history cleared',
+      'chat_deleted': 'Chat deleted',
+      'chat_blocked': 'User blocked',
+      'chat_muted': 'Notifications muted',
+      'chat_unmuted': 'Notifications unmuted',
+      'chat_profile_unavailable': 'Profile unavailable',
 
       // Friends
       'friends_search_hint': 'Search friends',

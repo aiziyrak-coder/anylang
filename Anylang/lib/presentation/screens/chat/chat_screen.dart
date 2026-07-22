@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
@@ -7,12 +8,17 @@ import '../../../data/audio/waveform_utils.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
+import '../../../data/network/friends_repository.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../modal/attachment_bottom_sheet.dart';
+import '../../modal/chat_overflow_sheet.dart';
 import '../../modal/message_actions_dialog.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../user_profile/user_profile_payload.dart';
+import '../user_profile/user_profile_screen.dart';
 import 'chat_action.dart';
 import 'chat_content.dart';
 import 'chat_message.dart';
@@ -37,6 +43,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     state.peerOnline = p.online;
     state.chatId = p.chatId;
     state.peerId = p.peerId;
+    state.muted.value = SessionStore.isChatMuted(p.chatId);
+    state.searching.value = false;
+    state.searchQuery.value = '';
 
     state.input.value = '';
     state.replyTo.value = null;
@@ -317,10 +326,93 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         _toast('chat_copied'.tr);
 
       case DeleteMessage a:
+        final id = int.tryParse(a.message.id);
         state.messages.removeWhere((m) => m.id == a.message.id);
         if (state.replyTo.value?.id == a.message.id) {
           state.replyTo.value = null;
         }
+        if (id != null) {
+          await Get.find<ChatRepository>().deleteMessage(id);
+        }
+
+      case OpenChatMenu _:
+        final chosen = await showChatOverflowSheet(
+          context,
+          muted: state.muted.value,
+        );
+        switch (chosen) {
+          case ChatOverflowAction.profile:
+            sendAction(OpenPeerProfile());
+          case ChatOverflowAction.search:
+            sendAction(ToggleChatSearch());
+          case ChatOverflowAction.mute:
+            sendAction(ToggleChatMute());
+          case ChatOverflowAction.clearHistory:
+            sendAction(ClearChatHistory());
+          case ChatOverflowAction.deleteChat:
+            sendAction(DeleteChat());
+          case ChatOverflowAction.block:
+            sendAction(BlockPeer());
+          case null:
+            break;
+        }
+
+      case OpenPeerProfile _:
+        await _openPeerProfile();
+
+      case ToggleChatSearch _:
+        final next = !state.searching.value;
+        state.searching.value = next;
+        if (!next) state.searchQuery.value = '';
+
+      case ChatSearchChanged a:
+        state.searchQuery.value = a.text;
+
+      case ToggleChatMute _:
+        final next = !state.muted.value;
+        state.muted.value = next;
+        await SessionStore.setChatMuted(state.chatId, next);
+        _toast(next ? 'chat_muted'.tr : 'chat_unmuted'.tr);
+
+      case ClearChatHistory _:
+        final ok = await _confirm(
+          title: 'chat_overflow_clear'.tr,
+          body: 'chat_clear_confirm'.tr,
+          confirmLabel: 'chat_overflow_clear'.tr,
+        );
+        if (ok) await _clearHistory(showToast: true);
+
+      case DeleteChat _:
+        final ok = await _confirm(
+          title: 'chat_overflow_delete_chat'.tr,
+          body: 'chat_delete_confirm'.tr,
+          confirmLabel: 'chat_overflow_delete_chat'.tr,
+          danger: true,
+        );
+        if (!ok) return;
+        await _clearHistory(showToast: false);
+        await Get.find<VoiceRecorderService>().cancel();
+        await Get.find<VoicePlayerService>().stop(save: true);
+        popBackNavigate();
+        _toast('chat_deleted'.tr);
+
+      case BlockPeer _:
+        final ok = await _confirm(
+          title: 'chat_overflow_block'.tr,
+          body: 'chat_block_confirm'.tr,
+          confirmLabel: 'chat_overflow_block'.tr,
+          danger: true,
+        );
+        if (!ok) return;
+        if (state.peerId > 0) {
+          await SessionStore.setUserBlocked(state.peerId, true);
+          await Get.find<FriendsRepository>().removeFriend(state.peerId);
+        }
+        await _clearHistory(showToast: false);
+        await Get.find<VoiceRecorderService>().cancel();
+        await Get.find<VoicePlayerService>().stop(save: true);
+        popBackNavigate();
+        _toast('chat_blocked'.tr);
 
       case StartRecording _:
         final player = Get.find<VoicePlayerService>();
@@ -422,10 +514,78 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         state.sending.value = false;
 
       case Back _:
+        if (state.searching.value) {
+          state.searching.value = false;
+          state.searchQuery.value = '';
+          return;
+        }
         await Get.find<VoiceRecorderService>().cancel();
         await Get.find<VoicePlayerService>().stop(save: true);
         popBackNavigate();
     }
+  }
+
+  Future<void> _openPeerProfile() async {
+    if (state.peerId <= 0) {
+      showAppWarning('chat_profile_unavailable'.tr);
+      return;
+    }
+    final result =
+        await Get.find<ProfileRepository>().getPublicUser(state.peerId);
+    result.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) return;
+        navigate(
+          UserProfileScreen(),
+          payload: UserProfilePayload.fromApi(map),
+        );
+      },
+      failure: showAppError,
+    );
+  }
+
+  Future<bool> _confirm({
+    required String title,
+    required String body,
+    required String confirmLabel,
+    bool danger = false,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('settings_cancel'.tr),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              confirmLabel,
+              style: TextStyle(
+                color: danger ? const Color(0xFFB42318) : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  Future<void> _clearHistory({required bool showToast}) async {
+    final ids = state.messages
+        .map((m) => int.tryParse(m.id))
+        .whereType<int>()
+        .toList();
+    state.messages.clear();
+    state.replyTo.value = null;
+    final repo = Get.find<ChatRepository>();
+    await Future.wait(ids.map((id) => repo.deleteMessage(id)));
+    if (showToast) _toast('chat_history_cleared'.tr);
   }
 
   String _nextId() => 'm${DateTime.now().microsecondsSinceEpoch}_${_seq++}';

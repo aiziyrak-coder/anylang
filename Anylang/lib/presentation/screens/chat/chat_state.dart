@@ -28,4 +28,11 @@ class ChatState extends GetxController {
 
   /// Matn yuborilmoqda — dubl yuborishni oldini oladi.
   final RxBool sending = false.obs;
+
+  /// Chat ichida qidiruv (Telegram uslubi).
+  final RxBool searching = false.obs;
+  final RxString searchQuery = ''.obs;
+
+  /// Shu suhbat uchun bildirishnoma o‘chirilganmi.
+  final RxBool muted = false.obs;
 }

@@ -46,6 +46,9 @@ class FriendsRepository {
   }
 
   Future<BaseResult> removeFriend(int userId) {
-    return _client.delete(api: 'api/v1/friends/$userId');
+    return _client.delete(
+      api: 'api/v1/friends/$userId',
+      notify: SnackNotify.none,
+    );
   }
 }

@@ -102,6 +102,15 @@ class ChatRepository {
       notify: SnackNotify.none,
     );
   }
+
+  /// Xabarni men uchun yashirish (`for_everyone=false`).
+  Future<BaseResult> deleteMessage(int messageId, {bool forEveryone = false}) {
+    return _client.delete(
+      api: 'api/v1/messages/$messageId',
+      queryParameters: {'for_everyone': forEveryone},
+      notify: SnackNotify.none,
+    );
+  }
 }
 
 extension ChatResultX on BaseResult {

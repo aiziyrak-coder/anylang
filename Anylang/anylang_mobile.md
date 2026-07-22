@@ -216,7 +216,7 @@ qo'yib uning xabarlarini o'qiy oladi. Qolaversa `ws://` — shifrlanmagan.
 - [ ] `client_message_id` (UUID) generatsiya qilinadi — optimistik UI va WS echo
       dublikatini oldini olish uchun. **BE 8.4**
 - [ ] **Typing indikatori** — UI elementi yo'q. App bar'da "yozmoqda..." qo'shiladi. **BE 8.9**
-- [ ] **App bar menyusi (⋮)** — `onMenu: () {}` bo'sh. Bloklash / suhbatni tozalash /
+- [x] **App bar menyusi (⋮)** — `onMenu: () {}` bo'sh. Bloklash / suhbatni tozalash /
       profilga o'tish (Maxfiylik moduli bosqichida).
 
 ---

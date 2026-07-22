@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
@@ -38,6 +39,7 @@ class MessagesScreen extends Screen<MessagesState, void> {
         final items = asList(data)
             .whereType<Map>()
             .map((e) => Conversation.fromApi(Map<String, dynamic>.from(e)))
+            .where((c) => !SessionStore.isUserBlocked(c.peerId))
             .toList();
         state.conversations.assignAll(items);
       },
@@ -62,6 +64,7 @@ class MessagesScreen extends Screen<MessagesState, void> {
         final items = asList(data)
             .whereType<Map>()
             .map((e) => Conversation.fromApi(Map<String, dynamic>.from(e)))
+            .where((c) => !SessionStore.isUserBlocked(c.peerId))
             .toList();
         state.searchResults.assignAll(items);
       },
@@ -89,6 +92,10 @@ class MessagesScreen extends Screen<MessagesState, void> {
         }
       case OpenConversation a:
         final conv = a.conversation;
+        if (SessionStore.isUserBlocked(conv.peerId)) {
+          showAppWarning('chat_blocked'.tr);
+          return;
+        }
         navigate(
           ChatScreen(),
           payload: ChatPayload(

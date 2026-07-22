@@ -64,3 +64,30 @@ class CancelRecording extends ChatAction {}
 
 /// Yozilgan ovozni yuborish.
 class SendVoice extends ChatAction {}
+
+/// App bar ⋮ — suhbat menyusi.
+class OpenChatMenu extends ChatAction {}
+
+/// Suhbatdosh profilini ochish (avatar / ism / menyu).
+class OpenPeerProfile extends ChatAction {}
+
+/// Chat ichida qidiruv rejimini yoqish/o‘chirish.
+class ToggleChatSearch extends ChatAction {}
+
+/// Qidiruv matni.
+class ChatSearchChanged extends ChatAction {
+  final String text;
+  ChatSearchChanged(this.text);
+}
+
+/// Bildirishnomalarni o‘chirish / yoqish.
+class ToggleChatMute extends ChatAction {}
+
+/// Tarixni tozalash (men uchun).
+class ClearChatHistory extends ChatAction {}
+
+/// Suhbatni o‘chirish (tozalash + chiqish).
+class DeleteChat extends ChatAction {}
+
+/// Foydalanuvchini bloklash.
+class BlockPeer extends ChatAction {}

@@ -17,16 +17,20 @@ import 'chat_state.dart';
 class ChatContent extends ScreenContent<ChatState> {
   // UI resurslari — content darajasida (mobile↔tablet almashsa qayta yaratiladi).
   final TextEditingController _input = TextEditingController();
+  final TextEditingController _search = TextEditingController();
   final ScrollController _scroll = ScrollController();
   final Map<String, GlobalKey> _messageKeys = {};
   Worker? _messagesWorker;
   Worker? _inputWorker;
+  Worker? _searchWorker;
 
   @override
   void onClose() {
     _messagesWorker?.dispose();
     _inputWorker?.dispose();
+    _searchWorker?.dispose();
     _input.dispose();
+    _search.dispose();
     _scroll.dispose();
     if (Get.isRegistered<VoiceRecorderService>()) {
       Get.find<VoiceRecorderService>().cancel();
@@ -41,6 +45,14 @@ class ChatContent extends ScreenContent<ChatState> {
     _inputWorker = ever(state.input, (v) {
       if (_input.text != v) {
         _input.value = TextEditingValue(
+          text: v,
+          selection: TextSelection.collapsed(offset: v.length),
+        );
+      }
+    });
+    _searchWorker = ever(state.searchQuery, (v) {
+      if (_search.text != v) {
+        _search.value = TextEditingValue(
           text: v,
           selection: TextSelection.collapsed(offset: v.length),
         );
@@ -91,13 +103,21 @@ class ChatContent extends ScreenContent<ChatState> {
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: Column(
             children: [
-              ChatAppBar(
-                name: state.peerName,
-                initial: state.peerInitial,
-                avatarGradient: state.peerAvatar,
-                online: state.peerOnline,
-                onBack: () => sendAction(Back()),
-                onMenu: () {},
+              Obx(
+                () => ChatAppBar(
+                  name: state.peerName,
+                  initial: state.peerInitial,
+                  avatarGradient: state.peerAvatar,
+                  online: state.peerOnline,
+                  searching: state.searching.value,
+                  hasSearchQuery: state.searchQuery.value.trim().isNotEmpty,
+                  searchController: _search,
+                  onBack: () => sendAction(Back()),
+                  onMenu: () => sendAction(OpenChatMenu()),
+                  onPeerTap: () => sendAction(OpenPeerProfile()),
+                  onCloseSearch: () => sendAction(ToggleChatSearch()),
+                  onSearchChanged: (v) => sendAction(ChatSearchChanged(v)),
+                ),
               ),
               Expanded(child: _list(c, state, sendAction)),
               Obx(
@@ -133,6 +153,12 @@ class ChatContent extends ScreenContent<ChatState> {
       void Function(MyAction action) sendAction) {
     return Obx(() {
       if (state.loading.value) return const AppLoading();
+      final q = state.searchQuery.value.trim().toLowerCase();
+      final items = q.isEmpty
+          ? state.messages.toList()
+          : state.messages
+              .where((m) => m.previewText().toLowerCase().contains(q))
+              .toList();
       if (state.messages.isEmpty) {
         return AppEmptyState(
           icon: Icons.forum_outlined,
@@ -140,13 +166,20 @@ class ChatContent extends ScreenContent<ChatState> {
           subtitle: 'chat_empty_hint'.tr,
         );
       }
+      if (q.isNotEmpty && items.isEmpty) {
+        return AppEmptyState(
+          icon: Icons.search_off_rounded,
+          title: 'chat_search_empty'.tr,
+          subtitle: 'chat_search_empty_hint'.tr,
+        );
+      }
       return ListView.builder(
         controller: _scroll,
         padding: EdgeInsets.fromLTRB(14.dp, 12.dp, 14.dp, 12.dp),
-        itemCount: state.messages.length + 1,
+        itemCount: items.length + 1,
         itemBuilder: (_, i) {
           if (i == 0) return _dateChip(c);
-          final msg = state.messages[i - 1];
+          final msg = items[i - 1];
           final key = _keyFor(msg.id);
           return KeyedSubtree(
             key: key,

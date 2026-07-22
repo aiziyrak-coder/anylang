@@ -127,6 +127,47 @@ class SessionStore {
     return null;
   }
 
+  static const _kMutedChats = 'muted_chats';
+  static const _kBlockedUsers = 'blocked_users';
+
+  static Set<String> _stringIdSet(String key) {
+    final raw = _box.get(key);
+    if (raw is! List) return <String>{};
+    return raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toSet();
+  }
+
+  static Future<void> _putStringIdSet(String key, Set<String> ids) async {
+    await _box.put(key, ids.toList());
+  }
+
+  static bool isChatMuted(int chatId) =>
+      chatId > 0 && _stringIdSet(_kMutedChats).contains('$chatId');
+
+  static Future<void> setChatMuted(int chatId, bool muted) async {
+    if (chatId <= 0) return;
+    final ids = _stringIdSet(_kMutedChats);
+    if (muted) {
+      ids.add('$chatId');
+    } else {
+      ids.remove('$chatId');
+    }
+    await _putStringIdSet(_kMutedChats, ids);
+  }
+
+  static bool isUserBlocked(int userId) =>
+      userId > 0 && _stringIdSet(_kBlockedUsers).contains('$userId');
+
+  static Future<void> setUserBlocked(int userId, bool blocked) async {
+    if (userId <= 0) return;
+    final ids = _stringIdSet(_kBlockedUsers);
+    if (blocked) {
+      ids.add('$userId');
+    } else {
+      ids.remove('$userId');
+    }
+    await _putStringIdSet(_kBlockedUsers, ids);
+  }
+
   static int? _jwtExpMillis(String token) {
     final parts = token.split('.');
     if (parts.length != 3) return null;

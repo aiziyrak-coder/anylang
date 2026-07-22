@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
 import '../../utils/app_snackbar.dart';
@@ -32,6 +33,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
         final items = asList(data)
             .whereType<Map>()
             .map((e) => Friend.fromApi(Map<String, dynamic>.from(e)))
+            .where((f) => !SessionStore.isUserBlocked(f.id))
             .toList();
         state.friends.assignAll(items);
       },
@@ -46,6 +48,10 @@ class FriendsScreen extends Screen<FriendsState, void> {
       case FriendsSearchChanged a:
         state.query.value = a.text;
       case OpenChat a:
+        if (SessionStore.isUserBlocked(a.friend.id)) {
+          showAppWarning('chat_blocked'.tr);
+          return;
+        }
         final result = await Get.find<ChatRepository>().createChat(a.friend.id);
         result.when(
           success: (data) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
 import '../../../data/network/profile_repository.dart';
@@ -84,6 +85,10 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
   }
 
   Future<void> _openChat(AddFriendResult user) async {
+    if (SessionStore.isUserBlocked(user.id)) {
+      showAppWarning('chat_blocked'.tr);
+      return;
+    }
     final chat = await Get.find<ChatRepository>().createChat(user.id);
     chat.when(
       success: (data) {
