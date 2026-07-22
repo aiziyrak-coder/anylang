@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/local/session_store.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/buttons/my_icon_button.dart';
 import '../../ui/items/conversation_item.dart';
+import '../../ui/items/friend_result_item.dart';
 import '../../ui/search_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -67,14 +69,15 @@ class MessagesContent extends ScreenContent<MessagesState> {
               if (searching && state.searching.value) {
                 return const AppLoading();
               }
-              final items = searching
-                  ? state.searchResults.toList()
-                  : state.conversations.toList();
+              if (searching) {
+                return _searchResults(c, state, sendAction);
+              }
+              final items = state.conversations.toList();
               if (items.isEmpty) {
                 return AppEmptyState(
-                  icon: searching ? Icons.search_off_rounded : Icons.chat_bubble_outline_rounded,
-                  title: searching ? 'empty_no_results'.tr : 'messages_empty'.tr,
-                  subtitle: searching ? null : 'messages_empty_hint'.tr,
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: 'messages_empty'.tr,
+                  subtitle: 'messages_empty_hint'.tr,
                 );
               }
               return RefreshIndicator(
@@ -94,6 +97,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
                       online: conv.online,
                       unread: conv.unread,
                       highlighted: conv.highlighted,
+                      muted: SessionStore.isChatMuted(conv.id),
                       onTap: () => sendAction(OpenConversation(conv)),
                     );
                   },
@@ -101,6 +105,84 @@ class MessagesContent extends ScreenContent<MessagesState> {
               );
             }),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchResults(
+    AppColors c,
+    MessagesState state,
+    void Function(MyAction action) sendAction,
+  ) {
+    final users = state.userResults.toList();
+    final chats = state.searchResults.toList();
+    if (users.isEmpty && chats.isEmpty) {
+      return AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'empty_no_results'.tr,
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async => sendAction(RefreshConversations()),
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
+        children: [
+          if (users.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.fromLTRB(8.dp, 4.dp, 8.dp, 8.dp),
+              child: Text(
+                'messages_people'.tr,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            for (final user in users)
+              Material(
+                color: Colors.transparent,
+                child: FriendResultItem(
+                  initial: user.initial,
+                  avatarGradient: user.avatarGradient,
+                  name: user.name,
+                  subtitle: user.subtitle,
+                  online: user.online,
+                  action: FriendActionState.message,
+                  actionLabel: 'add_friend_message'.tr,
+                  onAction: () => sendAction(OpenUserChat(user)),
+                ),
+              ),
+            if (chats.isNotEmpty) SizedBox(height: 8.dp),
+          ],
+          if (chats.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.fromLTRB(8.dp, 4.dp, 8.dp, 8.dp),
+              child: Text(
+                'messages_chats'.tr,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            for (final conv in chats)
+              ConversationItem(
+                initial: conv.initial,
+                avatarGradient: conv.avatarGradient,
+                initialColor: conv.initialColor,
+                name: conv.name,
+                lastMessage: conv.lastMessage,
+                time: conv.time,
+                online: conv.online,
+                unread: conv.unread,
+                highlighted: conv.highlighted,
+                muted: SessionStore.isChatMuted(conv.id),
+                onTap: () => sendAction(OpenConversation(conv)),
+              ),
+          ],
         ],
       ),
     );

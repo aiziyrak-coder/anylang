@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import '../../../data/core/mappers.dart';
+import '../../../data/network/chat_repository.dart';
+import '../../../data/network/products_repository.dart';
+import '../../../data/network/profile_repository.dart';
+import '../../screens/chat/chat_payload.dart';
+import '../../screens/chat/chat_screen.dart';
+import '../../utils/app_snackbar.dart';
 import '../../ui/buttons/rich_button.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
@@ -43,7 +50,101 @@ class _ProductInfoSheet extends StatefulWidget {
 
 class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   int _selected = 0;
-  bool _fav = false;
+  late bool _fav;
+  bool _favLoading = false;
+  bool _contacting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fav = widget.product.isFavorited;
+  }
+
+  Future<void> _contactSeller() async {
+    if (_contacting) return;
+    final sellerId = widget.product.sellerId;
+    if (sellerId <= 0) {
+      showAppError('product_contact_unavailable'.tr);
+      return;
+    }
+    _contacting = true;
+    Navigator.of(context).pop();
+
+    final chatResult = await Get.find<ChatRepository>().createChat(sellerId);
+    if (chatResult.errorOrNull != null) {
+      showAppError(chatResult.errorOrNull!);
+      _contacting = false;
+      return;
+    }
+    final map = asMap(chatResult.dataOrNull);
+    final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+    if (chatId <= 0) {
+      showAppError('chat_profile_unavailable'.tr);
+      _contacting = false;
+      return;
+    }
+
+    var name = 'User';
+    var initial = '?';
+    var gradient = avatarGradientFor(sellerId);
+    var online = false;
+    String? avatarUrl;
+
+    final profileResult =
+        await Get.find<ProfileRepository>().getPublicUser(sellerId);
+    profileResult.when(
+      success: (profileData) {
+        final profile = asMap(profileData);
+        if (profile == null) return;
+        name = profile['full_name']?.toString() ?? name;
+        initial = initialsOf(name);
+        online = profile['is_online'] == true;
+        avatarUrl = profile['avatar_url']?.toString();
+      },
+      failure: (_) {},
+    );
+
+    final ctx = Get.context;
+    if (ctx != null && ctx.mounted) {
+      final screen = ChatScreen();
+      screen.payload = ChatPayload(
+        chatId: chatId,
+        peerId: sellerId,
+        name: name,
+        initial: initial,
+        avatarGradient: gradient,
+        online: online,
+        avatarUrl: avatarUrl,
+      );
+      await Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => screen.build()),
+      );
+    }
+    _contacting = false;
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_favLoading || widget.product.id <= 0) return;
+    final wasFav = _fav;
+    setState(() {
+      _fav = !wasFav;
+      _favLoading = true;
+    });
+    final repo = Get.find<ProductsRepository>();
+    final result = wasFav
+        ? await repo.unfavorite(widget.product.id)
+        : await repo.favorite(widget.product.id);
+    if (!mounted) return;
+    result.when(
+      success: (_) {},
+      failure: (err) {
+        setState(() => _fav = wasFav);
+        showAppError(err);
+      },
+    );
+    setState(() => _favLoading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -323,7 +424,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
             borderRadius: radius,
             child: InkWell(
               borderRadius: radius,
-              onTap: () => setState(() => _fav = !_fav),
+              onTap: _favLoading ? null : _toggleFavorite,
               child: Ink(
                 decoration: BoxDecoration(
                   borderRadius: radius,
@@ -346,7 +447,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
           Expanded(
             child: RichButton(
               text: 'product_contact'.tr,
-              onTap: () {}, // TODO: sotuvchi bilan bog'lanish
+              onTap: _contactSeller,
               iconNearText: true,
               startIcon: SvgPicture.asset('assets/icons/ic_contact.svg', width: 20.dp, height: 20.dp),
               textColor: c.onAccent,

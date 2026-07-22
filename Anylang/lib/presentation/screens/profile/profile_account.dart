@@ -138,4 +138,38 @@ class ProfileAccount {
       email: json['email'] as String?,
     );
   }
+
+  ProfileAccount copyWith({
+    List<OwnListing>? listings,
+    int? listingsCount,
+    String? avatarUrl,
+  }) {
+    return ProfileAccount(
+      id: id,
+      isBusiness: isBusiness,
+      name: name,
+      initial: initial,
+      avatarGradient: avatarGradient,
+      verified: verified,
+      flagAsset: flagAsset,
+      countryCode: countryCode,
+      country: country,
+      username: username,
+      nativeLanguage: nativeLanguage,
+      memberSince: memberSince,
+      subscriptionPlan: subscriptionPlan,
+      subscriptionPeriod: subscriptionPeriod,
+      subscriptionLabel: subscriptionLabel,
+      subscriptionExpiresAt: subscriptionExpiresAt,
+      subscriptionActive: subscriptionActive,
+      showPremiumBadge: showPremiumBadge,
+      role: role,
+      listingsCount: listingsCount ?? this.listingsCount,
+      viewsCount: viewsCount,
+      rating: rating,
+      listings: listings ?? this.listings,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      email: email,
+    );
+  }
 }

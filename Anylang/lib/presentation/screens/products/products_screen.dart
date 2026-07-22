@@ -75,6 +75,8 @@ class ProductsScreen extends Screen<ProductsState, void> {
           failure: showAppError,
         );
         state.searching.value = false;
+      case RefreshProducts _:
+        await _load();
       case OpenProduct a:
         showProductInfoBottomSheet(
           context,

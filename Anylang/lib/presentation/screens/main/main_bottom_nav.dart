@@ -24,11 +24,13 @@ const List<MainNavTab> kMainNavTabs = [
 class MainBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final List<int>? badgeCounts;
 
   const MainBottomNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.badgeCounts,
   });
 
   @override
@@ -52,6 +54,9 @@ class MainBottomNav extends StatelessWidget {
                     iconAsset: kMainNavTabs[i].iconAsset,
                     label: kMainNavTabs[i].labelKey.tr,
                     selected: currentIndex == i,
+                    badgeCount: badgeCounts != null && i < badgeCounts!.length
+                        ? badgeCounts![i]
+                        : null,
                     onTap: () => onTap(i),
                   ),
                 ),

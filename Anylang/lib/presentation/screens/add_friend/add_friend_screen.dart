@@ -128,6 +128,26 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
     }
   }
 
+  void _markCancelled(AddFriendResult source) {
+    final updated = AddFriendResult(
+      id: source.id,
+      initial: source.initial,
+      avatarGradient: source.avatarGradient,
+      name: source.name,
+      subtitle: source.subtitle,
+      online: source.online,
+      action: FriendActionState.add,
+    );
+
+    final resultsIdx = state.results.indexWhere((e) => e.id == source.id);
+    if (resultsIdx >= 0) {
+      state.results[resultsIdx] = updated;
+      state.results.refresh();
+    }
+
+    state.sentRequests.removeWhere((e) => e.id == source.id);
+  }
+
   @override
   Future<void> actionHandler(AddFriendState state, MyAction action) async {
     switch (action) {
@@ -146,7 +166,38 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
         _sendingRequest = true;
         final result = await Get.find<FriendsRepository>().sendRequest(a.result.id);
         result.when(
-          success: (_) => _markRequested(a.result),
+          success: (data) {
+            final map = asMap(data);
+            final requestId = (map?['id'] as num?)?.toInt();
+            final status = map?['status']?.toString();
+            if (status == 'accepted') {
+              final updated = a.result.copyWith(action: FriendActionState.message);
+              final resultsIdx =
+                  state.results.indexWhere((e) => e.id == a.result.id);
+              if (resultsIdx >= 0) {
+                state.results[resultsIdx] = updated;
+                state.results.refresh();
+              }
+              return;
+            }
+            _markRequested(
+              requestId != null
+                  ? a.result.copyWith(requestId: requestId)
+                  : a.result,
+            );
+          },
+          failure: showAppError,
+        );
+        _sendingRequest = false;
+      case CancelFriendRequest a:
+        if (_sendingRequest) return;
+        final requestId = a.result.requestId;
+        if (requestId == null) return;
+        _sendingRequest = true;
+        final result =
+            await Get.find<FriendsRepository>().cancelRequest(requestId);
+        result.when(
+          success: (_) => _markCancelled(a.result),
           failure: showAppError,
         );
         _sendingRequest = false;

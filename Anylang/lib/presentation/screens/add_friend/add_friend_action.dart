@@ -27,3 +27,9 @@ class MessageResult extends AddFriendAction {
   final AddFriendResult result;
   MessageResult(this.result);
 }
+
+/// Do'stlar rejimi: yuborilgan so'rovni bekor qilish.
+class CancelFriendRequest extends AddFriendAction {
+  final AddFriendResult result;
+  CancelFriendRequest(this.result);
+}

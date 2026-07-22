@@ -58,5 +58,20 @@ class MainScreen extends Screen<MainState, void> {
         .where((f) => !SessionStore.isUserBlocked(f.id))
         .toList();
     fs.friends.assignAll(items);
+    await _loadPendingCount(fs);
+  }
+
+  Future<void> _loadPendingCount(FriendsState fs) async {
+    final result = await Get.find<FriendsRepository>().listRequests(type: 'incoming');
+    result.when(
+      success: (data) {
+        final count = asList(data)
+            .whereType<Map>()
+            .where((e) => (e['status'] as String?) == 'pending')
+            .length;
+        fs.pendingCount.value = count;
+      },
+      failure: (_) {},
+    );
   }
 }

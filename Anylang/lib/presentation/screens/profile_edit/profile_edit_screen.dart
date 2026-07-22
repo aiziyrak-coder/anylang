@@ -61,10 +61,21 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
         if (file == null) return;
         state.isSaving.value = true;
         try {
-          final result = await Get.find<ProfileRepository>().uploadAvatar(file.path);
+          final result =
+              await Get.find<ProfileRepository>().uploadAvatar(file.path);
           result.when(
-            success: (_) {},
-            failure: (_) {},
+            success: (data) {
+              final map = asMap(data);
+              final url = map?['avatar_url']?.toString() ??
+                  map?['url']?.toString();
+              final acc = state.account;
+              if (acc != null && url != null) {
+                state.account = acc.copyWith(avatarUrl: url);
+              }
+              state.avatarEpoch.value++;
+              showAppMessage('Avatar yangilandi');
+            },
+            failure: showAppError,
           );
         } finally {
           state.isSaving.value = false;
@@ -94,9 +105,10 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
           final result = await Get.find<ProfileRepository>().updateMe(body);
           result.when(
             success: (_) {
+              showAppMessage('Profil saqlandi');
               popBackNavigate();
             },
-            failure: (_) {},
+            failure: showAppError,
           );
         } finally {
           state.isSaving.value = false;

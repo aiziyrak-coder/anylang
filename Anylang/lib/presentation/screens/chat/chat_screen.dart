@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +18,7 @@ import '../../../data/network/friends_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/network/realtime_sync_service.dart';
+import '../../../data/network/socket_service.dart';
 import '../../modal/attachment_bottom_sheet.dart';
 import '../../modal/chat_overflow_sheet.dart';
 import '../../modal/image_picker.dart';
@@ -40,6 +43,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   ChatScreen() : super(mobileContent: ChatContent());
 
   int _seq = 0;
+  Timer? _typingDebounce;
+  bool _lastTypingSent = false;
 
   @override
   void initState(ChatPayload? payload) {
@@ -60,6 +65,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     state.muted.value = SessionStore.isChatMuted(p.chatId);
     state.searching.value = false;
     state.searchQuery.value = '';
+    state.peerTyping.value = false;
 
     state.input.value = '';
     state.replyTo.value = null;
@@ -135,6 +141,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         id: msg.id,
         dir: msg.dir,
         time: msg.time,
+        createdAt: msg.createdAt,
         duration: msg.voiceDuration ?? '0:00',
         durationMs: msg.voiceDurationMs,
         path: msg.voicePath,
@@ -148,7 +155,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       id: msg.id,
       dir: msg.dir,
       time: msg.time,
+      createdAt: msg.createdAt,
       text: msg.text ?? '',
+      textOriginal: msg.textOriginal,
+      showingOriginal: msg.showingOriginal,
       status: msg.status,
       reply: reply,
     );
@@ -171,9 +181,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final senderId = (json['sender_id'] as num?)?.toInt();
     final outgoing = me != null && senderId == me;
     final created = DateTime.tryParse(json['created_at']?.toString() ?? '');
-    final text = (json['text'] as String?) ??
-        (json['text_original'] as String?) ??
-        '';
+    final textTranslated = json['text'] as String?;
+    final textOriginal = json['text_original'] as String?;
+    final text = textTranslated ?? textOriginal ?? '';
     final type = (json['type'] as String?) ?? 'text';
     final reply = _replyFromApi(json, me) ?? fallbackReply;
     final status = _statusFromApi(json, outgoing: outgoing);
@@ -189,7 +199,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       return ChatMessage.voice(
         id: '${json['id']}',
         dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
-        time: formatChatTime(created),
+        time: formatMessageClock(created),
+        createdAt: created,
         duration: durationMs != null
             ? WaveformUtils.formatDuration(Duration(milliseconds: durationMs))
             : '0:00',
@@ -203,7 +214,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     }
     final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
     final dir = outgoing ? ChatDir.outgoing : ChatDir.incoming;
-    final time = formatChatTime(created);
+    final time = formatMessageClock(created);
     final id = '${json['id']}';
     switch (type) {
       case 'image':
@@ -211,6 +222,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: dir,
           time: time,
+          createdAt: created,
           url: meta['url']?.toString(),
           gradient: avatarTealGradient,
           status: status,
@@ -226,6 +238,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: dir,
           time: time,
+          createdAt: created,
           name: name,
           size: size is num ? _formatBytes(size.toInt()) : '—',
           ext: ext,
@@ -236,6 +249,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: dir,
           time: time,
+          createdAt: created,
           title: meta['name']?.toString() ??
               meta['product_name']?.toString() ??
               'chat_preview_product'.tr,
@@ -247,6 +261,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: dir,
           time: time,
+          createdAt: created,
           label: meta['label']?.toString() ?? 'chat_preview_location'.tr,
           distance: '',
           status: status,
@@ -257,6 +272,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: dir,
           time: time,
+          createdAt: created,
           name: name,
           phone: meta['contact_phone']?.toString() ?? '',
           initial: initialsOf(name),
@@ -267,7 +283,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           id: id,
           dir: dir,
           time: time,
+          createdAt: created,
           text: text,
+          textOriginal: textOriginal,
           status: status,
           reply: reply,
         );
@@ -324,6 +342,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     switch (action) {
       case InputChanged a:
         state.input.value = a.text;
+        _handleTyping(state, a.text);
 
       case SendText _:
         final text = state.input.value.trim();
@@ -335,7 +354,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         final optimistic = ChatMessage.text(
           id: _nextId(),
           dir: ChatDir.outgoing,
-          time: _now(),
+          time: formatMessageClock(DateTime.now()),
+          createdAt: DateTime.now(),
           text: text,
           status: ChatStatus.sent,
           reply: replyUi,
@@ -393,8 +413,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
       case LongPressMessage a:
         final msg = a.message;
+        final hasOriginal = msg.textOriginal != null &&
+            msg.textOriginal!.isNotEmpty &&
+            msg.textOriginal != msg.text;
         final showTranslate =
-            msg.type == ChatMsgType.text && !msg.isOutgoing;
+            msg.type == ChatMsgType.text && !msg.isOutgoing && hasOriginal;
         final chosen = await showMessageActionsDialog(
           context,
           message: msg,
@@ -409,6 +432,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           case MessageMenuAction.delete:
             sendAction(DeleteMessage(msg));
           case MessageMenuAction.translate:
+            final idx = state.messages.indexWhere((m) => m.id == msg.id);
+            if (idx >= 0) {
+              state.messages[idx] = msg.withToggleOriginal();
+            }
           case null:
             break;
         }
@@ -540,7 +567,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         final optimistic = ChatMessage.voice(
           id: _nextId(),
           dir: ChatDir.outgoing,
-          time: _now(),
+          time: formatMessageClock(DateTime.now()),
+          createdAt: DateTime.now(),
           duration: WaveformUtils.formatDuration(recorded.duration),
           durationMs: recorded.duration.inMilliseconds,
           path: recorded.path,
@@ -592,6 +620,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               id: real.id,
               dir: real.dir,
               time: real.time,
+              createdAt: real.createdAt,
               duration: optimistic.voiceDuration ?? real.voiceDuration ?? '0:00',
               durationMs: optimistic.voiceDurationMs ?? real.voiceDurationMs,
               path: optimistic.voicePath ?? real.voicePath,
@@ -612,6 +641,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         state.sending.value = false;
 
       case Back _:
+        _typingDebounce?.cancel();
+        _sendTyping(state, isTyping: false);
         if (state.searching.value) {
           state.searching.value = false;
           state.searchQuery.value = '';
@@ -701,9 +732,27 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
   String _nextId() => 'm${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
 
-  String _now() {
-    final t = DateTime.now();
-    return '${t.hour}:${t.minute.toString().padLeft(2, '0')}';
+  void _handleTyping(ChatState state, String text) {
+    if (state.chatId <= 0 || !Get.isRegistered<SocketService>()) return;
+    if (text.isEmpty) {
+      _typingDebounce?.cancel();
+      _sendTyping(state, isTyping: false);
+      return;
+    }
+    _typingDebounce?.cancel();
+    _typingDebounce = Timer(const Duration(milliseconds: 1200), () {
+      _sendTyping(state, isTyping: true);
+    });
+  }
+
+  void _sendTyping(ChatState state, {required bool isTyping}) {
+    if (state.chatId <= 0 || !Get.isRegistered<SocketService>()) return;
+    if (!isTyping && !_lastTypingSent) return;
+    Get.find<SocketService>().sendRaw({
+      'type': 'typing',
+      'data': {'chat_id': state.chatId, 'is_typing': isTyping},
+    });
+    _lastTypingSent = isTyping;
   }
 
   ChatReply? _replyFor(ChatState state) {
@@ -722,7 +771,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final optimistic = ChatMessage.image(
       id: _nextId(),
       dir: ChatDir.outgoing,
-      time: _now(),
+      time: formatMessageClock(DateTime.now()),
+      createdAt: DateTime.now(),
       url: file.path,
       gradient: avatarTealGradient,
       status: ChatStatus.sent,
@@ -752,7 +802,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final optimistic = ChatMessage.file(
       id: _nextId(),
       dir: ChatDir.outgoing,
-      time: _now(),
+      time: formatMessageClock(DateTime.now()),
+      createdAt: DateTime.now(),
       name: name,
       size: file.size > 0 ? _formatBytes(file.size) : '—',
       ext: ext,
@@ -773,7 +824,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final optimistic = ChatMessage.product(
       id: _nextId(),
       dir: ChatDir.outgoing,
-      time: _now(),
+      time: formatMessageClock(DateTime.now()),
+      createdAt: DateTime.now(),
       title: product.name,
       price: product.price,
       status: ChatStatus.sent,
@@ -818,7 +870,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final optimistic = ChatMessage.location(
       id: _nextId(),
       dir: ChatDir.outgoing,
-      time: _now(),
+      time: formatMessageClock(DateTime.now()),
+      createdAt: DateTime.now(),
       label: label,
       distance: '',
       status: ChatStatus.sent,
@@ -842,7 +895,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final optimistic = ChatMessage.contact(
       id: _nextId(),
       dir: ChatDir.outgoing,
-      time: _now(),
+      time: formatMessageClock(DateTime.now()),
+      createdAt: DateTime.now(),
       name: name,
       phone: phone,
       initial: initialsOf(name),
@@ -919,6 +973,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               id: real.id,
               dir: real.dir,
               time: real.time,
+              createdAt: real.createdAt,
               url: optimistic.imageUrl,
               gradient: avatarTealGradient,
               status: real.status,

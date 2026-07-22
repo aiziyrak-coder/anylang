@@ -13,9 +13,7 @@ import '../select_language/select_language_option.dart';
 import 'jonli_action.dart';
 import 'jonli_state.dart';
 
-// Jonli rejim — matnlar sessiya/STT dan keladi (bo'sh holat).
-const String _demoOriginal = '';
-const String _demoTranslated = '';
+// Jonli rejim — matnlar sessiya/STT dan keladi.
 
 class JonliContent extends ScreenContent<JonliState> {
 
@@ -233,7 +231,11 @@ class JonliContent extends ScreenContent<JonliState> {
 
   // ---- Variant C — tarjima / playback body ----
   Widget _translationBody(AppColors c, JonliState state) {
-    return SingleChildScrollView(
+    return Obx(() {
+      final original = state.lastOriginal.value;
+      final translated = state.lastTranslated.value;
+      final busy = state.busy.value;
+      return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(20.dp, 6.dp, 20.dp, 6.dp),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,42 +252,44 @@ class JonliContent extends ScreenContent<JonliState> {
                 border: Border.all(color: c.outline),
               ),
               child: Text(
-                _demoOriginal.isEmpty ? 'jonli_placeholder'.tr : _demoOriginal,
+                original.isEmpty ? 'jonli_placeholder'.tr : original,
                 style: TextStyle(color: c.textPrimary, fontSize: 15.sp),
               ),
             ),
           ),
           SizedBox(height: 12.dp),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.dp, vertical: 11.dp),
-              decoration: BoxDecoration(
-                color: c.surface,
-                borderRadius: BorderRadius.circular(16.dp),
-                border: Border.all(color: c.outline),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (int i = 0; i < 3; i++) ...[
-                    Container(width: 7.dp, height: 7.dp, decoration: BoxDecoration(color: kSpeakBlue, shape: BoxShape.circle)),
+          if (busy)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16.dp, vertical: 11.dp),
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(16.dp),
+                  border: Border.all(color: c.outline),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (int i = 0; i < 3; i++) ...[
+                      Container(width: 7.dp, height: 7.dp, decoration: BoxDecoration(color: kSpeakBlue, shape: BoxShape.circle)),
+                      SizedBox(width: 4.dp),
+                    ],
                     SizedBox(width: 4.dp),
+                    Text('jonli_translating'.tr, style: TextStyle(color: c.textSecondary, fontSize: 13.sp)),
                   ],
-                  SizedBox(width: 4.dp),
-                  Text('jonli_translating'.tr, style: TextStyle(color: c.textSecondary, fontSize: 13.sp)),
-                ],
+                ),
               ),
             ),
-          ),
           SizedBox(height: 16.dp),
-          _ttsCard(c, state),
+          _ttsCard(c, state, translated),
         ],
       ),
     );
+    });
   }
 
-  Widget _ttsCard(AppColors c, JonliState state) {
+  Widget _ttsCard(AppColors c, JonliState state, String translated) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.dp),
@@ -310,7 +314,7 @@ class JonliContent extends ScreenContent<JonliState> {
           ),
           SizedBox(height: 12.dp),
           Text(
-            _demoTranslated.isEmpty ? '“…”' : '“$_demoTranslated”',
+            translated.isEmpty ? '“…”' : '“$translated”',
             style: TextStyle(color: c.textPrimary, fontSize: 16.sp, fontWeight: FontWeight.w600),
           ),
           SizedBox(height: 14.dp),

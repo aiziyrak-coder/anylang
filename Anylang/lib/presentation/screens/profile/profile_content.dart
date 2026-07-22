@@ -39,6 +39,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
               ProfileAvatar(
                 initial: d.initial,
                 gradient: d.avatarGradient,
+                imageUrl: d.avatarUrl,
                 shape: d.isBusiness ? ProfileAvatarShape.roundedSquare : ProfileAvatarShape.circle,
               ),
               SizedBox(height: 14.dp),

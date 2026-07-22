@@ -4,8 +4,10 @@ import '../../ui/gradient_background.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../friends/friends_screen.dart';
+import '../friends/friends_state.dart';
 import '../jonli/jonli_screen.dart';
 import '../messages/messages_screen.dart';
+import '../messages/messages_state.dart';
 import '../products/products_screen.dart';
 import '../profile/profile_screen.dart';
 import 'main_action.dart';
@@ -43,10 +45,21 @@ class MainContent extends ScreenContent<MainState> {
                   )),
             ),
             // Pastki navigatsiya bari.
-            Obx(() => MainBottomNav(
-                  currentIndex: state.currentTab.value,
-                  onTap: (i) => sendAction(TabSelected(i)),
-                )),
+            Obx(() {
+              final messagesBadge = Get.isRegistered<MessagesState>()
+                  ? Get.find<MessagesState>()
+                      .conversations
+                      .fold<int>(0, (sum, c) => sum + c.unread)
+                  : 0;
+              final friendsBadge = Get.isRegistered<FriendsState>()
+                  ? Get.find<FriendsState>().pendingCount.value
+                  : 0;
+              return MainBottomNav(
+                currentIndex: state.currentTab.value,
+                badgeCounts: [messagesBadge, friendsBadge, 0, 0, 0],
+                onTap: (i) => sendAction(TabSelected(i)),
+              );
+            }),
           ],
         ),
       ),

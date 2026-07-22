@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/audio/voice_recorder_service.dart';
+import '../../../data/core/mappers.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/chat_wallpaper_background.dart';
@@ -12,6 +13,7 @@ import '../../utils/size_controller.dart';
 import 'chat_action.dart';
 import 'chat_app_bar.dart';
 import 'chat_composer.dart';
+import 'chat_message.dart';
 import 'chat_state.dart';
 
 class ChatContent extends ScreenContent<ChatState> {
@@ -91,6 +93,20 @@ class ChatContent extends ScreenContent<ChatState> {
   GlobalKey _keyFor(String id) =>
       _messageKeys.putIfAbsent(id, GlobalKey.new);
 
+  List<Object> _buildListItems(List<ChatMessage> messages) {
+    final out = <Object>[];
+    String? lastDayKey;
+    for (final msg in messages) {
+      final dayKey = chatDayKey(msg.createdAt);
+      if (dayKey.isNotEmpty && dayKey != lastDayKey) {
+        out.add(formatChatDayLabel(msg.createdAt));
+        lastDayKey = dayKey;
+      }
+      out.add(msg);
+    }
+    return out;
+  }
+
   @override
   Widget build(BuildContext context, ChatState state,
       void Function(MyAction action) sendAction) {
@@ -124,6 +140,7 @@ class ChatContent extends ScreenContent<ChatState> {
                   initial: state.peerInitial,
                   avatarGradient: state.peerAvatar,
                   online: state.peerOnline.value,
+                  statusText: state.peerTyping.value ? 'chat_typing'.tr : null,
                   searching: state.searching.value,
                   hasSearchQuery: state.searchQuery.value.trim().isNotEmpty,
                   searchController: _search,
@@ -173,7 +190,7 @@ class ChatContent extends ScreenContent<ChatState> {
     return Obx(() {
       if (state.loading.value) return const AppLoading();
       final q = state.searchQuery.value.trim().toLowerCase();
-      final items = q.isEmpty
+      final messages = q.isEmpty
           ? state.messages.toList()
           : state.messages
               .where((m) => m.previewText().toLowerCase().contains(q))
@@ -185,20 +202,24 @@ class ChatContent extends ScreenContent<ChatState> {
           subtitle: 'chat_empty_hint'.tr,
         );
       }
-      if (q.isNotEmpty && items.isEmpty) {
+      if (q.isNotEmpty && messages.isEmpty) {
         return AppEmptyState(
           icon: Icons.search_off_rounded,
           title: 'chat_search_empty'.tr,
           subtitle: 'chat_search_empty_hint'.tr,
         );
       }
+      final items = _buildListItems(messages);
       return ListView.builder(
         controller: _scroll,
         padding: EdgeInsets.fromLTRB(14.dp, 12.dp, 14.dp, 12.dp),
-        itemCount: items.length + 1,
+        itemCount: items.length,
         itemBuilder: (_, i) {
-          if (i == 0) return _dateChip(c);
-          final msg = items[i - 1];
+          final item = items[i];
+          if (item is String) {
+            return _dateChip(c, item);
+          }
+          final msg = item as ChatMessage;
           final key = _keyFor(msg.id);
           return KeyedSubtree(
             key: key,
@@ -218,18 +239,20 @@ class ChatContent extends ScreenContent<ChatState> {
     });
   }
 
-  Widget _dateChip(AppColors c) {
-    return Center(
-      child: Container(
-        margin: EdgeInsets.only(bottom: 8.dp),
-        padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 4.dp),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(12.dp),
-        ),
-        child: Text(
-          'chat_today'.tr,
-          style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+  Widget _dateChip(AppColors c, String label) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 10.dp),
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 5.dp),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(12.dp),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+          ),
         ),
       ),
     );

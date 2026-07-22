@@ -6,4 +6,7 @@ class FriendsState extends GetxController {
   RxList<Friend> friends = <Friend>[].obs;
   RxString query = ''.obs;
   RxBool loading = true.obs;
+
+  /// Kiruvchi do'st so'rovlari soni (pastki nav badge uchun).
+  RxInt pendingCount = 0.obs;
 }

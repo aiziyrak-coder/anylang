@@ -12,8 +12,10 @@ import '../add_friend/add_friend_screen.dart';
 import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
 import 'friend.dart';
+import 'friend_request.dart';
 import 'friends_action.dart';
 import 'friends_content.dart';
+import 'friends_requests_bottom_sheet.dart';
 import 'friends_state.dart';
 
 class FriendsScreen extends Screen<FriendsState, void> {
@@ -24,9 +26,20 @@ class FriendsScreen extends Screen<FriendsState, void> {
     _load();
   }
 
+  Future<void> _loadPendingCount() async {
+    final result = await Get.find<FriendsRepository>().listRequests(type: 'incoming');
+    result.when(
+      success: (data) {
+        state.pendingCount.value = asList(data).whereType<Map>().length;
+      },
+      failure: (_) {},
+    );
+  }
+
   Future<void> _load() async {
     state.loading.value = true;
-    final result = await Get.find<FriendsRepository>().listFriends();
+    final repo = Get.find<FriendsRepository>();
+    final result = await repo.listFriends();
     result.when(
       success: (data) {
         final items = asList(data)
@@ -38,7 +51,51 @@ class FriendsScreen extends Screen<FriendsState, void> {
       },
       failure: showAppError,
     );
+    await _loadPendingCount();
     state.loading.value = false;
+  }
+
+  Future<void> _openRequestsSheet() async {
+    final result = await Get.find<FriendsRepository>().listRequests(type: 'incoming');
+    var requests = <FriendRequest>[];
+    result.when(
+      success: (data) {
+        requests = asList(data)
+            .whereType<Map>()
+            .map((e) => FriendRequest.fromApi(Map<String, dynamic>.from(e)))
+            .where((r) => r.requestId > 0)
+            .toList();
+      },
+      failure: (err) {
+        showAppError(err);
+        return;
+      },
+    );
+    if (!context.mounted) return;
+    await showFriendsRequestsBottomSheet(
+      context,
+      requests: requests,
+      onAccept: (requestId) async {
+        final r = await Get.find<FriendsRepository>().acceptRequest(requestId);
+        r.when(
+          success: (_) async {
+            await _load();
+          },
+          failure: showAppError,
+        );
+      },
+      onDecline: (requestId) async {
+        final r = await Get.find<FriendsRepository>().declineRequest(requestId);
+        r.when(
+          success: (_) async {
+            state.pendingCount.value =
+                (state.pendingCount.value - 1).clamp(0, 999);
+          },
+          failure: showAppError,
+        );
+      },
+    );
+    await _loadPendingCount();
   }
 
   @override
@@ -48,6 +105,8 @@ class FriendsScreen extends Screen<FriendsState, void> {
         state.query.value = a.text;
       case RefreshFriends _:
         await _load();
+      case OpenFriendRequests _:
+        await _openRequestsSheet();
       case OpenChat a:
         if (SessionStore.isUserBlocked(a.friend.id)) {
           showAppWarning('chat_blocked'.tr);

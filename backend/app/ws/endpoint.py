@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.core.security import decode_token
 from app.db.redis import get_redis
 from app.db.session import get_session_factory
+from app.models.chat import Chat
 from app.models.user import User
 from app.ws.hub import get_hub
 from app.ws.presence import broadcast_presence
@@ -130,6 +131,40 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(def
             if msg_type == "ping":
                 await hub.refresh_presence(redis, user_id)
                 await websocket.send_json({"type": "pong", "data": {}})
+            elif msg_type == "typing":
+                data = msg.get("data") or {}
+                chat_id_raw = data.get("chat_id")
+                if chat_id_raw is None:
+                    continue
+                try:
+                    chat_id = int(chat_id_raw)
+                except (TypeError, ValueError):
+                    continue
+                is_typing = bool(data.get("is_typing"))
+
+                factory = get_session_factory()
+                async with factory() as db:
+                    result = await db.execute(select(Chat).where(Chat.id == chat_id))
+                    chat = result.scalar_one_or_none()
+                    if chat is None:
+                        continue
+                    if user_id not in (chat.user_low_id, chat.user_high_id):
+                        continue
+                    peer_id = (
+                        chat.user_high_id
+                        if user_id == chat.user_low_id
+                        else chat.user_low_id
+                    )
+
+                await hub.publish(
+                    peer_id,
+                    "typing",
+                    {
+                        "chat_id": chat_id,
+                        "user_id": user_id,
+                        "is_typing": is_typing,
+                    },
+                )
     except WebSocketDisconnect:
         pass
     finally:

@@ -14,6 +14,7 @@ class ConversationItem extends StatelessWidget {
   final bool online;
   final int unread;
   final bool highlighted;
+  final bool muted;
   final VoidCallback onTap;
 
   const ConversationItem({
@@ -27,6 +28,7 @@ class ConversationItem extends StatelessWidget {
     required this.online,
     required this.unread,
     required this.highlighted,
+    this.muted = false,
     required this.onTap,
   });
 
@@ -121,6 +123,10 @@ class ConversationItem extends StatelessWidget {
               ),
             ),
             SizedBox(width: 8.dp),
+            if (muted) ...[
+              Icon(Icons.notifications_off_outlined, color: c.textFaint, size: 14.dp),
+              SizedBox(width: 4.dp),
+            ],
             Text(
               time,
               style: TextStyle(color: c.textFaint, fontSize: 12.sp),

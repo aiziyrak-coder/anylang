@@ -1,12 +1,14 @@
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../add_product/add_product_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
+import '../products/product.dart';
 import '../profile_edit/profile_edit_screen.dart';
 import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
@@ -33,6 +35,33 @@ class ProfileScreen extends Screen<ProfileState, void> {
       },
       failure: showAppError,
     );
+    await _loadListings();
+  }
+
+  Future<void> _loadListings() async {
+    final acc = state.account.value;
+    if (acc == null || !acc.isBusiness) return;
+    final result = await Get.find<ProductsRepository>().listMine(limit: 20);
+    final data = result.dataOrNull;
+    if (data == null) return;
+    final items = asList(data)
+        .whereType<Map>()
+        .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))
+        .map(
+          (p) => OwnListing(
+            id: p.id,
+            tileGradient: productGradientFor(p.id),
+            name: p.name,
+            price: p.price,
+          ),
+        )
+        .toList();
+    final current = state.account.value;
+    if (current == null) return;
+    state.account.value = current.copyWith(
+      listings: items,
+      listingsCount: items.length,
+    );
   }
 
   @override
@@ -43,15 +72,20 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case OpenSettings _:
         navigate(SettingsScreen());
       case EditPersonalProfile _:
-        navigate(ProfileEditScreen(), payload: state.account.value);
+        await navigate(ProfileEditScreen(), payload: state.account.value);
+        await _load();
       case EditBusinessInfo _:
-        navigate(EditBusinessInfoScreen());
+        await navigate(EditBusinessInfoScreen());
+        await _load();
       case AddProductRequested _:
-        navigate(AddProductScreen());
+        await navigate(AddProductScreen());
+        await _load();
       case SeeAllListings _:
-        break;
-      case OpenOwnListing _:
-        break;
+        await _loadListings();
+        final n = state.account.value?.listings.length ?? 0;
+        showAppMessage(n == 0 ? 'Hali e’lon yo‘q' : '$n ta e’lon yangilandi');
+      case OpenOwnListing a:
+        showAppMessage(a.listing.name);
     }
   }
 }

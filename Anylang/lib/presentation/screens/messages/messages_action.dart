@@ -1,4 +1,5 @@
 import '../../utils/screen_options/my_action.dart';
+import '../add_friend/add_friend_result.dart';
 import 'conversation.dart';
 
 /// Faqat Xabarlar ekraniga xos action'lar.
@@ -20,3 +21,9 @@ class OpenConversation extends MessagesAction {
 class NewConversation extends MessagesAction {}
 
 class RefreshConversations extends MessagesAction {}
+
+/// Qidiruvdan foydalanuvchi bilan suhbat ochish.
+class OpenUserChat extends MessagesAction {
+  final AddFriendResult user;
+  OpenUserChat(this.user);
+}

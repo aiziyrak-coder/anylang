@@ -25,18 +25,22 @@ class ChatReply {
 }
 
 /// Bitta chat xabari. Barcha turlar bitta modelda — turi `type` bilan
-/// belgilanadi, tegishli maydonlar to'ldiriladi. Hozircha mock; keyinchalik
-/// backend/DB'dan keladi.
+/// belgilanadi, tegishli maydonlar to'ldiriladi.
 class ChatMessage {
   final String id;
   final ChatMsgType type;
   final ChatDir dir;
   final String time; // "14:32"
+  final DateTime? createdAt;
   final ChatStatus status; // faqat chiquvchi uchun
   final ChatReply? reply;
 
   // text
   final String? text;
+  /// Jo'natuvchi asl matni (tarjima qilingan xabarlarda).
+  final String? textOriginal;
+  /// `true` bo'lsa bubble'da `textOriginal` ko'rsatiladi.
+  final bool showingOriginal;
 
   // image
   final LinearGradient? imageGradient;
@@ -72,9 +76,12 @@ class ChatMessage {
     required this.type,
     required this.dir,
     required this.time,
+    this.createdAt,
     this.status = ChatStatus.read,
     this.reply,
     this.text,
+    this.textOriginal,
+    this.showingOriginal = false,
     this.imageGradient,
     this.imageUrl,
     this.voiceDuration,
@@ -96,14 +103,57 @@ class ChatMessage {
 
   bool get isOutgoing => dir == ChatDir.outgoing;
 
+  /// Bubble'da ko'rsatiladigan matn (tarjima / asl toggle).
+  String get displayText {
+    if (showingOriginal &&
+        textOriginal != null &&
+        textOriginal!.isNotEmpty) {
+      return textOriginal!;
+    }
+    return text ?? '';
+  }
+
+  ChatMessage withToggleOriginal() => ChatMessage(
+        id: id,
+        type: type,
+        dir: dir,
+        time: time,
+        createdAt: createdAt,
+        status: status,
+        reply: reply,
+        text: text,
+        textOriginal: textOriginal,
+        showingOriginal: !showingOriginal,
+        imageGradient: imageGradient,
+        imageUrl: imageUrl,
+        voiceDuration: voiceDuration,
+        voiceDownloaded: voiceDownloaded,
+        voicePath: voicePath,
+        voiceSamples: voiceSamples,
+        voiceDurationMs: voiceDurationMs,
+        productTitle: productTitle,
+        productPrice: productPrice,
+        locationLabel: locationLabel,
+        locationDistance: locationDistance,
+        fileName: fileName,
+        fileSize: fileSize,
+        fileExt: fileExt,
+        contactName: contactName,
+        contactPhone: contactPhone,
+        contactInitial: contactInitial,
+      );
+
   ChatMessage withStatus(ChatStatus status) => ChatMessage(
         id: id,
         type: type,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         reply: reply,
         text: text,
+        textOriginal: textOriginal,
+        showingOriginal: showingOriginal,
         imageGradient: imageGradient,
         imageUrl: imageUrl,
         voiceDuration: voiceDuration,
@@ -128,23 +178,30 @@ class ChatMessage {
     required ChatDir dir,
     required String time,
     required String text,
+    DateTime? createdAt,
+    String? textOriginal,
     ChatStatus status = ChatStatus.read,
     ChatReply? reply,
+    bool showingOriginal = false,
   }) =>
       ChatMessage(
         id: id,
         type: ChatMsgType.text,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         reply: reply,
         text: text,
+        textOriginal: textOriginal,
+        showingOriginal: showingOriginal,
       );
 
   factory ChatMessage.image({
     required String id,
     required ChatDir dir,
     required String time,
+    DateTime? createdAt,
     LinearGradient? gradient,
     String? url,
     ChatStatus status = ChatStatus.read,
@@ -155,6 +212,7 @@ class ChatMessage {
         type: ChatMsgType.image,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         reply: reply,
         imageGradient: gradient,
@@ -166,6 +224,7 @@ class ChatMessage {
     required ChatDir dir,
     required String time,
     required String duration,
+    DateTime? createdAt,
     bool downloaded = true,
     ChatStatus status = ChatStatus.read,
     String? path,
@@ -178,6 +237,7 @@ class ChatMessage {
         type: ChatMsgType.voice,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         reply: reply,
         voiceDuration: duration,
@@ -193,6 +253,7 @@ class ChatMessage {
     required String time,
     required String title,
     required String price,
+    DateTime? createdAt,
     ChatStatus status = ChatStatus.read,
   }) =>
       ChatMessage(
@@ -200,6 +261,7 @@ class ChatMessage {
         type: ChatMsgType.product,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         productTitle: title,
         productPrice: price,
@@ -211,6 +273,7 @@ class ChatMessage {
     required String time,
     required String label,
     required String distance,
+    DateTime? createdAt,
     ChatStatus status = ChatStatus.read,
   }) =>
       ChatMessage(
@@ -218,6 +281,7 @@ class ChatMessage {
         type: ChatMsgType.location,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         locationLabel: label,
         locationDistance: distance,
@@ -230,6 +294,7 @@ class ChatMessage {
     required String name,
     required String size,
     required String ext,
+    DateTime? createdAt,
     ChatStatus status = ChatStatus.read,
   }) =>
       ChatMessage(
@@ -237,6 +302,7 @@ class ChatMessage {
         type: ChatMsgType.file,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         fileName: name,
         fileSize: size,
@@ -250,6 +316,7 @@ class ChatMessage {
     required String name,
     required String phone,
     required String initial,
+    DateTime? createdAt,
     ChatStatus status = ChatStatus.read,
   }) =>
       ChatMessage(
@@ -257,6 +324,7 @@ class ChatMessage {
         type: ChatMsgType.contact,
         dir: dir,
         time: time,
+        createdAt: createdAt,
         status: status,
         contactName: name,
         contactPhone: phone,
@@ -267,7 +335,7 @@ class ChatMessage {
   String previewText() {
     switch (type) {
       case ChatMsgType.text:
-        return text ?? '';
+        return displayText;
       case ChatMsgType.image:
         return 'chat_preview_photo'.tr;
       case ChatMsgType.voice:

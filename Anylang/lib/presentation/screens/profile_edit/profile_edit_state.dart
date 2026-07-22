@@ -9,4 +9,5 @@ class ProfileEditState extends GetxController {
   RxString country = ''.obs;
   RxString gender = 'female'.obs; // 'female' | 'male'
   RxBool isSaving = false.obs;
+  final RxInt avatarEpoch = 0.obs;
 }

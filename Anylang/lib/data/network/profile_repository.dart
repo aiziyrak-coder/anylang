@@ -23,6 +23,13 @@ class ProfileRepository {
     return _client.post(api: 'api/v1/users/me/avatar', data: formData);
   }
 
+  Future<BaseResult> uploadBusinessLogo(String filePath) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath),
+    });
+    return _client.post(api: 'api/v1/users/me/business/logo', data: formData);
+  }
+
   Future<BaseResult> getBusiness() {
     return _client.get(api: 'api/v1/users/me/business');
   }

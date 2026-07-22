@@ -108,6 +108,7 @@ class _MessageActionsOverlay extends StatelessWidget {
               width: menuWidth,
               child: _MenuCard(
                 c: c,
+                message: message,
                 showTranslate: showTranslate,
               ),
             ),
@@ -157,9 +158,14 @@ class _ReadReceiptChip extends StatelessWidget {
 
 class _MenuCard extends StatelessWidget {
   final AppColors c;
+  final ChatMessage message;
   final bool showTranslate;
 
-  const _MenuCard({required this.c, required this.showTranslate});
+  const _MenuCard({
+    required this.c,
+    required this.message,
+    required this.showTranslate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +190,9 @@ class _MenuCard extends StatelessWidget {
               context,
               MessageMenuAction.translate,
               'assets/icons/ic_globe.svg',
-              'chat_menu_original'.tr,
+              message.showingOriginal
+                  ? 'chat_menu_translated'.tr
+                  : 'chat_menu_original'.tr,
               color: c.accentText,
             ),
           _row(

@@ -46,6 +46,10 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
             _apiToRole[(map['business_role'] as String?) ?? ''] ?? 'Ishlab chiqaruvchi';
         state.website.value = (map['website'] as String?) ?? '';
         state.description.value = (map['description'] as String?) ?? '';
+        final logo = map['logo_url']?.toString();
+        if (logo != null && logo.isNotEmpty) {
+          state.logoUrl.value = logo;
+        }
         final certs = map['certificates'];
         if (certs is List) {
           state.certificates.assignAll(certs.map((e) => e.toString()));
@@ -63,7 +67,24 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
       case ChangeLogo _:
         final file = await pickImage(context);
         if (file == null) return;
-        showAppMessage('Logotip yuklash tez orada');
+        state.isSaving.value = true;
+        try {
+          final result =
+              await Get.find<ProfileRepository>().uploadBusinessLogo(file.path);
+          result.when(
+            success: (data) {
+              final map = asMap(data);
+              final url = map?['logo_url']?.toString() ?? map?['url']?.toString();
+              if (url != null && url.isNotEmpty) {
+                state.logoUrl.value = url;
+              }
+              showAppMessage('Logotip yangilandi');
+            },
+            failure: showAppError,
+          );
+        } finally {
+          state.isSaving.value = false;
+        }
       case SelectBusinessCountry a:
         state.country.value = a.country;
       case SelectBusinessRole a:

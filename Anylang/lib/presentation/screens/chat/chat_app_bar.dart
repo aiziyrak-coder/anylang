@@ -13,6 +13,8 @@ class ChatAppBar extends StatelessWidget {
   final String initial;
   final LinearGradient avatarGradient;
   final bool online;
+  /// Agar berilsa — online/offline o‘rniga ko‘rsatiladi (masalan “Yozmoqda...”).
+  final String? statusText;
   final bool searching;
   final bool hasSearchQuery;
   final TextEditingController? searchController;
@@ -28,6 +30,7 @@ class ChatAppBar extends StatelessWidget {
     required this.initial,
     required this.avatarGradient,
     required this.online,
+    this.statusText,
     required this.onBack,
     required this.onMenu,
     required this.onPeerTap,
@@ -98,7 +101,8 @@ class ChatAppBar extends StatelessWidget {
                           ),
                           SizedBox(height: 2.dp),
                           Text(
-                            online ? 'chat_online'.tr : 'chat_offline'.tr,
+                            statusText ??
+                                (online ? 'chat_online'.tr : 'chat_offline'.tr),
                             style: TextStyle(
                               color: c.textSecondary,
                               fontSize: 12.sp,

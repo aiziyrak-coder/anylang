@@ -115,7 +115,6 @@ class FriendResultItem extends StatelessWidget {
   Widget _actionButton(AppColors c) {
     final radius = BorderRadius.circular(99.dp);
     final bool isAdd = action == FriendActionState.add;
-    final bool isRequested = action == FriendActionState.requested;
 
     // Holatga qarab ko'rinish.
     final Gradient? gradient = isAdd ? limeButtonGradient : null;
@@ -131,7 +130,7 @@ class FriendResultItem extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: isRequested ? null : onAction,
+        onTap: onAction,
         borderRadius: radius,
         child: Ink(
           decoration: BoxDecoration(

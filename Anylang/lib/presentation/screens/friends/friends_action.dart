@@ -21,3 +21,6 @@ class AddFriend extends FriendsAction {}
 
 /// Ro'yxatni yangilash (pull-to-refresh / tab).
 class RefreshFriends extends FriendsAction {}
+
+/// Kiruvchi do'stlik so'rovlarini ochish.
+class OpenFriendRequests extends FriendsAction {}

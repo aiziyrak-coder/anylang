@@ -17,6 +17,7 @@ import 'settings_state.dart';
 /// S15 — Sozlamalar. Umumiy, Ko'rinish (tema), Bildirishnomalar,
 /// Maxfiylik & hisob bo'limlari + hisobdan chiqish.
 class SettingsContent extends ScreenContent<SettingsState> {
+  String _visibilityLabel(String key) => 'settings_visibility_$key'.tr;
 
   @override
   Widget build(BuildContext context, SettingsState state, void Function(MyAction action) sendAction) {
@@ -87,13 +88,13 @@ class SettingsContent extends ScreenContent<SettingsState> {
                     _sectionLabel(c, 'settings_privacy'.tr),
                     SizedBox(height: 9.dp),
                     _card(c, [
-                      InfoRow(
-                        icon: Icons.visibility_outlined,
-                        label: 'settings_profile_visibility'.tr,
-                        value: 'settings_visibility_everyone'.tr,
-                        showChevron: true,
-                        onTap: () => sendAction(OpenProfileVisibility()),
-                      ),
+                      Obx(() => InfoRow(
+                            icon: Icons.visibility_outlined,
+                            label: 'settings_profile_visibility'.tr,
+                            value: _visibilityLabel(state.profileVisibilityKey.value),
+                            showChevron: true,
+                            onTap: () => sendAction(OpenProfileVisibility()),
+                          )),
                       InfoRow(
                         icon: Icons.block_outlined,
                         label: 'settings_blocked_users'.tr,

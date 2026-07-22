@@ -135,7 +135,7 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
     final isRequested = r.action == FriendActionState.requested;
     final label = isFriend
         ? 'add_friend_message'.tr
-        : (isRequested ? 'add_friend_requested'.tr : 'add_friend_add'.tr);
+        : (isRequested ? 'add_friend_cancel_request'.tr : 'add_friend_add'.tr);
 
     return FriendResultItem(
       initial: r.initial,
@@ -148,7 +148,9 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
       onAction: () {
         if (isFriend) {
           sendAction(MessageResult(r));
-        } else if (!isRequested) {
+        } else if (isRequested) {
+          sendAction(CancelFriendRequest(r));
+        } else {
           sendAction(SendFriendRequest(r));
         }
       },

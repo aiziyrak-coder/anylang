@@ -11,6 +11,7 @@ enum ProfileAvatarShape { circle, roundedSquare }
 class ProfileAvatar extends StatelessWidget {
   final String initial;
   final LinearGradient gradient;
+  final String? imageUrl;
   final ProfileAvatarShape shape;
   final double size;
   final bool online;
@@ -20,6 +21,7 @@ class ProfileAvatar extends StatelessWidget {
     super.key,
     required this.initial,
     required this.gradient,
+    this.imageUrl,
     this.shape = ProfileAvatarShape.circle,
     this.size = 88,
     this.online = false,
@@ -40,16 +42,7 @@ class ProfileAvatar extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            width: s,
-            height: s,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(gradient: gradient, borderRadius: borderRadius),
-            child: Text(
-              initial,
-              style: TextStyle(color: kLime, fontSize: s * 0.38, fontWeight: FontWeight.w700),
-            ),
-          ),
+          _avatarBody(c, s, borderRadius),
           if (online)
             Positioned(
               right: 0,
@@ -82,6 +75,36 @@ class ProfileAvatar extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _avatarBody(AppColors c, double s, BorderRadius borderRadius) {
+    final url = imageUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: borderRadius,
+        child: Image.network(
+          url,
+          width: s,
+          height: s,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => _initialBody(c, s, borderRadius),
+        ),
+      );
+    }
+    return _initialBody(c, s, borderRadius);
+  }
+
+  Widget _initialBody(AppColors c, double s, BorderRadius borderRadius) {
+    return Container(
+      width: s,
+      height: s,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(gradient: gradient, borderRadius: borderRadius),
+      child: Text(
+        initial,
+        style: TextStyle(color: kLime, fontSize: s * 0.38, fontWeight: FontWeight.w700),
       ),
     );
   }

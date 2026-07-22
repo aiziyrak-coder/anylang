@@ -10,4 +10,5 @@ class EditBusinessInfoState extends GetxController {
   RxList<String> certificates = <String>[].obs;
   RxList<LinearGradient> factoryImages = <LinearGradient>[].obs;
   RxBool isSaving = false.obs;
+  final RxnString logoUrl = RxnString();
 }

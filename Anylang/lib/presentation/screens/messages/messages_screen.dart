@@ -5,12 +5,14 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../add_friend/add_friend_payload.dart';
+import '../add_friend/add_friend_result.dart';
 import '../add_friend/add_friend_screen.dart';
 import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
@@ -54,13 +56,35 @@ class MessagesScreen extends Screen<MessagesState, void> {
     if (q.isEmpty) {
       state.searching.value = false;
       state.searchResults.clear();
+      state.userResults.clear();
       return;
     }
     final seq = ++_searchSeq;
     state.searching.value = true;
-    final result = await Get.find<ChatRepository>().search(q);
+    final chatFuture = Get.find<ChatRepository>().search(q);
+    final userFuture = q.length >= 3
+        ? Get.find<ProfileRepository>().searchUsers(q)
+        : null;
+    final chatResult = await chatFuture;
+    if (userFuture != null) {
+      final userResult = await userFuture;
+      if (seq != _searchSeq) return;
+      userResult.when(
+        success: (data) {
+          final items = asList(data)
+              .whereType<Map>()
+              .map((e) => AddFriendResult.fromApi(Map<String, dynamic>.from(e)))
+              .where((u) => !SessionStore.isUserBlocked(u.id))
+              .toList();
+          state.userResults.assignAll(items);
+        },
+        failure: (_) => state.userResults.clear(),
+      );
+    } else {
+      state.userResults.clear();
+    }
     if (seq != _searchSeq) return;
-    result.when(
+    chatResult.when(
       success: (data) {
         final items = asList(data)
             .whereType<Map>()
@@ -76,6 +100,32 @@ class MessagesScreen extends Screen<MessagesState, void> {
     }
   }
 
+  Future<void> _openUserChat(AddFriendResult user) async {
+    if (SessionStore.isUserBlocked(user.id)) {
+      showAppWarning('chat_blocked'.tr);
+      return;
+    }
+    final chat = await Get.find<ChatRepository>().createChat(user.id);
+    chat.when(
+      success: (data) {
+        final map = asMap(data);
+        final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+        navigate(
+          ChatScreen(),
+          payload: ChatPayload(
+            chatId: chatId,
+            peerId: user.id,
+            name: user.name,
+            initial: user.initial,
+            avatarGradient: user.avatarGradient,
+            online: user.online,
+          ),
+        );
+      },
+      failure: showAppError,
+    );
+  }
+
   @override
   Future<void> actionHandler(MessagesState state, MyAction action) async {
     switch (action) {
@@ -85,6 +135,7 @@ class MessagesScreen extends Screen<MessagesState, void> {
         if (a.text.trim().isEmpty) {
           state.searching.value = false;
           state.searchResults.clear();
+          state.userResults.clear();
         } else {
           _searchDebounce = Timer(
             const Duration(milliseconds: 350),
@@ -129,6 +180,8 @@ class MessagesScreen extends Screen<MessagesState, void> {
         await _load();
       case RefreshConversations _:
         await _load();
+      case OpenUserChat a:
+        await _openUserChat(a.user);
     }
   }
 }

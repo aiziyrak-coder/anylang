@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../add_friend/add_friend_result.dart';
 import 'conversation.dart';
 
 class MessagesState extends GetxController {
@@ -7,6 +8,9 @@ class MessagesState extends GetxController {
 
   /// Qidiruv natijalari (API).
   RxList<Conversation> searchResults = <Conversation>[].obs;
+
+  /// Foydalanuvchi qidiruv natijalari (API).
+  RxList<AddFriendResult> userResults = <AddFriendResult>[].obs;
 
   RxString query = ''.obs;
   RxBool loading = true.obs;

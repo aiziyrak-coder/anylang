@@ -168,6 +168,55 @@ class SessionStore {
     await _putStringIdSet(_kBlockedUsers, ids);
   }
 
+  static List<int> blockedUserIds() {
+    return _stringIdSet(_kBlockedUsers)
+        .map(int.tryParse)
+        .whereType<int>()
+        .where((id) => id > 0)
+        .toList()
+      ..sort();
+  }
+
+  static const _kNotifNewMessages = 'notif_new_messages';
+  static const _kNotifFriendRequests = 'notif_friend_requests';
+  static const _kNotifMarketing = 'notif_marketing';
+  static const _kProfileVisibility = 'profile_visibility';
+
+  static bool notificationEnabled(String key, {bool defaultValue = true}) {
+    final stored = _box.get(key);
+    if (stored is bool) return stored;
+    return defaultValue;
+  }
+
+  static Future<void> setNotificationEnabled(String key, bool value) async {
+    await _box.put(key, value);
+  }
+
+  static bool newMessagesNotificationsEnabled() =>
+      notificationEnabled(_kNotifNewMessages);
+
+  static bool friendRequestsNotificationsEnabled() =>
+      notificationEnabled(_kNotifFriendRequests);
+
+  static bool marketingNotificationsEnabled() =>
+      notificationEnabled(_kNotifMarketing, defaultValue: false);
+
+  static Future<void> setNewMessagesNotificationsEnabled(bool value) =>
+      setNotificationEnabled(_kNotifNewMessages, value);
+
+  static Future<void> setFriendRequestsNotificationsEnabled(bool value) =>
+      setNotificationEnabled(_kNotifFriendRequests, value);
+
+  static Future<void> setMarketingNotificationsEnabled(bool value) =>
+      setNotificationEnabled(_kNotifMarketing, value);
+
+  static String profileVisibility() =>
+      _box.get(_kProfileVisibility, defaultValue: 'everyone') as String;
+
+  static Future<void> setProfileVisibility(String value) async {
+    await _box.put(_kProfileVisibility, value);
+  }
+
   static int? _jwtExpMillis(String token) {
     final parts = token.split('.');
     if (parts.length != 3) return null;

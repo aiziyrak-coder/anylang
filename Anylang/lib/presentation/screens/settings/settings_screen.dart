@@ -8,14 +8,21 @@ import '../../utils/app_snackbar.dart';
 import '../../utils/language_localizations.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../forgot_password/forgot_password_screen.dart';
 import '../login/login_screen.dart';
 import '../select_language/select_language_option.dart';
+import '../../modal/simple_list_picker_bottom_sheet.dart';
+import 'blocked_users_bottom_sheet.dart';
 import 'settings_action.dart';
 import 'settings_content.dart';
 import 'settings_state.dart';
 
 class SettingsScreen extends Screen<SettingsState, void> {
   SettingsScreen() : super(mobileContent: SettingsContent());
+
+  static const _visibilityKeys = ['everyone', 'friends', 'nobody'];
+
+  String _visibilityLabel(String key) => 'settings_visibility_$key'.tr;
 
   void _clearLocalSession() {
     if (Get.isRegistered<SocketService>()) {
@@ -35,6 +42,10 @@ class SettingsScreen extends Screen<SettingsState, void> {
       );
       state.currentLanguageKey.value = match.key;
     }
+    state.newMessagesEnabled.value = SessionStore.newMessagesNotificationsEnabled();
+    state.friendRequestsEnabled.value = SessionStore.friendRequestsNotificationsEnabled();
+    state.marketingEnabled.value = SessionStore.marketingNotificationsEnabled();
+    state.profileVisibilityKey.value = SessionStore.profileVisibility();
   }
 
   @override
@@ -46,10 +57,13 @@ class SettingsScreen extends Screen<SettingsState, void> {
         switch (a.key) {
           case 'new_messages':
             state.newMessagesEnabled.value = a.value;
+            await SessionStore.setNewMessagesNotificationsEnabled(a.value);
           case 'friend_requests':
             state.friendRequestsEnabled.value = a.value;
+            await SessionStore.setFriendRequestsNotificationsEnabled(a.value);
           case 'marketing':
             state.marketingEnabled.value = a.value;
+            await SessionStore.setMarketingNotificationsEnabled(a.value);
         }
       case ChangeThemeMode a:
         Get.find<ThemeController>().setMode(a.mode);
@@ -98,9 +112,23 @@ class SettingsScreen extends Screen<SettingsState, void> {
           showAppError(e.toString());
         }
       case OpenProfileVisibility _:
+        final labels = _visibilityKeys.map(_visibilityLabel).toList();
+        final picked = await showSimpleListPickerBottomSheet(
+          context,
+          title: 'settings_profile_visibility'.tr,
+          items: labels,
+          selected: _visibilityLabel(state.profileVisibilityKey.value),
+        );
+        if (picked == null) return;
+        final idx = labels.indexOf(picked);
+        if (idx < 0) return;
+        final key = _visibilityKeys[idx];
+        state.profileVisibilityKey.value = key;
+        await SessionStore.setProfileVisibility(key);
       case OpenBlockedUsers _:
+        await showBlockedUsersBottomSheet(context);
       case OpenChangePassword _:
-        showAppMessage('Tez orada');
+        navigate(ForgotPasswordScreen());
     }
   }
 }

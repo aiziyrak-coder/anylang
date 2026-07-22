@@ -47,7 +47,6 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   @override
   Widget build(BuildContext context, ProfileEditState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
-    final account = state.account;
 
     return GradientBackground(
       child: SafeArea(
@@ -67,11 +66,20 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Center(
-                      child: ProfileAvatar(
-                        initial: account?.initial ?? '',
-                        gradient: account?.avatarGradient ?? avatarTealGradient,
-                        shape: account?.isBusiness == true ? ProfileAvatarShape.roundedSquare : ProfileAvatarShape.circle,
-                        onEdit: () => sendAction(ChangeProfilePhoto()),
+                      child: Obx(
+                        () {
+                          final _ = state.avatarEpoch.value;
+                          final account = state.account;
+                          return ProfileAvatar(
+                            initial: account?.initial ?? '',
+                            gradient: account?.avatarGradient ?? avatarTealGradient,
+                            imageUrl: account?.avatarUrl,
+                            shape: account?.isBusiness == true
+                                ? ProfileAvatarShape.roundedSquare
+                                : ProfileAvatarShape.circle,
+                            onEdit: () => sendAction(ChangeProfilePhoto()),
+                          );
+                        },
                       ),
                     ),
                     SizedBox(height: 8.dp),

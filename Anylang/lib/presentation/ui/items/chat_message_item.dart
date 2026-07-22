@@ -216,7 +216,7 @@ class ChatMessageItem extends StatelessWidget {
         children: [
           if (message.reply != null) _replyQuote(c, message.reply!),
           Text(
-            message.text ?? '',
+            message.displayText,
             style: TextStyle(
               color: _primaryText(c),
               fontSize: 15.sp,

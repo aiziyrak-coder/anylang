@@ -20,6 +20,7 @@ import '../../presentation/ui/theme/gradients.dart';
 class RealtimeSyncService extends GetxService {
   StreamSubscription<Map<String, dynamic>>? _sub;
   int? _activeChatId;
+  Timer? _typingClearTimer;
 
   void setActiveChat(int? chatId) => _activeChatId = chatId;
 
@@ -54,6 +55,8 @@ class RealtimeSyncService extends GetxService {
         _onMessageDeleted(data);
       case 'presence':
         _onPresence(data);
+      case 'typing':
+        _onTyping(data);
       default:
         break;
     }
@@ -92,6 +95,7 @@ class RealtimeSyncService extends GetxService {
           chat.messages.add(mapped);
         }
         if (!isMine) {
+          chat.peerTyping.value = false;
           final id = int.tryParse(msgId);
           if (id != null) {
             Get.find<ChatRepository>().markRead(chatId, [id]);
@@ -202,6 +206,24 @@ class RealtimeSyncService extends GetxService {
     }
   }
 
+  void _onTyping(Map<String, dynamic> data) {
+    final chatId = (data['chat_id'] as num?)?.toInt();
+    final userId = (data['user_id'] as num?)?.toInt();
+    final isTyping = data['is_typing'] == true;
+    if (chatId == null || userId == null) return;
+    if (!Get.isRegistered<ChatState>()) return;
+    final chat = Get.find<ChatState>();
+    if (chat.chatId != chatId || chat.peerId != userId) return;
+
+    chat.peerTyping.value = isTyping;
+    _typingClearTimer?.cancel();
+    if (isTyping) {
+      _typingClearTimer = Timer(const Duration(seconds: 3), () {
+        chat.peerTyping.value = false;
+      });
+    }
+  }
+
   Future<void> _softReloadConversations() async {
     if (!Get.isRegistered<MessagesState>() || !Get.isRegistered<ChatRepository>()) {
       return;
@@ -234,6 +256,7 @@ class RealtimeSyncService extends GetxService {
 
   @override
   void onClose() {
+    _typingClearTimer?.cancel();
     _sub?.cancel();
     super.onClose();
   }
@@ -248,9 +271,9 @@ ChatMessage mapChatMessageFromApi(
   final senderId = (json['sender_id'] as num?)?.toInt();
   final outgoing = me != null && senderId == me;
   final created = DateTime.tryParse(json['created_at']?.toString() ?? '');
-  final text = (json['text'] as String?) ??
-      (json['text_original'] as String?) ??
-      '';
+  final textTranslated = json['text'] as String?;
+  final textOriginal = json['text_original'] as String?;
+  final text = textTranslated ?? textOriginal ?? '';
   final type = (json['type'] as String?) ?? 'text';
   final reply = _replyFromApi(json, me, peerName) ?? fallbackReply;
   final status = _statusFromApi(json, outgoing: outgoing);
@@ -266,7 +289,8 @@ ChatMessage mapChatMessageFromApi(
     return ChatMessage.voice(
       id: '${json['id']}',
       dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
-      time: formatChatTime(created),
+      time: formatMessageClock(created),
+      createdAt: created,
       duration: durationMs != null
           ? WaveformUtils.formatDuration(Duration(milliseconds: durationMs))
           : '0:00',
@@ -280,7 +304,7 @@ ChatMessage mapChatMessageFromApi(
   }
   final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
   final dir = outgoing ? ChatDir.outgoing : ChatDir.incoming;
-  final time = formatChatTime(created);
+  final time = formatMessageClock(created);
   final id = '${json['id']}';
   switch (type) {
     case 'image':
@@ -288,6 +312,7 @@ ChatMessage mapChatMessageFromApi(
         id: id,
         dir: dir,
         time: time,
+        createdAt: created,
         url: meta['url']?.toString(),
         gradient: avatarTealGradient,
         status: status,
@@ -302,6 +327,7 @@ ChatMessage mapChatMessageFromApi(
         id: id,
         dir: dir,
         time: time,
+        createdAt: created,
         name: name,
         size: size is num ? _formatBytes(size.toInt()) : '—',
         ext: ext,
@@ -312,6 +338,7 @@ ChatMessage mapChatMessageFromApi(
         id: id,
         dir: dir,
         time: time,
+        createdAt: created,
         title: meta['name']?.toString() ??
             meta['product_name']?.toString() ??
             'Mahsulot',
@@ -323,6 +350,7 @@ ChatMessage mapChatMessageFromApi(
         id: id,
         dir: dir,
         time: time,
+        createdAt: created,
         label: meta['label']?.toString() ?? 'Joylashuv',
         distance: '',
         status: status,
@@ -333,6 +361,7 @@ ChatMessage mapChatMessageFromApi(
         id: id,
         dir: dir,
         time: time,
+        createdAt: created,
         name: name,
         phone: meta['contact_phone']?.toString() ?? '',
         initial: initialsOf(name),
@@ -343,7 +372,9 @@ ChatMessage mapChatMessageFromApi(
         id: id,
         dir: dir,
         time: time,
+        createdAt: created,
         text: text,
+        textOriginal: textOriginal,
         status: status,
         reply: reply,
       );

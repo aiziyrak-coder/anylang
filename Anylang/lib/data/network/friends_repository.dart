@@ -45,6 +45,13 @@ class FriendsRepository {
     return _client.post(api: 'api/v1/friends/requests/$requestId/decline');
   }
 
+  Future<BaseResult> cancelRequest(int requestId) {
+    return _client.delete(
+      api: 'api/v1/friends/requests/$requestId',
+      notify: SnackNotify.none,
+    );
+  }
+
   Future<BaseResult> removeFriend(int userId) {
     return _client.delete(
       api: 'api/v1/friends/$userId',

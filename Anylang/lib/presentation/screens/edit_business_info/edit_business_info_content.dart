@@ -93,11 +93,16 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Center(
-                      child: ProfileAvatar(
-                        initial: 'A',
-                        gradient: avatarBrownGradient,
-                        shape: ProfileAvatarShape.roundedSquare,
-                        onEdit: () => sendAction(ChangeLogo()),
+                      child: Obx(
+                        () => ProfileAvatar(
+                          initial: initialsOf(state.companyName.value.isNotEmpty
+                              ? state.companyName.value
+                              : 'A'),
+                          gradient: avatarBrownGradient,
+                          imageUrl: state.logoUrl.value,
+                          shape: ProfileAvatarShape.roundedSquare,
+                          onEdit: () => sendAction(ChangeLogo()),
+                        ),
                       ),
                     ),
                     SizedBox(height: 8.dp),

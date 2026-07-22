@@ -39,6 +39,46 @@ class FriendsContent extends ScreenContent<FriendsState> {
                     ),
                   ),
                 ),
+                Obx(() {
+                  final count = state.pendingCount.value;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      MyIconButton(
+                        onClick: () => sendAction(OpenFriendRequests()),
+                        icon: Icons.mail_outline_rounded,
+                        iconColor: c.textPrimary,
+                        iconSize: 22.dp,
+                        backgroundColor: c.surface,
+                        borderRadius: 12.dp,
+                        padding: EdgeInsets.all(10.dp),
+                      ),
+                      if (count > 0)
+                        Positioned(
+                          right: -4.dp,
+                          top: -4.dp,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 5.dp, vertical: 1.dp),
+                            decoration: BoxDecoration(
+                              color: c.accent,
+                              borderRadius: BorderRadius.circular(99.dp),
+                            ),
+                            constraints: BoxConstraints(minWidth: 18.dp, minHeight: 18.dp),
+                            alignment: Alignment.center,
+                            child: Text(
+                              count > 99 ? '99+' : '$count',
+                              style: TextStyle(
+                                color: c.onAccent,
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                }),
+                SizedBox(width: 8.dp),
                 MyIconButton(
                   onClick: () => sendAction(AddFriend()),
                   icon: Icons.person_add_alt_1,

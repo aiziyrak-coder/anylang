@@ -12,6 +12,7 @@ class Product {
   final String views;
   final String? imageUrl;
   final int sellerId;
+  final bool isFavorited;
 
   const Product({
     required this.id,
@@ -23,6 +24,7 @@ class Product {
     this.subtitle,
     this.imageUrl,
     this.sellerId = 0,
+    this.isFavorited = false,
   });
 
   factory Product.fromApi(Map<String, dynamic> json) {
@@ -39,6 +41,7 @@ class Product {
       views: formatViews((json['views_count'] as num?)?.toInt() ?? 0),
       imageUrl: json['primary_image_url'] as String?,
       sellerId: (json['seller_id'] as num?)?.toInt() ?? 0,
+      isFavorited: json['is_favorited'] == true,
     );
   }
 }

@@ -15,3 +15,6 @@ class OpenProduct extends ProductsAction {
   final Product product;
   OpenProduct(this.product);
 }
+
+/// Ro'yxatni qayta yuklash (pull-to-refresh).
+class RefreshProducts extends ProductsAction {}

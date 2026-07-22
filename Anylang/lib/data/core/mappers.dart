@@ -49,17 +49,46 @@ String formatChatTime(DateTime? dt) {
   final sameDay =
       local.year == now.year && local.month == now.month && local.day == now.day;
   if (sameDay) {
-    final h = local.hour.toString().padLeft(2, '0');
-    final m = local.minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    return formatMessageClock(local);
   }
   final yesterday = now.subtract(const Duration(days: 1));
   if (local.year == yesterday.year &&
       local.month == yesterday.month &&
       local.day == yesterday.day) {
-    return 'Kecha';
+    return 'chat_yesterday'.tr;
   }
   return '${local.day}.${local.month}';
+}
+
+/// Chat bubble ichidagi soat — har doim HH:mm.
+String formatMessageClock(DateTime? dt) {
+  if (dt == null) return '';
+  final local = dt.toLocal();
+  final h = local.hour.toString().padLeft(2, '0');
+  final m = local.minute.toString().padLeft(2, '0');
+  return '$h:$m';
+}
+
+/// Sana ajratkich: Bugun / Kecha / dd.MM.yyyy
+String formatChatDayLabel(DateTime? dt) {
+  if (dt == null) return '';
+  final local = dt.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  if (day == today) return 'chat_today'.tr;
+  if (day == today.subtract(const Duration(days: 1))) {
+    return 'chat_yesterday'.tr;
+  }
+  final d = local.day.toString().padLeft(2, '0');
+  final mo = local.month.toString().padLeft(2, '0');
+  return '$d.$mo.${local.year}';
+}
+
+String chatDayKey(DateTime? dt) {
+  if (dt == null) return '';
+  final local = dt.toLocal();
+  return '${local.year}-${local.month}-${local.day}';
 }
 
 String formatViews(int n) {
