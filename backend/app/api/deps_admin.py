@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.core.deps import DbSession
 from app.core.errors import AppError
-from app.core.security import decode_token
+from app.core.security import decode_admin_token
 from app.models.user import AdminUser
 
 _bearer = HTTPBearer(auto_error=False)
@@ -27,7 +27,7 @@ async def get_current_admin(
         )
 
     try:
-        payload = decode_token(credentials.credentials)
+        payload = decode_admin_token(credentials.credentials)
     except jwt.PyJWTError as exc:
         raise AppError(
             message="Invalid or expired token",

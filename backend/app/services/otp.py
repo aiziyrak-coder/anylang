@@ -81,17 +81,20 @@ async def create_and_send_otp(
     purpose: str,
     app_language: str = "uz_UZ",
     enforce_cooldown: bool = True,
+    enforce_hourly: bool = True,
 ) -> tuple[str, int, bool]:
     """Create OTP record, send email, apply rate limits.
 
     Returns (code, resend_after_seconds, emailed).
+    Plaintext code is never stored in Redis — only SHA-256 hash in DB.
     """
     email_norm = email.lower().strip()
 
     if enforce_cooldown:
         await check_resend_allowed(redis, email_norm, purpose)
 
-    await _enforce_hourly_limit(redis, email_norm)
+    if enforce_hourly:
+        await _enforce_hourly_limit(redis, email_norm)
 
     now = datetime.now(UTC)
     await db.execute(
@@ -118,8 +121,6 @@ async def create_and_send_otp(
 
     emailed = await send_otp_email(email_norm, code, app_language)
     await _set_resend_cooldown(redis, email_norm, purpose)
-    # Cache plaintext briefly so ops can recover when SMTP is down (hashed in DB).
-    await redis.setex(f"otp:last:{purpose}:{email_norm}", OTP_TTL_MINUTES * 60, code)
 
     return code, RESEND_COOLDOWN_SECONDS, emailed
 

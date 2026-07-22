@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -27,7 +27,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
-        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "geolocation=(), microphone=(), camera=()",
+        )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+        )
+        response.headers.setdefault("X-XSS-Protection", "0")
         if get_settings().is_production:
             response.headers.setdefault(
                 "Strict-Transport-Security",
@@ -55,6 +63,7 @@ def create_app() -> FastAPI:
 
     docs_url = None if settings.is_production else "/docs"
     redoc_url = None if settings.is_production else "/redoc"
+    openapi_url = None if settings.is_production else "/openapi.json"
 
     app = FastAPI(
         title=settings.app_name,
@@ -62,6 +71,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         docs_url=docs_url,
         redoc_url=redoc_url,
+        openapi_url=openapi_url,
     )
 
     if settings.sentry_dsn:

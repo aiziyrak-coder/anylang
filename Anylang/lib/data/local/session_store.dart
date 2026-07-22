@@ -1,12 +1,53 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 
-/// Auth sessiyasini Hive `user` box'da saqlash / o'chirish.
+/// Auth sessiyasi: JWT lar [FlutterSecureStorage] da (Keystore/Keychain),
+/// profil kabi maxfiy bo'lmagan ma'lumotlar Hive `user` box'da.
 class SessionStore {
   SessionStore._();
 
+  static const _kAccess = 'accessToken';
+  static const _kRefresh = 'refreshToken';
+  static const _kExpire = 'tokenExpireTime';
+
+  static final FlutterSecureStorage _secure = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
   static Box get _box => Hive.box('user');
+
+  static String? _accessCache;
+  static String? _refreshCache;
+  static int? _expireCache;
+  static bool _ready = false;
+
+  /// Ilova startida chaqiriladi — Hive dan secure storage ga migrate qiladi.
+  static Future<void> init() async {
+    if (_ready) return;
+    _accessCache = await _secure.read(key: _kAccess);
+    _refreshCache = await _secure.read(key: _kRefresh);
+    final expireRaw = await _secure.read(key: _kExpire);
+    _expireCache = int.tryParse(expireRaw ?? '');
+
+    // Legacy plaintext Hive → secure migration
+    final legacyAccess = _box.get(_kAccess) as String?;
+    final legacyRefresh = _box.get(_kRefresh) as String?;
+    if ((_accessCache == null || _accessCache!.isEmpty) &&
+        legacyAccess != null &&
+        legacyAccess.isNotEmpty &&
+        legacyAccess != 'none') {
+      await saveTokens(
+        accessToken: legacyAccess,
+        refreshToken: legacyRefresh ?? 'none',
+        expiresInSeconds: null,
+      );
+    } else {
+      await _clearLegacyTokenKeys();
+    }
+    _ready = true;
+  }
 
   static Future<void> saveTokens({
     required String accessToken,
@@ -20,16 +61,23 @@ class SessionStore {
             .add(Duration(seconds: expiresInSeconds ?? 30 * 60))
             .millisecondsSinceEpoch;
 
-    await _box.put('accessToken', accessToken);
-    await _box.put('refreshToken', refreshToken);
-    await _box.put('tokenExpireTime', expire);
+    _accessCache = accessToken;
+    _refreshCache = refreshToken;
+    _expireCache = expire;
+
+    await _secure.write(key: _kAccess, value: accessToken);
+    await _secure.write(key: _kRefresh, value: refreshToken);
+    await _secure.write(key: _kExpire, value: '$expire');
+    await _clearLegacyTokenKeys();
+
     if (user != null) {
       await _box.put('user', user);
     }
   }
 
-  static String? get refreshToken => _box.get('refreshToken') as String?;
-  static String? get accessToken => _box.get('accessToken') as String?;
+  static String? get refreshToken => _refreshCache;
+  static String? get accessToken => _accessCache;
+  static int? get tokenExpireTime => _expireCache;
 
   static bool get hasSession {
     final rt = refreshToken;
@@ -37,10 +85,20 @@ class SessionStore {
   }
 
   static Future<void> clear() async {
-    await _box.delete('accessToken');
-    await _box.delete('refreshToken');
-    await _box.delete('tokenExpireTime');
+    _accessCache = null;
+    _refreshCache = null;
+    _expireCache = null;
+    await _secure.delete(key: _kAccess);
+    await _secure.delete(key: _kRefresh);
+    await _secure.delete(key: _kExpire);
+    await _clearLegacyTokenKeys();
     await _box.delete('user');
+  }
+
+  static Future<void> _clearLegacyTokenKeys() async {
+    await _box.delete(_kAccess);
+    await _box.delete(_kRefresh);
+    await _box.delete(_kExpire);
   }
 
   static String appLanguage() {

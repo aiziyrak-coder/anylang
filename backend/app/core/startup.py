@@ -44,6 +44,22 @@ def validate_settings(settings: Settings) -> None:
             errors.append("CORS_ORIGINS must be an explicit allow-list in production")
         if not settings.trusted_host_list:
             errors.append("TRUSTED_HOSTS must be set in production")
+        if settings.allow_otp_in_response:
+            errors.append("ALLOW_OTP_IN_RESPONSE must be false in production")
+        if settings.smtp_fail_open:
+            errors.append(
+                "SMTP_FAIL_OPEN must be false in production "
+                "(failed email delivery must not silently continue)"
+            )
+        if not (settings.admin_secret_key or "").strip():
+            logger.warning(
+                "ADMIN_SECRET_KEY empty — admin JWTs share SECRET_KEY; "
+                "set a separate ADMIN_SECRET_KEY"
+            )
+        elif settings.admin_secret_key.strip() == settings.secret_key:
+            errors.append("ADMIN_SECRET_KEY must differ from SECRET_KEY in production")
+        elif len(settings.admin_secret_key.strip()) < 48:
+            errors.append("ADMIN_SECRET_KEY must be at least 48 characters in production")
         provider = (settings.translation_provider or "mock").strip().lower()
         if provider == "openai":
             if not settings.openai_api_key:

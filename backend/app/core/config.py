@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
 
     secret_key: str = Field(..., min_length=32)
+    # Separate signing key for admin JWTs (recommended). Falls back to SECRET_KEY if empty.
+    admin_secret_key: str = ""
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 60
 
@@ -36,7 +38,7 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "AnyLang <noreply@anylang.local>"
     smtp_tls: bool = False
-    # If SMTP is down, still complete register/login OTP flow (code logged / optional response).
+    # If SMTP is down, still accept register (OTP hashed in DB). Never return OTP in production.
     smtp_fail_open: bool = True
     allow_otp_in_response: bool = False
 
@@ -80,6 +82,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def admin_signing_key(self) -> str:
+        """Admin JWT HMAC key — prefer ADMIN_SECRET_KEY when set."""
+        key = (self.admin_secret_key or "").strip()
+        return key if key else self.secret_key
 
     @property
     def mock_payments_allowed(self) -> bool:

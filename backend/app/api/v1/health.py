@@ -8,8 +8,10 @@ router = APIRouter()
 @router.get("/meta")
 async def meta() -> dict[str, str]:
     settings = get_settings()
-    return {
+    payload = {
         "name": settings.app_name,
-        "env": settings.app_env,
         "api": "v1",
     }
+    if not settings.is_production:
+        payload["env"] = settings.app_env
+    return payload

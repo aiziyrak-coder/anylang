@@ -1,34 +1,16 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from uuid import uuid4
-
-import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security import hash_password, verify_password
+from app.core.security import create_admin_access_token, hash_password, verify_password
 from app.models.user import AdminUser
 
 DEFAULT_ADMIN_EMAIL = "admin@anylang.com"
 DEFAULT_ADMIN_PASSWORD = "Admin123!"  # local only — overridden by ADMIN_PASSWORD
 DEFAULT_ADMIN_NAME = "AnyLang Admin"
-
-
-def create_admin_access_token(admin_id: int, role: str) -> str:
-    settings = get_settings()
-    now = datetime.now(UTC)
-    payload = {
-        "sub": str(admin_id),
-        "type": "admin",
-        "role": role,
-        "iat": now,
-        "exp": now + timedelta(hours=8),
-        "jti": uuid4().hex,
-    }
-    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 
 async def seed_admin(db: AsyncSession) -> None:

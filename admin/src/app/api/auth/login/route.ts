@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   jar.set(COOKIE, data.access_token as string, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     maxAge: (data.expires_in as number) ?? 28800,
   });

@@ -619,13 +619,36 @@ async def upload_chat_media(
                 status_code=400,
             ) from exc
 
-    ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
-    if content_type == "image/jpeg":
-        ext = "jpg"
+    ext_map = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/gif": "gif",
+        "video/mp4": "mp4",
+        "video/webm": "webm",
+        "video/quicktime": "mov",
+        "audio/mpeg": "mp3",
+        "audio/mp3": "mp3",
+        "audio/mp4": "m4a",
+        "audio/aac": "aac",
+        "audio/x-m4a": "m4a",
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/ogg": "ogg",
+        "application/pdf": "pdf",
+        "application/msword": "doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "text/plain": "txt",
+    }
+    raw_ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    safe_ext = "".join(ch for ch in raw_ext if ch.isalnum())[:8]
+    ext = ext_map.get(content_type) or (safe_ext if safe_ext else "bin")
+    # Never trust path-like filenames in object keys
+    safe_name = "".join(ch for ch in filename if ch.isalnum() or ch in "._-")[:80] or "file"
     key = f"chat/uploads/{user.id}/{uuid4().hex}.{ext}"
     url = await get_storage().upload_bytes(key, data, content_type)
 
-    meta: dict = {"filename": filename, "content_type": content_type, "size": len(data)}
+    meta: dict = {"filename": safe_name, "content_type": content_type, "size": len(data)}
     media = ChatMedia(uploader_id=user.id, type=media_type, url=url, meta=meta, attached=False)
     db.add(media)
     await db.flush()

@@ -70,7 +70,13 @@ async def _authenticate_ws(token: str | None) -> int | None:
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)) -> None:
-    access = _extract_token(websocket, token)
+    from app.core.config import get_settings
+
+    # Prefer Authorization / subprotocol. Query-string tokens leak via logs/proxies.
+    if token and get_settings().is_production:
+        await websocket.close(code=4401, reason="Query token not allowed")
+        return
+    access = _extract_token(websocket, None if get_settings().is_production else token)
     user_id = await _authenticate_ws(access)
     if user_id is None:
         await websocket.close(code=4401, reason="Authentication required")

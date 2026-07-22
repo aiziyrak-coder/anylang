@@ -57,12 +57,10 @@ async def send_otp_email(to_email: str, code: str, app_language: str = "uz_UZ") 
         return True
     except Exception as exc:
         logger.warning(
-            "SMTP send failed (%s); OTP fallback — email=%s code=%s",
-            exc,
+            "SMTP send failed (%s); OTP not emailed — email=%s",
+            type(exc).__name__,
             to_email,
-            code,
         )
-        print(f"[AnyLang OTP] email={to_email} code={code} (SMTP unavailable: {exc})")
         if settings.is_production and not settings.smtp_fail_open:
             raise
         return False

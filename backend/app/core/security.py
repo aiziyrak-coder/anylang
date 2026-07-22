@@ -58,3 +58,29 @@ def create_refresh_token(subject: str | int, token_family: str | None = None) ->
 def decode_token(token: str) -> dict[str, Any]:
     settings = get_settings()
     return jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+
+
+def create_admin_access_token(admin_id: int, role: str) -> str:
+    settings = get_settings()
+    now = datetime.now(UTC)
+    payload = {
+        "sub": str(admin_id),
+        "type": "admin",
+        "role": role,
+        "iat": now,
+        "exp": now + timedelta(hours=8),
+        "jti": uuid4().hex,
+    }
+    return jwt.encode(payload, settings.admin_signing_key, algorithm="HS256")
+
+
+def decode_admin_token(token: str) -> dict[str, Any]:
+    """Decode admin JWT with admin key; fall back to user secret for migration."""
+    settings = get_settings()
+    try:
+        return jwt.decode(token, settings.admin_signing_key, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        if settings.admin_secret_key:
+            # Explicit admin key set — do not accept user-secret-signed tokens
+            raise
+        return jwt.decode(token, settings.secret_key, algorithms=["HS256"])

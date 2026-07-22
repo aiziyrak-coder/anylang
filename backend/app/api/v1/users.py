@@ -210,6 +210,10 @@ async def search_users_endpoint(
 
 
 @router.get("/{user_id}", response_model=PublicUserProfileOut)
-async def get_user_profile(user_id: int, db: DbSession) -> PublicUserProfileOut:
-    data = await get_public_profile(db, user_id)
+async def get_user_profile(
+    user_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> PublicUserProfileOut:
+    data = await get_public_profile(db, user_id, viewer=current_user)
     return PublicUserProfileOut.model_validate(data)

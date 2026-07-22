@@ -45,8 +45,13 @@ def deploy_api() -> None:
 
     sudo(
         c,
-        "grep -q '^SMTP_FAIL_OPEN=' /home/admin_root/anylang/deploy/.env || "
-        "printf '\\nSMTP_FAIL_OPEN=true\\nALLOW_OTP_IN_RESPONSE=true\\n' >> /home/admin_root/anylang/deploy/.env",
+        "cd /home/admin_root/anylang/deploy && "
+        "sed -i 's/^ALLOW_OTP_IN_RESPONSE=.*/ALLOW_OTP_IN_RESPONSE=false/' .env; "
+        "sed -i 's/^SMTP_FAIL_OPEN=.*/SMTP_FAIL_OPEN=false/' .env; "
+        "grep -q '^ALLOW_OTP_IN_RESPONSE=' .env || echo 'ALLOW_OTP_IN_RESPONSE=false' >> .env; "
+        "grep -q '^SMTP_FAIL_OPEN=' .env || echo 'SMTP_FAIL_OPEN=false' >> .env; "
+        "grep -q '^ADMIN_SECRET_KEY=' .env || "
+        "echo \"ADMIN_SECRET_KEY=$(openssl rand -base64 48)\" >> .env",
     )
     sudo(
         c,

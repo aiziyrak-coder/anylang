@@ -185,7 +185,11 @@ async def _friendship_context(
     return "pending", friendship.id, is_incoming
 
 
-async def get_public_profile(db: AsyncSession, user_id: int) -> dict:
+async def get_public_profile(
+    db: AsyncSession,
+    user_id: int,
+    viewer: User | None = None,
+) -> dict:
     user = await load_user_for_response(db, user_id)
     if user is None or not user.is_active or user.deleted_at is not None:
         raise AppError(message="Foydalanuvchi topilmadi", error_code="USER_NOT_FOUND", status_code=404)

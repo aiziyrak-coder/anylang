@@ -35,6 +35,7 @@ void main() async {
 
   await Hive.initFlutter();
   await Hive.openBox('user');
+  await SessionStore.init();
   await MainModule().initModule();
   runApp(const MyApp());
 }

@@ -28,6 +28,9 @@ from app.services.otp import (
     PURPOSE_RESET_PASSWORD,
     PURPOSE_VERIFY_EMAIL,
     RESEND_COOLDOWN_SECONDS,
+    _enforce_hourly_limit,
+    _set_resend_cooldown,
+    check_resend_allowed,
     create_and_send_otp,
     get_resend_after_seconds,
     verify_otp,
@@ -142,10 +145,15 @@ async def register(
         "email": email_norm,
         "message": "Tasdiqlash kodi emailingizga yuborildi"
         if emailed
-        else "Ro'yxatdan o'tdingiz. Tasdiqlash kodi emailga yuborilmadi — debug_otp dan foydalaning",
+        else "Ro'yxatdan o'tdingiz. Tasdiqlash kodi emailga yuborilmadi — keyinroq qayta yuboring",
         "resend_after_seconds": resend_after,
     }
-    if (not emailed) or settings.allow_otp_in_response:
+    # Never expose OTP outside local/dev, and only when explicitly enabled.
+    if (
+        not settings.is_production
+        and settings.allow_otp_in_response
+        and ((not emailed) or settings.debug)
+    ):
         out["debug_otp"] = code
     return out
 
@@ -415,7 +423,8 @@ async def google_sign_in(
                 message="Akkaunt o'chirilgan — tiklash uchun ariza yuboring",
                 error_code="ACCOUNT_DELETED",
                 status_code=403,
-                extra={"email": user.email},
+                # Caller proved Google ownership of this email — needed for restore UX.
+                extra={"email": email},
             )
         if not user.is_active:
             raise AppError(
@@ -424,10 +433,21 @@ async def google_sign_in(
                 status_code=403,
             )
         if google_sub and not user.google_sub:
+            # Do not auto-link Google onto password accounts (account takeover via email).
+            if user.password_hash:
+                raise AppError(
+                    message=(
+                        "Bu email parol bilan ro'yxatdan o'tgan. "
+                        "Avval parol bilan kiring — Google bog'lash alohida."
+                    ),
+                    error_code="ACCOUNT_EXISTS_PASSWORD",
+                    status_code=409,
+                )
             user.google_sub = google_sub
         if avatar_url and not user.avatar_url:
             user.avatar_url = avatar_url
-        if not user.is_verified:
+        # Only treat as verified when this identity is already Google-linked (or OAuth-only).
+        if not user.is_verified and user.google_sub:
             user.is_verified = True
         if app_language:
             user.app_language = app_language
@@ -558,6 +578,21 @@ async def forgot_password(
     app_language: str,
 ) -> dict[str, Any]:
     email_norm = email.lower().strip()
+    # Identical rate-limit path for existing and unknown emails (anti-enumeration).
+    try:
+        await check_resend_allowed(redis, email_norm, PURPOSE_RESET_PASSWORD)
+    except AppError as exc:
+        if exc.error_code == "RESEND_TOO_SOON":
+            return {
+                "message": "Agar bu email ro'yxatdan o'tgan bo'lsa, tasdiqlash kodi yuborildi",
+                "resend_after_seconds": exc.extra.get(
+                    "resend_after_seconds", RESEND_COOLDOWN_SECONDS
+                ),
+            }
+        raise
+
+    await _enforce_hourly_limit(redis, email_norm)
+
     result = await db.execute(
         select(User.id).where(
             User.email == email_norm,
@@ -568,20 +603,17 @@ async def forgot_password(
 
     resend_after = RESEND_COOLDOWN_SECONDS
     if user_exists:
-        try:
-            _, resend_after, _ = await create_and_send_otp(
-                db,
-                redis,
-                email=email_norm,
-                purpose=PURPOSE_RESET_PASSWORD,
-                app_language=app_language,
-                enforce_cooldown=True,
-            )
-        except AppError as exc:
-            if exc.error_code == "RESEND_TOO_SOON":
-                resend_after = exc.extra.get("resend_after_seconds", RESEND_COOLDOWN_SECONDS)
-            else:
-                raise
+        _, resend_after, _ = await create_and_send_otp(
+            db,
+            redis,
+            email=email_norm,
+            purpose=PURPOSE_RESET_PASSWORD,
+            app_language=app_language,
+            enforce_cooldown=False,
+            enforce_hourly=False,
+        )
+    else:
+        await _set_resend_cooldown(redis, email_norm, PURPOSE_RESET_PASSWORD)
 
     return {
         "message": "Agar bu email ro'yxatdan o'tgan bo'lsa, tasdiqlash kodi yuborildi",

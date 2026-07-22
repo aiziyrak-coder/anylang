@@ -71,7 +71,6 @@ async def get_current_user(
             message="Akkaunt o'chirilgan",
             error_code="ACCOUNT_DELETED",
             status_code=403,
-            extra={"email": user.email},
         )
 
     if not user.is_verified:

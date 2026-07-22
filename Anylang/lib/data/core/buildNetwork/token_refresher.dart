@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 
 import '../../local/session_store.dart';
 import 'api_config.dart';
@@ -12,11 +11,10 @@ import 'api_config.dart';
 class TokenRefresher {
   TokenRefresher();
 
-  final Box _box = Hive.box('user');
   Completer<String>? _refreshCompleter;
 
   Future<String> getToken() async {
-    final current = _box.get('accessToken') as String?;
+    final current = SessionStore.accessToken;
     if (current == null || current.isEmpty || current == 'none') {
       return 'none';
     }
@@ -27,10 +25,10 @@ class TokenRefresher {
   }
 
   Future<bool> tokenExpired() async {
-    final access = _box.get('accessToken') as String?;
+    final access = SessionStore.accessToken;
     final fromJwt = _jwtExpMillis(access);
     final expireMillis = fromJwt ??
-        (_box.get('tokenExpireTime') as int?) ??
+        SessionStore.tokenExpireTime ??
         DateTime.now().millisecondsSinceEpoch;
     final expireTime = DateTime.fromMillisecondsSinceEpoch(expireMillis);
     return expireTime.isBefore(DateTime.now().add(const Duration(minutes: 1)));
@@ -45,7 +43,7 @@ class TokenRefresher {
     _refreshCompleter = completer;
 
     try {
-      final refreshTokenValue = _box.get('refreshToken') as String?;
+      final refreshTokenValue = SessionStore.refreshToken;
       if (refreshTokenValue == null ||
           refreshTokenValue.isEmpty ||
           refreshTokenValue == 'none') {
@@ -84,7 +82,7 @@ class TokenRefresher {
               e.type == DioExceptionType.receiveTimeout ||
               e.type == DioExceptionType.sendTimeout);
       if (isNetwork) {
-        final fallback = _box.get('accessToken') as String?;
+        final fallback = SessionStore.accessToken;
         completer.complete(fallback ?? 'none');
         return fallback ?? 'none';
       }

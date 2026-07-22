@@ -8,5 +8,8 @@ node_modules/
 **/__pycache__/
 .next/
 scripts/ssh_probe*.py
+scripts/*creds*
+scripts/get_creds.py
+**/*CREDENTIALS*
 deploy/.env
 deploy/CREDENTIALS.local.txt
