@@ -11,9 +11,34 @@ DEEPL_FREE_URL = "https://api-free.deepl.com/v2/translate"
 DEEPL_PRO_URL = "https://api.deepl.com/v2/translate"
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
+_LANG_NAMES = {
+    "uz": "Uzbek",
+    "ru": "Russian",
+    "en": "English",
+    "tr": "Turkish",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "ar": "Arabic",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "hi": "Hindi",
+    "kk": "Kazakh",
+    "ky": "Kyrgyz",
+    "tg": "Tajik",
+}
+
 
 def _normalize_lang(code: str) -> str:
     return code.split("_")[0].lower()
+
+
+def _lang_name(code: str | None) -> str:
+    if not code:
+        return "auto-detected"
+    n = _normalize_lang(code)
+    return _LANG_NAMES.get(n, n)
 
 
 def _deepl_lang(code: str) -> str:
@@ -22,7 +47,8 @@ def _deepl_lang(code: str) -> str:
 
 async def _translate_openai(text: str, target: str, source: str | None) -> str:
     settings = get_settings()
-    src = source or "auto"
+    src_name = _lang_name(source)
+    tgt_name = _lang_name(target)
     system = (
         "You are a precise translation engine for a messaging/chat app. "
         "Translate the user message into the target language. "
@@ -36,8 +62,8 @@ async def _translate_openai(text: str, target: str, source: str | None) -> str:
         "7) Preserve line breaks and basic punctuation intent."
     )
     user = (
-        f"Source language: {src}\n"
-        f"Target language: {target}\n\n"
+        f"Source language: {src_name}\n"
+        f"Target language: {tgt_name}\n\n"
         f"Text to translate:\n{text}"
     )
     headers = {

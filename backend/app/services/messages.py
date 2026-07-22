@@ -151,8 +151,9 @@ def _serialize_message(
         text_original = message.text_original
         text = message.text_original
         if message.type == "text" and message.sender_id != viewer_id:
+            lang = _normalize_lang(viewer_language)
             for tr in message.translations or []:
-                if tr.language == viewer_language:
+                if _normalize_lang(tr.language) == lang:
                     text = tr.text
                     break
         meta = message.meta
