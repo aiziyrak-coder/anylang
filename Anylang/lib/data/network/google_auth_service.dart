@@ -9,9 +9,9 @@ import '../../presentation/utils/app_snackbar.dart';
 
 /// Google Sign-In → backend `id_token`.
 ///
-/// Production: set `--dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>`
-/// Local: agar client ID yo'q / Play Services ishlamasa — debug dialog orqali
-/// backend qabul qiladigan unsigned JWT yaratiladi (GOOGLE_CLIENT_IDS bo'sh bo'lganda).
+/// Production: `--dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>`
+/// Agar client ID yo‘q bo‘lsa — email dialog orqali bootstrap token
+/// (server `GOOGLE_CLIENT_IDS` bo‘sh bo‘lganda qabul qiladi).
 class GoogleAuthService {
   static const String serverClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
@@ -24,34 +24,26 @@ class GoogleAuthService {
       );
 
   Future<String?> signInForIdToken() async {
+    // Client ID yo‘q — Play Services idToken bermaydi; bootstrap dialog.
+    if (serverClientId.isEmpty) {
+      return _promptBootstrapGoogle();
+    }
+
     try {
       final account = await _client.signIn();
-      if (account == null) {
-        // User cancelled
-        return null;
-      }
+      if (account == null) return null;
       final auth = await account.authentication;
       final idToken = auth.idToken;
-      if (idToken != null && idToken.isNotEmpty) {
-        return idToken;
-      }
+      if (idToken != null && idToken.isNotEmpty) return idToken;
 
-      // Android ba'zan idToken bermaydi — local debug fallback
-      if (kDebugMode) {
-        final email = account.email;
-        final name = account.displayName ?? email.split('@').first;
-        return _mintDevIdToken(email: email, name: name, sub: account.id);
-      }
-
-      throw StateError(
-        'Google id_token olinmadi. GOOGLE_SERVER_CLIENT_ID ni sozlang',
-      );
+      // idToken yo‘q — bootstrap fallback
+      final email = account.email;
+      final name = account.displayName ?? email.split('@').first;
+      return _mintDevIdToken(email: email, name: name, sub: account.id);
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Google Sign-In failed: $e — trying local fallback');
-        final fallback = await _promptDevGoogle();
-        if (fallback != null) return fallback;
-      }
+      debugPrint('Google Sign-In failed: $e');
+      final fallback = await _promptBootstrapGoogle();
+      if (fallback != null) return fallback;
       rethrow;
     }
   }
@@ -62,39 +54,37 @@ class GoogleAuthService {
     } catch (_) {}
   }
 
-  Future<String?> _promptDevGoogle() async {
-    final emailCtrl = TextEditingController(text: 'google.user@gmail.com');
-    final nameCtrl = TextEditingController(text: 'Google User');
+  Future<String?> _promptBootstrapGoogle() async {
+    final emailCtrl = TextEditingController(text: '');
+    final nameCtrl = TextEditingController(text: '');
     final ok = await Get.dialog<bool>(
       AlertDialog(
-        title: const Text('Local Google (debug)'),
+        title: Text('google_bootstrap_title'.tr),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Google Play / Client ID sozlanmagan. Test uchun email kiriting — '
-              'backend local rejimida qabul qiladi.',
-            ),
+            Text('google_bootstrap_hint'.tr),
             const SizedBox(height: 12),
             TextField(
               controller: emailCtrl,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: InputDecoration(labelText: 'email'.tr),
               keyboardType: TextInputType.emailAddress,
+              autofocus: true,
             ),
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Ism'),
+              decoration: InputDecoration(labelText: 'full_name'.tr),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
-            child: const Text('Bekor'),
+            child: Text('settings_cancel'.tr),
           ),
           TextButton(
             onPressed: () => Get.back(result: true),
-            child: const Text('Davom etish'),
+            child: Text('continue'.tr),
           ),
         ],
       ),
@@ -102,18 +92,21 @@ class GoogleAuthService {
     );
     if (ok != true) return null;
     final email = emailCtrl.text.trim().toLowerCase();
-    if (email.isEmpty || !email.contains('@')) {
-      showAppError('Email noto\'g\'ri');
+    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+      showAppError('email_invalid'.tr);
       return null;
     }
+    final name = nameCtrl.text.trim().isEmpty
+        ? email.split('@').first
+        : nameCtrl.text.trim();
     return _mintDevIdToken(
       email: email,
-      name: nameCtrl.text.trim().isEmpty ? email.split('@').first : nameCtrl.text.trim(),
-      sub: 'local-${email.hashCode.abs()}',
+      name: name,
+      sub: 'bootstrap-${email.hashCode.abs()}',
     );
   }
 
-  /// Unsigned JWT — faqat local backend (GOOGLE_CLIENT_IDS bo'sh) uchun.
+  /// Unsigned JWT — server GOOGLE_CLIENT_IDS bo‘sh bo‘lganda.
   String _mintDevIdToken({
     required String email,
     required String name,
