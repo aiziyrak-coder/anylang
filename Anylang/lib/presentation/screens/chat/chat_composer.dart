@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/my_icon_button.dart';
+import '../../ui/frosted_bar.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../ui/waveform_bars.dart';
@@ -47,20 +48,20 @@ class ChatComposer extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.appColors;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: c.isDark
-            ? const Color(0xCC07111F)
-            : const Color(0xE6F5F8FC),
-        border: Border(top: BorderSide(color: c.outline)),
-      ),
-      padding: EdgeInsets.fromLTRB(12.dp, 8.dp, 12.dp, 12.dp),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (reply != null && !recording) _replyPreview(c),
-          recording ? _recordRow(c) : _inputRow(c),
-        ],
+    return FrostedBar(
+      border: Border(top: BorderSide(color: c.outline.withValues(alpha: 0.45))),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(12.dp, 8.dp, 12.dp, 12.dp),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (reply != null && !recording) _replyPreview(c),
+              recording ? _recordRow(c) : _inputRow(c),
+            ],
+          ),
+        ),
       ),
     );
   }

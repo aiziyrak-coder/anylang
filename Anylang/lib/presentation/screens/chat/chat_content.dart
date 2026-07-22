@@ -96,14 +96,29 @@ class ChatContent extends ScreenContent<ChatState> {
       void Function(MyAction action) sendAction) {
     final c = context.appColors;
     final recorder = Get.find<VoiceRecorderService>();
+    final topInset = MediaQuery.paddingOf(context).top;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // App bar / composer taxminiy balandligi — list padding.
+    final topPad = topInset + 66.dp;
+    final bottomPad = bottomInset + 72.dp;
 
     return ChatWallpaperBackground(
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Column(
-            children: [
-              Obx(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.only(top: topPad, bottom: bottomPad),
+                child: _list(c, state, sendAction),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Obx(
                 () => ChatAppBar(
                   name: state.peerName,
                   initial: state.peerInitial,
@@ -119,8 +134,12 @@ class ChatContent extends ScreenContent<ChatState> {
                   onSearchChanged: (v) => sendAction(ChatSearchChanged(v)),
                 ),
               ),
-              Expanded(child: _list(c, state, sendAction)),
-              Obx(
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Obx(
                 () {
                   final samples = List<double>.of(recorder.liveSamples);
                   return ChatComposer(
@@ -142,8 +161,8 @@ class ChatContent extends ScreenContent<ChatState> {
                   );
                 },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

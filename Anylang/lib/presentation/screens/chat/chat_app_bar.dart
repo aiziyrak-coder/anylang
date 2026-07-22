@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/my_icon_button.dart';
+import '../../ui/frosted_bar.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/size_controller.dart';
 
@@ -43,15 +44,15 @@ class ChatAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.appColors;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(6.dp, 6.dp, 10.dp, 10.dp),
-      decoration: BoxDecoration(
-        color: c.isDark
-            ? const Color(0xCC07111F)
-            : const Color(0xE6F5F8FC),
-        border: Border(bottom: BorderSide(color: c.outline)),
+    return FrostedBar(
+      border: Border(bottom: BorderSide(color: c.outline.withValues(alpha: 0.45))),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(6.dp, 6.dp, 10.dp, 10.dp),
+          child: searching ? _searchRow(c) : _peerRow(c),
+        ),
       ),
-      child: searching ? _searchRow(c) : _peerRow(c),
     );
   }
 
