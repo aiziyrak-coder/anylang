@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/core/mappers.dart';
-import '../../ui/theme/gradients.dart';
 
 class OwnListing {
   final int id;
@@ -31,7 +30,10 @@ class ProfileAccount {
   final String? memberSince;
   final String? subscriptionPlan;
   final String? subscriptionPeriod;
+  final String? subscriptionLabel;
   final DateTime? subscriptionExpiresAt;
+  final bool subscriptionActive;
+  final bool showPremiumBadge;
   final String? role;
   final int? listingsCount;
   final String? viewsCount;
@@ -54,7 +56,10 @@ class ProfileAccount {
     this.memberSince,
     this.subscriptionPlan,
     this.subscriptionPeriod,
+    this.subscriptionLabel,
     this.subscriptionExpiresAt,
+    this.subscriptionActive = false,
+    this.showPremiumBadge = false,
     this.role,
     this.listingsCount,
     this.viewsCount,
@@ -72,9 +77,15 @@ class ProfileAccount {
     final biz = json['business'] as Map?;
     final sub = json['subscription'] as Map?;
     final created = DateTime.tryParse(json['created_at']?.toString() ?? '');
+    final started = DateTime.tryParse(sub?['started_at']?.toString() ?? '');
     final expires = DateTime.tryParse(sub?['expires_at']?.toString() ?? '');
     final plan = sub?['plan']?.toString();
+    final billing = sub?['billing_cycle']?.toString();
+    final isActive = sub?['is_active'] == true;
     final countryCode = (json['country'] as String?) ?? '';
+    final planKey = plan?.toLowerCase();
+    final showPremium = !isBusiness && isActive && planKey == 'premium';
+
     return ProfileAccount(
       id: id,
       isBusiness: isBusiness,
@@ -86,16 +97,26 @@ class ProfileAccount {
       initial: initialsOf(name),
       avatarGradient: avatarGradientFor(id),
       verified: json['verified_badge'] == true,
-      flagAsset: countryCode.toUpperCase() == 'TR'
-          ? 'assets/images/flag_tr.png'
-          : 'assets/images/flag_uz.png',
-      country: countryCode.isEmpty ? '—' : countryCode,
+      flagAsset: flagAssetForCountry(countryCode),
+      country: formatCountryName(countryCode),
       username: number.isEmpty ? null : formatNumber(number),
-      nativeLanguage: json['native_language'] as String?,
-      memberSince: created == null ? null : '${created.month}.${created.year}',
-      subscriptionPlan: plan,
-      subscriptionPeriod: sub?['billing_cycle']?.toString(),
+      nativeLanguage: formatLanguageName(json['native_language'] as String?),
+      memberSince: formatMonthYear(created),
+      subscriptionPlan: formatSubscriptionPlan(plan),
+      subscriptionPeriod: formatSubscriptionPeriod(
+        billingCycle: billing,
+        startedAt: started,
+        expiresAt: expires,
+      ),
+      subscriptionLabel: formatSubscriptionLabel(
+        plan: plan,
+        billingCycle: billing,
+        startedAt: started,
+        expiresAt: expires,
+      ),
       subscriptionExpiresAt: expires,
+      subscriptionActive: isActive,
+      showPremiumBadge: showPremium,
       role: biz?['business_role']?.toString(),
       listingsCount: (biz?['stats'] is Map)
           ? ((biz!['stats'] as Map)['listings_count'] as num?)?.toInt()

@@ -86,10 +86,10 @@ class ProfileContent extends ScreenContent<ProfileState> {
           SizedBox(width: 6.dp),
           Icon(Icons.verified_rounded, size: 20.dp, color: c.accentText),
         ],
-        if (!d.isBusiness && d.subscriptionPlan != null) ...[
+        if (d.showPremiumBadge) ...[
           SizedBox(width: 8.dp),
           PillBadge(
-            label: d.subscriptionPlan!.toUpperCase(),
+            label: 'PREMIUM',
             icon: Icons.workspace_premium_rounded,
             background: c.accent,
             foreground: c.onAccent,
@@ -117,17 +117,31 @@ class ProfileContent extends ScreenContent<ProfileState> {
   }
 
   Widget _infoCard(AppColors c, ProfileAccount d) {
+    final subLabel = d.subscriptionLabel ?? d.subscriptionPlan ?? '';
     final rows = <Widget>[
-      InfoRow(icon: Icons.language_outlined, label: 'profile_native_language'.tr, value: d.nativeLanguage ?? ''),
-      InfoRow(icon: Icons.location_on_outlined, label: 'profile_country'.tr, value: d.country),
-      InfoRow(icon: Icons.calendar_today_outlined, label: 'profile_member_since'.tr, value: d.memberSince ?? ''),
       InfoRow(
-        icon: Icons.workspace_premium_outlined,
-        label: 'profile_subscription'.tr,
-        value: '${d.subscriptionPlan} · ${d.subscriptionPeriod}',
-        valueColor: c.accentText,
+        icon: Icons.language_outlined,
+        label: 'profile_native_language'.tr,
+        value: d.nativeLanguage ?? '',
       ),
-      if (d.subscriptionExpiresAt != null)
+      InfoRow(
+        icon: Icons.location_on_outlined,
+        label: 'profile_country'.tr,
+        value: d.country,
+      ),
+      InfoRow(
+        icon: Icons.calendar_today_outlined,
+        label: 'profile_member_since'.tr,
+        value: d.memberSince ?? '',
+      ),
+      if (subLabel.isNotEmpty)
+        InfoRow(
+          icon: Icons.workspace_premium_outlined,
+          label: 'profile_subscription'.tr,
+          value: subLabel,
+          valueColor: d.showPremiumBadge ? c.accentText : null,
+        ),
+      if (d.subscriptionExpiresAt != null && d.subscriptionActive)
         InfoRow(
           icon: Icons.event_available_outlined,
           label: 'profile_subscription_expires'.tr,

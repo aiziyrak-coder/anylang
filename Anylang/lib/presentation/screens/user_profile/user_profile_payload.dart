@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/core/mappers.dart';
-import '../../ui/theme/gradients.dart';
 
 class UserProfilePayload {
   final int id;
@@ -51,11 +50,7 @@ class UserProfilePayload {
       name: name,
       initial: initialsOf(name),
       avatarGradient: avatarGradientFor(id),
-      verified: json['verified_badge'] == true,
-      flagAsset: country.toUpperCase() == 'TR'
-          ? 'assets/images/flag_tr.png'
-          : 'assets/images/flag_uz.png',
-      country: country.isEmpty ? '—' : country,
+      country: formatCountryName(country),
       role: (json['subtitle_role'] as String?) ?? '',
       phone: number.isEmpty ? '' : formatNumber(number),
       experience: biz?['founded_year'] != null
@@ -69,6 +64,8 @@ class UserProfilePayload {
       listings: (biz?['stats'] is Map)
           ? ((biz!['stats'] as Map)['listings_count'] as num?)?.toInt() ?? 0
           : 0,
+      flagAsset: flagAssetForCountry(country),
+      verified: json['verified_badge'] == true,
     );
   }
 }
