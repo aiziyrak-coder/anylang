@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/secondary_button.dart';
@@ -17,31 +18,70 @@ import 'profile_action.dart';
 import 'profile_state.dart';
 
 /// S14 — o'z profili. `isBusiness`ga qarab shaxsiy (obuna) yoki biznes
-/// (e'lonlar/statistika) ko'rinishi ko'rsatiladi. Asosiy ekranning "Profil"
-/// tabi sifatida ishlatiladi — fon shaffof (MainContent gradienti ko'rinadi).
+/// (e'lonlar/statistika) ko'rinishi ko'rsatiladi.
 class ProfileContent extends ScreenContent<ProfileState> {
-
   ProfileContent() : super(color: Colors.transparent);
 
   @override
-  Widget build(BuildContext context, ProfileState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, ProfileState state,
+      void Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return Padding(
       padding: EdgeInsets.only(top: 8.dp),
       child: Obx(() {
+        if (state.loading.value && state.account.value == null) {
+          return const AppLoading();
+        }
+        final err = state.error.value;
         final d = state.account.value;
-        if (d == null) return const AppLoading();
+        if (d == null) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 28.dp),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppEmptyState(
+                    icon: Icons.person_off_outlined,
+                    title: 'profile_load_failed'.tr,
+                    subtitle: err,
+                  ),
+                  SizedBox(height: 16.dp),
+                  SecondaryButton(
+                    text: 'common_retry'.tr,
+                    onTap: () => sendAction(RetryProfileLoad()),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
         return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 24.dp),
           child: Column(
             children: [
-              ProfileAvatar(
-                initial: d.initial,
-                gradient: d.avatarGradient,
-                imageUrl: d.avatarUrl,
-                shape: d.isBusiness ? ProfileAvatarShape.roundedSquare : ProfileAvatarShape.circle,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  customBorder: d.isBusiness
+                      ? RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22.dp),
+                        )
+                      : const CircleBorder(),
+                  onTap: (d.avatarUrl?.trim().isNotEmpty == true)
+                      ? () => sendAction(OpenProfileAvatar())
+                      : null,
+                  child: ProfileAvatar(
+                    initial: d.initial,
+                    gradient: d.avatarGradient,
+                    imageUrl: d.avatarUrl,
+                    shape: d.isBusiness
+                        ? ProfileAvatarShape.roundedSquare
+                        : ProfileAvatarShape.circle,
+                  ),
+                ),
               ),
               SizedBox(height: 14.dp),
               _nameRow(c, d),
@@ -60,7 +100,9 @@ class ProfileContent extends ScreenContent<ProfileState> {
               SizedBox(height: 18.dp),
               if (d.isBusiness) _statsRow(c, d) else _infoCard(c, d),
               SizedBox(height: 18.dp),
-              d.isBusiness ? _businessActions(c, sendAction) : _personalActions(c, sendAction),
+              d.isBusiness
+                  ? _businessActions(c, sendAction)
+                  : _personalActions(c, sendAction),
               if (d.isBusiness) ...[
                 SizedBox(height: 22.dp),
                 _listingsSection(c, d, sendAction),
@@ -81,7 +123,11 @@ class ProfileContent extends ScreenContent<ProfileState> {
             d.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: c.textPrimary, fontSize: 22.sp, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 22.sp,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         if (d.verified) ...[
@@ -91,7 +137,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
         if (d.showPremiumBadge) ...[
           SizedBox(width: 8.dp),
           PillBadge(
-            label: 'PREMIUM',
+            label: 'profile_premium'.tr,
             icon: Icons.workspace_premium_rounded,
             background: c.accent,
             foreground: c.onAccent,
@@ -102,17 +148,34 @@ class ProfileContent extends ScreenContent<ProfileState> {
   }
 
   Widget _subtitleRow(AppColors c, ProfileAccount d) {
+    final roleKey = d.roleLabel;
+    final roleText = roleKey.isEmpty ? '' : roleKey.tr;
+    final subtitle = d.isBusiness
+        ? (roleText.isEmpty ? d.country : '${d.country} · $roleText')
+        : (d.username == null || d.username!.isEmpty
+            ? d.country
+            : '${d.country} · ${d.username}');
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(3.dp),
-          child: Image.asset(d.flagAsset, width: 18.dp, height: 13.dp, fit: BoxFit.cover),
+          child: Image.asset(
+            d.flagAsset,
+            width: 18.dp,
+            height: 13.dp,
+            fit: BoxFit.cover,
+          ),
         ),
         SizedBox(width: 6.dp),
-        Text(
-          d.isBusiness ? '${d.country} · ${d.role}' : '${d.country} · ${d.username}',
-          style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+        Flexible(
+          child: Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+          ),
         ),
       ],
     );
@@ -171,13 +234,27 @@ class ProfileContent extends ScreenContent<ProfileState> {
   }
 
   Widget _statsRow(AppColors c, ProfileAccount d) {
+    final listings = '${d.listingsCount ?? 0}';
+    final views = (d.viewsCount == null || d.viewsCount!.isEmpty)
+        ? '0'
+        : d.viewsCount!;
+    final rating = d.rating == null ? '—' : d.rating!.toStringAsFixed(1);
     return Row(
       children: [
-        Expanded(child: ProfileStatCard(value: '${d.listingsCount}', label: 'profile_listings_stat'.tr)),
+        Expanded(
+          child: ProfileStatCard(
+            value: listings,
+            label: 'profile_listings_stat'.tr,
+          ),
+        ),
         SizedBox(width: 10.dp),
-        Expanded(child: ProfileStatCard(value: d.viewsCount ?? '', label: 'profile_views'.tr)),
+        Expanded(
+          child: ProfileStatCard(value: views, label: 'profile_views'.tr),
+        ),
         SizedBox(width: 10.dp),
-        Expanded(child: ProfileStatCard(value: '${d.rating}', label: 'profile_rating'.tr)),
+        Expanded(
+          child: ProfileStatCard(value: rating, label: 'profile_rating'.tr),
+        ),
       ],
     );
   }
@@ -187,7 +264,11 @@ class ProfileContent extends ScreenContent<ProfileState> {
       children: [
         PrimaryButton(
           text: 'profile_plans'.tr,
-          startIcon: const Icon(Icons.workspace_premium_rounded, color: kNavy, size: 18),
+          startIcon: const Icon(
+            Icons.workspace_premium_rounded,
+            color: kNavy,
+            size: 18,
+          ),
           onTap: () => sendAction(OpenSubscription()),
         ),
         SizedBox(height: 12.dp),
@@ -218,11 +299,21 @@ class ProfileContent extends ScreenContent<ProfileState> {
             Expanded(
               child: PrimaryButton(
                 text: 'profile_add_product'.tr,
-                startIcon: const Icon(Icons.add_rounded, color: kNavy, size: 20),
+                startIcon: const Icon(
+                  Icons.add_rounded,
+                  color: kNavy,
+                  size: 20,
+                ),
                 onTap: () => sendAction(AddProductRequested()),
               ),
             ),
           ],
+        ),
+        SizedBox(height: 12.dp),
+        SecondaryButton(
+          text: 'profile_plans'.tr,
+          startIcon: Icon(Icons.workspace_premium_outlined, size: 18.dp),
+          onTap: () => sendAction(OpenSubscription()),
         ),
         SizedBox(height: 18.dp),
         _settingsHub(c, sendAction),
@@ -322,7 +413,11 @@ class ProfileContent extends ScreenContent<ProfileState> {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: c.textSecondary, size: 22.dp),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: c.textSecondary,
+                size: 22.dp,
+              ),
             ],
           ),
         ),
@@ -330,46 +425,93 @@ class ProfileContent extends ScreenContent<ProfileState> {
     );
   }
 
-  Widget _listingsSection(AppColors c, ProfileAccount d, void Function(MyAction) sendAction) {
+  Widget _listingsSection(
+    AppColors c,
+    ProfileAccount d,
+    void Function(MyAction) sendAction,
+  ) {
+    final count = d.listingsCount ?? d.listings.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             Text(
-              '${'profile_my_listings'.tr} · ${d.listingsCount}',
-              style: TextStyle(color: c.textPrimary, fontSize: 14.sp, fontWeight: FontWeight.w700),
-            ),
-            const Spacer(),
-            InkWell(
-              onTap: () => sendAction(SeeAllListings()),
-              child: Text(
-                'products_see_all'.tr,
-                style: TextStyle(color: c.accentText, fontSize: 13.sp, fontWeight: FontWeight.w600),
+              '${'profile_my_listings'.tr} · $count',
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w700,
               ),
             ),
+            const Spacer(),
+            if (d.listings.isNotEmpty)
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => sendAction(SeeAllListings()),
+                  borderRadius: BorderRadius.circular(8.dp),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 6.dp,
+                      vertical: 4.dp,
+                    ),
+                    child: Text(
+                      'products_see_all'.tr,
+                      style: TextStyle(
+                        color: c.accentText,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         SizedBox(height: 12.dp),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12.dp,
-            mainAxisSpacing: 12.dp,
-            childAspectRatio: 1.05,
+        if (d.listings.isEmpty)
+          Column(
+            children: [
+              AppEmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'profile_listings_empty'.tr,
+                subtitle: 'profile_listings_empty_hint'.tr,
+              ),
+              SizedBox(height: 12.dp),
+              SecondaryButton(
+                text: 'profile_add_product'.tr,
+                startIcon: Icon(Icons.add_rounded, size: 18.dp),
+                onTap: () => sendAction(AddProductRequested()),
+              ),
+            ],
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12.dp,
+              mainAxisSpacing: 12.dp,
+              childAspectRatio: 1.05,
+            ),
+            itemCount: d.listings.length.clamp(0, 6),
+            itemBuilder: (_, i) =>
+                _ownListingCard(c, d.listings[i], sendAction),
           ),
-          itemCount: d.listings.length,
-          itemBuilder: (_, i) => _ownListingCard(c, d.listings[i], sendAction),
-        ),
       ],
     );
   }
 
-  Widget _ownListingCard(AppColors c, OwnListing listing, void Function(MyAction) sendAction) {
+  Widget _ownListingCard(
+    AppColors c,
+    OwnListing listing,
+    void Function(MyAction) sendAction,
+  ) {
     final radius = BorderRadius.circular(16.dp);
+    final img = listing.imageUrl?.trim();
     return Material(
       color: c.surface,
       borderRadius: radius,
@@ -380,7 +522,17 @@ class ProfileContent extends ScreenContent<ProfileState> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: DecoratedBox(decoration: BoxDecoration(gradient: listing.tileGradient)),
+              child: img != null && img.isNotEmpty
+                  ? Image.network(
+                      img,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => DecoratedBox(
+                        decoration: BoxDecoration(gradient: listing.tileGradient),
+                      ),
+                    )
+                  : DecoratedBox(
+                      decoration: BoxDecoration(gradient: listing.tileGradient),
+                    ),
             ),
             Padding(
               padding: EdgeInsets.fromLTRB(12.dp, 10.dp, 12.dp, 12.dp),
@@ -392,12 +544,20 @@ class ProfileContent extends ScreenContent<ProfileState> {
                     listing.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: c.textPrimary, fontSize: 13.sp, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   SizedBox(height: 4.dp),
                   Text(
                     listing.price,
-                    style: TextStyle(color: c.textPrimary, fontSize: 14.sp, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),

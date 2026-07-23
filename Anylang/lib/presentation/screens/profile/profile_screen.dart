@@ -4,9 +4,12 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../modal/full_screen_image_dialog.dart';
+import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../../utils/size_controller.dart';
 import '../add_product/add_product_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
 import '../products/product.dart';
@@ -29,22 +32,37 @@ class ProfileScreen extends Screen<ProfileState, void> {
   }
 
   Future<void> _load() async {
+    state.loading.value = true;
+    state.error.value = null;
     final result = await Get.find<ProfileRepository>().getMe();
     result.when(
       success: (data) {
         final map = asMap(data);
-        if (map == null) return;
+        if (map == null) {
+          state.error.value = 'profile_load_failed'.tr;
+          state.loading.value = false;
+          return;
+        }
         state.account.value = ProfileAccount.fromApi(map);
+        state.error.value = null;
       },
-      failure: showAppError,
+      failure: (err) {
+        state.error.value = err.toString();
+        showAppError(err);
+      },
     );
+    state.loading.value = false;
     await _loadListings();
   }
 
   Future<void> _loadListings() async {
     final acc = state.account.value;
     if (acc == null || !acc.isBusiness) return;
-    final result = await Get.find<ProductsRepository>().listMine(limit: 20);
+    final result = await Get.find<ProductsRepository>().listMine(limit: 40);
+    if (result.errorOrNull != null) {
+      showAppError(result.errorOrNull);
+      return;
+    }
     final data = result.dataOrNull;
     if (data == null) return;
     final items = asList(data)
@@ -56,15 +74,14 @@ class ProfileScreen extends Screen<ProfileState, void> {
             tileGradient: productGradientFor(p.id),
             name: p.name,
             price: p.price,
+            imageUrl: p.imageUrl,
           ),
         )
         .toList();
     final current = state.account.value;
     if (current == null) return;
-    state.account.value = current.copyWith(
-      listings: items,
-      listingsCount: items.length,
-    );
+    // API stats.listings_count saqlanadi — faqat ro'yxat yangilanadi.
+    state.account.value = current.copyWith(listings: items);
   }
 
   @override
@@ -100,6 +117,12 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case AddProductRequested _:
         await navigate(AddProductScreen());
         await _load();
+      case RetryProfileLoad _:
+        await _load();
+      case OpenProfileAvatar _:
+        final url = state.account.value?.avatarUrl?.trim();
+        if (url == null || url.isEmpty) return;
+        await showFullScreenImage(context, url: url);
       case SeeAllListings _:
         await _loadListings();
         final items = state.account.value?.listings ?? const [];
@@ -108,6 +131,7 @@ class ProfileScreen extends Screen<ProfileState, void> {
           return;
         }
         if (!context.mounted) return;
+        final c = context.appColors;
         await showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
@@ -119,33 +143,61 @@ class ProfileScreen extends Screen<ProfileState, void> {
               minChildSize: 0.4,
               builder: (_, scroll) => Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(ctx).scaffoldBackgroundColor,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(20)),
+                  color: c.surface,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20.dp)),
                 ),
                 child: ListView.separated(
                   controller: scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  padding: EdgeInsets.fromLTRB(16.dp, 16.dp, 16.dp, 24.dp),
                   itemCount: items.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => SizedBox(height: 8.dp),
                   itemBuilder: (_, i) {
                     if (i == 0) {
                       return Text(
                         'profile_listings_see_all'.tr,
-                        style: const TextStyle(
-                          fontSize: 18,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 18.sp,
                           fontWeight: FontWeight.w700,
                         ),
                       );
                     }
                     final listing = items[i - 1];
-                    return ListTile(
-                      title: Text(listing.name),
-                      subtitle: Text(listing.price),
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        await actionHandler(state, OpenOwnListing(listing));
-                      },
+                    final img = listing.imageUrl?.trim();
+                    return Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(10.dp),
+                          child: SizedBox(
+                            width: 48.dp,
+                            height: 48.dp,
+                            child: img != null && img.isNotEmpty
+                                ? Image.network(img, fit: BoxFit.cover)
+                                : DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: listing.tileGradient,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        title: Text(
+                          listing.name,
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          listing.price,
+                          style: TextStyle(color: c.textSecondary),
+                        ),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          await actionHandler(state, OpenOwnListing(listing));
+                        },
+                      ),
                     );
                   },
                 ),
@@ -162,17 +214,17 @@ class ProfileScreen extends Screen<ProfileState, void> {
         final result = await Get.find<ProductsRepository>().detail(id);
         final map = asMap(result.dataOrNull);
         if (map == null) {
-          showAppError(result.errorOrNull ?? 'Mahsulot topilmadi');
+          showAppError(result.errorOrNull ?? 'product_not_found'.tr);
           return;
         }
         final product = Product.fromApi(map);
+        if (!context.mounted) return;
         await showProductInfoBottomSheet(
           context,
           product,
-          onOpenBusiness: () async {
+          onOpenBusiness: () {
+            // O'z mahsuloti — biznes sahifasiga o'tish shart emas.
             Navigator.of(context).maybePop();
-            await navigate(EditBusinessInfoScreen());
-            await _load();
           },
         );
         await _loadListings();

@@ -34,7 +34,8 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _websiteCtrl;
   late final TextEditingController _descriptionCtrl;
-  bool _hydrated = false;
+  Worker? _formWorker;
+  int _lastEpoch = -1;
 
   @override
   void initContent() {
@@ -43,21 +44,25 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
     _descriptionCtrl = TextEditingController();
   }
 
-  void _hydrate(EditBusinessInfoState state) {
-    if (_hydrated) return;
-    if (state.companyName.value.isEmpty &&
-        state.website.value.isEmpty &&
-        state.description.value.isEmpty) {
-      return;
+  void _bindHydrate(EditBusinessInfoState state) {
+    _formWorker?.dispose();
+    _formWorker = ever(state.formEpoch, (_) {
+      _nameCtrl.text = state.companyName.value;
+      _websiteCtrl.text = state.website.value;
+      _descriptionCtrl.text = state.description.value;
+      _lastEpoch = state.formEpoch.value;
+    });
+    if (state.formEpoch.value != _lastEpoch) {
+      _nameCtrl.text = state.companyName.value;
+      _websiteCtrl.text = state.website.value;
+      _descriptionCtrl.text = state.description.value;
+      _lastEpoch = state.formEpoch.value;
     }
-    _hydrated = true;
-    _nameCtrl.text = state.companyName.value;
-    _websiteCtrl.text = state.website.value;
-    _descriptionCtrl.text = state.description.value;
   }
 
   @override
   void onClose() {
+    _formWorker?.dispose();
     _nameCtrl.dispose();
     _websiteCtrl.dispose();
     _descriptionCtrl.dispose();
@@ -66,7 +71,7 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
   @override
   Widget build(BuildContext context, EditBusinessInfoState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
-    _hydrate(state);
+    _bindHydrate(state);
 
     return GradientBackground(
       child: SafeArea(
@@ -193,10 +198,17 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                           spacing: 10.dp,
                           runSpacing: 10.dp,
                           children: [
-                            for (final g in state.factoryImages) MediaTile.image(gradient: g),
+                            for (final img in state.factoryImages)
+                              MediaTile.image(
+                                imageUrl: img.url,
+                                gradient: prodOliveGradient,
+                                onTap: () =>
+                                    sendAction(OpenFactoryImage(img.url)),
+                              ),
                             MediaTile.upload(
                               uploadLabel: 'business_upload'.tr,
-                              onTap: () => sendAction(AddFactoryImageRequested()),
+                              onTap: () =>
+                                  sendAction(AddFactoryImageRequested()),
                             ),
                           ],
                         )),

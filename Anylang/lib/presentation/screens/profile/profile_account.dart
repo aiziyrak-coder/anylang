@@ -7,13 +7,21 @@ class OwnListing {
   final LinearGradient tileGradient;
   final String name;
   final String price;
+  final String? imageUrl;
 
   const OwnListing({
     required this.tileGradient,
     required this.name,
     required this.price,
     this.id = 0,
+    this.imageUrl,
   });
+}
+
+String businessRoleLabel(String? apiRole) {
+  final key = (apiRole ?? '').trim().toLowerCase();
+  if (key.isEmpty) return '';
+  return 'business_role_$key';
 }
 
 class ProfileAccount {
@@ -37,6 +45,7 @@ class ProfileAccount {
   final DateTime? subscriptionExpiresAt;
   final bool subscriptionActive;
   final bool showPremiumBadge;
+  /// API role code: manufacturer | distributor | retail | service
   final String? role;
   final int? listingsCount;
   final String? viewsCount;
@@ -73,9 +82,14 @@ class ProfileAccount {
     this.email,
   });
 
+  String get roleLabel {
+    final k = businessRoleLabel(role);
+    return k.isEmpty ? '' : k;
+  }
+
   factory ProfileAccount.fromApi(Map<String, dynamic> json) {
     final id = (json['id'] as num?)?.toInt() ?? 0;
-    final name = (json['full_name'] as String?) ?? 'User';
+    final personalName = (json['full_name'] as String?) ?? 'User';
     final number = json['number']?.toString() ?? '';
     final isBusiness = json['is_business'] == true;
     final biz = json['business'] as Map?;
@@ -89,16 +103,16 @@ class ProfileAccount {
     final countryCode = (json['country'] as String?) ?? '';
     final planKey = plan?.toLowerCase();
     final showPremium = !isBusiness && isActive && planKey == 'premium';
+    final company = (biz?['company_name'] as String?)?.trim();
+    final displayName = isBusiness && company != null && company.isNotEmpty
+        ? company
+        : personalName;
 
     return ProfileAccount(
       id: id,
       isBusiness: isBusiness,
-      name: isBusiness
-          ? ((biz?['company_name'] as String?)?.isNotEmpty == true
-              ? biz!['company_name'] as String
-              : name)
-          : name,
-      initial: initialsOf(name),
+      name: displayName,
+      initial: initialsOf(displayName),
       avatarGradient: avatarGradientFor(id),
       verified: json['verified_badge'] == true,
       flagAsset: flagAssetForCountry(countryCode),
@@ -143,12 +157,15 @@ class ProfileAccount {
     List<OwnListing>? listings,
     int? listingsCount,
     String? avatarUrl,
+    String? name,
+    String? initial,
+    String? email,
   }) {
     return ProfileAccount(
       id: id,
       isBusiness: isBusiness,
-      name: name,
-      initial: initial,
+      name: name ?? this.name,
+      initial: initial ?? this.initial,
       avatarGradient: avatarGradient,
       verified: verified,
       flagAsset: flagAsset,
@@ -169,7 +186,7 @@ class ProfileAccount {
       rating: rating,
       listings: listings ?? this.listings,
       avatarUrl: avatarUrl ?? this.avatarUrl,
-      email: email,
+      email: email ?? this.email,
     );
   }
 }

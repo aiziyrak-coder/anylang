@@ -28,9 +28,15 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
   Future<void> _loadListings() async {
     final data = state.data;
     if (data == null || data.id <= 0 || !data.business) return;
+    state.listings.clear();
     state.listingsLoading.value = true;
     final result =
         await Get.find<ProductsRepository>().listByUser(data.id, limit: 20);
+    if (result.errorOrNull != null) {
+      state.listingsLoading.value = false;
+      showAppError(result.errorOrNull);
+      return;
+    }
     final items = asList(result.dataOrNull)
         .whereType<Map>()
         .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))

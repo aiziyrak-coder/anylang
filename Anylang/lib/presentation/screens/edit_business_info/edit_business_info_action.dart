@@ -24,6 +24,11 @@ class AddCertificateRequested extends EditBusinessInfoAction {}
 
 class AddFactoryImageRequested extends EditBusinessInfoAction {}
 
+class OpenFactoryImage extends EditBusinessInfoAction {
+  final String url;
+  OpenFactoryImage(this.url);
+}
+
 class SaveBusinessInfo extends EditBusinessInfoAction {
   final String companyName;
   final String website;

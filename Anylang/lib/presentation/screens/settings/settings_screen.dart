@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
+import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/auth_repository.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../../data/network/socket_service.dart';
 import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/language_localizations.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../edit_business_info/edit_business_info_screen.dart';
 import '../forgot_password/forgot_password_screen.dart';
 import '../login/login_screen.dart';
 import '../profile_edit/profile_edit_screen.dart';
@@ -135,9 +139,18 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
       case OpenBlockedUsers _:
         await showBlockedUsersBottomSheet(context);
       case OpenChangePassword _:
+        // Autentifikatsiyalangan change-password API yo'q — OTP reset.
+        // Sessiyali holatda ForgotPasswordScreen Login'ga tashlamaydi.
         navigate(ForgotPasswordScreen());
       case OpenEditProfileFromSettings _:
-        await navigate(ProfileEditScreen());
+        final me = await Get.find<ProfileRepository>().getMe();
+        final map = asMap(me.dataOrNull);
+        final isBusiness = map?['is_business'] == true;
+        if (isBusiness) {
+          await navigate(EditBusinessInfoScreen());
+        } else {
+          await navigate(ProfileEditScreen());
+        }
       case OpenSubscriptionFromSettings _:
         await navigate(SubscriptionScreen());
     }

@@ -7,13 +7,14 @@ enum _MediaTileKind { upload, image }
 
 /// Rasm tanlash panellarida (Zavod rasmlari, Mahsulot rasmlari) ishlatiladigan
 /// bitta kvadrat plitka. `MediaTile.upload` — chiziqli chegarali "Yuklash"
-/// joy egallovchisi. `MediaTile.image` — tanlangan rasm (gradient
+/// joy egallovchisi. `MediaTile.image` — tanlangan rasm (URL yoki gradient
 /// placeholder), ixtiyoriy olib tashlash tugmasi va ixtiyoriy belgi bilan.
 class MediaTile extends StatelessWidget {
   final _MediaTileKind _kind;
   final String? uploadLabel;
   final VoidCallback? onTap;
   final LinearGradient? gradient;
+  final String? imageUrl;
   final VoidCallback? onRemove;
   final String? badgeText;
   final double size;
@@ -25,18 +26,20 @@ class MediaTile extends StatelessWidget {
     this.size = 90,
   })  : _kind = _MediaTileKind.upload,
         gradient = null,
+        imageUrl = null,
         onRemove = null,
         badgeText = null;
 
   const MediaTile.image({
     super.key,
-    required this.gradient,
+    this.gradient,
+    this.imageUrl,
     this.onRemove,
     this.badgeText,
+    this.onTap,
     this.size = 90,
   })  : _kind = _MediaTileKind.image,
-        uploadLabel = null,
-        onTap = null;
+        uploadLabel = null;
 
   @override
   Widget build(BuildContext context) {
@@ -73,17 +76,43 @@ class MediaTile extends StatelessWidget {
       );
     }
 
+    final url = imageUrl?.trim();
+    final g = gradient ??
+        const LinearGradient(colors: [Color(0xFF1B3A57), Color(0xFF0A2340)]);
+
+    Widget body = ClipRRect(
+      borderRadius: radius,
+      child: url != null && url.isNotEmpty
+          ? Image.network(
+              url,
+              width: s,
+              height: s,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => DecoratedBox(
+                decoration: BoxDecoration(gradient: g, borderRadius: radius),
+              ),
+            )
+          : DecoratedBox(
+              decoration: BoxDecoration(gradient: g, borderRadius: radius),
+            ),
+    );
+
+    if (onTap != null) {
+      body = Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: onTap, borderRadius: radius, child: body),
+      );
+    }
+
     return SizedBox(
       width: s,
       height: s,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(gradient: gradient, borderRadius: radius),
-            ),
-          ),
+          Positioned.fill(child: body),
           if (onRemove != null)
             Positioned(
               top: 6.dp,

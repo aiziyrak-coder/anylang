@@ -16,9 +16,10 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
 
   @override
   void initState(ProfileAccount? payload) {
-    state.account = payload;
+    state.account.value = payload;
     state.country.value = payload?.countryCode ?? '';
     state.gender.value = 'male';
+    if (payload != null) state.formEpoch.value++;
     _hydrateFromApi();
   }
 
@@ -28,20 +29,22 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
       success: (data) {
         final map = asMap(data);
         if (map == null) return;
-        state.account = ProfileAccount.fromApi(map);
+        final acc = ProfileAccount.fromApi(map);
+        state.account.value = acc;
         final code = (map['country'] as String?)?.trim().toUpperCase() ?? '';
         if (code.length == 2) {
           state.country.value = code;
-        } else if (state.account?.countryCode.isNotEmpty == true) {
-          state.country.value = state.account!.countryCode;
+        } else if (acc.countryCode.isNotEmpty) {
+          state.country.value = acc.countryCode;
         }
         state.gender.value = (map['gender'] as String?) ?? 'male';
         final bd = map['birth_date']?.toString();
         if (bd != null && bd.isNotEmpty) {
           state.birthDate.value = DateTime.tryParse(bd);
         }
+        state.formEpoch.value++;
       },
-      failure: (_) {},
+      failure: showAppError,
     );
   }
 
@@ -66,14 +69,17 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
           result.when(
             success: (data) {
               final map = asMap(data);
-              final url = map?['avatar_url']?.toString() ??
-                  map?['url']?.toString();
-              final acc = state.account;
+              final url =
+                  map?['avatar_url']?.toString() ?? map?['url']?.toString();
+              final acc = state.account.value;
               if (acc != null && url != null) {
-                state.account = acc.copyWith(avatarUrl: url);
+                state.account.value = acc.copyWith(
+                  avatarUrl: url,
+                  initial: initialsOf(acc.name),
+                );
               }
               state.avatarEpoch.value++;
-              showAppMessage('Avatar yangilandi');
+              showAppMessage('profile_avatar_updated'.tr);
             },
             failure: showAppError,
           );
@@ -105,7 +111,7 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
           final result = await Get.find<ProfileRepository>().updateMe(body);
           result.when(
             success: (_) {
-              showAppMessage('Profil saqlandi');
+              showAppMessage('profile_saved'.tr);
               popBackNavigate();
             },
             failure: showAppError,

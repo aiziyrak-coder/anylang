@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import '../../modal/full_screen_image_dialog.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/my_icon_button.dart';
@@ -57,14 +58,18 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
                           if (d.business) ...[
                             SizedBox(height: 20.dp),
                             _completeness(c, d),
-                            SizedBox(height: 20.dp),
-                            _sectionTitle(c, 'profile_certificates'.tr),
-                            SizedBox(height: 10.dp),
-                            _certificates(c, d),
-                            SizedBox(height: 20.dp),
-                            _sectionTitle(c, 'profile_factory_images'.tr),
-                            SizedBox(height: 10.dp),
-                            _factoryImages(),
+                            if (d.certificates.isNotEmpty) ...[
+                              SizedBox(height: 20.dp),
+                              _sectionTitle(c, 'profile_certificates'.tr),
+                              SizedBox(height: 10.dp),
+                              _certificates(c, d),
+                            ],
+                            if (d.factoryImageUrls.isNotEmpty) ...[
+                              SizedBox(height: 20.dp),
+                              _sectionTitle(c, 'profile_factory_images'.tr),
+                              SizedBox(height: 10.dp),
+                              _factoryImages(context, d),
+                            ],
                             SizedBox(height: 20.dp),
                             _sectionTitle(c, '${'profile_listings'.tr} · ${d.listings}'),
                             SizedBox(height: 12.dp),
@@ -110,6 +115,12 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
   }
 
   Widget _subtitle(AppColors c, UserProfilePayload d) {
+    final roleText = d.role.isEmpty
+        ? ''
+        : (d.role.startsWith('business_role_') ? d.role.tr : d.role);
+    final text = d.business
+        ? (roleText.isEmpty ? d.country : '${d.country} · $roleText')
+        : (d.phone.isEmpty ? d.country : '${d.country} · ${d.phone}');
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -118,7 +129,14 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
           child: Image.asset(d.flagAsset, width: 18.dp, height: 13.dp, fit: BoxFit.cover),
         ),
         SizedBox(width: 6.dp),
-        Text('${d.country} · ${d.role}', style: TextStyle(color: c.textSecondary, fontSize: 13.sp)),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+          ),
+        ),
       ],
     );
   }
@@ -180,20 +198,27 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
   }
 
   Widget _infoCard(AppColors c, UserProfilePayload d, void Function(MyAction) sendAction) {
+    final roleText = d.role.isEmpty
+        ? ''
+        : (d.role.startsWith('business_role_') ? d.role.tr : d.role);
     final rows = <Widget>[
       InfoRow(iconAsset: 'assets/icons/ic_location.svg', label: 'profile_country'.tr, value: d.country),
       if (d.business) ...[
-        InfoRow(iconAsset: 'assets/icons/ic_activity.svg', label: 'profile_activity'.tr, value: d.role),
-        InfoRow(iconAsset: 'assets/icons/ic_clock.svg', label: 'profile_experience'.tr, value: d.experience ?? ''),
-        InfoRow(
-          iconAsset: 'assets/icons/ic_globe.svg',
-          label: 'profile_website'.tr,
-          value: d.website ?? '',
-          valueColor: c.accentText,
-          onTap: () => sendAction(OpenWebsite()),
-        ),
+        if (roleText.isNotEmpty)
+          InfoRow(iconAsset: 'assets/icons/ic_activity.svg', label: 'profile_activity'.tr, value: roleText),
+        if ((d.experience ?? '').trim().isNotEmpty)
+          InfoRow(iconAsset: 'assets/icons/ic_clock.svg', label: 'profile_experience'.tr, value: d.experience!),
+        if ((d.website ?? '').trim().isNotEmpty)
+          InfoRow(
+            iconAsset: 'assets/icons/ic_globe.svg',
+            label: 'profile_website'.tr,
+            value: d.website!,
+            valueColor: c.accentText,
+            onTap: () => sendAction(OpenWebsite()),
+          ),
       ],
-      InfoRow(iconAsset: 'assets/icons/ic_phone.svg', label: 'profile_phone'.tr, value: d.phone),
+      if (d.phone.trim().isNotEmpty)
+        InfoRow(iconAsset: 'assets/icons/ic_phone.svg', label: 'profile_phone'.tr, value: d.phone),
     ];
 
     final children = <Widget>[];
@@ -288,23 +313,46 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
     );
   }
 
-  Widget _factoryImages() {
-    Widget tile(LinearGradient g) => Expanded(
-          child: DecoratedBox(
-            decoration: BoxDecoration(gradient: g, borderRadius: BorderRadius.circular(14.dp)),
-            child: Center(
-              child: SvgPicture.asset('assets/icons/ic_prod_image.svg', width: 26.dp, height: 26.dp),
-            ),
-          ),
-        );
+  Widget _factoryImages(BuildContext context, UserProfilePayload d) {
+    final urls = d.factoryImageUrls;
     return SizedBox(
       height: 90.dp,
-      child: Row(
-        children: [
-          tile(prodBlueGradient),
-          SizedBox(width: 10.dp),
-          tile(prodBrownGradient),
-        ],
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: urls.length,
+        separatorBuilder: (_, _) => SizedBox(width: 10.dp),
+        itemBuilder: (_, i) {
+          final url = urls[i];
+          return Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14.dp),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => showFullScreenImage(context, url: url),
+              child: SizedBox(
+                width: 120.dp,
+                height: 90.dp,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: prodBlueGradient,
+                      borderRadius: BorderRadius.circular(14.dp),
+                    ),
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/icons/ic_prod_image.svg',
+                        width: 26.dp,
+                        height: 26.dp,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

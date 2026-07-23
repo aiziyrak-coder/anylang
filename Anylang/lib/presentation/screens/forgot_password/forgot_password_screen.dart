@@ -11,6 +11,7 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/auth_repository.dart';
 import '../login/login_screen.dart';
 
@@ -192,7 +193,12 @@ class ForgotPasswordScreen extends Screen<ForgotPasswordState, void> {
           result.when(
             success: (_) {
               showAppMessage('password_reset_ok'.tr);
-              navigateAndRemoveUntil(LoginScreen());
+              // Sozlamalardan kelgan bo'lsa — sessiyani saqlab qaytamiz.
+              if (SessionStore.hasSession) {
+                popBackNavigate();
+              } else {
+                navigateAndRemoveUntil(LoginScreen());
+              }
             },
             failure: showAppError,
           );

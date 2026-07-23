@@ -6,8 +6,7 @@ import '../utils/size_controller.dart';
 enum ProfileAvatarShape { circle, roundedSquare }
 
 /// Profil avatari: gradient fon + bosh harf. Ixtiyoriy onlayn nuqta
-/// (`online`) va tahrirlash tugmasi (`onEdit`) bilan. `user_profile` (boshqa
-/// foydalanuvchi) va `profile` (o'z profili) ekranlarida qayta ishlatiladi.
+/// (`online`) va tahrirlash tugmasi (`onEdit`) bilan.
 class ProfileAvatar extends StatelessWidget {
   final String initial;
   final LinearGradient gradient;
@@ -69,7 +68,11 @@ class ProfileAvatar extends StatelessWidget {
                   customBorder: const CircleBorder(),
                   child: Padding(
                     padding: EdgeInsets.all(6.dp),
-                    child: Icon(Icons.edit_rounded, size: 14.dp, color: c.onAccent),
+                    child: Icon(
+                      Icons.edit_rounded,
+                      size: 14.dp,
+                      color: c.onAccent,
+                    ),
                   ),
                 ),
               ),
@@ -86,9 +89,11 @@ class ProfileAvatar extends StatelessWidget {
         borderRadius: borderRadius,
         child: Image.network(
           url,
+          key: ValueKey(url),
           width: s,
           height: s,
           fit: BoxFit.cover,
+          gaplessPlayback: true,
           errorBuilder: (_, _, _) => _initialBody(c, s, borderRadius),
         ),
       );
@@ -104,7 +109,11 @@ class ProfileAvatar extends StatelessWidget {
       decoration: BoxDecoration(gradient: gradient, borderRadius: borderRadius),
       child: Text(
         initial,
-        style: TextStyle(color: kLime, fontSize: s * 0.38, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          color: kLime,
+          fontSize: s * 0.38,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

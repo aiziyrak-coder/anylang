@@ -33,3 +33,9 @@ class OpenOwnListing extends ProfileAction {
   final OwnListing listing;
   OpenOwnListing(this.listing);
 }
+
+/// Profil yuklanishi xato — qayta urinish.
+class RetryProfileLoad extends ProfileAction {}
+
+/// Avatar / logo ustiga bosib to'liq ekranda ko'rish.
+class OpenProfileAvatar extends ProfileAction {}

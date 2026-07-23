@@ -25,6 +25,8 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
+  Worker? _formWorker;
+  int _lastEpoch = -1;
 
   @override
   void initContent() {
@@ -32,14 +34,25 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
     _emailCtrl = TextEditingController();
   }
 
-  @override
-  void uiBuildFinished(ProfileEditState state) {
-    _nameCtrl.text = state.account?.name ?? '';
-    _emailCtrl.text = state.account?.email ?? '';
+  void _bindHydrate(ProfileEditState state) {
+    _formWorker?.dispose();
+    _formWorker = ever(state.formEpoch, (_) {
+      final acc = state.account.value;
+      _nameCtrl.text = acc?.name ?? '';
+      _emailCtrl.text = acc?.email ?? '';
+      _lastEpoch = state.formEpoch.value;
+    });
+    if (state.formEpoch.value != _lastEpoch) {
+      final acc = state.account.value;
+      _nameCtrl.text = acc?.name ?? '';
+      _emailCtrl.text = acc?.email ?? '';
+      _lastEpoch = state.formEpoch.value;
+    }
   }
 
   @override
   void onClose() {
+    _formWorker?.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
   }
@@ -47,6 +60,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   @override
   Widget build(BuildContext context, ProfileEditState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
+    _bindHydrate(state);
 
     return GradientBackground(
       child: SafeArea(
@@ -69,7 +83,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                       child: Obx(
                         () {
                           final _ = state.avatarEpoch.value;
-                          final account = state.account;
+                          final account = state.account.value;
                           return ProfileAvatar(
                             initial: account?.initial ?? '',
                             gradient: account?.avatarGradient ?? avatarTealGradient,
@@ -84,11 +98,24 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                     ),
                     SizedBox(height: 8.dp),
                     Center(
-                      child: InkWell(
-                        onTap: () => sendAction(ChangeProfilePhoto()),
-                        child: Text(
-                          'profile_edit_change_photo'.tr,
-                          style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => sendAction(ChangeProfilePhoto()),
+                          borderRadius: BorderRadius.circular(8.dp),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8.dp,
+                              vertical: 4.dp,
+                            ),
+                            child: Text(
+                              'profile_edit_change_photo'.tr,
+                              style: TextStyle(
+                                color: c.textSecondary,
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -147,6 +174,15 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
                         ),
+                      ),
+                    ),
+                    SizedBox(height: 6.dp),
+                    Text(
+                      'profile_email_readonly_hint'.tr,
+                      style: TextStyle(
+                        color: c.textFaint,
+                        fontSize: 12.sp,
+                        height: 1.3,
                       ),
                     ),
                     SizedBox(height: 28.dp),
