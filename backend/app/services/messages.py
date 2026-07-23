@@ -434,10 +434,14 @@ async def create_message(
             reply_to=reply_payload_recipient,
         )
         event_data = {"chat_id": chat_id}
-        await hub.publish(user.id, "new_message", {**event_data, "message": sender_payload})
-        await hub.publish(
-            recipient.id, "new_message", {**event_data, "message": recipient_payload}
-        )
+        # Redis/WS xatosi HTTP yuborishni buzmasin — xabar DB'da saqlansin.
+        try:
+            await hub.publish(user.id, "new_message", {**event_data, "message": sender_payload})
+            await hub.publish(
+                recipient.id, "new_message", {**event_data, "message": recipient_payload}
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Realtime publish failed for chat %s: %s", chat_id, exc)
         return sender_payload
 
     payload = await _publish(message)
@@ -544,8 +548,11 @@ async def mark_messages_read(
             "message_ids": read_ids,
             "read_at": now.isoformat(),
         }
-        await hub.publish(other_id, "messages_read", event)
-        await hub.publish(user.id, "messages_read", event)
+        try:
+            await hub.publish(other_id, "messages_read", event)
+            await hub.publish(user.id, "messages_read", event)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("messages_read publish failed: %s", exc)
 
     return {"read_count": len(read_ids), "message_ids": read_ids}
 

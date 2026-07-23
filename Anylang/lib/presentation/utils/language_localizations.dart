@@ -7,12 +7,11 @@ class LanguageLocalizations extends Translations {
 
   // 🔹 Ilova qo‘llab-quvvatlaydigan tillar
   static final locales = [
-    const Locale('uz', 'UZ'), // O'zbekcha
-    const Locale('ru', 'RU'), // Ruscha
-    const Locale('us', 'US'), // Inglizcha
+    const Locale('uz', 'UZ'),
+    const Locale('ru', 'RU'),
+    const Locale('en', 'US'),
   ];
 
-  // 🔹 Til kodi va nomi
   static final langs = [
     'uz_UZ',
     'ru_RU',
@@ -22,9 +21,11 @@ class LanguageLocalizations extends Translations {
   // 🔹 Ilovaning standart tili
   static const fallbackLocale = Locale('uz', 'UZ');
 
-  // 🔹 Tarjimalar
+  // 🔹 Tarjimalar — GetX locale kaliti `til_MAMlakat` yoki qisqa `til`.
+  // Aliaslar: locale mismatch bo'lsa ham `.tr` kod ko'rsatmasin.
   @override
-  Map<String, Map<String, String>> get keys => {
+  Map<String, Map<String, String>> get keys {
+    final base = <String, Map<String, String>>{
     'uz_UZ': {
       'app_name': 'AnyLang',
       'continue': 'Davom etish',
@@ -178,6 +179,8 @@ class LanguageLocalizations extends Translations {
       'chat_contact_send': 'Xabar yuborish',
       'chat_my_location': 'Mening joylashuvim',
       'chat_copied': 'Nusxa olindi',
+      'chat_send_unavailable': 'Chat ochilmadi. Qayta urinib ko‘ring',
+      'chat_send_failed': 'Xabar yuborilmadi',
       'chat_read_label': 'O‘qilgan',
       'chat_menu_original': 'Tarjima qilinmagan asli',
       'chat_menu_translated': 'Tarjima',
@@ -652,6 +655,8 @@ class LanguageLocalizations extends Translations {
       'chat_contact_send': 'Написать сообщение',
       'chat_my_location': 'Моя локация',
       'chat_copied': 'Скопировано',
+      'chat_send_unavailable': 'Чат не открыт. Попробуйте снова',
+      'chat_send_failed': 'Не удалось отправить сообщение',
       'chat_read_label': 'Прочитано',
       'chat_menu_original': 'Оригинал без перевода',
       'chat_menu_translated': 'Перевод',
@@ -1126,6 +1131,8 @@ class LanguageLocalizations extends Translations {
       'chat_contact_send': 'Send message',
       'chat_my_location': 'My location',
       'chat_copied': 'Copied',
+      'chat_send_unavailable': 'Chat unavailable. Please try again',
+      'chat_send_failed': 'Failed to send message',
       'chat_read_label': 'Read',
       'chat_menu_original': 'Original (untranslated)',
       'chat_menu_translated': 'Translation',
@@ -1452,11 +1459,20 @@ class LanguageLocalizations extends Translations {
       'jonli_session_failed': 'Could not start session',
       'jonli_translate_failed': 'Translation failed',
     },
-  };
+    };
+    // Qisqa locale kodlari — Material/GetX ba'zan countryCode'siz keladi.
+    base['uz'] = base['uz_UZ']!;
+    base['ru'] = base['ru_RU']!;
+    base['en'] = base['us_US']!;
+    base['en_US'] = base['us_US']!;
+    base['en_GB'] = base['us_US']!;
+    return base;
+  }
 
 
   static void changeLocale(String langCode) {
-    Locale locale = locales[langs.indexOf(langCode)];
+    final idx = langs.indexOf(langCode);
+    final locale = idx >= 0 ? locales[idx] : fallbackLocale;
     Get.updateLocale(locale);
     var box = Hive.box("user");
     box.put("language", langCode);

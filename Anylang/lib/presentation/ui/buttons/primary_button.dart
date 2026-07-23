@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
-import '../theme/gradients.dart';
 import '../../utils/size_controller.dart';
 import 'rich_button.dart';
 
@@ -47,7 +46,7 @@ class PrimaryButton extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 18.dp, horizontal: 20.dp),
       borderRadius: radius,
       decoration: BoxDecoration(
-        gradient: limeButtonGradient,
+        gradient: c.accentButtonGradient,
         borderRadius: radius,
         boxShadow: [
           BoxShadow(

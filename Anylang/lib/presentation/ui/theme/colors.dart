@@ -9,54 +9,44 @@ Color notActiveBtn = Color(0xFFEFEFEF);
 Color notActiveText = Color(0xFF8C8F9F);
 Color lightGray = Color(0xFFF7F7F7);
 Color bluePrimary = Color(0xFF174BEA);
-Color dividerColor = Color(0xFFC7C7C7);
+Color dividerColor = Color(0xFFE5EAF0);
 
-// Dialog / surface tokens
 Color textDark = Color(0xFF0F1729);
 Color textMuted = Color(0xFF647189);
-Color fieldBorder = Color(0xFFE2E8F0);
+Color fieldBorder = Color(0x14000000);
 Color fieldFill = Color(0xFFF5F5F7);
 Color fieldLabel = Color(0xFF665CF2);
 Color purplePrimary = Color(0xFF665CF2);
 
-// ---------------------------------------------------------------------------
-// AnyLang brand + theme tizimi (light / dark)
-// ---------------------------------------------------------------------------
-// Brend akssenti — ikkala temada bir xil (navy + lime).
-const Color kLime = Color(0xFFCBE84C);
-const Color kNavy = Color(0xFF0A2340);
+// Brand — light'da to'qroq lime (yorug' fonda ko'rinsin), dark'da yorqin.
+const Color kLime = Color(0xFF8BC21A);
+const Color kLimeBright = Color(0xFFD4F04A);
+const Color kNavy = Color(0xFF071526);
 
-// Onlayn holat nuqtasi (avatar) — ikkala temada bir xil yashil.
-const Color kOnline = Color(0xFF9FE870);
-// Avatar ustidagi harf rangi (to'q fon uchun ochiq) — temaga bog'liq emas.
+const Color kOnline = Color(0xFF34C759);
 const Color kAvatarFg = Color(0xFFF2F7FC);
-// Jonli muloqot — suhbatdosh gapirganda ko'k akssent (halqa/waveform).
-const Color kSpeakBlue = Color(0xFF7CC4F5);
-// Jonli muloqot — "Tinglanmoqda" qizil holati.
-const Color kListenRed = Color(0xFFFF6B6B);
+const Color kSpeakBlue = Color(0xFF64D2FF);
+const Color kListenRed = Color(0xFFFF453A);
 
-/// Semantik rang tokenlari. Har token light/dark uchun alohida qiymatga ega.
-/// UI'da `context.appColors.<token>` orqali olinadi (ThemeExtension — theme
-/// almashganda avtomatik qayta chiziladi).
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   final Brightness brightness;
   final Color background;
   final Gradient backgroundGradient;
-  final Color surface; // kartalar / input fill
-  final Color surfaceBorder; // karta/input chegarasi
+  final Color surface;
+  final Color surfaceBorder;
   final Color textPrimary;
-  final Color textSecondary; // muted
-  final Color textFaint; // hint / eng och
-  final Color accent; // lime
-  final Color onAccent; // lime ustidagi matn (navy)
-  final Color accentSoft; // tanlangan holat uchun lime tint
-  final Color outline; // divider / chegara
-  final Color logoTileBg; // logo ortidagi navy kvadrat
-  final Color toggleTrackOff; // ToggleSwitch — o'chgan holat foni
-  final Color toggleThumbOn; // ToggleSwitch — yoqilgan holat dumaloq tugmasi
-  final Color toggleThumbOff; // ToggleSwitch — o'chgan holat dumaloq tugmasi
-  final Color segmentTrackBg; // ThemeSelector kabi pill-segment tanlagich foni
+  final Color textSecondary;
+  final Color textFaint;
+  final Color accent;
+  final Color onAccent;
+  final Color accentSoft;
+  final Color outline;
+  final Color logoTileBg;
+  final Color toggleTrackOff;
+  final Color toggleThumbOn;
+  final Color toggleThumbOff;
+  final Color segmentTrackBg;
 
   const AppColors({
     required this.brightness,
@@ -80,18 +70,34 @@ class AppColors extends ThemeExtension<AppColors> {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// Light temada lime ustida matn past kontrast — to'q zaytun.
-  Color get accentText =>
-      isDark ? accent : const Color(0xFF3F4A0A);
+  /// Accent ustidagi matn — light'da oq/navy, dark'da navy.
+  Color get accentText => isDark ? kLimeBright : const Color(0xFF2E4A08);
 
-  /// Onboarding illyustratsiya kartasi foni — yuqorida akssent tint, pastda
-  /// surface'ga o'tuvchi nozik gradient.
+  LinearGradient get accentButtonGradient => LinearGradient(
+        colors: isDark
+            ? const [Color(0xFFD6F24E), Color(0xFFBCDD3E)]
+            : const [Color(0xFF8BC21A), Color(0xFF6FA00F)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+
+  List<BoxShadow> get glassShadow => [
+        BoxShadow(
+          color: isDark
+              ? const Color(0x88000000)
+              : const Color(0x1A071526),
+          blurRadius: isDark ? 20 : 24,
+          offset: const Offset(0, 8),
+          spreadRadius: -4,
+        ),
+      ];
+
   Gradient get cardTintGradient => LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          accent.withValues(alpha: isDark ? 0.12 : 0.16),
-          isDark ? const Color(0xFF0C2136) : const Color(0xFFD5E0EC),
+          accent.withValues(alpha: isDark ? 0.14 : 0.12),
+          isDark ? const Color(0xFF0C2136) : const Color(0xFFE8EEF6),
         ],
       );
 
@@ -136,7 +142,6 @@ class AppColors extends ThemeExtension<AppColors> {
     );
   }
 
-  // Theme o'zgarishi bir zumda (snap) bo'ladi — oraliq lerp shart emas.
   @override
   AppColors lerp(ThemeExtension<AppColors>? other, double t) {
     if (other is! AppColors) return this;
@@ -144,56 +149,64 @@ class AppColors extends ThemeExtension<AppColors> {
   }
 }
 
+/// Light: yorug' fon + to'q matn/ikon/akssent.
 const AppColors lightAppColors = AppColors(
   brightness: Brightness.light,
-  // To'qroq, ochiq-kulrang emas — navy tintli fon (matn yaxshi o'qiladi).
-  background: Color(0xFFE6EDF5),
+  background: Color(0xFFF0F3F8),
   backgroundGradient: LinearGradient(
-    colors: [Color(0xFFDCE6F2), Color(0xFFCBD8E8), Color(0xFFB8C9DC)],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFFF7F9FC),
+      Color(0xFFE8EEF5),
+      Color(0xFFDCE5F0),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   ),
-  surface: Color(0xFFF7FAFD),
-  surfaceBorder: Color(0xFF9AADC4),
-  textPrimary: Color(0xFF061526),
-  textSecondary: Color(0xFF2F4258),
-  textFaint: Color(0xFF4A5F78),
+  surface: Color(0xFFFFFFFF),
+  surfaceBorder: Color(0x22071526),
+  textPrimary: Color(0xFF071526),
+  textSecondary: Color(0xFF3A4D63),
+  textFaint: Color(0xFF5C7088),
   accent: kLime,
-  onAccent: kNavy,
-  accentSoft: Color(0x40A8C230),
-  outline: Color(0xFF8FA3BB),
+  onAccent: Color(0xFF071526),
+  accentSoft: Color(0x338BC21A),
+  outline: Color(0x1A071526),
   logoTileBg: kNavy,
-  toggleTrackOff: Color(0x40061526),
+  toggleTrackOff: Color(0x33071526),
   toggleThumbOn: Colors.white,
   toggleThumbOff: Colors.white,
-  segmentTrackBg: Color(0x22061526),
+  segmentTrackBg: Color(0x1A071526),
 );
 
+/// Dark: qorong'u fon + yorqin matn/ikon/akssent.
 const AppColors darkAppColors = AppColors(
   brightness: Brightness.dark,
-  background: Color(0xFF071B31),
+  background: Color(0xFF06111F),
   backgroundGradient: LinearGradient(
-    colors: [Color(0xFF041526), Color(0xFF0A2340), Color(0xFF0C2B4A)],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFF040D18),
+      Color(0xFF0A1A2E),
+      Color(0xFF102438),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   ),
-  surface: Color(0xFF122C48),
-  surfaceBorder: Color(0xFF2A4A6B),
-  textPrimary: Color(0xFFF2F7FC),
-  textSecondary: Color(0xFFB4C5D8),
-  textFaint: Color(0xFF8FA3BB),
-  accent: kLime,
-  onAccent: kNavy,
-  accentSoft: Color(0x33CBE84C),
-  outline: Color(0xFF2A4A6B),
-  logoTileBg: Color(0xFF0F2A49),
-  toggleTrackOff: Color(0x33FFFFFF),
+  surface: Color(0xFF1A3148),
+  surfaceBorder: Color(0x33FFFFFF),
+  textPrimary: Color(0xFFFFFFFF),
+  textSecondary: Color(0xFFD0DCE8),
+  textFaint: Color(0xFFA8B8C9),
+  accent: kLimeBright,
+  onAccent: Color(0xFF071526),
+  accentSoft: Color(0x44D4F04A),
+  outline: Color(0x28FFFFFF),
+  logoTileBg: Color(0xFF122A44),
+  toggleTrackOff: Color(0x44FFFFFF),
   toggleThumbOn: kNavy,
-  toggleThumbOff: Color(0xFFB4C5D8),
-  segmentTrackBg: Color(0x66000000),
+  toggleThumbOff: Color(0xFFE8F0F8),
+  segmentTrackBg: Color(0x55000000),
 );
 
-/// UI'da qisqa foydalanish uchun: `context.appColors.background`.
 extension AppColorsX on BuildContext {
   AppColors get appColors =>
       Theme.of(this).extension<AppColors>() ?? darkAppColors;

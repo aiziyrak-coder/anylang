@@ -92,21 +92,54 @@ class ChatMessageItem extends StatelessWidget {
       );
 
   Widget _bubble(AppColors c, Widget child) {
-    return Ink(
-      padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
+    final radius = _bubbleRadius;
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: _out ? c.accent : c.surface,
-        border: _out ? null : Border.all(color: c.surfaceBorder),
-        borderRadius: _bubbleRadius,
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: _out
+                ? const Color(0x330B1F36)
+                : (c.isDark
+                    ? const Color(0x66000000)
+                    : const Color(0x140B1F36)),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+            spreadRadius: -4,
+          ),
+        ],
       ),
-      child: child,
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
+          decoration: BoxDecoration(
+            color: _out
+                ? c.accent
+                : (c.isDark
+                    ? const Color(0xF21A3148)
+                    : const Color(0xFFFFFFFF)),
+            borderRadius: radius,
+            border: _out
+                ? null
+                : Border.all(
+                    color: c.isDark
+                        ? const Color(0x33FFFFFF)
+                        : const Color(0x22071526),
+                    width: 0.7,
+                  ),
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 
-  Color _primaryText(AppColors c) => _out ? c.onAccent : c.textPrimary;
+  Color _primaryText(AppColors c) =>
+      _out ? c.onAccent : c.textPrimary;
 
   Color _metaColor(AppColors c) =>
-      _out ? c.onAccent.withValues(alpha: 0.55) : c.textFaint;
+      _out ? c.onAccent.withValues(alpha: 0.65) : c.textSecondary;
 
   /// Vaqt + (chiquvchi uchun) o'qildi belgisi.
   Widget _meta(AppColors c) {
@@ -149,6 +182,7 @@ class ChatMessageItem extends StatelessWidget {
       ),
       child: IntrinsicHeight(
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
@@ -159,7 +193,9 @@ class ChatMessageItem extends StatelessWidget {
               ),
             ),
             SizedBox(width: 8.dp),
-            Flexible(
+            // Flexible emas — aks holda bubble maxWidth gacha cho'ziladi.
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: SizeController.screenWidth * 0.55),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,25 +252,29 @@ class ChatMessageItem extends StatelessWidget {
   // ---------------------------------------------------------------------------
 
   Widget _text(AppColors c) {
+    // IntrinsicWidth: qisqa matn bubble'ni kontentga qisqartiradi;
+    // tashqi ConstrainedBox maxWidth (~76%) chegara sifatida qoladi.
     return _bubble(
       c,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (message.reply != null) _replyQuote(c, message.reply!),
-          Text(
-            message.displayText.isEmpty ? '—' : message.displayText,
-            style: TextStyle(
-              color: _primaryText(c),
-              fontSize: 15.sp,
-              fontWeight: _out ? FontWeight.w600 : FontWeight.w400,
-              height: 1.3,
+      IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (message.reply != null) _replyQuote(c, message.reply!),
+            Text(
+              message.displayText.isEmpty ? '—' : message.displayText,
+              style: TextStyle(
+                color: _primaryText(c),
+                fontSize: 15.sp,
+                fontWeight: _out ? FontWeight.w600 : FontWeight.w400,
+                height: 1.3,
+              ),
             ),
-          ),
-          SizedBox(height: 4.dp),
-          Align(alignment: Alignment.centerRight, child: _meta(c)),
-        ],
+            SizedBox(height: 4.dp),
+            Align(alignment: Alignment.centerRight, child: _meta(c)),
+          ],
+        ),
       ),
     );
   }

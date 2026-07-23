@@ -75,11 +75,7 @@ class _MyAppState extends State<MyApp> {
       darkTheme: AppTheme.dark,
       themeMode: Get.find<ThemeController>().mode.value,
       locale: _getLanguage(),
-      supportedLocales: const [
-        Locale('uz'),
-        Locale('en'),
-        Locale('ru'),
-      ],
+      supportedLocales: LanguageLocalizations.locales,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -87,12 +83,24 @@ class _MyAppState extends State<MyApp> {
       ],
       builder: (context, child) {
         SizeController.init(context);
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final overlay = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness:
+              isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness:
+              isDark ? Brightness.light : Brightness.dark,
+          systemNavigationBarContrastEnforced: false,
+        );
         return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: transparentSystemUi,
+          value: overlay,
           child: child ?? const SizedBox.shrink(),
         );
       },
-      fallbackLocale: const Locale('uz', 'UZ'),
+      fallbackLocale: LanguageLocalizations.fallbackLocale,
       home: const _BootstrapHome(),
     );
   }

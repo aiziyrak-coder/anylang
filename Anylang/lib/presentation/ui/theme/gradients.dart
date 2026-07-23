@@ -9,9 +9,9 @@ final purpleBlueGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
-// AnyLang asosiy (primary) tugma gradienti — lime. Ikkala temada bir xil.
+// Primary lime — light fonda ham ko'rinadigan to'qroq yashil.
 const LinearGradient limeButtonGradient = LinearGradient(
-  colors: [Color(0xFFD6F24E), Color(0xFFBCDD3E)],
+  colors: [Color(0xFF8BC21A), Color(0xFF6FA00F)],
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
 );
