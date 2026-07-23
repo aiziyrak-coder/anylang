@@ -5,11 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../data/audio/voice_player_service.dart';
+import '../../modal/full_screen_image_dialog.dart';
 import '../../screens/chat/chat_message.dart';
 import '../../utils/size_controller.dart';
 import '../theme/colors.dart';
 import '../theme/gradients.dart';
 import '../waveform_bars.dart';
+
+/// Chat ichidagi rasm bubble kengligi (balandlik aspect ratio bo'yicha).
+const double _kChatImageWidth = 220;
 
 /// Suhbatdagi bitta xabar (ListView elementi). Turiga qarab mos ko'rinishni
 /// chizadi: matn, rasm, ovoz, mahsulot, joylashuv, fayl, kontakt. Reply
@@ -49,7 +53,7 @@ class ChatMessageItem extends StatelessWidget {
             child: InkWell(
               borderRadius: _bubbleRadius,
               onLongPress: onLongPress,
-              child: _body(c),
+              child: _body(context, c),
             ),
           ),
         ),
@@ -57,12 +61,12 @@ class ChatMessageItem extends StatelessWidget {
     );
   }
 
-  Widget _body(AppColors c) {
+  Widget _body(BuildContext context, AppColors c) {
     switch (message.type) {
       case ChatMsgType.text:
         return _text(c);
       case ChatMsgType.image:
-        return _image(c);
+        return _image(context, c);
       case ChatMsgType.voice:
         return _voice(c);
       case ChatMsgType.product:
@@ -235,45 +239,41 @@ class ChatMessageItem extends StatelessWidget {
     );
   }
 
-  Widget _image(AppColors c) {
+  Widget _image(BuildContext context, AppColors c) {
     final url = message.imageUrl;
     final isNet = url != null &&
         (url.startsWith('http://') || url.startsWith('https://'));
     final isFile = url != null && url.isNotEmpty && !isNet;
+    final width = _kChatImageWidth.dp;
 
     Widget media;
     if (isNet) {
-      media = _ChatNetworkImage(
-        url: url,
+      media = _ChatAdaptiveImage(
+        width: width,
         gradient: message.imageGradient ?? prodTealGradient,
-        onOpen: () {
-          HapticFeedback.selectionClick();
-          _openImageViewer(url);
-        },
+        imageProvider: NetworkImage(url),
+        builder: (provider, fit) => Image(
+          image: provider,
+          width: width,
+          fit: fit,
+          gaplessPlayback: true,
+        ),
       );
     } else if (isFile) {
-      media = Image.file(
-        File(url),
-        width: 220.dp,
-        height: 150.dp,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          width: 220.dp,
-          height: 150.dp,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: message.imageGradient ?? prodTealGradient,
-          ),
-          child: Icon(
-            Icons.broken_image_outlined,
-            size: 36.dp,
-            color: c.onAccent.withValues(alpha: 0.45),
-          ),
+      media = _ChatAdaptiveImage(
+        width: width,
+        gradient: message.imageGradient ?? prodTealGradient,
+        imageProvider: FileImage(File(url)),
+        builder: (provider, fit) => Image(
+          image: provider,
+          width: width,
+          fit: fit,
+          gaplessPlayback: true,
         ),
       );
     } else {
       media = Container(
-        width: 220.dp,
+        width: width,
         height: 150.dp,
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -287,21 +287,27 @@ class ChatMessageItem extends StatelessWidget {
       );
     }
 
-    return GestureDetector(
-      onTap: isFile
-          ? () {
-              HapticFeedback.selectionClick();
-              _openImageViewer(url);
-            }
-          : null,
-      child: ClipRRect(
-        borderRadius: _bubbleRadius,
-        child: Stack(
-          children: [
-            media,
-            Positioned(
-              right: 8.dp,
-              bottom: 8.dp,
+    final openable = isNet || isFile;
+    return ClipRRect(
+      borderRadius: _bubbleRadius,
+      child: Stack(
+        children: [
+          media,
+          if (openable)
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => showFullScreenImage(context, url: url),
+                  splashColor: Colors.white.withValues(alpha: 0.22),
+                  highlightColor: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+          Positioned(
+            right: 8.dp,
+            bottom: 8.dp,
+            child: IgnorePointer(
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 3.dp),
                 decoration: BoxDecoration(
@@ -313,20 +319,8 @@ class ChatMessageItem extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openImageViewer(String url) {
-    final ctx = Get.context;
-    if (ctx == null) return;
-    Navigator.of(ctx).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black.withValues(alpha: 0.92),
-        pageBuilder: (_, __, ___) => _ChatImageViewer(url: url),
+          ),
+        ],
       ),
     );
   }
@@ -737,38 +731,110 @@ class ChatMessageItem extends StatelessWidget {
   }
 }
 
-class _ChatNetworkImage extends StatefulWidget {
-  final String url;
+class _ChatAdaptiveImage extends StatefulWidget {
+  final double width;
   final LinearGradient gradient;
-  final VoidCallback onOpen;
+  final ImageProvider imageProvider;
+  final Widget Function(ImageProvider provider, BoxFit fit) builder;
 
-  const _ChatNetworkImage({
-    required this.url,
+  const _ChatAdaptiveImage({
+    required this.width,
     required this.gradient,
-    required this.onOpen,
+    required this.imageProvider,
+    required this.builder,
   });
 
   @override
-  State<_ChatNetworkImage> createState() => _ChatNetworkImageState();
+  State<_ChatAdaptiveImage> createState() => _ChatAdaptiveImageState();
 }
 
-class _ChatNetworkImageState extends State<_ChatNetworkImage> {
-  int _retryKey = 0;
+class _ChatAdaptiveImageState extends State<_ChatAdaptiveImage> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  double? _aspect; // width / height
   bool _failed = false;
+  int _retryKey = 0;
+
+  static const double _fallbackAspect = 220 / 150;
+  static const double _minAspect = 0.55; // juda baland
+  static const double _maxAspect = 2.4; // juda keng
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatAdaptiveImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageProvider != widget.imageProvider) {
+      _failed = false;
+      _aspect = null;
+      _resolve();
+    }
+  }
+
+  void _resolve() {
+    _detach();
+    final stream = widget.imageProvider.resolve(const ImageConfiguration());
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener(
+      (info, _) {
+        final w = info.image.width.toDouble();
+        final h = info.image.height.toDouble();
+        if (w <= 0 || h <= 0) return;
+        final raw = w / h;
+        final clamped = raw.clamp(_minAspect, _maxAspect).toDouble();
+        if (!mounted) return;
+        setState(() {
+          _aspect = clamped;
+          _failed = false;
+        });
+      },
+      onError: (_, __) {
+        if (!mounted) return;
+        setState(() => _failed = true);
+      },
+    );
+    stream.addListener(listener);
+    _stream = stream;
+    _listener = listener;
+  }
+
+  void _detach() {
+    if (_stream != null && _listener != null) {
+      _stream!.removeListener(_listener!);
+    }
+    _stream = null;
+    _listener = null;
+  }
+
+  @override
+  void dispose() {
+    _detach();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final aspect = _aspect ?? _fallbackAspect;
+    final height = widget.width / aspect;
 
     if (_failed) {
       return GestureDetector(
-        onTap: () => setState(() {
-          _failed = false;
-          _retryKey++;
-        }),
+        onTap: () {
+          setState(() {
+            _failed = false;
+            _retryKey++;
+            _aspect = null;
+          });
+          _resolve();
+        },
         child: Container(
-          width: 220.dp,
-          height: 150.dp,
+          width: widget.width,
+          height: height,
           alignment: Alignment.center,
           decoration: BoxDecoration(gradient: widget.gradient),
           child: Icon(
@@ -780,89 +846,31 @@ class _ChatNetworkImageState extends State<_ChatNetworkImage> {
       );
     }
 
-    return GestureDetector(
-      onTap: widget.onOpen,
-      child: Image.network(
-        widget.url,
-        key: ValueKey('${widget.url}_$_retryKey'),
-        width: 220.dp,
-        height: 150.dp,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return Container(
-            width: 220.dp,
-            height: 150.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(gradient: widget.gradient),
-            child: SizedBox(
-              width: 22.dp,
-              height: 22.dp,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: c.onAccent.withValues(alpha: 0.7),
-              ),
-            ),
-          );
-        },
-        errorBuilder: (_, __, ___) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _failed = true);
-          });
-          return Container(
-            width: 220.dp,
-            height: 150.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(gradient: widget.gradient),
-            child: Icon(
-              Icons.broken_image_outlined,
-              size: 36.dp,
-              color: c.onAccent.withValues(alpha: 0.45),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ChatImageViewer extends StatelessWidget {
-  final String url;
-
-  const _ChatImageViewer({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    final isNet = url.startsWith('http://') || url.startsWith('https://');
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: Stack(
-            children: [
-              Center(
-                child: InteractiveViewer(
-                  minScale: 0.8,
-                  maxScale: 4,
-                  child: isNet
-                      ? Image.network(url, fit: BoxFit.contain)
-                      : Image.file(File(url), fit: BoxFit.contain),
+    return SizedBox(
+      width: widget.width,
+      height: height,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(decoration: BoxDecoration(gradient: widget.gradient)),
+          if (_aspect == null)
+            Center(
+              child: SizedBox(
+                width: 22.dp,
+                height: 22.dp,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: c.onAccent.withValues(alpha: 0.7),
                 ),
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
-                ),
-              ),
-            ],
+            ),
+          KeyedSubtree(
+            key: ValueKey(_retryKey),
+            child: widget.builder(widget.imageProvider, BoxFit.cover),
           ),
-        ),
+        ],
       ),
     );
   }
 }
+

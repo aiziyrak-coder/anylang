@@ -6,6 +6,7 @@ import '../../../data/core/mappers.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../modal/full_screen_image_dialog.dart';
 import '../../screens/chat/chat_payload.dart';
 import '../../screens/chat/chat_screen.dart';
 import '../../utils/app_snackbar.dart';
@@ -294,30 +295,43 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                   height: 46.dp,
                 ),
               ),
+            if (url != null && url.isNotEmpty)
+              Positioned.fill(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => showFullScreenImage(context, url: url),
+                    splashColor: Colors.white.withValues(alpha: 0.2),
+                    highlightColor: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
             Positioned(
               top: 12.dp,
               right: 12.dp,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 5.dp),
-                decoration: BoxDecoration(
-                  color: kNavy.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(99.dp),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SvgPicture.asset(
-                      'assets/icons/ic_eye.svg',
-                      width: 13.dp,
-                      height: 13.dp,
-                      colorFilter: ColorFilter.mode(c.accent, BlendMode.srcIn),
-                    ),
-                    SizedBox(width: 5.dp),
-                    Text(
-                      '${_product.views} ${'products_views'.tr}',
-                      style: TextStyle(color: kAvatarFg, fontSize: 12.sp),
-                    ),
-                  ],
+              child: IgnorePointer(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 5.dp),
+                  decoration: BoxDecoration(
+                    color: kNavy.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(99.dp),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/icons/ic_eye.svg',
+                        width: 13.dp,
+                        height: 13.dp,
+                        colorFilter: ColorFilter.mode(c.accent, BlendMode.srcIn),
+                      ),
+                      SizedBox(width: 5.dp),
+                      Text(
+                        '${_product.views} ${'products_views'.tr}',
+                        style: TextStyle(color: kAvatarFg, fontSize: 12.sp),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
