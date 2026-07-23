@@ -134,6 +134,17 @@ async def list_subscriptions(
     return await console.list_subscriptions(db, plan=plan, page=page, limit=limit)
 
 
+@router.get("/plan-catalog")
+async def plan_catalog(
+    _admin: ModeratorPlus,
+    language: str | None = Query(default="uz_UZ"),
+) -> dict:
+    """Same catalog the mobile app uses — for admin grant UX."""
+    from app.services import subscription as subscription_service
+
+    return subscription_service.get_plans(language=language)
+
+
 @router.patch("/subscriptions/{user_id}")
 async def patch_subscription(
     user_id: int,

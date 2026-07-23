@@ -123,7 +123,7 @@ export const uz = {
   },
   subscriptions: {
     title: "Obunalar",
-    subtitle: "Tarifni majburiy o‘zgartirish, uzaytirish yoki bekor qilish",
+    subtitle: "Tarif katalogi, berish, uzaytirish va bekor qilish",
     planAll: "Barcha tariflar",
     colUser: "Foydalanuvchi",
     colPlan: "Tarif",
@@ -133,6 +133,13 @@ export const uz = {
     extend30: "+30 kun",
     cancel: "Bekor qilish",
     activate: "Faollashtirish",
+    stopRenew: "Yangilashni to‘xtat",
+    revokeNow: "Hozir Basic",
+    catalogFree: "Bepul",
+    catalogPrice: "Oylik ${monthly} · Yillik ${yearly}/oy",
+    catalogYearlyTotal: "Yillik jami ${total}",
+    semanticsHint:
+      "«Hozir Basic» — darhol Basic. «Yangilashni to‘xtat» — muddat oxirigacha saqlanadi. Pullik tarif berilganda avtomatik +30 kun qo‘yiladi.",
   },
   payments: {
     title: "To‘lovlar",

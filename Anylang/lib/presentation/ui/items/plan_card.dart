@@ -27,6 +27,8 @@ class PlanCard extends StatelessWidget {
   final String ctaText;
   final VoidCallback? onCta;
   final bool ctaEnabled;
+  /// Optional line under price (e.g. yearly billed total).
+  final String? priceNote;
 
   const PlanCard({
     super.key,
@@ -40,6 +42,7 @@ class PlanCard extends StatelessWidget {
     this.badgeIcon,
     this.onCta,
     this.ctaEnabled = true,
+    this.priceNote,
   });
 
   @override
@@ -99,6 +102,13 @@ class PlanCard extends StatelessWidget {
                   ],
                 ],
               ),
+              if (priceNote != null && priceNote!.isNotEmpty) ...[
+                SizedBox(height: 4.dp),
+                Text(
+                  priceNote!,
+                  style: TextStyle(color: c.textFaint, fontSize: 12.sp),
+                ),
+              ],
               SizedBox(height: 14.dp),
               for (final f in features) _featureRow(c, f),
               SizedBox(height: 16.dp),

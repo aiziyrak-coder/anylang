@@ -14,6 +14,9 @@ class PlanOut(BaseModel):
     is_free: bool
     monthly_price: str | None = None
     yearly_price: str | None = None
+    # Yearly billed total = yearly_price (monthly-equivalent) * 12
+    yearly_total: str | None = None
+    savings_percent: int | None = None
     currency: str = "USD"
     badge: str | None = None
     features: list[PlanFeatureOut]

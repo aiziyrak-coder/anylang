@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/full_screen_image_dialog.dart';
@@ -45,6 +48,7 @@ class ProfileScreen extends Screen<ProfileState, void> {
         }
         state.account.value = ProfileAccount.fromApi(map);
         state.error.value = null;
+        unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
       },
       failure: (err) {
         state.error.value = err.toString();

@@ -137,6 +137,15 @@ class SessionStore {
     return null;
   }
 
+  /// Persist refreshed `/users/me` (or login user) without touching tokens.
+  static Future<void> saveUser(Map<String, dynamic> user) async {
+    await _box.put('user', user);
+    final native = user['native_language']?.toString();
+    if (native != null && native.isNotEmpty) {
+      await _box.put('native_language', normalizeLangCode(native));
+    }
+  }
+
   static int? userId() {
     final id = user()?['id'];
     if (id is int) return id;

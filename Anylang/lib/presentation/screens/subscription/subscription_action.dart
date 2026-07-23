@@ -15,3 +15,7 @@ class SelectPlan extends SubscriptionAction {
 }
 
 class CancelSubscription extends SubscriptionAction {}
+
+class RetryLoadPlans extends SubscriptionAction {}
+
+class CheckPendingPayment extends SubscriptionAction {}

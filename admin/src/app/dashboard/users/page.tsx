@@ -120,9 +120,20 @@ export default function UsersPage() {
   async function grantPlan(userId: number, plan: string) {
     setBusy(true);
     try {
+      const body: Record<string, unknown> = {
+        plan,
+        is_active: true,
+        auto_renew: false,
+      };
+      if (plan !== "basic") {
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 30);
+        body.billing_cycle = "monthly";
+        body.expires_at = expires.toISOString();
+      }
       await apiFetch(`/api/v1/admin/subscriptions/${userId}`, {
         method: "PATCH",
-        body: JSON.stringify({ plan, is_active: true }),
+        body: JSON.stringify(body),
       });
       setToast(t("app.success"));
       await load();

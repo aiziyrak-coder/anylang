@@ -9,6 +9,7 @@ import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../subscription/subscription_screen.dart';
 import 'jonli_action.dart';
 import 'jonli_content.dart';
 import 'jonli_state.dart';
@@ -31,6 +32,20 @@ class JonliScreen extends Screen<JonliState, void> {
     }
   }
 
+  bool _isPremiumRequired(Object? err) {
+    final text = err?.toString().toLowerCase() ?? '';
+    return text.contains('premium') ||
+        text.contains('subscription') ||
+        text.contains('jonli muloqot uchun') ||
+        text.contains('подписк') ||
+        text.contains('тариф');
+  }
+
+  Future<void> _offerPlans() async {
+    showAppMessage('jonli_premium_required'.tr);
+    await navigate(SubscriptionScreen());
+  }
+
   Future<void> _ensureSession() async {
     if (state.sessionId.value != null) return;
     final result = await Get.find<LiveRepository>().startSession(
@@ -42,7 +57,12 @@ class JonliScreen extends Screen<JonliState, void> {
     if (id != null) {
       state.sessionId.value = id;
     } else if (result.errorOrNull != null) {
-      showAppError(result.errorOrNull);
+      final err = result.errorOrNull;
+      if (_isPremiumRequired(err)) {
+        await _offerPlans();
+      } else {
+        showAppError(err);
+      }
     }
   }
 
@@ -76,15 +96,20 @@ class JonliScreen extends Screen<JonliState, void> {
             sessionId: sessionId,
             filePath: recorded.path,
             speaker: speaker,
-            clientTurnId: 't${DateTime.now().microsecondsSinceEpoch}_${_turnSeq++}',
+            clientTurnId:
+                't${DateTime.now().microsecondsSinceEpoch}_${_turnSeq++}',
           );
           final map = asMap(result.dataOrNull);
           if (map == null) {
-            showAppError(result.errorOrNull ?? 'jonli_translate_failed'.tr);
+            final err = result.errorOrNull ?? 'jonli_translate_failed'.tr;
+            if (_isPremiumRequired(err)) {
+              await _offerPlans();
+            } else {
+              showAppError(err);
+            }
             return;
           }
-          state.lastOriginal.value =
-              map['text_original']?.toString() ?? '';
+          state.lastOriginal.value = map['text_original']?.toString() ?? '';
           state.lastTranslated.value =
               map['text_translated']?.toString() ?? '';
           final audioUrl = map['audio_url']?.toString() ??
@@ -105,7 +130,6 @@ class JonliScreen extends Screen<JonliState, void> {
         final my = state.myLanguage.value;
         state.myLanguage.value = state.otherLanguage.value;
         state.otherLanguage.value = my;
-        // Restart session with new languages
         final old = state.sessionId.value;
         if (old != null) {
           await Get.find<LiveRepository>().endSession(old);

@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     payment_provider: str = "mock"  # mock | stripe
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
-    stripe_success_url: str = "http://localhost:3000/billing/success"
-    stripe_cancel_url: str = "http://localhost:3000/billing/cancel"
+    stripe_success_url: str = "https://anylang.uz/billing/success"
+    stripe_cancel_url: str = "https://anylang.uz/billing/cancel"
     allow_mock_payments: bool = False
     allow_mock_translation: bool = False
 

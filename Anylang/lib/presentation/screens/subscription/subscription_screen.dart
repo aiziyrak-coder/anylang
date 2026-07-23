@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/core/buildNetwork/network_client.dart';
+import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/payment_repository.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../ui/items/plan_card.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -18,19 +22,82 @@ import 'subscription_state.dart';
 class SubscriptionScreen extends Screen<SubscriptionState, void> {
   SubscriptionScreen() : super(mobileContent: SubscriptionContent());
 
+  int? _pendingPaymentId;
+  Timer? _pollTimer;
+  AppLifecycleListener? _lifecycle;
+
   @override
   void initState(void payload) {
     state.loading.value = true;
-    _loadPlans();
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (_pendingPaymentId != null) {
+          unawaited(_pollPendingPayment(showWaiting: false));
+        }
+      },
+    );
+    unawaited(_loadAll());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _lifecycle?.dispose();
+    _pendingPaymentId = null;
+    state.awaitingPayment.value = false;
+  }
+
+  Future<void> _loadAll() async {
+    state.loading.value = true;
+    state.loadError.value = false;
+    await _refreshMe();
+    await _loadPlans();
+    state.loading.value = false;
+  }
+
+  Future<void> _refreshMe() async {
+    final result = await Get.find<ProfileRepository>().getMe();
+    result.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) return;
+        unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
+        final sub = map['subscription'];
+        if (sub is Map) {
+          state.currentPlanCode.value =
+              sub['plan']?.toString().toLowerCase();
+          state.expiresAtIso.value = sub['expires_at']?.toString();
+          state.autoRenew.value = sub['auto_renew'] == true;
+        } else {
+          state.currentPlanCode.value = null;
+          state.expiresAtIso.value = null;
+          state.autoRenew.value = false;
+        }
+      },
+      failure: (_) {},
+    );
   }
 
   Future<void> _loadPlans() async {
-    state.loading.value = true;
     final client = Get.find<NetworkClient>();
-    final result = await client.get(api: 'api/v1/subscription/plans');
+    final lang = SessionStore.appLanguage();
+    final result = await client.get(
+      api: 'api/v1/subscription/plans',
+      queryParameters: {'language': lang},
+    );
     result.when(
       success: (data) {
-        if (data is! Map || data['plans'] is! List) return;
+        if (data is! Map || data['plans'] is! List) {
+          state.loadError.value = true;
+          return;
+        }
+        var currentCode = state.currentPlanCode.value;
+        if (currentCode == null) {
+          final userPlan = SessionStore.user()?['subscription'];
+          if (userPlan is Map) {
+            currentCode = userPlan['plan']?.toString().toLowerCase();
+          }
+        }
         final items = <SubscriptionPlan>[];
         for (final raw in data['plans'] as List) {
           if (raw is! Map) continue;
@@ -48,37 +115,48 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           }
           final monthly = raw['monthly_price']?.toString();
           final yearly = raw['yearly_price']?.toString();
+          final yearlyTotal = raw['yearly_total']?.toString();
+          final savings = raw['savings_percent'];
           final code = raw['code']?.toString() ?? '';
-          final userPlan = SessionStore.user()?['subscription'];
-          final currentCode = userPlan is Map
-              ? userPlan['plan']?.toString().toLowerCase()
-              : null;
+          final isCurrent = currentCode != null &&
+              currentCode == code.toLowerCase();
           items.add(SubscriptionPlan(
             code: code,
             title: raw['title']?.toString() ?? '',
             isFree: raw['is_free'] == true,
             monthlyPrice: monthly != null ? '\$$monthly' : '',
             yearlyPrice: yearly != null ? '\$$yearly' : '',
-            badgeText: raw['badge']?.toString(),
+            yearlyTotal: yearlyTotal != null ? '\$$yearlyTotal' : null,
+            savingsPercent: savings is int
+                ? savings
+                : (savings is num ? savings.toInt() : null),
+            badgeText: isCurrent
+                ? 'subscription_badge_current'.tr
+                : raw['badge']?.toString(),
             features: features,
-            isCurrent: raw['is_current'] == true ||
-                (currentCode != null && currentCode == code.toLowerCase()),
+            isCurrent: isCurrent,
           ));
         }
-        if (items.isNotEmpty) {
+        if (items.isEmpty) {
+          state.loadError.value = true;
+          if (kDebugMode) {
+            state.plans.assignAll(kMockSubscriptionPlans);
+          }
+        } else {
           state.plans
             ..clear()
             ..addAll(items);
+          state.loadError.value = false;
         }
       },
       failure: (err) {
         showAppError(err);
+        state.loadError.value = true;
         if (kDebugMode && state.plans.isEmpty) {
           state.plans.assignAll(kMockSubscriptionPlans);
         }
       },
     );
-    state.loading.value = false;
   }
 
   @override
@@ -88,13 +166,82 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         popBackNavigate();
       case SelectBillingCycle a:
         state.billingCycle.value = a.cycle;
+      case RetryLoadPlans _:
+        await _loadAll();
+      case CheckPendingPayment _:
+        await _pollPendingPayment(showWaiting: true);
       case SelectPlan a:
         await _selectPlan(a.plan);
       case CancelSubscription _:
+        await _cancelSubscription();
+    }
+  }
+
+  Future<void> _cancelSubscription() async {
+    final expires = state.expiresAtIso.value;
+    final content = expires != null && expires.isNotEmpty
+        ? 'subscription_cancel_confirm_until'.trParams({
+            'date': _formatExpires(expires),
+          })
+        : 'subscription_cancel_confirm'.tr;
+    final ok = await Get.dialog<bool>(
+      AlertDialog(
+        title: Text('subscription_cancel'.tr),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text('common_cancel'.tr),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: Text(
+              'subscription_cancel'.tr,
+              style: const TextStyle(color: Color(0xFFB42318)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final client = Get.find<NetworkClient>();
+    final result = await client.post(api: 'api/v1/subscription/cancel');
+    result.when(
+      success: (data) async {
+        final map = asMap(data);
+        if (map != null) {
+          await SessionStore.saveUser(Map<String, dynamic>.from(map));
+        }
+        showAppMessage(
+          expires != null && expires.isNotEmpty
+              ? 'subscription_cancelled_until'.trParams({
+                  'date': _formatExpires(expires),
+                })
+              : 'subscription_cancelled'.tr,
+        );
+        await _loadAll();
+      },
+      failure: showAppError,
+    );
+  }
+
+  Future<void> _selectPlan(SubscriptionPlan plan) async {
+    final current = state.currentPlanCode.value;
+    final onPaid = current != null &&
+        current != 'basic' &&
+        (state.expiresAtIso.value?.isNotEmpty ?? false);
+
+    // Switching to Basic while on a paid plan = cancel renew at period end.
+    if (plan.isFree || plan.code == 'basic') {
+      if (onPaid && current != 'basic') {
         final ok = await Get.dialog<bool>(
           AlertDialog(
-            title: Text('subscription_cancel'.tr),
-            content: Text('subscription_cancel_confirm'.tr),
+            title: Text('subscription_downgrade_title'.tr),
+            content: Text(
+              'subscription_downgrade_body'.trParams({
+                'date': _formatExpires(state.expiresAtIso.value!),
+              }),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Get.back(result: false),
@@ -102,38 +249,46 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
               ),
               TextButton(
                 onPressed: () => Get.back(result: true),
-                child: Text(
-                  'subscription_cancel'.tr,
-                  style: const TextStyle(color: Color(0xFFB42318)),
-                ),
+                child: Text('subscription_cancel'.tr),
               ),
             ],
           ),
         );
-        if (ok != true) return;
-        final client = Get.find<NetworkClient>();
-        final result = await client.post(api: 'api/v1/subscription/cancel');
-        result.when(
-          success: (_) {
-            showAppMessage('subscription_cancelled'.tr);
-            popBackNavigate();
-          },
-          failure: showAppError,
-        );
-    }
-  }
-
-  Future<void> _selectPlan(SubscriptionPlan plan) async {
-    if (plan.isFree || plan.code == 'basic') {
+        if (ok == true) {
+          final client = Get.find<NetworkClient>();
+          final result =
+              await client.post(api: 'api/v1/subscription/cancel');
+          result.when(
+            success: (data) async {
+              final map = asMap(data);
+              if (map != null) {
+                await SessionStore.saveUser(Map<String, dynamic>.from(map));
+              }
+              showAppMessage(
+                'subscription_cancelled_until'.trParams({
+                  'date': _formatExpires(state.expiresAtIso.value!),
+                }),
+              );
+              await _loadAll();
+            },
+            failure: showAppError,
+          );
+        }
+        return;
+      }
       final client = Get.find<NetworkClient>();
       final result = await client.post(
         api: 'api/v1/subscription/subscribe',
         data: {'plan': 'basic'},
       );
       result.when(
-        success: (_) {
-          showAppMessage('Basic tarif faollashtirildi');
-          popBackNavigate();
+        success: (data) async {
+          final map = asMap(data);
+          if (map != null) {
+            await SessionStore.saveUser(Map<String, dynamic>.from(map));
+          }
+          showAppMessage('subscription_basic_activated'.tr);
+          await _loadAll();
         },
         failure: showAppError,
       );
@@ -161,25 +316,28 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           final uri = Uri.tryParse(checkoutUrl);
           if (uri != null) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
-            showAppMessage("To'lov sahifasi ochildi");
+          }
+          if (id is num) {
+            _pendingPaymentId = id.toInt();
+            state.awaitingPayment.value = true;
+            _startPollLoop();
+            showAppMessage('subscription_checkout_opened'.tr);
           }
           return;
         }
 
         if (id is num && (kDebugMode || mockConfirm == true)) {
-          if (!kDebugMode && mockConfirm != true) {
-            showAppMessage('subscription_checkout_opened'.tr);
-            return;
-          }
           final confirm = await payments.confirmMock(id.toInt());
-          confirm.when(
-            success: (_) {
-              showAppMessage('${plan.title} faollashtirildi');
-              popBackNavigate();
+          await confirm.when(
+            success: (_) async {
+              showAppMessage(
+                'subscription_activated'.trParams({'plan': plan.title}),
+              );
+              await _loadAll();
             },
-            failure: showAppError,
+            failure: (e) async => showAppError(e),
           );
-        } else if (mockConfirm != true) {
+        } else {
           showAppMessage('subscription_checkout_opened'.tr);
         }
       },
@@ -187,5 +345,71 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         showAppError(e);
       },
     );
+  }
+
+  void _startPollLoop() {
+    _pollTimer?.cancel();
+    var attempts = 0;
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      attempts++;
+      final done = await _pollPendingPayment(showWaiting: false);
+      if (done || attempts >= 40) {
+        _pollTimer?.cancel();
+        if (!done && attempts >= 40) {
+          showAppMessage('subscription_payment_check_hint'.tr);
+        }
+      }
+    });
+  }
+
+  /// Returns true when payment resolved (paid or failed).
+  Future<bool> _pollPendingPayment({required bool showWaiting}) async {
+    final id = _pendingPaymentId;
+    if (id == null) {
+      if (showWaiting) showAppMessage('subscription_payment_check_hint'.tr);
+      return true;
+    }
+    final payments = Get.find<PaymentRepository>();
+    final result = await payments.getPayment(id);
+    var resolved = false;
+    result.when(
+      success: (data) {
+        final map = asMap(data);
+        final status = map?['status']?.toString().toLowerCase();
+        if (status == 'paid' || status == 'succeeded' || status == 'completed') {
+          resolved = true;
+          _pendingPaymentId = null;
+          state.awaitingPayment.value = false;
+          _pollTimer?.cancel();
+          showAppMessage('subscription_payment_success'.tr);
+          unawaited(_loadAll());
+        } else if (status == 'failed' ||
+            status == 'canceled' ||
+            status == 'cancelled') {
+          resolved = true;
+          _pendingPaymentId = null;
+          state.awaitingPayment.value = false;
+          _pollTimer?.cancel();
+          showAppMessage('subscription_payment_failed'.tr);
+        } else if (showWaiting) {
+          showAppMessage('subscription_payment_pending'.tr);
+        }
+      },
+      failure: (err) {
+        if (showWaiting) showAppError(err);
+      },
+    );
+    return resolved;
+  }
+
+  String _formatExpires(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final d = dt.day.toString().padLeft(2, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      return '$d.$m.${dt.year}';
+    } catch (_) {
+      return iso;
+    }
   }
 }

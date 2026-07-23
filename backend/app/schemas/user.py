@@ -7,7 +7,7 @@ AppLanguage = Literal["uz_UZ", "ru_RU", "us_US"]
 Gender = Literal["male", "female"]
 SubscriptionPlan = Literal["basic", "premium", "business"]
 BillingCycle = Literal["monthly", "yearly"]
-SubscriptionSource = Literal["purchase", "number_bonus"]
+SubscriptionSource = Literal["purchase", "number_bonus", "admin"]
 BusinessRole = Literal["manufacturer", "distributor", "retail", "service"]
 
 

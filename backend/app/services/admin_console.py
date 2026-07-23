@@ -274,8 +274,12 @@ async def patch_subscription(
     admin: AdminUser,
     ip: str | None = None,
 ) -> dict[str, Any]:
+    from app.services.subscription import _cycle_delta, _ensure_business_profile
+
     result = await db.execute(
-        select(User).where(User.id == user_id).options(selectinload(User.subscription))
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.subscription), selectinload(User.business))
     )
     user = result.scalar_one_or_none()
     if user is None:
@@ -291,14 +295,45 @@ async def patch_subscription(
         if plan not in {"basic", "premium", "business"}:
             raise AppError(message="Invalid plan", error_code="VALIDATION_ERROR", status_code=400)
         sub.plan = plan
+
     if billing_cycle is not None:
+        if billing_cycle not in {"monthly", "yearly"}:
+            raise AppError(
+                message="Invalid billing_cycle",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
         sub.billing_cycle = billing_cycle
+
     if expires_at is not None:
         sub.expires_at = expires_at
     if auto_renew is not None:
         sub.auto_renew = auto_renew
     if is_active is not None:
         sub.is_active = is_active
+
+    # Granting a paid plan: sensible defaults so mobile status is coherent.
+    if sub.plan in {"premium", "business"} and sub.is_active:
+        now = datetime.now(UTC)
+        if sub.billing_cycle is None:
+            sub.billing_cycle = "monthly"
+        if sub.expires_at is None or sub.expires_at <= now:
+            sub.expires_at = now + _cycle_delta(sub.billing_cycle or "monthly")
+        if sub.started_at is None:
+            sub.started_at = now
+        if auto_renew is None and plan is not None:
+            # Admin grants are time-boxed gifts unless explicitly set to renew.
+            sub.auto_renew = False
+        if sub.plan == "business":
+            await _ensure_business_profile(db, user)
+    elif sub.plan == "basic":
+        sub.billing_cycle = None
+        sub.started_at = None
+        sub.expires_at = None
+        sub.auto_renew = False
+        if is_active is None:
+            sub.is_active = True
+
     sub.source = "admin"
     await db.flush()
     await write_audit(
@@ -307,7 +342,12 @@ async def patch_subscription(
         action="subscription.patch",
         target_type="user",
         target_id=user_id,
-        meta={"plan": sub.plan, "is_active": sub.is_active},
+        meta={
+            "plan": sub.plan,
+            "is_active": sub.is_active,
+            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            "auto_renew": sub.auto_renew,
+        },
         ip=ip,
     )
     return {
@@ -317,6 +357,7 @@ async def patch_subscription(
         "expires_at": sub.expires_at,
         "auto_renew": sub.auto_renew,
         "is_active": sub.is_active,
+        "source": sub.source,
     }
 
 

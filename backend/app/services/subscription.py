@@ -83,10 +83,23 @@ PLAN_TITLES: dict[str, dict[str, str]] = {
     "us_US": {"basic": "Basic", "premium": "Premium", "business": "Business"},
 }
 
+PLAN_BADGES: dict[str, dict[str, str]] = {
+    "uz_UZ": {"business": "SOTUVCHILAR"},
+    "ru_RU": {"business": "ПРОДАВЦЫ"},
+    "us_US": {"business": "SELLERS"},
+}
+
 
 def _resolve_language(language: str | None) -> str:
     if language in FEATURE_TEXTS:
         return language  # type: ignore[return-value]
+    # Accept short codes from mobile session store aliases.
+    aliases = {"uz": "uz_UZ", "ru": "ru_RU", "en": "us_US", "us": "us_US"}
+    if language:
+        short = language.split("_")[0].split("-")[0].lower()
+        mapped = aliases.get(short)
+        if mapped:
+            return mapped
     return "uz_UZ"
 
 
@@ -94,24 +107,37 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
     lang = _resolve_language(language)
     titles = PLAN_TITLES[lang]
     features_map = FEATURE_TEXTS[lang]
+    badges = PLAN_BADGES[lang]
 
     plans: list[dict[str, Any]] = []
     for code in ("basic", "premium", "business"):
         prices = PLAN_PRICES[code]
+        monthly = prices["monthly_price"]
+        yearly = prices["yearly_price"]
+        yearly_total: Decimal | None = None
+        savings_percent: int | None = None
+        if monthly is not None and yearly is not None:
+            yearly_total = yearly * 12
+            if monthly > 0:
+                savings_percent = int(round((1 - float(yearly / monthly)) * 100))
+
         plan: dict[str, Any] = {
             "code": code,
             "title": titles[code],
             "is_free": code == "basic",
-            "monthly_price": str(prices["monthly_price"]) if prices["monthly_price"] is not None else None,
-            "yearly_price": str(prices["yearly_price"]) if prices["yearly_price"] is not None else None,
+            "monthly_price": str(monthly) if monthly is not None else None,
+            "yearly_price": str(yearly) if yearly is not None else None,
+            "yearly_total": str(yearly_total) if yearly_total is not None else None,
+            "savings_percent": savings_percent,
             "currency": "USD",
-            "badge": "SELLERS" if code == "business" else None,
+            "badge": badges.get(code),
             "features": [
                 {"text": text, "included": included} for text, included in features_map[code]
             ],
         }
         if billing_cycle == "monthly":
             plan["yearly_price"] = None
+            plan["yearly_total"] = None
         elif billing_cycle == "yearly":
             plan["monthly_price"] = None
         plans.append(plan)
@@ -147,7 +173,8 @@ async def activate_paid_subscription(
     subscription.billing_cycle = billing_cycle
     subscription.started_at = now
     subscription.expires_at = now + _cycle_delta(billing_cycle)
-    subscription.auto_renew = True
+    # Stripe Checkout is one-shot (mode=payment); no auto-charge until Billing is wired.
+    subscription.auto_renew = False
     subscription.is_active = True
     subscription.source = "purchase"
     if plan == "business":
@@ -252,7 +279,10 @@ async def apply_bonus_subscription(
 
 
 async def expire_subscriptions(db: AsyncSession) -> int:
-    """Downgrade expired paid subscriptions to basic. Returns count updated."""
+    """Downgrade expired paid subscriptions to basic. Returns count updated.
+
+    One-shot Stripe purchases never auto-renew; expire whenever expires_at has passed.
+    """
     now = datetime.now(UTC)
     result = await db.execute(
         select(Subscription).where(
@@ -260,7 +290,6 @@ async def expire_subscriptions(db: AsyncSession) -> int:
             Subscription.is_active.is_(True),
             Subscription.expires_at.is_not(None),
             Subscription.expires_at < now,
-            Subscription.auto_renew.is_(False),
         )
     )
     expired = list(result.scalars().all())

@@ -9,6 +9,8 @@ class SubscriptionPlan {
   final bool isFree;
   final String monthlyPrice;
   final String yearlyPrice;
+  final String? yearlyTotal;
+  final int? savingsPercent;
   final List<PlanFeature> features;
   final bool isCurrent;
   final String? badgeText;
@@ -20,6 +22,8 @@ class SubscriptionPlan {
     this.isFree = false,
     this.monthlyPrice = '',
     this.yearlyPrice = '',
+    this.yearlyTotal,
+    this.savingsPercent,
     this.isCurrent = false,
     this.badgeText,
   });
@@ -44,6 +48,8 @@ const List<SubscriptionPlan> kMockSubscriptionPlans = [
     title: 'Premium',
     monthlyPrice: '\$4.99',
     yearlyPrice: '\$3.99',
+    yearlyTotal: '\$47.88',
+    savingsPercent: 20,
     isCurrent: true,
     badgeText: 'JORIY TARIF',
     features: [
@@ -57,6 +63,8 @@ const List<SubscriptionPlan> kMockSubscriptionPlans = [
     title: 'Business',
     monthlyPrice: '\$19.99',
     yearlyPrice: '\$15.99',
+    yearlyTotal: '\$191.88',
+    savingsPercent: 20,
     badgeText: 'SOTUVCHILAR',
     features: [
       PlanFeature('Premium’dagi barchasi'),

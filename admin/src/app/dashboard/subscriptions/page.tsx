@@ -19,6 +19,7 @@ type Row = {
   expires_at: string | null;
   auto_renew: boolean;
   is_active: boolean;
+  source?: string;
 };
 
 type ListResp = {
@@ -28,14 +29,41 @@ type ListResp = {
   page: number;
 };
 
+type PlanFeature = { text: string; included: boolean };
+type PlanCatalog = {
+  code: string;
+  title: string;
+  is_free: boolean;
+  monthly_price: string | null;
+  yearly_price: string | null;
+  yearly_total: string | null;
+  savings_percent: number | null;
+  currency: string;
+  badge: string | null;
+  features: PlanFeature[];
+};
+
 export default function SubscriptionsPage() {
   const [plan, setPlan] = useState("");
   const [items, setItems] = useState<Row[]>([]);
+  const [catalog, setCatalog] = useState<PlanCatalog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+
+  async function loadCatalog() {
+    try {
+      const res = await apiFetch<{ plans: PlanCatalog[] }>(
+        "/api/v1/admin/plan-catalog?language=uz_UZ",
+      );
+      setCatalog(res.plans ?? []);
+    } catch {
+      // Catalog is informational; list still works.
+    }
+  }
 
   async function load() {
     try {
@@ -51,16 +79,23 @@ export default function SubscriptionsPage() {
   }
 
   useEffect(() => {
+    void loadCatalog();
+  }, []);
+
+  useEffect(() => {
     void load();
   }, [plan, page]);
 
   async function patchSub(userId: number, body: object) {
     setBusyId(userId);
+    setError(null);
+    setToast(null);
     try {
       await apiFetch(`/api/v1/admin/subscriptions/${userId}`, {
         method: "PATCH",
         body: JSON.stringify(body),
       });
+      setToast(t("app.success"));
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("app.error"));
@@ -69,11 +104,43 @@ export default function SubscriptionsPage() {
     }
   }
 
+  async function grantPlan(userId: number, nextPlan: string) {
+    if (nextPlan === "basic") {
+      await patchSub(userId, {
+        plan: "basic",
+        is_active: true,
+        auto_renew: false,
+      });
+      return;
+    }
+    const expires = new Date();
+    expires.setDate(expires.getDate() + 30);
+    await patchSub(userId, {
+      plan: nextPlan,
+      billing_cycle: "monthly",
+      expires_at: expires.toISOString(),
+      is_active: true,
+      auto_renew: false,
+    });
+  }
+
   async function extend30(userId: number, current: string | null) {
     const base = current ? new Date(current) : new Date();
     if (base < new Date()) base.setTime(Date.now());
     base.setDate(base.getDate() + 30);
     await patchSub(userId, { expires_at: base.toISOString(), is_active: true });
+  }
+
+  async function stopRenew(userId: number) {
+    await patchSub(userId, { auto_renew: false });
+  }
+
+  async function revokeNow(userId: number) {
+    await patchSub(userId, {
+      plan: "basic",
+      is_active: true,
+      auto_renew: false,
+    });
   }
 
   return (
@@ -94,7 +161,47 @@ export default function SubscriptionsPage() {
         </select>
       </PageHeader>
 
+      {toast ? <Alert variant="success">{toast}</Alert> : null}
       {error ? <Alert variant="error">{error}</Alert> : null}
+
+      {catalog.length > 0 ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          {catalog.map((p) => (
+            <div key={p.code} className="rounded-xl border bg-white p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold">{p.title}</h3>
+                {p.badge ? (
+                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] uppercase text-zinc-600">
+                    {p.badge}
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-2 text-sm text-zinc-600">
+                {p.is_free
+                  ? t("subscriptions.catalogFree")
+                  : t("subscriptions.catalogPrice", {
+                      monthly: p.monthly_price ?? "—",
+                      yearly: p.yearly_price ?? "—",
+                    })}
+              </p>
+              {p.yearly_total ? (
+                <p className="mt-1 text-xs text-zinc-500">
+                  {t("subscriptions.catalogYearlyTotal", { total: p.yearly_total })}
+                </p>
+              ) : null}
+              <ul className="mt-3 space-y-1 text-xs text-zinc-600">
+                {p.features.map((f) => (
+                  <li key={f.text}>
+                    {f.included ? "✓" : "✗"} {f.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <p className="text-xs text-zinc-500">{t("subscriptions.semanticsHint")}</p>
 
       <div className="overflow-hidden rounded-xl border bg-white">
         <table className="min-w-full text-sm">
@@ -115,13 +222,14 @@ export default function SubscriptionsPage() {
                   <div className="font-medium">{r.full_name}</div>
                   <div className="text-xs text-zinc-500">
                     {r.email} · {r.number}
+                    {r.source ? ` · ${r.source}` : ""}
                   </div>
                 </td>
                 <td className="px-4 py-2">
                   <select
-                    defaultValue={r.plan}
+                    value={r.plan}
                     disabled={busyId === r.user_id}
-                    onChange={(e) => patchSub(r.user_id, { plan: e.target.value, is_active: true })}
+                    onChange={(e) => grantPlan(r.user_id, e.target.value)}
                     className="rounded border px-2 py-1 text-xs"
                   >
                     <option value="basic">{planLabel("basic")}</option>
@@ -137,7 +245,9 @@ export default function SubscriptionsPage() {
                   <button
                     type="button"
                     disabled={busyId === r.user_id}
-                    onClick={() => patchSub(r.user_id, { auto_renew: !r.auto_renew })}
+                    onClick={() =>
+                      patchSub(r.user_id, { auto_renew: !r.auto_renew })
+                    }
                     className="rounded border px-2 py-0.5 text-xs"
                   >
                     {r.auto_renew ? t("app.yes") : t("app.no")}
@@ -153,14 +263,26 @@ export default function SubscriptionsPage() {
                     >
                       {t("subscriptions.extend30")}
                     </button>
-                    <button
-                      type="button"
-                      disabled={busyId === r.user_id}
-                      onClick={() => patchSub(r.user_id, { is_active: !r.is_active })}
-                      className="rounded border px-2 py-1 text-xs"
-                    >
-                      {r.is_active ? t("subscriptions.cancel") : t("subscriptions.activate")}
-                    </button>
+                    {r.auto_renew ? (
+                      <button
+                        type="button"
+                        disabled={busyId === r.user_id}
+                        onClick={() => stopRenew(r.user_id)}
+                        className="rounded border px-2 py-1 text-xs"
+                      >
+                        {t("subscriptions.stopRenew")}
+                      </button>
+                    ) : null}
+                    {r.plan !== "basic" ? (
+                      <button
+                        type="button"
+                        disabled={busyId === r.user_id}
+                        onClick={() => revokeNow(r.user_id)}
+                        className="rounded border border-red-200 px-2 py-1 text-xs text-red-700"
+                      >
+                        {t("subscriptions.revokeNow")}
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>

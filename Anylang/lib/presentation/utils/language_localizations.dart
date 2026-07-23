@@ -416,6 +416,30 @@ class LanguageLocalizations extends Translations {
       'month_12': 'Dekabr',
       'subscription_current_plan_cta': 'Joriy rejangiz',
       'subscription_choose_plan_cta': 'Tarifni tanlash',
+      'subscription_badge_current': 'JORIY TARIF',
+      'subscription_billed_yearly': 'Yillik @total (oylik ekvivalent)',
+      'subscription_load_failed': 'Tariflar yuklanmadi. Qayta urinib ko‘ring.',
+      'subscription_status_active': '@plan — amal qiladi @date gacha',
+      'subscription_status_active_nodate': '@plan — faol',
+      'subscription_status_ending':
+          '@plan — yangilanmaydi, @date gacha amal qiladi',
+      'subscription_cancel_confirm_until':
+          'Avto-yangilash o‘chiriladi. Tarif @date gacha amal qiladi.',
+      'subscription_cancelled_until':
+          'Bekor qilindi. Tarif @date gacha amal qiladi.',
+      'subscription_downgrade_title': 'Basic ga o‘tish',
+      'subscription_downgrade_body':
+          'Joriy tarif darhol o‘chmaydi. Yangilanish to‘xtatiladi va @date dan keyin Basic bo‘ladi.',
+      'subscription_basic_activated': 'Basic tarif faollashtirildi',
+      'subscription_activated': '@plan faollashtirildi',
+      'subscription_check_payment': 'To‘lovni tekshirish',
+      'subscription_payment_success': 'To‘lov qabul qilindi. Tarif yangilandi.',
+      'subscription_payment_failed': 'To‘lov amalga oshmadi',
+      'subscription_payment_pending': 'To‘lov hali yakunlanmagan. Biroz kuting.',
+      'subscription_payment_check_hint':
+          'To‘lovni yakunlab ilovaga qayting, keyin «To‘lovni tekshirish»ni bosing.',
+      'jonli_premium_required':
+          'Jonli muloqot uchun Premium yoki Business kerak',
 
       // Biznes ma'lumot tahrirlash (S17)
       'business_edit_title': 'Biznes ma’lumot',
@@ -866,6 +890,30 @@ class LanguageLocalizations extends Translations {
       'month_12': 'Декабрь',
       'subscription_current_plan_cta': 'Ваш текущий тариф',
       'subscription_choose_plan_cta': 'Выбрать тариф',
+      'subscription_badge_current': 'ТЕКУЩИЙ',
+      'subscription_billed_yearly': 'В год @total (эквивалент в месяц)',
+      'subscription_load_failed': 'Не удалось загрузить тарифы. Повторите.',
+      'subscription_status_active': '@plan — действует до @date',
+      'subscription_status_active_nodate': '@plan — активен',
+      'subscription_status_ending':
+          '@plan — без продления, действует до @date',
+      'subscription_cancel_confirm_until':
+          'Автопродление будет отключено. Тариф действует до @date.',
+      'subscription_cancelled_until':
+          'Отменено. Тариф действует до @date.',
+      'subscription_downgrade_title': 'Переход на Basic',
+      'subscription_downgrade_body':
+          'Текущий тариф не отключится сразу. Продление остановится, и после @date станет Basic.',
+      'subscription_basic_activated': 'Тариф Basic активирован',
+      'subscription_activated': '@plan активирован',
+      'subscription_check_payment': 'Проверить оплату',
+      'subscription_payment_success': 'Оплата принята. Тариф обновлён.',
+      'subscription_payment_failed': 'Оплата не прошла',
+      'subscription_payment_pending': 'Оплата ещё не завершена. Подождите.',
+      'subscription_payment_check_hint':
+          'Завершите оплату и вернитесь в приложение, затем нажмите «Проверить оплату».',
+      'jonli_premium_required':
+          'Для живого общения нужен Premium или Business',
 
       // Редактирование бизнес-данных (S17)
       'business_edit_title': 'Бизнес-данные',
@@ -1316,6 +1364,30 @@ class LanguageLocalizations extends Translations {
       'month_12': 'December',
       'subscription_current_plan_cta': 'Your current plan',
       'subscription_choose_plan_cta': 'Choose plan',
+      'subscription_badge_current': 'CURRENT',
+      'subscription_billed_yearly': 'Billed yearly @total',
+      'subscription_load_failed': 'Could not load plans. Please retry.',
+      'subscription_status_active': '@plan — active until @date',
+      'subscription_status_active_nodate': '@plan — active',
+      'subscription_status_ending':
+          '@plan — will not renew, active until @date',
+      'subscription_cancel_confirm_until':
+          'Auto-renew will be turned off. Your plan stays active until @date.',
+      'subscription_cancelled_until':
+          'Cancelled. Your plan stays active until @date.',
+      'subscription_downgrade_title': 'Switch to Basic',
+      'subscription_downgrade_body':
+          'Your current plan will not end immediately. Renewal stops and you move to Basic after @date.',
+      'subscription_basic_activated': 'Basic plan activated',
+      'subscription_activated': '@plan activated',
+      'subscription_check_payment': 'Check payment',
+      'subscription_payment_success': 'Payment received. Plan updated.',
+      'subscription_payment_failed': 'Payment failed',
+      'subscription_payment_pending': 'Payment not finished yet. Please wait.',
+      'subscription_payment_check_hint':
+          'Finish checkout, return to the app, then tap “Check payment”.',
+      'jonli_premium_required':
+          'Live mode requires Premium or Business',
 
       // Edit business info (S17)
       'business_edit_title': 'Business info',

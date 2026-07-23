@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -98,6 +98,33 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     app.include_router(ws_router)
+
+    _billing_html = """<!DOCTYPE html>
+<html lang="uz"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AnyLang</title></head>
+<body>
+<h1>{title}</h1>
+<p>{body}</p>
+</body></html>"""
+
+    @app.get("/billing/success", response_class=HTMLResponse)
+    async def billing_success() -> HTMLResponse:
+        return HTMLResponse(
+            _billing_html.format(
+                title="To‘lov qabul qilindi",
+                body="Ilovaga qayting — tarif avtomatik yangilanadi.",
+            )
+        )
+
+    @app.get("/billing/cancel", response_class=HTMLResponse)
+    async def billing_cancel() -> HTMLResponse:
+        return HTMLResponse(
+            _billing_html.format(
+                title="To‘lov bekor qilindi",
+                body="Hech narsa yechilmadi. Ilovaga qaytib qayta urinib ko‘ring.",
+            )
+        )
 
     @app.get("/health")
     async def health() -> dict[str, str]:
