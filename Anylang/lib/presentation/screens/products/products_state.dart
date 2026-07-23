@@ -7,4 +7,5 @@ class ProductsState extends GetxController {
   RxString query = ''.obs;
   RxBool loading = true.obs;
   RxBool searching = false.obs;
+  RxBool showingFavorites = false.obs;
 }

@@ -74,26 +74,46 @@ class AddProductScreen extends Screen<AddProductState, void> {
         state.currency.value = a.currency;
       case SelectCategory a:
         state.category.value = a.category;
-      case SaveDraftRequested _:
-        showAppMessage('Qoralama saqlandi (faqat qurilmada)');
-        popBackNavigate();
+      case SaveDraftRequested a:
+        await _submit(
+          state,
+          name: a.name,
+          price: a.price,
+          shortDescription: a.shortDescription,
+          detailedDescription: a.detailedDescription,
+          status: 'draft',
+        );
       case PublishProductRequested a:
-        await _publish(state, a);
+        await _submit(
+          state,
+          name: a.name,
+          price: a.price,
+          shortDescription: a.shortDescription,
+          detailedDescription: a.detailedDescription,
+          status: 'published',
+        );
     }
   }
 
-  Future<void> _publish(
-    AddProductState state,
-    PublishProductRequested a,
-  ) async {
-    final name = a.name.trim();
-    final price = a.price.trim().replaceAll(',', '.');
+  Future<void> _submit(
+    AddProductState state, {
+    required String name,
+    required String price,
+    required String shortDescription,
+    required String detailedDescription,
+    required String status,
+  }) async {
+    name = name.trim();
+    price = price.trim().replaceAll(',', '.');
+    shortDescription = shortDescription.trim();
+    detailedDescription = detailedDescription.trim();
+
     if (name.length < 2) {
-      showAppError('Mahsulot nomi kerak');
+      showAppError('add_product_name_required'.tr);
       return;
     }
     if (price.isEmpty || double.tryParse(price) == null) {
-      showAppError('Narx noto‘g‘ri');
+      showAppError('add_product_price_invalid'.tr);
       return;
     }
     final paths = state.images
@@ -102,7 +122,7 @@ class AddProductScreen extends Screen<AddProductState, void> {
         .where((p) => p.isNotEmpty && File(p).existsSync())
         .toList();
     if (paths.isEmpty) {
-      showAppError('Kamida 1 ta rasm qo‘shing');
+      showAppError('add_product_image_required'.tr);
       return;
     }
 
@@ -115,7 +135,7 @@ class AddProductScreen extends Screen<AddProductState, void> {
         final map = asMap(up.dataOrNull);
         final id = (map?['id'] as num?)?.toInt();
         if (id == null) {
-          showAppError(up.errorOrNull ?? 'Rasm yuklanmadi');
+          showAppError(up.errorOrNull ?? 'add_product_image_upload_failed'.tr);
           return;
         }
         imageIds.add(id);
@@ -123,20 +143,29 @@ class AddProductScreen extends Screen<AddProductState, void> {
       final cat = _kCategoryCodes[state.category.value] ?? 'other';
       final result = await repo.create({
         'name': name,
-        'short_description': a.shortDescription.trim(),
-        'description': a.detailedDescription.trim().isEmpty
-            ? a.shortDescription.trim()
-            : a.detailedDescription.trim(),
+        'short_description': shortDescription,
+        'description': detailedDescription.isEmpty
+            ? shortDescription
+            : detailedDescription,
         'price': price,
         'currency': state.currency.value,
         'category': cat,
         'image_ids': imageIds,
         'primary_image_id': imageIds.first,
-        'status': 'published',
+        'status': status,
       });
       if (result.dataOrNull != null) {
-        showAppMessage('Mahsulot e’lon qilindi');
+        showAppMessage(
+          status == 'draft'
+              ? 'add_product_draft_saved'.tr
+              : 'add_product_published'.tr,
+        );
         popBackNavigate();
+        return;
+      }
+      final err = result.errorOrNull?.toString() ?? '';
+      if (err.contains('NOT_A_BUSINESS') || err.contains('business')) {
+        showAppError('add_product_business_required'.tr);
       } else {
         showAppError(result.errorOrNull ?? 'error'.tr);
       }

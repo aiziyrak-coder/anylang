@@ -14,7 +14,7 @@ class ProductsRepository {
       queryParameters: {
         'page': page,
         'limit': limit,
-        if (q != null && q.isNotEmpty) 'q': q,
+        if (q != null && q.isNotEmpty) 'search': q,
       },
     );
   }

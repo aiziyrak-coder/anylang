@@ -151,17 +151,18 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
           ),
         ),
         SizedBox(width: 10.dp),
-        MyIconButton(
-          onClick: () => sendAction(CallUser()),
-          svgIcon: 'assets/icons/ic_phone.svg',
-          iconColor: c.textPrimary,
-          iconSize: 20.dp,
-          backgroundColor: c.surface,
-          borderRadius: 14.dp,
-          padding: EdgeInsets.all(14.dp),
-          border: Border.all(color: c.outline),
-        ),
-        if (d.business) ...[
+        if ((d.phone).trim().isNotEmpty)
+          MyIconButton(
+            onClick: () => sendAction(CallUser()),
+            svgIcon: 'assets/icons/ic_phone.svg',
+            iconColor: c.textPrimary,
+            iconSize: 20.dp,
+            backgroundColor: c.surface,
+            borderRadius: 14.dp,
+            padding: EdgeInsets.all(14.dp),
+            border: Border.all(color: c.outline),
+          ),
+        if (d.business && (d.website ?? '').trim().isNotEmpty) ...[
           SizedBox(width: 10.dp),
           MyIconButton(
             onClick: () => sendAction(OpenWebsite()),

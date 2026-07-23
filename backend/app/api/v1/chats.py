@@ -90,6 +90,38 @@ async def hide_chat(
     )
 
 
+@router.post("/{chat_id}/mute", status_code=status.HTTP_200_OK)
+async def mute_chat(
+    chat_id: int,
+    db: DbSession,
+    redis: RedisClient,
+    current_user: CurrentUser,
+) -> dict:
+    return await chats_service.set_chat_muted(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        muted=True,
+        redis=redis,
+    )
+
+
+@router.delete("/{chat_id}/mute", status_code=status.HTTP_200_OK)
+async def unmute_chat(
+    chat_id: int,
+    db: DbSession,
+    redis: RedisClient,
+    current_user: CurrentUser,
+) -> dict:
+    return await chats_service.set_chat_muted(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        muted=False,
+        redis=redis,
+    )
+
+
 @router.get("/{chat_id}/messages", response_model=MessageListOut)
 async def list_chat_messages(
     chat_id: int,

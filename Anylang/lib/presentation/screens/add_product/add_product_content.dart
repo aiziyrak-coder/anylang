@@ -157,7 +157,12 @@ class AddProductContent extends ScreenContent<AddProductState> {
                         Expanded(
                           child: SecondaryButton(
                             text: 'add_product_draft'.tr,
-                            onTap: () => sendAction(SaveDraftRequested()),
+                            onTap: () => sendAction(SaveDraftRequested(
+                              name: _nameCtrl.text,
+                              price: _priceCtrl.text,
+                              shortDescription: _shortDescCtrl.text,
+                              detailedDescription: _detailedDescCtrl.text,
+                            )),
                           ),
                         ),
                         SizedBox(width: 12.dp),

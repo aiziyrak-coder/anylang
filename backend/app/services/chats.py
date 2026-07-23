@@ -353,5 +353,49 @@ async def hide_chat(
     return {"id": chat_id, "hidden": True}
 
 
+async def set_chat_muted(
+    db: AsyncSession,
+    *,
+    user: User,
+    chat_id: int,
+    muted: bool,
+    redis: Redis,
+) -> dict:
+    await _get_chat_for_user(db, chat_id, user.id)
+    key = f"chat_muted:{user.id}"
+    if muted:
+        await redis.sadd(key, chat_id)
+    else:
+        await redis.srem(key, chat_id)
+    return {"id": chat_id, "muted": muted}
+
+
+async def is_chat_muted(redis: Redis, *, user_id: int, chat_id: int) -> bool:
+    return bool(await redis.sismember(f"chat_muted:{user_id}", chat_id))
+
+
+async def block_user(redis: Redis, *, user_id: int, peer_id: int) -> dict:
+    if peer_id <= 0 or peer_id == user_id:
+        raise AppError(message="Noto'g'ri foydalanuvchi", error_code="VALIDATION_ERROR", status_code=400)
+    await redis.sadd(f"blocked:{user_id}", peer_id)
+    return {"user_id": peer_id, "blocked": True}
+
+
+async def unblock_user(redis: Redis, *, user_id: int, peer_id: int) -> dict:
+    await redis.srem(f"blocked:{user_id}", peer_id)
+    return {"user_id": peer_id, "blocked": False}
+
+
+async def list_blocked_user_ids(redis: Redis, *, user_id: int) -> list[int]:
+    raw = await redis.smembers(f"blocked:{user_id}")
+    out: list[int] = []
+    for x in raw or []:
+        try:
+            out.append(int(x if not isinstance(x, bytes) else x.decode()))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 async def require_chat_access(db: AsyncSession, chat_id: int, user_id: int) -> Chat:
     return await _get_chat_for_user(db, chat_id, user_id)

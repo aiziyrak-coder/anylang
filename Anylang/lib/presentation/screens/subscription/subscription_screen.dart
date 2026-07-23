@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/core/buildNetwork/network_client.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/payment_repository.dart';
 import '../../ui/items/plan_card.dart';
 import '../../utils/app_snackbar.dart';
@@ -46,14 +48,21 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           }
           final monthly = raw['monthly_price']?.toString();
           final yearly = raw['yearly_price']?.toString();
+          final code = raw['code']?.toString() ?? '';
+          final userPlan = SessionStore.user()?['subscription'];
+          final currentCode = userPlan is Map
+              ? userPlan['plan']?.toString().toLowerCase()
+              : null;
           items.add(SubscriptionPlan(
-            code: raw['code']?.toString() ?? '',
+            code: code,
             title: raw['title']?.toString() ?? '',
             isFree: raw['is_free'] == true,
             monthlyPrice: monthly != null ? '\$$monthly' : '',
             yearlyPrice: yearly != null ? '\$$yearly' : '',
             badgeText: raw['badge']?.toString(),
             features: features,
+            isCurrent: raw['is_current'] == true ||
+                (currentCode != null && currentCode == code.toLowerCase()),
           ));
         }
         if (items.isNotEmpty) {
@@ -64,7 +73,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
       },
       failure: (err) {
         showAppError(err);
-        if (state.plans.isEmpty) {
+        if (kDebugMode && state.plans.isEmpty) {
           state.plans.assignAll(kMockSubscriptionPlans);
         }
       },
@@ -157,7 +166,11 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           return;
         }
 
-        if (id is num) {
+        if (id is num && (kDebugMode || mockConfirm == true)) {
+          if (!kDebugMode && mockConfirm != true) {
+            showAppMessage('subscription_checkout_opened'.tr);
+            return;
+          }
           final confirm = await payments.confirmMock(id.toInt());
           confirm.when(
             success: (_) {
@@ -166,6 +179,8 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
             },
             failure: showAppError,
           );
+        } else if (mockConfirm != true) {
+          showAppMessage('subscription_checkout_opened'.tr);
         }
       },
       failure: (e) async {

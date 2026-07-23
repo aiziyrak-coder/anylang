@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/local/session_store.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/size_controller.dart';
 
@@ -35,6 +36,9 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
 
   Future<void> _unblock(int id) async {
     await SessionStore.setUserBlocked(id, false);
+    if (Get.isRegistered<ProfileRepository>()) {
+      await Get.find<ProfileRepository>().unblockUser(id);
+    }
     setState(() => _ids = SessionStore.blockedUserIds());
   }
 

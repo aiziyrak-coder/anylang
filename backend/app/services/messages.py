@@ -288,6 +288,16 @@ async def create_message(
     chat = await _get_chat_for_user(db, chat_id, user.id)
     recipient = await _load_recipient(db, chat, user.id)
 
+    blocked = await redis.sismember(f"blocked:{user.id}", recipient.id) or await redis.sismember(
+        f"blocked:{recipient.id}", user.id
+    )
+    if blocked:
+        raise AppError(
+            message="Bu foydalanuvchi bilan yozishish mumkin emas",
+            error_code="USER_BLOCKED",
+            status_code=403,
+        )
+
     if msg_type == "text":
         if not text or not text.strip():
             raise AppError(

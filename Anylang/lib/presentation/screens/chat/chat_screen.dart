@@ -243,6 +243,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           name: name,
           size: size is num ? _formatBytes(size.toInt()) : '—',
           ext: ext,
+          url: meta['url']?.toString(),
           status: status,
         );
       case 'product':
@@ -266,6 +267,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           createdAt: created,
           label: meta['label']?.toString() ?? 'chat_preview_location'.tr,
           distance: '',
+          latitude: (meta['latitude'] as num?)?.toDouble(),
+          longitude: (meta['longitude'] as num?)?.toDouble(),
           status: status,
         );
       case 'contact':
@@ -522,6 +525,18 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         final next = !state.muted.value;
         state.muted.value = next;
         await SessionStore.setChatMuted(state.chatId, next);
+        if (state.chatId > 0) {
+          final repo = Get.find<ChatRepository>();
+          final result = next
+              ? await repo.muteChat(state.chatId)
+              : await repo.unmuteChat(state.chatId);
+          if (result.errorOrNull != null) {
+            state.muted.value = !next;
+            await SessionStore.setChatMuted(state.chatId, !next);
+            showAppError(result.errorOrNull);
+            return;
+          }
+        }
         _toast(next ? 'chat_muted'.tr : 'chat_unmuted'.tr);
 
       case ClearChatHistory _:
@@ -571,7 +586,16 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         if (!ok) return;
         if (state.peerId > 0) {
           await SessionStore.setUserBlocked(state.peerId, true);
+          await Get.find<ProfileRepository>().blockUser(state.peerId);
           await Get.find<FriendsRepository>().removeFriend(state.peerId);
+        }
+        if (state.chatId > 0) {
+          await Get.find<ChatRepository>().hideChat(state.chatId);
+          if (Get.isRegistered<MessagesState>()) {
+            Get.find<MessagesState>()
+                .conversations
+                .removeWhere((c) => c.id == state.chatId);
+          }
         }
         await _clearHistory(showToast: false);
         await Get.find<VoiceRecorderService>().cancel();
@@ -939,6 +963,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       createdAt: DateTime.now(),
       label: label,
       distance: '',
+      latitude: pos.latitude,
+      longitude: pos.longitude,
       status: ChatStatus.sent,
     );
     await _sendMetaMessage(

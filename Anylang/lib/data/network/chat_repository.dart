@@ -141,6 +141,14 @@ class ChatRepository {
     return _client.post(api: 'api/v1/chats/$chatId/hide');
   }
 
+  Future<BaseResult> muteChat(int chatId) {
+    return _client.post(api: 'api/v1/chats/$chatId/mute', notify: SnackNotify.none);
+  }
+
+  Future<BaseResult> unmuteChat(int chatId) {
+    return _client.delete(api: 'api/v1/chats/$chatId/mute', notify: SnackNotify.none);
+  }
+
   Future<BaseResult> deleteMessage(int messageId, {bool forEveryone = false}) {
     return _client.delete(
       api: 'api/v1/messages/$messageId',

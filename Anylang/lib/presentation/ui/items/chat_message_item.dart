@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../data/audio/voice_player_service.dart';
 import '../../screens/chat/chat_message.dart';
 import '../../utils/size_controller.dart';
@@ -530,169 +531,207 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Widget _location(AppColors c) {
-    return _bubble(
-      c,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10.dp),
-            child: Container(
-              width: 200.dp,
-              height: 110.dp,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(gradient: prodTealGradient),
-              child: Icon(Icons.location_on, size: 30.dp, color: c.accent),
-            ),
-          ),
-          SizedBox(height: 8.dp),
-          Row(
-            children: [
-              Icon(Icons.place_outlined, size: 14.dp, color: c.accent),
-              SizedBox(width: 4.dp),
-              Flexible(
-                child: Text(
-                  '${message.locationLabel ?? ''} · ${message.locationDistance ?? ''}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
-                ),
+    return GestureDetector(
+      onTap: () async {
+        HapticFeedback.selectionClick();
+        final lat = message.latitude;
+        final lng = message.longitude;
+        final uri = (lat != null && lng != null)
+            ? Uri.parse(
+                'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+              )
+            : Uri.parse(
+                'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(message.locationLabel ?? '')}',
+              );
+        if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+          Get.snackbar('error'.tr, 'maps_open_failed'.tr);
+        }
+      },
+      child: _bubble(
+        c,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10.dp),
+              child: Container(
+                width: 200.dp,
+                height: 110.dp,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(gradient: prodTealGradient),
+                child: Icon(Icons.location_on, size: 30.dp, color: c.accent),
               ),
-            ],
-          ),
-          SizedBox(height: 6.dp),
-          Align(alignment: Alignment.centerRight, child: _meta(c)),
-        ],
+            ),
+            SizedBox(height: 8.dp),
+            Row(
+              children: [
+                Icon(Icons.place_outlined, size: 14.dp, color: c.accent),
+                SizedBox(width: 4.dp),
+                Flexible(
+                  child: Text(
+                    message.locationLabel ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 6.dp),
+            Align(alignment: Alignment.centerRight, child: _meta(c)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _file(AppColors c) {
-    return _bubble(
-      c,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _iconTile(
-                c,
-                child: Text(
-                  message.fileExt ?? '',
-                  style: TextStyle(
-                    color: c.accentText,
-                    fontSize: 10.sp,
-                    fontWeight: FontWeight.w700,
+    return GestureDetector(
+      onTap: () async {
+        final url = message.fileUrl?.trim();
+        if (url == null || url.isEmpty) return;
+        HapticFeedback.selectionClick();
+        final uri = Uri.tryParse(url);
+        if (uri == null ||
+            !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+          Get.snackbar('error'.tr, 'file_open_failed'.tr);
+        }
+      },
+      child: _bubble(
+        c,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _iconTile(
+                  c,
+                  child: Text(
+                    message.fileExt ?? '',
+                    style: TextStyle(
+                      color: c.accentText,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(width: 12.dp),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      message.fileName ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
+                SizedBox(width: 12.dp),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message.fileName ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 3.dp),
-                    Text(
-                      '${message.fileSize ?? ''} · ${message.fileExt ?? ''}',
-                      style: TextStyle(color: c.textFaint, fontSize: 12.sp),
-                    ),
-                  ],
+                      SizedBox(height: 3.dp),
+                      Text(
+                        '${message.fileSize ?? ''} · ${message.fileExt ?? ''}',
+                        style: TextStyle(color: c.textFaint, fontSize: 12.sp),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: 4.dp),
-          Align(alignment: Alignment.centerRight, child: _meta(c)),
-        ],
+              ],
+            ),
+            SizedBox(height: 4.dp),
+            Align(alignment: Alignment.centerRight, child: _meta(c)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _contact(AppColors c) {
-    return _bubble(
-      c,
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 44.dp,
-                height: 44.dp,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: c.accentSoft,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  message.contactInitial ?? '',
-                  style: TextStyle(
-                    color: c.accentText,
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
+    return GestureDetector(
+      onTap: () async {
+        final phone = message.contactPhone?.trim() ?? '';
+        if (phone.isEmpty) return;
+        HapticFeedback.selectionClick();
+        final uri = Uri(scheme: 'tel', path: phone);
+        await launchUrl(uri);
+      },
+      child: _bubble(
+        c,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44.dp,
+                  height: 44.dp,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: c.accentSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    message.contactInitial ?? '',
+                    style: TextStyle(
+                      color: c.accentText,
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(width: 12.dp),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      message.contactName ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
+                SizedBox(width: 12.dp),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message.contactName ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 3.dp),
-                    Text(
-                      message.contactPhone ?? '',
-                      style: TextStyle(color: c.textFaint, fontSize: 12.sp),
-                    ),
-                  ],
+                      SizedBox(height: 3.dp),
+                      Text(
+                        message.contactPhone ?? '',
+                        style: TextStyle(color: c.textFaint, fontSize: 12.sp),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10.dp),
+            Divider(height: 1.dp, thickness: 1, color: c.outline),
+            SizedBox(height: 8.dp),
+            Center(
+              child: Text(
+                'chat_contact_send'.tr,
+                style: TextStyle(
+                  color: c.accentText,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
-          ),
-          SizedBox(height: 10.dp),
-          Divider(height: 1.dp, thickness: 1, color: c.outline),
-          SizedBox(height: 8.dp),
-          Center(
-            child: Text(
-              'chat_contact_send'.tr,
-              style: TextStyle(
-                color: c.accentText,
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w600,
-              ),
             ),
-          ),
-          SizedBox(height: 6.dp),
-          Align(alignment: Alignment.centerRight, child: _meta(c)),
-        ],
+            SizedBox(height: 6.dp),
+            Align(alignment: Alignment.centerRight, child: _meta(c)),
+          ],
+        ),
       ),
     );
   }

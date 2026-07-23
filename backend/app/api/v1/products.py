@@ -29,6 +29,7 @@ async def list_products(
     db: DbSession,
     current_user: CurrentUser,
     search: str | None = None,
+    q: str | None = Query(default=None, description="Alias for search"),
     category: str | None = None,
     min_price: Decimal | None = None,
     max_price: Decimal | None = None,
@@ -41,7 +42,7 @@ async def list_products(
     data = await products_service.list_products(
         db,
         viewer=current_user,
-        search=search,
+        search=search or q,
         category=category,
         min_price=min_price,
         max_price=max_price,

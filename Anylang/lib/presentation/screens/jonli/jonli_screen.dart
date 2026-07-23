@@ -87,6 +87,17 @@ class JonliScreen extends Screen<JonliState, void> {
               map['text_original']?.toString() ?? '';
           state.lastTranslated.value =
               map['text_translated']?.toString() ?? '';
+          final audioUrl = map['audio_url']?.toString() ??
+              map['tts_url']?.toString() ??
+              '';
+          if (audioUrl.isNotEmpty &&
+              Get.isRegistered<VoicePlayerService>()) {
+            await Get.find<VoicePlayerService>().toggle(
+              id: 'jonli_$sessionId',
+              path: audioUrl,
+              duration: const Duration(seconds: 3),
+            );
+          }
         } finally {
           state.busy.value = false;
         }

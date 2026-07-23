@@ -114,7 +114,7 @@ class LoginContent extends ScreenContent<LoginState> {
               LabeledDivider(label: 'or'.tr),
               SizedBox(height: 22.dp),
               Obx(() => RichButton(
-                    text: 'google_coming_soon'.tr,
+                      text: 'google_sign_in'.tr,
                     isLoading: state.isGoogleLoading.value,
                     enabled: !state.isLoading.value,
                     onTap: () => sendAction(GoogleLogin()),

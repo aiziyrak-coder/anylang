@@ -138,11 +138,16 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                           onSelect: (g) => sendAction(SelectProfileGender(g)),
                         )),
                     SizedBox(height: 16.dp),
-                    AppTextField(
-                      label: 'email'.tr,
-                      hint: 'dilnoza@email.com',
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
+                    IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.65,
+                        child: AppTextField(
+                          label: 'email'.tr,
+                          hint: 'dilnoza@email.com',
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                      ),
                     ),
                     SizedBox(height: 28.dp),
                     Obx(() => PrimaryButton(

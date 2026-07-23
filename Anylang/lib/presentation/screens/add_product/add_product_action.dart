@@ -20,7 +20,19 @@ class SelectCategory extends AddProductAction {
   SelectCategory(this.category);
 }
 
-class SaveDraftRequested extends AddProductAction {}
+class SaveDraftRequested extends AddProductAction {
+  final String name;
+  final String price;
+  final String shortDescription;
+  final String detailedDescription;
+
+  SaveDraftRequested({
+    required this.name,
+    required this.price,
+    required this.shortDescription,
+    required this.detailedDescription,
+  });
+}
 
 class PublishProductRequested extends AddProductAction {
   final String name;

@@ -109,9 +109,20 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
         if (name != null && name.isNotEmpty) state.certificates.add(name);
       case AddFactoryImageRequested _:
         final file = await pickImage(context);
-        if (file != null) {
-          state.factoryImages.add(prodOliveGradient);
-          showAppMessage('Rasm tanlandi — saqlashda yuklanadi');
+        if (file == null) return;
+        state.isSaving.value = true;
+        try {
+          final result =
+              await Get.find<ProfileRepository>().uploadFactoryImage(file.path);
+          result.when(
+            success: (_) {
+              state.factoryImages.add(prodOliveGradient);
+              showAppMessage('business_factory_uploaded'.tr);
+            },
+            failure: showAppError,
+          );
+        } finally {
+          state.isSaving.value = false;
         }
       case SaveBusinessInfo a:
         state.isSaving.value = true;

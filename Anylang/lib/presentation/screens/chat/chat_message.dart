@@ -61,11 +61,14 @@ class ChatMessage {
   // location
   final String? locationLabel; // "Do'kon manzili"
   final String? locationDistance; // "1.2 km"
+  final double? latitude;
+  final double? longitude;
 
   // file
   final String? fileName; // "Shartnoma.pdf"
   final String? fileSize; // "248 KB"
   final String? fileExt; // "PDF"
+  final String? fileUrl;
 
   // contact
   final String? contactName;
@@ -95,9 +98,12 @@ class ChatMessage {
     this.productId,
     this.locationLabel,
     this.locationDistance,
+    this.latitude,
+    this.longitude,
     this.fileName,
     this.fileSize,
     this.fileExt,
+    this.fileUrl,
     this.contactName,
     this.contactPhone,
     this.contactInitial,
@@ -142,9 +148,12 @@ class ChatMessage {
         productId: productId,
         locationLabel: locationLabel,
         locationDistance: locationDistance,
+        latitude: latitude,
+        longitude: longitude,
         fileName: fileName,
         fileSize: fileSize,
         fileExt: fileExt,
+        fileUrl: fileUrl,
         contactName: contactName,
         contactPhone: contactPhone,
         contactInitial: contactInitial,
@@ -173,9 +182,12 @@ class ChatMessage {
         productId: productId,
         locationLabel: locationLabel,
         locationDistance: locationDistance,
+        latitude: latitude,
+        longitude: longitude,
         fileName: fileName,
         fileSize: fileSize,
         fileExt: fileExt,
+        fileUrl: fileUrl,
         contactName: contactName,
         contactPhone: contactPhone,
         contactInitial: contactInitial,
@@ -284,6 +296,8 @@ class ChatMessage {
     required String label,
     required String distance,
     DateTime? createdAt,
+    double? latitude,
+    double? longitude,
     ChatStatus status = ChatStatus.read,
   }) =>
       ChatMessage(
@@ -295,6 +309,8 @@ class ChatMessage {
         status: status,
         locationLabel: label,
         locationDistance: distance,
+        latitude: latitude,
+        longitude: longitude,
       );
 
   factory ChatMessage.file({
@@ -305,6 +321,7 @@ class ChatMessage {
     required String size,
     required String ext,
     DateTime? createdAt,
+    String? url,
     ChatStatus status = ChatStatus.read,
   }) =>
       ChatMessage(
@@ -317,6 +334,7 @@ class ChatMessage {
         fileName: name,
         fileSize: size,
         fileExt: ext,
+        fileUrl: url,
       );
 
   factory ChatMessage.contact({

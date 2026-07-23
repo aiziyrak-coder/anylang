@@ -76,7 +76,30 @@ class ProductsScreen extends Screen<ProductsState, void> {
         );
         state.searching.value = false;
       case RefreshProducts _:
+        state.showingFavorites.value = false;
         await _load();
+      case ShowFavorites _:
+        if (state.showingFavorites.value) {
+          state.showingFavorites.value = false;
+          await _load();
+          return;
+        }
+        state.loading.value = true;
+        state.showingFavorites.value = true;
+        final fav = await Get.find<ProductsRepository>().listFavorites();
+        fav.when(
+          success: (data) {
+            final items = asList(data)
+                .whereType<Map>()
+                .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))
+                .toList();
+            state.top.clear();
+            state.all.assignAll(items);
+            if (items.isEmpty) showAppMessage('favorites_empty'.tr);
+          },
+          failure: showAppError,
+        );
+        state.loading.value = false;
       case OpenProduct a:
         showProductInfoBottomSheet(
           context,

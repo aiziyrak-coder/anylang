@@ -30,9 +30,30 @@ class ProductsContent extends ScreenContent<ProductsState> {
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.dp),
-            child: Text(
-              'products_title'.tr,
-              style: TextStyle(color: c.textPrimary, fontSize: 27.sp, fontWeight: FontWeight.w700),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Obx(() => Text(
+                        state.showingFavorites.value
+                            ? 'favorites_title'.tr
+                            : 'products_title'.tr,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 27.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )),
+                ),
+                Obx(() => IconButton(
+                      onPressed: () => sendAction(ShowFavorites()),
+                      icon: Icon(
+                        state.showingFavorites.value
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: c.accent,
+                      ),
+                    )),
+              ],
             ),
           ),
           SizedBox(height: 16.dp),

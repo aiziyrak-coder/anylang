@@ -48,4 +48,26 @@ class ProfileRepository {
   Future<BaseResult> getPublicUser(int userId) {
     return _client.get(api: 'api/v1/users/$userId');
   }
+
+  Future<BaseResult> uploadFactoryImage(String filePath) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath),
+    });
+    return _client.post(
+      api: 'api/v1/users/me/business/factory-images',
+      data: formData,
+    );
+  }
+
+  Future<BaseResult> blockUser(int peerId) {
+    return _client.post(api: 'api/v1/users/me/blocked/$peerId');
+  }
+
+  Future<BaseResult> unblockUser(int peerId) {
+    return _client.delete(api: 'api/v1/users/me/blocked/$peerId');
+  }
+
+  Future<BaseResult> listBlocked() {
+    return _client.get(api: 'api/v1/users/me/blocked');
+  }
 }

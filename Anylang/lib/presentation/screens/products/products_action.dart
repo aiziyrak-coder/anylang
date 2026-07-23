@@ -18,3 +18,6 @@ class OpenProduct extends ProductsAction {
 
 /// Ro'yxatni qayta yuklash (pull-to-refresh).
 class RefreshProducts extends ProductsAction {}
+
+/// Sevimlilar ro'yxatini ko'rsatish.
+class ShowFavorites extends ProductsAction {}

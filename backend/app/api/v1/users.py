@@ -18,6 +18,7 @@ from app.schemas.common import MessageResponse
 from app.schemas.user import BusinessOut, UserOut
 from app.services import admin_console as console
 from app.services import business as business_service
+from app.services import chats as chats_service
 from app.services.admin_ops import client_ip
 from app.services.users import (
     get_public_profile,
@@ -207,6 +208,33 @@ async def search_users_endpoint(
     params = normalize_page(page, limit, default_size=30)
     data = await search_users(db, current_user, query, params)
     return UserSearchOut.model_validate(data)
+
+
+@router.get("/me/blocked")
+async def list_blocked(
+    current_user: CurrentUser,
+    redis: RedisClient,
+) -> dict:
+    ids = await chats_service.list_blocked_user_ids(redis, user_id=current_user.id)
+    return {"items": [{"id": i} for i in ids]}
+
+
+@router.post("/me/blocked/{peer_id}", status_code=status.HTTP_200_OK)
+async def block_peer(
+    peer_id: int,
+    current_user: CurrentUser,
+    redis: RedisClient,
+) -> dict:
+    return await chats_service.block_user(redis, user_id=current_user.id, peer_id=peer_id)
+
+
+@router.delete("/me/blocked/{peer_id}", status_code=status.HTTP_200_OK)
+async def unblock_peer(
+    peer_id: int,
+    current_user: CurrentUser,
+    redis: RedisClient,
+) -> dict:
+    return await chats_service.unblock_user(redis, user_id=current_user.id, peer_id=peer_id)
 
 
 @router.get("/{user_id}", response_model=PublicUserProfileOut)

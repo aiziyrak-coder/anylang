@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
@@ -85,8 +86,57 @@ class ProfileScreen extends Screen<ProfileState, void> {
         await _load();
       case SeeAllListings _:
         await _loadListings();
-        final n = state.account.value?.listings.length ?? 0;
-        showAppMessage(n == 0 ? 'Hali e’lon yo‘q' : '$n ta e’lon yangilandi');
+        final items = state.account.value?.listings ?? const [];
+        if (items.isEmpty) {
+          showAppMessage('profile_listings_empty'.tr);
+          return;
+        }
+        if (!context.mounted) return;
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (ctx) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              maxChildSize: 0.92,
+              minChildSize: 0.4,
+              builder: (_, scroll) => Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).scaffoldBackgroundColor,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: ListView.separated(
+                  controller: scroll,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  itemCount: items.length + 1,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    if (i == 0) {
+                      return Text(
+                        'profile_listings_see_all'.tr,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      );
+                    }
+                    final listing = items[i - 1];
+                    return ListTile(
+                      title: Text(listing.name),
+                      subtitle: Text(listing.price),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await actionHandler(state, OpenOwnListing(listing));
+                      },
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
       case OpenOwnListing a:
         final id = a.listing.id;
         if (id <= 0) {
@@ -103,7 +153,11 @@ class ProfileScreen extends Screen<ProfileState, void> {
         await showProductInfoBottomSheet(
           context,
           product,
-          onOpenBusiness: () {},
+          onOpenBusiness: () async {
+            Navigator.of(context).maybePop();
+            await navigate(EditBusinessInfoScreen());
+            await _load();
+          },
         );
         await _loadListings();
     }

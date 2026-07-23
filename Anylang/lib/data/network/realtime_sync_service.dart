@@ -331,6 +331,7 @@ ChatMessage mapChatMessageFromApi(
         name: name,
         size: size is num ? _formatBytes(size.toInt()) : '—',
         ext: ext,
+        url: meta['url']?.toString(),
         status: status,
       );
     case 'product':
@@ -343,6 +344,7 @@ ChatMessage mapChatMessageFromApi(
             meta['product_name']?.toString() ??
             'Mahsulot',
         price: meta['price']?.toString() ?? '—',
+        productId: (meta['product_id'] as num?)?.toInt(),
         status: status,
       );
     case 'location':
@@ -353,6 +355,8 @@ ChatMessage mapChatMessageFromApi(
         createdAt: created,
         label: meta['label']?.toString() ?? 'Joylashuv',
         distance: '',
+        latitude: (meta['latitude'] as num?)?.toDouble(),
+        longitude: (meta['longitude'] as num?)?.toDouble(),
         status: status,
       );
     case 'contact':
