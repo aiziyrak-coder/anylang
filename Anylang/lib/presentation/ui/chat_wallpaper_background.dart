@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'theme/colors.dart';
 
-/// Chat doodle wallpaper — light/dark asset, blur yo'q (tiniq).
+/// Chat doodle wallpaper — seamless tile (ImageRepeat), blur/seam yo'q.
 class ChatWallpaperBackground extends StatelessWidget {
   final Widget child;
 
@@ -16,29 +16,23 @@ class ChatWallpaperBackground extends StatelessWidget {
     final c = context.appColors;
     final asset = c.isDark ? darkAsset : lightAsset;
     final base = c.isDark ? const Color(0xFF000000) : const Color(0xFFF3EAF8);
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    // 4x tile asset → scale ~2–2.5 so pattern crisp, not huge.
+    final scale = (dpr >= 3) ? 2.2 : (dpr >= 2 ? 2.0 : 1.6);
 
-    return ColoredBox(
-      color: base,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            asset,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.high,
-            isAntiAlias: true,
-            gaplessPlayback: true,
-          ),
-          // Juda yengil overlay — o'qilish uchun, pattern ko'rinib turadi.
-          ColoredBox(
-            color: c.isDark
-                ? const Color(0x1A000000)
-                : const Color(0x0AFFFFFF),
-          ),
-          child,
-        ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: base,
+        image: DecorationImage(
+          image: AssetImage(asset),
+          repeat: ImageRepeat.repeat,
+          alignment: Alignment.topLeft,
+          scale: scale,
+          filterQuality: FilterQuality.high,
+          opacity: c.isDark ? 0.92 : 0.78,
+        ),
       ),
+      child: SizedBox.expand(child: child),
     );
   }
 }

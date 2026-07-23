@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from PIL import Image
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -64,6 +64,9 @@ MEDIA_RULES: dict[str, dict] = {
 
 def _pick_translation_text(message: Message, viewer_language: str) -> str | None:
     """Viewer tilidagi tarjimani qaytaradi; bo'sh qatorni e'tiborsiz qoldiradi."""
+    insp = sa_inspect(message)
+    if "translations" in insp.unloaded:
+        return None
     lang = _normalize_lang(viewer_language)
     for tr in message.translations or []:
         if _normalize_lang(tr.language) != lang:
@@ -166,6 +169,13 @@ def _serialize_message(
     if read_message_ids is not None:
         read_by_recipient = message.id in read_message_ids
 
+    # Avoid async lazy-load (MissingGreenlet) when translations not eager-loaded.
+    insp = sa_inspect(message)
+    if "translations" in insp.unloaded:
+        tr_list: list[MessageTranslation] = []
+    else:
+        tr_list = list(message.translations or [])
+
     return {
         "id": message.id,
         "chat_id": message.chat_id,
@@ -184,7 +194,7 @@ def _serialize_message(
         "deleted_for_everyone": message.deleted_for_everyone,
         "translations": [
             {"language": t.language, "text": t.text, "status": t.status}
-            for t in (message.translations or [])
+            for t in tr_list
         ],
         "read_by_recipient": read_by_recipient,
         "created_at": message.created_at,
@@ -395,6 +405,8 @@ async def create_message(
         status="sent",
         delivered_at=now,
     )
+    # Async: relationship lazy-load → MissingGreenlet. Serialize oldidan bo'sh list.
+    message.translations = []
     db.add(message)
     await db.flush()
 
@@ -490,9 +502,8 @@ async def create_message(
 
         if translations:
             await db.flush()
-            await db.refresh(message, attribute_names=["translations"])
+            # Explicit assign — avoid refresh/lazy-load MissingGreenlet.
             message.translations = translations
-            # Tarjima tayyor bo'lsa — qabul qiluvchiga yangilangan matnni qayta yuboramiz.
             if status == "done" and translated != text:
                 payload = await _publish(message)
 
