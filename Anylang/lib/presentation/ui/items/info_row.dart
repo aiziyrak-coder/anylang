@@ -46,7 +46,11 @@ class InfoRow extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           if (value.isNotEmpty) ...[
@@ -56,15 +60,15 @@ class InfoRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: valueColor ?? c.textPrimary,
-                fontSize: 14.sp,
+                color: valueColor ?? c.textSecondary,
+                fontSize: 13.sp,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
           if (showChevron) ...[
             SizedBox(width: 4.dp),
-            Icon(Icons.chevron_right_rounded, size: 20.dp, color: c.textFaint),
+            Icon(Icons.chevron_right_rounded, size: 20.dp, color: c.textSecondary),
           ],
         ],
       ),

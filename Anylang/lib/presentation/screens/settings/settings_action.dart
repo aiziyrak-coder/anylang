@@ -20,6 +20,8 @@ class SelectAppLanguage extends SettingsAction {
 class OpenProfileVisibility extends SettingsAction {}
 class OpenBlockedUsers extends SettingsAction {}
 class OpenChangePassword extends SettingsAction {}
+class OpenEditProfileFromSettings extends SettingsAction {}
+class OpenSubscriptionFromSettings extends SettingsAction {}
 class SettingsLogoutRequested extends SettingsAction {}
 
 class SettingsDeleteAccountRequested extends SettingsAction {}

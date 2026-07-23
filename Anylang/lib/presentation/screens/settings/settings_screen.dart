@@ -10,14 +10,17 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../forgot_password/forgot_password_screen.dart';
 import '../login/login_screen.dart';
+import '../profile_edit/profile_edit_screen.dart';
 import '../select_language/select_language_option.dart';
+import '../subscription/subscription_screen.dart';
 import '../../modal/simple_list_picker_bottom_sheet.dart';
 import 'blocked_users_bottom_sheet.dart';
 import 'settings_action.dart';
 import 'settings_content.dart';
+import 'settings_payload.dart';
 import 'settings_state.dart';
 
-class SettingsScreen extends Screen<SettingsState, void> {
+class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
   SettingsScreen() : super(mobileContent: SettingsContent());
 
   static const _visibilityKeys = ['everyone', 'friends', 'nobody'];
@@ -32,7 +35,8 @@ class SettingsScreen extends Screen<SettingsState, void> {
   }
 
   @override
-  void initState(void payload) {
+  void initState(SettingsPayload? payload) {
+    state.focus.value = payload?.focus ?? SettingsFocus.app;
     final locale = Get.locale;
     if (locale != null) {
       final code = '${locale.languageCode}_${locale.countryCode}';
@@ -42,8 +46,10 @@ class SettingsScreen extends Screen<SettingsState, void> {
       );
       state.currentLanguageKey.value = match.key;
     }
-    state.newMessagesEnabled.value = SessionStore.newMessagesNotificationsEnabled();
-    state.friendRequestsEnabled.value = SessionStore.friendRequestsNotificationsEnabled();
+    state.newMessagesEnabled.value =
+        SessionStore.newMessagesNotificationsEnabled();
+    state.friendRequestsEnabled.value =
+        SessionStore.friendRequestsNotificationsEnabled();
     state.marketingEnabled.value = SessionStore.marketingNotificationsEnabled();
     state.profileVisibilityKey.value = SessionStore.profileVisibility();
   }
@@ -130,6 +136,10 @@ class SettingsScreen extends Screen<SettingsState, void> {
         await showBlockedUsersBottomSheet(context);
       case OpenChangePassword _:
         navigate(ForgotPasswordScreen());
+      case OpenEditProfileFromSettings _:
+        await navigate(ProfileEditScreen());
+      case OpenSubscriptionFromSettings _:
+        await navigate(SubscriptionScreen());
     }
   }
 }

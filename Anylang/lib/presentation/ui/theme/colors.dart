@@ -80,10 +80,9 @@ class AppColors extends ThemeExtension<AppColors> {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// Fon/surface ustida to'g'ridan-to'g'ri yoziladigan akssent matn uchun —
-  /// light temada `accent` (lime) past kontrastli, shuning uchun to'qroq
-  /// soya ishlatiladi; dark temada oddiy `accent` bilan bir xil.
-  Color get accentText => isDark ? accent : const Color(0xFF7D8A1E);
+  /// Light temada lime ustida matn past kontrast — to'q zaytun.
+  Color get accentText =>
+      isDark ? accent : const Color(0xFF3F4A0A);
 
   /// Onboarding illyustratsiya kartasi foni — yuqorida akssent tint, pastda
   /// surface'ga o'tuvchi nozik gradient.
@@ -92,7 +91,7 @@ class AppColors extends ThemeExtension<AppColors> {
         end: Alignment.bottomCenter,
         colors: [
           accent.withValues(alpha: isDark ? 0.12 : 0.16),
-          isDark ? const Color(0xFF0C2136) : const Color(0xFFF3F6FB),
+          isDark ? const Color(0xFF0C2136) : const Color(0xFFD5E0EC),
         ],
       );
 
@@ -147,50 +146,51 @@ class AppColors extends ThemeExtension<AppColors> {
 
 const AppColors lightAppColors = AppColors(
   brightness: Brightness.light,
-  background: Color(0xFFF5F8FC),
+  // To'qroq, ochiq-kulrang emas — navy tintli fon (matn yaxshi o'qiladi).
+  background: Color(0xFFE6EDF5),
   backgroundGradient: LinearGradient(
-    colors: [Color(0xFFF7F9FC), Color(0xFFE9EEF5)],
+    colors: [Color(0xFFDCE6F2), Color(0xFFCBD8E8), Color(0xFFB8C9DC)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   ),
-  surface: Color(0xFFFFFFFF),
-  surfaceBorder: Color(0xFFE6ECF3),
-  textPrimary: Color(0xFF0B2545),
-  textSecondary: Color(0xFF5E6E85),
-  textFaint: Color(0xFF93A0B4),
+  surface: Color(0xFFF7FAFD),
+  surfaceBorder: Color(0xFF9AADC4),
+  textPrimary: Color(0xFF061526),
+  textSecondary: Color(0xFF2F4258),
+  textFaint: Color(0xFF4A5F78),
   accent: kLime,
   onAccent: kNavy,
-  accentSoft: Color(0x24CBE84C),
-  outline: Color(0xFFE6ECF3),
+  accentSoft: Color(0x40A8C230),
+  outline: Color(0xFF8FA3BB),
   logoTileBg: kNavy,
-  toggleTrackOff: Color(0x260B2545),
+  toggleTrackOff: Color(0x40061526),
   toggleThumbOn: Colors.white,
   toggleThumbOff: Colors.white,
-  segmentTrackBg: Color(0x0D0B2545),
+  segmentTrackBg: Color(0x22061526),
 );
 
 const AppColors darkAppColors = AppColors(
   brightness: Brightness.dark,
-  background: Color(0xFF0A2340),
+  background: Color(0xFF071B31),
   backgroundGradient: LinearGradient(
-    colors: [Color(0xFF071B31), Color(0xFF0A2340), Color(0xFF07203A)],
+    colors: [Color(0xFF041526), Color(0xFF0A2340), Color(0xFF0C2B4A)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   ),
-  surface: Color(0x0DFFFFFF),
-  surfaceBorder: Color(0x14FFFFFF),
-  textPrimary: Color(0xFFEAF1F8),
-  textSecondary: Color(0xFF8FA3BB),
-  textFaint: Color(0xFF6E829B),
+  surface: Color(0xFF122C48),
+  surfaceBorder: Color(0xFF2A4A6B),
+  textPrimary: Color(0xFFF2F7FC),
+  textSecondary: Color(0xFFB4C5D8),
+  textFaint: Color(0xFF8FA3BB),
   accent: kLime,
   onAccent: kNavy,
-  accentSoft: Color(0x1FCBE84C),
-  outline: Color(0x1AFFFFFF),
+  accentSoft: Color(0x33CBE84C),
+  outline: Color(0xFF2A4A6B),
   logoTileBg: Color(0xFF0F2A49),
-  toggleTrackOff: Color(0x1FFFFFFF),
+  toggleTrackOff: Color(0x33FFFFFF),
   toggleThumbOn: kNavy,
-  toggleThumbOff: Color(0xFF8FA3BB),
-  segmentTrackBg: Color(0x40000000),
+  toggleThumbOff: Color(0xFFB4C5D8),
+  segmentTrackBg: Color(0x66000000),
 );
 
 /// UI'da qisqa foydalanish uchun: `context.appColors.background`.

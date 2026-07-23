@@ -60,7 +60,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
               SizedBox(height: 18.dp),
               if (d.isBusiness) _statsRow(c, d) else _infoCard(c, d),
               SizedBox(height: 18.dp),
-              d.isBusiness ? _businessActions(sendAction) : _personalActions(sendAction),
+              d.isBusiness ? _businessActions(c, sendAction) : _personalActions(c, sendAction),
               if (d.isBusiness) ...[
                 SizedBox(height: 22.dp),
                 _listingsSection(c, d, sendAction),
@@ -182,7 +182,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
     );
   }
 
-  Widget _personalActions(void Function(MyAction) sendAction) {
+  Widget _personalActions(AppColors c, void Function(MyAction) sendAction) {
     return Column(
       children: [
         PrimaryButton(
@@ -196,35 +196,137 @@ class ProfileContent extends ScreenContent<ProfileState> {
           startIcon: Icon(Icons.edit_outlined, size: 18.dp),
           onTap: () => sendAction(EditPersonalProfile()),
         ),
-        SizedBox(height: 12.dp),
-        SecondaryButton(
-          text: 'profile_settings'.tr,
-          startIcon: Icon(Icons.settings_outlined, size: 18.dp),
-          onTap: () => sendAction(OpenSettings()),
+        SizedBox(height: 18.dp),
+        _settingsHub(c, sendAction),
+      ],
+    );
+  }
+
+  Widget _businessActions(AppColors c, void Function(MyAction) sendAction) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: SecondaryButton(
+                text: 'profile_edit'.tr,
+                startIcon: Icon(Icons.edit_outlined, size: 18.dp),
+                onTap: () => sendAction(EditBusinessInfo()),
+              ),
+            ),
+            SizedBox(width: 10.dp),
+            Expanded(
+              child: PrimaryButton(
+                text: 'profile_add_product'.tr,
+                startIcon: const Icon(Icons.add_rounded, color: kNavy, size: 20),
+                onTap: () => sendAction(AddProductRequested()),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 18.dp),
+        _settingsHub(c, sendAction),
+      ],
+    );
+  }
+
+  Widget _settingsHub(AppColors c, void Function(MyAction) sendAction) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'profile_settings_hub'.tr.toUpperCase(),
+          style: TextStyle(
+            color: c.textSecondary,
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+          ),
+        ),
+        SizedBox(height: 10.dp),
+        _settingsTile(
+          c,
+          icon: Icons.tune_rounded,
+          title: 'settings_app_title'.tr,
+          subtitle: 'settings_app_desc'.tr,
+          onTap: () => sendAction(OpenAppSettings()),
+        ),
+        SizedBox(height: 10.dp),
+        _settingsTile(
+          c,
+          icon: Icons.manage_accounts_rounded,
+          title: 'settings_account_title'.tr,
+          subtitle: 'settings_account_desc'.tr,
+          onTap: () => sendAction(OpenAccountSettings()),
         ),
       ],
     );
   }
 
-  Widget _businessActions(void Function(MyAction) sendAction) {
-    return Row(
-      children: [
-        Expanded(
-          child: SecondaryButton(
-            text: 'profile_edit'.tr,
-            startIcon: Icon(Icons.edit_outlined, size: 18.dp),
-            onTap: () => sendAction(EditBusinessInfo()),
+  Widget _settingsTile(
+    AppColors c, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: c.surface,
+      borderRadius: BorderRadius.circular(16.dp),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.all(14.dp),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16.dp),
+            border: Border.all(color: c.surfaceBorder, width: 1.2),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42.dp,
+                height: 42.dp,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: c.accentSoft,
+                  borderRadius: BorderRadius.circular(12.dp),
+                ),
+                child: Icon(icon, color: c.accentText, size: 22.dp),
+              ),
+              SizedBox(width: 12.dp),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 2.dp),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: c.textSecondary,
+                        fontSize: 12.sp,
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: c.textSecondary, size: 22.dp),
+            ],
           ),
         ),
-        SizedBox(width: 10.dp),
-        Expanded(
-          child: PrimaryButton(
-            text: 'profile_add_product'.tr,
-            startIcon: const Icon(Icons.add_rounded, color: kNavy, size: 20),
-            onTap: () => sendAction(AddProductRequested()),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

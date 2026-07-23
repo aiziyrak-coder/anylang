@@ -7,7 +7,13 @@ class ProfileAction extends MyAction {}
 /// "Tariflar" tugmasi bosilganda (S16).
 class OpenSubscription extends ProfileAction {}
 
-/// "Sozlamalar" tugmasi bosilganda (S15).
+/// "Tizim sozlamalari" — til, tema, bildirishnomalar.
+class OpenAppSettings extends ProfileAction {}
+
+/// "Akkaunt sozlamalari" — maxfiylik, parol, chiqish.
+class OpenAccountSettings extends ProfileAction {}
+
+/// Eski yo'l — umumiy sozlamalar (tizim).
 class OpenSettings extends ProfileAction {}
 
 /// Shaxsiy profil — "Tahrirlash" tugmasi bosilganda.

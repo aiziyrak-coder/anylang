@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
+import 'settings_payload.dart';
 
 class SettingsState extends GetxController {
+  Rx<SettingsFocus> focus = SettingsFocus.app.obs;
   RxBool newMessagesEnabled = true.obs;
   RxBool friendRequestsEnabled = true.obs;
   RxBool marketingEnabled = false.obs;
@@ -8,7 +10,5 @@ class SettingsState extends GetxController {
   /// Profil ko'rinishi: everyone | friends | nobody
   RxString profileVisibilityKey = 'everyone'.obs;
 
-  // Joriy ilova tilining kaliti (LanguageOption.key). Boshlang'ich qiymat
-  // Screen.initState'da joriy tildan beriladi.
   RxString currentLanguageKey = 'lang_name_uz'.obs;
 }

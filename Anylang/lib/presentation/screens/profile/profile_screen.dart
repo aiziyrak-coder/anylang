@@ -12,6 +12,7 @@ import '../edit_business_info/edit_business_info_screen.dart';
 import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
 import '../profile_edit/profile_edit_screen.dart';
+import '../settings/settings_payload.dart';
 import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
 import 'profile_account.dart';
@@ -73,7 +74,22 @@ class ProfileScreen extends Screen<ProfileState, void> {
         await navigate(SubscriptionScreen());
         await _load();
       case OpenSettings _:
-        await navigate(SettingsScreen());
+        await navigate(
+          SettingsScreen(),
+          payload: const SettingsPayload(focus: SettingsFocus.app),
+        );
+        await _load();
+      case OpenAppSettings _:
+        await navigate(
+          SettingsScreen(),
+          payload: const SettingsPayload(focus: SettingsFocus.app),
+        );
+        await _load();
+      case OpenAccountSettings _:
+        await navigate(
+          SettingsScreen(),
+          payload: const SettingsPayload(focus: SettingsFocus.account),
+        );
         await _load();
       case EditPersonalProfile _:
         await navigate(ProfileEditScreen(), payload: state.account.value);
