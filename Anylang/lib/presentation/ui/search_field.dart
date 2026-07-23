@@ -44,9 +44,10 @@ class _SearchFieldState extends State<SearchField> {
     final c = context.appColors;
     return Container(
       decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(14.dp),
-        border: Border.all(color: c.surfaceBorder),
+        color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+        borderRadius: BorderRadius.circular(16.dp),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+        boxShadow: c.glassShadow,
       ),
       padding: EdgeInsets.symmetric(horizontal: 12.dp),
       child: Row(

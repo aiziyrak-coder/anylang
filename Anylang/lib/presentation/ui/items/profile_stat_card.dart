@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../glass_surface.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 
@@ -13,19 +14,19 @@ class ProfileStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.appColors;
 
-    return Container(
+    return GlassSurface(
+      borderRadius: BorderRadius.circular(16.dp),
       padding: EdgeInsets.symmetric(vertical: 14.dp),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(14.dp),
-        border: Border.all(color: c.outline),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             value,
-            style: TextStyle(color: c.textPrimary, fontSize: 18.sp, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           SizedBox(height: 2.dp),
           Text(

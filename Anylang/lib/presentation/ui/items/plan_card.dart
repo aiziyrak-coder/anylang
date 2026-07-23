@@ -56,9 +56,15 @@ class PlanCard extends StatelessWidget {
         Container(
           padding: EdgeInsets.fromLTRB(18.dp, 20.dp, 18.dp, 18.dp),
           decoration: BoxDecoration(
-            color: highlighted ? c.accentSoft : c.surface,
+            color: highlighted
+                ? c.accentSoft
+                : (c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF)),
             borderRadius: radius,
-            border: Border.all(color: highlighted ? c.accent : c.outline, width: highlighted ? 1.6 : 1),
+            border: Border.all(
+              color: highlighted ? c.accent.withValues(alpha: 0.55) : c.surfaceBorder,
+              width: highlighted ? 1.2 : 0.7,
+            ),
+            boxShadow: c.glassShadow,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

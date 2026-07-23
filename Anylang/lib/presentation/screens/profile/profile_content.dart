@@ -218,16 +218,17 @@ class ProfileContent extends ScreenContent<ProfileState> {
     for (var i = 0; i < rows.length; i++) {
       children.add(rows[i]);
       if (i != rows.length - 1) {
-        children.add(Divider(height: 1.dp, thickness: 1.dp, color: c.outline));
+        children.add(Divider(height: 1.dp, thickness: 0.5, color: c.outline));
       }
     }
 
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(16.dp),
-        border: Border.all(color: c.outline),
+        color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+        borderRadius: BorderRadius.circular(18.dp),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+        boxShadow: c.glassShadow,
       ),
       child: Column(children: children),
     );
@@ -362,16 +363,19 @@ class ProfileContent extends ScreenContent<ProfileState> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: c.surface,
-      borderRadius: BorderRadius.circular(16.dp),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18.dp),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Container(
+        borderRadius: BorderRadius.circular(18.dp),
+        child: Ink(
           padding: EdgeInsets.all(14.dp),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16.dp),
-            border: Border.all(color: c.surfaceBorder, width: 1.2),
+            color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+            borderRadius: BorderRadius.circular(18.dp),
+            border: Border.all(color: c.surfaceBorder, width: 0.7),
+            boxShadow: c.glassShadow,
           ),
           child: Row(
             children: [
@@ -381,7 +385,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: c.accentSoft,
-                  borderRadius: BorderRadius.circular(12.dp),
+                  borderRadius: BorderRadius.circular(14.dp),
                 ),
                 child: Icon(icon, color: c.accentText, size: 22.dp),
               ),
@@ -395,7 +399,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                       style: TextStyle(
                         color: c.textPrimary,
                         fontSize: 15.sp,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     SizedBox(height: 2.dp),
@@ -415,7 +419,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: c.textSecondary,
+                color: c.textFaint,
                 size: 22.dp,
               ),
             ],

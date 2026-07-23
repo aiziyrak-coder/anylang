@@ -138,7 +138,7 @@ class ChatComposer extends StatelessWidget {
           iconColor: c.accentText,
           iconSize: 22.dp,
           backgroundColor: c.surface,
-          border: Border.all(color: c.surfaceBorder),
+          border: Border.all(color: c.surfaceBorder, width: 0.7),
           borderRadius: 22.dp,
           padding: EdgeInsets.all(10.dp),
         ),
@@ -149,8 +149,8 @@ class ChatComposer extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 16.dp),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: c.surface,
-              border: Border.all(color: c.surfaceBorder),
+              color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+              border: Border.all(color: c.surfaceBorder, width: 0.7),
               borderRadius: BorderRadius.circular(22.dp),
             ),
             child: TextField(
@@ -220,7 +220,7 @@ class ChatComposer extends StatelessWidget {
           iconColor: kListenRed,
           iconSize: 22.dp,
           backgroundColor: c.surface,
-          border: Border.all(color: c.surfaceBorder),
+          border: Border.all(color: c.surfaceBorder, width: 0.7),
           borderRadius: 22.dp,
           padding: EdgeInsets.all(10.dp),
         ),
@@ -230,8 +230,8 @@ class ChatComposer extends StatelessWidget {
             height: 44.dp,
             padding: EdgeInsets.symmetric(horizontal: 14.dp),
             decoration: BoxDecoration(
-              color: c.surface,
-              border: Border.all(color: c.surfaceBorder),
+              color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+              border: Border.all(color: c.surfaceBorder, width: 0.7),
               borderRadius: BorderRadius.circular(22.dp),
             ),
             child: Row(

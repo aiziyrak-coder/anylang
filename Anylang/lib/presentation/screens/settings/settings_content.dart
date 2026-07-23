@@ -219,9 +219,10 @@ class SettingsContent extends ScreenContent<SettingsState> {
     return Container(
       padding: EdgeInsets.all(16.dp),
       decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(18.dp),
-        border: Border.all(color: c.surfaceBorder, width: 1.2),
+        color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+        borderRadius: BorderRadius.circular(20.dp),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+        boxShadow: c.glassShadow,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,8 +233,7 @@ class SettingsContent extends ScreenContent<SettingsState> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: c.accentSoft,
-              borderRadius: BorderRadius.circular(12.dp),
-              border: Border.all(color: c.accent.withValues(alpha: 0.55)),
+              borderRadius: BorderRadius.circular(14.dp),
             ),
             child: Icon(icon, color: c.accentText, size: 22.dp),
           ),
@@ -304,7 +304,7 @@ class SettingsContent extends ScreenContent<SettingsState> {
     for (var i = 0; i < children.length; i++) {
       items.add(children[i]);
       if (divide && i != children.length - 1) {
-        items.add(Divider(height: 1.dp, thickness: 1.dp, color: c.outline));
+        items.add(Divider(height: 1.dp, thickness: 0.5, color: c.outline));
       }
     }
     return Container(
@@ -314,9 +314,10 @@ class SettingsContent extends ScreenContent<SettingsState> {
         vertical: divide ? 0 : 14.dp,
       ),
       decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(16.dp),
-        border: Border.all(color: c.surfaceBorder, width: 1.2),
+        color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+        borderRadius: BorderRadius.circular(18.dp),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+        boxShadow: c.glassShadow,
       ),
       child: Column(children: items),
     );

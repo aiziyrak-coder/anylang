@@ -1,11 +1,8 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import 'theme/colors.dart';
 
-/// Chat ekrani Telegram-uslubidagi doodle foni — light/dark alohida asset.
-/// Fon biroz blur qilinadi (xabarlar o‘qilishi osonroq).
+/// Chat doodle wallpaper — light/dark asset, blur yo'q (tiniq).
 class ChatWallpaperBackground extends StatelessWidget {
   final Widget child;
 
@@ -18,27 +15,26 @@ class ChatWallpaperBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.appColors;
     final asset = c.isDark ? darkAsset : lightAsset;
-    final base = c.isDark ? const Color(0xFF07111F) : const Color(0xFFF3F5F8);
+    final base = c.isDark ? const Color(0xFF000000) : const Color(0xFFF3EAF8);
 
     return ColoredBox(
       color: base,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 1.8, sigmaY: 1.8),
-            child: Image.asset(
-              asset,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-              filterQuality: FilterQuality.medium,
-            ),
+          Image.asset(
+            asset,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.high,
+            isAntiAlias: true,
+            gaplessPlayback: true,
           ),
-          // Yengil overlay — kontrast + yumshoqroq ko‘rinish.
+          // Juda yengil overlay — o'qilish uchun, pattern ko'rinib turadi.
           ColoredBox(
             color: c.isDark
-                ? const Color(0x33000000)
-                : const Color(0x14FFFFFF),
+                ? const Color(0x1A000000)
+                : const Color(0x0AFFFFFF),
           ),
           child,
         ],

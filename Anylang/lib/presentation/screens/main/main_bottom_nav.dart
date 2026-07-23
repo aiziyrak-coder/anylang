@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/glass_surface.dart';
 import '../../ui/items/nav_bar_item.dart';
-import '../../ui/theme/colors.dart';
 import '../../utils/size_controller.dart';
 
 /// Asosiy ekran pastki navigatsiyasining bitta tab ta'rifi (ikon + yorliq kaliti).
@@ -20,7 +20,7 @@ const List<MainNavTab> kMainNavTabs = [
   MainNavTab('assets/icons/ic_profile.svg', 'nav_profile'),
 ];
 
-/// Asosiy ekranning pastki navigatsiya bari (5 ta tab).
+/// Asosiy ekranning pastki navigatsiya bari (5 ta tab) — frosted glass.
 class MainBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -35,13 +35,8 @@ class MainBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.appColors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border(top: BorderSide(color: c.outline)),
-      ),
+    return GlassBar(
+      topEdge: true,
       child: SafeArea(
         top: false,
         child: Padding(

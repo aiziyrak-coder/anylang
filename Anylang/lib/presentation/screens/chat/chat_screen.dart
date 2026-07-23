@@ -376,7 +376,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
       case SendText _:
         final text = state.input.value.trim();
-        if (text.isEmpty || state.chatId <= 0 || state.sending.value) return;
+        if (text.isEmpty) return;
+        if (state.chatId <= 0) {
+          showAppError('chat_send_unavailable'.tr);
+          return;
+        }
+        if (state.sending.value) return;
         state.sending.value = true;
         final clientId = 'c${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
         final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
@@ -395,31 +400,45 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         state.replyTo.value = null;
         _sendTyping(state, isTyping: false);
 
-        final result = await Get.find<ChatRepository>().sendText(
-          chatId: state.chatId,
-          text: text,
-          clientMessageId: clientId,
-          replyToId: replyToId,
-        );
-        result.when(
-          success: (data) {
-            final map = asMap(data);
-            if (map == null) return;
-            final real = _fromApi(
-              map,
-              SessionStore.userId(),
-              fallbackReply: replyUi,
-            );
-            final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
-            if (idx >= 0) state.messages[idx] = real;
-          },
-          failure: (err) {
-            state.messages.removeWhere((m) => m.id == optimistic.id);
-            state.input.value = text;
-            showAppError(err);
-          },
-        );
-        state.sending.value = false;
+        try {
+          final result = await Get.find<ChatRepository>().sendText(
+            chatId: state.chatId,
+            text: text,
+            clientMessageId: clientId,
+            replyToId: replyToId,
+          );
+          result.when(
+            success: (data) {
+              final map = asMap(data);
+              if (map == null) {
+                showAppError('chat_send_failed'.tr);
+                return;
+              }
+              final real = _fromApi(
+                map,
+                SessionStore.userId(),
+                fallbackReply: replyUi,
+              );
+              final idx = state.messages.indexWhere(
+                (m) => m.id == clientId || m.id == real.id,
+              );
+              if (idx >= 0) {
+                state.messages[idx] = real;
+              } else {
+                state.messages.add(real);
+              }
+            },
+            failure: (err) {
+              state.messages.removeWhere(
+                (m) => m.id == clientId || m.id == optimistic.id,
+              );
+              state.input.value = text;
+              showAppError(err);
+            },
+          );
+        } finally {
+          state.sending.value = false;
+        }
 
       case OpenAttachMenu _:
         final kind = await showAttachmentBottomSheet(context);

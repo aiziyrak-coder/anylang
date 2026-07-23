@@ -272,12 +272,33 @@ class ChatContent extends ScreenContent<ChatState> {
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 5.dp),
           decoration: BoxDecoration(
-            color: c.surface,
-            borderRadius: BorderRadius.circular(12.dp),
+            color: c.isDark
+                ? const Color(0xCC152A42)
+                : const Color(0xE6FFFFFF),
+            borderRadius: BorderRadius.circular(14.dp),
+            border: Border.all(
+              color: c.isDark
+                  ? const Color(0x22FFFFFF)
+                  : const Color(0x66FFFFFF),
+              width: 0.7,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: c.isDark
+                    ? const Color(0x44000000)
+                    : const Color(0x140B1F36),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Text(
             label,
-            style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+            style: TextStyle(
+              color: c.textSecondary,
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

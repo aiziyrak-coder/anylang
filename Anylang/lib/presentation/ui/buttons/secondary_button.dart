@@ -3,8 +3,7 @@ import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 import 'rich_button.dart';
 
-/// AnyLang ikkilamchi (secondary) tugmasi — surface fon + outline chegara.
-/// Ichkarida `RichButton` (Material + InkWell ripple) ishlatiladi.
+/// Ikkilamchi tugma — glass fill, hairline (og'ir hoshiya yo'q).
 class SecondaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -46,9 +45,10 @@ class SecondaryButton extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 17.dp, horizontal: 20.dp),
       borderRadius: radius,
       decoration: BoxDecoration(
-        color: c.surface,
+        color: c.isDark ? const Color(0x55152A42) : const Color(0xCCFFFFFF),
         borderRadius: radius,
-        border: Border.all(color: c.surfaceBorder, width: 1.4),
+        border: Border.all(color: c.surfaceBorder, width: 0.8),
+        boxShadow: c.glassShadow,
       ),
     );
   }

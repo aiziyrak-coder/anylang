@@ -178,7 +178,7 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
             backgroundColor: c.surface,
             borderRadius: 14.dp,
             padding: EdgeInsets.all(14.dp),
-            border: Border.all(color: c.outline),
+            border: Border.all(color: c.outline, width: 0.7),
           ),
         if (d.business && (d.website ?? '').trim().isNotEmpty) ...[
           SizedBox(width: 10.dp),
@@ -190,7 +190,7 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
             backgroundColor: c.surface,
             borderRadius: 14.dp,
             padding: EdgeInsets.all(14.dp),
-            border: Border.all(color: c.outline),
+            border: Border.all(color: c.outline, width: 0.7),
           ),
         ],
       ],
@@ -225,16 +225,17 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
     for (var i = 0; i < rows.length; i++) {
       children.add(rows[i]);
       if (i != rows.length - 1) {
-        children.add(Divider(height: 1.dp, thickness: 1.dp, color: c.outline));
+        children.add(Divider(height: 1.dp, thickness: 0.5, color: c.outline));
       }
     }
 
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(16.dp),
-        border: Border.all(color: c.outline),
+        color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+        borderRadius: BorderRadius.circular(18.dp),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+        boxShadow: c.glassShadow,
       ),
       child: Column(children: children),
     );
