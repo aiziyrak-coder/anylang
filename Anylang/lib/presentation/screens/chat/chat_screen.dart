@@ -18,6 +18,7 @@ import '../../../data/network/friends_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/network/realtime_sync_service.dart';
+import '../../../data/network/session_bootstrap.dart';
 import '../../../data/network/socket_service.dart';
 import '../../modal/attachment_bottom_sheet.dart';
 import '../../modal/chat_overflow_sheet.dart';
@@ -67,28 +68,46 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     state.searching.value = false;
     state.searchQuery.value = '';
     state.peerTyping.value = false;
+    state.peerActivity.value = '';
 
     state.input.value = '';
     state.replyTo.value = null;
     state.recording.value = false;
     state.sending.value = false;
-    state.messages.clear();
     state.loading.value = true;
+    // Real-time: WS ulangani va tinglovchi qayta bog'langani shart.
+    unawaited(connectRealtimeIfNeeded());
     _loadMessages(p.chatId);
   }
 
   Future<void> _loadMessages(int chatId) async {
     final result = await Get.find<ChatRepository>().listMessages(chatId);
+    // Chat almashgan bo'lsa — eski javobni yozmang.
+    if (state.chatId != chatId) return;
     result.when(
       success: (data) {
+        if (state.chatId != chatId) return;
         final me = SessionStore.userId();
         final raw = asList(data)
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
         final items = raw.map((e) => _fromApi(e, me)).toList();
-        state.messages.assignAll(_fillMissingReplies(items, raw, me));
-        final ids = items
+        final filled = _fillMissingReplies(items, raw, me);
+        // Live WS xabarlari yuklash davomida kelgan bo'lishi mumkin —
+        // id bo'yicha birlashtiramiz (assignAll o'chirib yubormasin).
+        final byId = {for (final m in state.messages) m.id: m};
+        for (final m in filled) {
+          byId[m.id] = m;
+        }
+        final merged = byId.values.toList()
+          ..sort((a, b) {
+            final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return at.compareTo(bt);
+          });
+        state.messages.assignAll(merged);
+        final ids = filled
             .where((m) => !m.isOutgoing)
             .map((m) => int.tryParse(m.id))
             .whereType<int>()
@@ -99,7 +118,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       },
       failure: showAppError,
     );
-    state.loading.value = false;
+    if (state.chatId == chatId) state.loading.value = false;
   }
 
   /// Eski API faqat `reply_to_id` bersa — lokal xabarlaridan sitata yig'iladi.
@@ -363,7 +382,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
         final replyUi = _replyFor(state);
         final optimistic = ChatMessage.text(
-          id: _nextId(),
+          id: clientId,
           dir: ChatDir.outgoing,
           time: formatMessageClock(DateTime.now()),
           createdAt: DateTime.now(),
@@ -374,6 +393,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         state.messages.add(optimistic);
         state.input.value = '';
         state.replyTo.value = null;
+        _sendTyping(state, isTyping: false);
 
         final result = await Get.find<ChatRepository>().sendText(
           chatId: state.chatId,
@@ -615,24 +635,30 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           return;
         }
         state.recording.value = true;
+        _sendTyping(state, isTyping: true, activity: 'voice');
 
       case CancelRecording _:
         await Get.find<VoiceRecorderService>().cancel();
         state.recording.value = false;
+        _sendTyping(state, isTyping: false);
 
       case SendVoice _:
         if (state.sending.value) return;
         final recorded = await Get.find<VoiceRecorderService>().stop();
         state.recording.value = false;
-        if (recorded == null || state.chatId <= 0) return;
+        if (recorded == null || state.chatId <= 0) {
+          _sendTyping(state, isTyping: false);
+          return;
+        }
 
         state.sending.value = true;
+        _sendTyping(state, isTyping: true, activity: 'voice');
         final clientId = 'v${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
         final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
         final replyUi = _replyFor(state);
         state.replyTo.value = null;
         final optimistic = ChatMessage.voice(
-          id: _nextId(),
+          id: clientId,
           dir: ChatDir.outgoing,
           time: formatMessageClock(DateTime.now()),
           createdAt: DateTime.now(),
@@ -659,6 +685,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           } else {
             showAppMessage('voice_upload_failed'.tr);
           }
+          _sendTyping(state, isTyping: false);
           state.sending.value = false;
           return;
         }
@@ -697,14 +724,15 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               status: real.status,
               reply: real.reply ?? replyUi,
             );
-            final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+            final idx = state.messages.indexWhere((m) => m.id == clientId || m.id == real.id);
             if (idx >= 0) state.messages[idx] = merged;
           },
           failure: (err) {
-            state.messages.removeWhere((m) => m.id == optimistic.id);
+            state.messages.removeWhere((m) => m.id == clientId);
             showAppError(err);
           },
         );
+        _sendTyping(state, isTyping: false);
         state.sending.value = false;
 
       case Back _:
@@ -808,7 +836,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     }
     // Birinchi belgi — darhol typing; keyin keep-alive debounced.
     if (!_lastTypingSent) {
-      _sendTyping(state, isTyping: true);
+      _sendTyping(state, isTyping: true, activity: 'typing');
     }
     _typingDebounce?.cancel();
     _typingDebounce = Timer(const Duration(milliseconds: 2500), () {
@@ -816,12 +844,20 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     });
   }
 
-  void _sendTyping(ChatState state, {required bool isTyping}) {
+  void _sendTyping(
+    ChatState state, {
+    required bool isTyping,
+    String activity = 'typing',
+  }) {
     if (state.chatId <= 0 || !Get.isRegistered<SocketService>()) return;
     if (!isTyping && !_lastTypingSent) return;
     Get.find<SocketService>().sendRaw({
       'type': 'typing',
-      'data': {'chat_id': state.chatId, 'is_typing': isTyping},
+      'data': {
+        'chat_id': state.chatId,
+        'is_typing': isTyping,
+        if (isTyping) 'activity': activity,
+      },
     });
     _lastTypingSent = isTyping;
   }
@@ -1012,11 +1048,43 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }) async {
     if (state.sending.value || state.chatId <= 0) return;
     state.sending.value = true;
+    final activity = switch (messageType) {
+      'image' => 'photo',
+      'voice' || 'audio' => 'voice',
+      'video' => 'video',
+      _ => 'file',
+    };
+    _sendTyping(state, isTyping: true, activity: activity);
     final clientId = 'a${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
     final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
     final replyUi = optimistic.reply ?? _replyFor(state);
     state.replyTo.value = null;
-    state.messages.add(optimistic);
+    // Optimistic id = clientId — WS echo bilan merge ishlasin.
+    final optimisticRow = switch (optimistic.type) {
+      ChatMsgType.image => ChatMessage.image(
+          id: clientId,
+          dir: optimistic.dir,
+          time: optimistic.time,
+          createdAt: optimistic.createdAt,
+          url: optimistic.imageUrl,
+          gradient: avatarTealGradient,
+          status: optimistic.status,
+          reply: replyUi,
+        ),
+      ChatMsgType.file => ChatMessage.file(
+          id: clientId,
+          dir: optimistic.dir,
+          time: optimistic.time,
+          createdAt: optimistic.createdAt,
+          name: optimistic.fileName ?? 'file',
+          size: optimistic.fileSize ?? '—',
+          ext: optimistic.fileExt ?? 'FILE',
+          url: optimistic.fileUrl,
+          status: optimistic.status,
+        ),
+      _ => optimistic,
+    };
+    state.messages.add(optimisticRow);
 
     final repo = Get.find<ChatRepository>();
     final upload = await repo.uploadMedia(
@@ -1026,13 +1094,14 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final uploadMap = asMap(upload.dataOrNull);
     final mediaId = (uploadMap?['id'] as num?)?.toInt();
     if (mediaId == null) {
-      state.messages.removeWhere((m) => m.id == optimistic.id);
+      state.messages.removeWhere((m) => m.id == optimisticRow.id);
       final err = upload.errorOrNull;
       if (err != null) {
         showAppError(err);
       } else {
         showAppMessage('Fayl yuklanmadi');
       }
+      _sendTyping(state, isTyping: false);
       state.sending.value = false;
       return;
     }
@@ -1054,18 +1123,18 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           SessionStore.userId(),
           fallbackReply: replyUi,
         );
-        final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+        final idx = state.messages.indexWhere((m) => m.id == clientId || m.id == real.id);
         if (idx >= 0) {
           // Lokal fayl yo‘li bo‘lsa, tarmoq URL kelguncha saqlaymiz.
-          if (optimistic.type == ChatMsgType.image &&
+          if (optimisticRow.type == ChatMsgType.image &&
               (real.imageUrl == null || real.imageUrl!.isEmpty) &&
-              optimistic.imageUrl != null) {
+              optimisticRow.imageUrl != null) {
             state.messages[idx] = ChatMessage.image(
               id: real.id,
               dir: real.dir,
               time: real.time,
               createdAt: real.createdAt,
-              url: optimistic.imageUrl,
+              url: optimisticRow.imageUrl,
               gradient: avatarTealGradient,
               status: real.status,
               reply: real.reply ?? replyUi,
@@ -1076,10 +1145,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         }
       },
       failure: (err) {
-        state.messages.removeWhere((m) => m.id == optimistic.id);
+        state.messages.removeWhere((m) => m.id == clientId);
         showAppError(err);
       },
     );
+    _sendTyping(state, isTyping: false);
     state.sending.value = false;
   }
 

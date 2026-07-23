@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import UTC, datetime
 from io import BytesIO
 from uuid import uuid4
@@ -17,6 +19,8 @@ from app.models.chat import Chat, ChatMedia, Message, MessageHide, MessageRead, 
 from app.models.user import User
 from app.services.chats import _get_chat_for_user, _other_user_id
 from app.ws.hub import get_hub
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_MESSAGE_LIMIT = 50
 MAX_MESSAGE_LIMIT = 100
@@ -394,15 +398,66 @@ async def create_message(
     db.add(message)
     await db.flush()
 
+    chat.last_message_id = message.id
+    chat.last_message_at = message.created_at
+    chat.has_messages = True
+    await db.flush()
+
+    # Avval real-time yetkazish (tarjima kutmasdan) — Telegram uslubi.
+    reply_map = await _load_reply_to_payloads(
+        db, [message], viewer_language=user.native_language
+    )
+    reply_payload = reply_map.get(message.reply_to_id) if message.reply_to_id else None
+    if _normalize_lang(recipient.native_language) == _normalize_lang(user.native_language):
+        reply_payload_recipient = reply_payload
+    else:
+        reply_map_recipient = await _load_reply_to_payloads(
+            db, [message], viewer_language=recipient.native_language
+        )
+        reply_payload_recipient = (
+            reply_map_recipient.get(message.reply_to_id) if message.reply_to_id else None
+        )
+
+    hub = get_hub()
+
+    async def _publish(msg: Message) -> dict:
+        sender_payload = _serialize_message(
+            msg,
+            viewer_id=user.id,
+            viewer_language=user.native_language,
+            reply_to=reply_payload,
+        )
+        recipient_payload = _serialize_message(
+            msg,
+            viewer_id=recipient.id,
+            viewer_language=recipient.native_language,
+            reply_to=reply_payload_recipient,
+        )
+        event_data = {"chat_id": chat_id}
+        await hub.publish(user.id, "new_message", {**event_data, "message": sender_payload})
+        await hub.publish(
+            recipient.id, "new_message", {**event_data, "message": recipient_payload}
+        )
+        return sender_payload
+
+    payload = await _publish(message)
+
     translations: list[MessageTranslation] = []
     if msg_type == "text" and text:
         target_lang = _normalize_lang(recipient.native_language)
         source_lang = _normalize_lang(original_language) if original_language else None
+        translated = text
+        status = "done"
         try:
-            translated = await translate(text, target_lang, source_lang=source_lang)
-            status = "done"
+            translated = await asyncio.wait_for(
+                translate(text, target_lang, source_lang=source_lang),
+                timeout=2.5,
+            )
+        except TimeoutError:
+            logger.warning("Message translation timed out; keeping original for now")
+            translated = text
+            status = "failed"
         except Exception as exc:  # noqa: BLE001 — keep message even if AI is down
-            logger = __import__("logging").getLogger(__name__)
             logger.warning("Message translation failed (%s); keeping original", exc)
             translated = text
             status = "failed"
@@ -429,55 +484,13 @@ async def create_message(
             db.add(tr)
             translations.append(tr)
 
-    chat.last_message_id = message.id
-    chat.last_message_at = message.created_at
-    chat.has_messages = True
-    await db.flush()
-
-    await db.refresh(message, attribute_names=["translations"])
-    if translations:
-        message.translations = translations
-
-    reply_map = await _load_reply_to_payloads(
-        db, [message], viewer_language=user.native_language
-    )
-    reply_payload = reply_map.get(message.reply_to_id) if message.reply_to_id else None
-    if _normalize_lang(recipient.native_language) == _normalize_lang(user.native_language):
-        reply_payload_recipient = reply_payload
-    else:
-        reply_map_recipient = await _load_reply_to_payloads(
-            db, [message], viewer_language=recipient.native_language
-        )
-        reply_payload_recipient = (
-            reply_map_recipient.get(message.reply_to_id) if message.reply_to_id else None
-        )
-
-    payload = _serialize_message(
-        message,
-        viewer_id=user.id,
-        viewer_language=user.native_language,
-        reply_to=reply_payload,
-    )
-
-    hub = get_hub()
-    sender_payload = _serialize_message(
-        message,
-        viewer_id=user.id,
-        viewer_language=user.native_language,
-        reply_to=reply_payload,
-    )
-    recipient_payload = _serialize_message(
-        message,
-        viewer_id=recipient.id,
-        viewer_language=recipient.native_language,
-        reply_to=reply_payload_recipient,
-    )
-    event_data = {
-        "chat_id": chat_id,
-        "message": payload,
-    }
-    await hub.publish(user.id, "new_message", {**event_data, "message": sender_payload})
-    await hub.publish(recipient.id, "new_message", {**event_data, "message": recipient_payload})
+        if translations:
+            await db.flush()
+            await db.refresh(message, attribute_names=["translations"])
+            message.translations = translations
+            # Tarjima tayyor bo'lsa — qabul qiluvchiga yangilangan matnni qayta yuboramiz.
+            if status == "done" and translated != text:
+                payload = await _publish(message)
 
     return payload
 

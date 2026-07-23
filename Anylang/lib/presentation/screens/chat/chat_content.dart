@@ -149,7 +149,7 @@ class ChatContent extends ScreenContent<ChatState> {
                   initial: state.peerInitial,
                   avatarGradient: state.peerAvatar,
                   online: state.peerOnline.value,
-                  statusText: state.peerTyping.value ? 'chat_typing'.tr : null,
+                  statusText: _peerStatusText(state),
                   searching: state.searching.value,
                   hasSearchQuery: state.searchQuery.value.trim().isNotEmpty,
                   searchController: _search,
@@ -193,6 +193,19 @@ class ChatContent extends ScreenContent<ChatState> {
         ),
       ),
     );
+  }
+
+  String? _peerStatusText(ChatState state) {
+    if (!state.peerTyping.value && state.peerActivity.value.isEmpty) {
+      return null;
+    }
+    return switch (state.peerActivity.value) {
+      'photo' => 'chat_activity_photo'.tr,
+      'file' => 'chat_activity_file'.tr,
+      'voice' => 'chat_activity_voice'.tr,
+      'video' => 'chat_activity_video'.tr,
+      _ => 'chat_typing'.tr,
+    };
   }
 
   Widget _list(AppColors c, ChatState state,

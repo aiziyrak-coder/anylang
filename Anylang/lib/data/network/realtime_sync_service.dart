@@ -63,12 +63,12 @@ class RealtimeSyncService extends GetxService {
   }
 
   void _onNewMessage(Map<String, dynamic> data) {
-    final chatId = (data['chat_id'] as num?)?.toInt();
+    final chatId = _asInt(data['chat_id']);
     final msgMap = asMap(data['message']);
     if (chatId == null || msgMap == null) return;
 
     final me = SessionStore.userId();
-    final senderId = (msgMap['sender_id'] as num?)?.toInt();
+    final senderId = _asInt(msgMap['sender_id']);
     final isMine = me != null && senderId == me;
     final msgId = '${msgMap['id']}';
     final clientId = msgMap['client_message_id']?.toString();
@@ -96,6 +96,7 @@ class RealtimeSyncService extends GetxService {
         }
         if (!isMine) {
           chat.peerTyping.value = false;
+          chat.peerActivity.value = '';
           final id = int.tryParse(msgId);
           if (id != null) {
             Get.find<ChatRepository>().markRead(chatId, [id]);
@@ -137,7 +138,7 @@ class RealtimeSyncService extends GetxService {
   }
 
   void _onMessagesRead(Map<String, dynamic> data) {
-    final chatId = (data['chat_id'] as num?)?.toInt();
+    final chatId = _asInt(data['chat_id']);
     final ids = (data['message_ids'] as List?)
             ?.map((e) => e.toString())
             .toSet() ??
@@ -155,7 +156,7 @@ class RealtimeSyncService extends GetxService {
   }
 
   void _onMessageDeleted(Map<String, dynamic> data) {
-    final chatId = (data['chat_id'] as num?)?.toInt();
+    final chatId = _asInt(data['chat_id']);
     final messageId = data['message_id']?.toString();
     if (chatId == null || messageId == null) return;
     if (Get.isRegistered<ChatState>()) {
@@ -168,7 +169,7 @@ class RealtimeSyncService extends GetxService {
   }
 
   void _onPresence(Map<String, dynamic> data) {
-    final userId = (data['user_id'] as num?)?.toInt();
+    final userId = _asInt(data['user_id']);
     final online = data['is_online'] == true;
     if (userId == null) return;
 
@@ -207,21 +208,38 @@ class RealtimeSyncService extends GetxService {
   }
 
   void _onTyping(Map<String, dynamic> data) {
-    final chatId = (data['chat_id'] as num?)?.toInt();
-    final userId = (data['user_id'] as num?)?.toInt();
+    final chatId = _asInt(data['chat_id']);
+    final userId = _asInt(data['user_id']);
     final isTyping = data['is_typing'] == true;
+    final activityRaw = data['activity']?.toString().trim().toLowerCase() ?? '';
     if (chatId == null || userId == null) return;
     if (!Get.isRegistered<ChatState>()) return;
     final chat = Get.find<ChatState>();
     if (chat.chatId != chatId || chat.peerId != userId) return;
 
     chat.peerTyping.value = isTyping;
+    chat.peerActivity.value = isTyping
+        ? (activityRaw.isNotEmpty ? activityRaw : 'typing')
+        : '';
     _typingClearTimer?.cancel();
     if (isTyping) {
-      _typingClearTimer = Timer(const Duration(seconds: 3), () {
-        chat.peerTyping.value = false;
+      _typingClearTimer = Timer(const Duration(seconds: 4), () {
+        if (Get.isRegistered<ChatState>()) {
+          final c = Get.find<ChatState>();
+          if (c.chatId == chatId) {
+            c.peerTyping.value = false;
+            c.peerActivity.value = '';
+          }
+        }
       });
     }
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Future<void> _softReloadConversations() async {

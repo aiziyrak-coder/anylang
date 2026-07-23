@@ -9,6 +9,8 @@ class ChatState extends GetxController {
   String peerInitial = '';
   LinearGradient peerAvatar = avatarTealGradient;
   final RxBool peerOnline = false.obs;
+  /// Peer activity: '' | typing | photo | file | voice | video
+  final RxString peerActivity = ''.obs;
   final RxBool peerTyping = false.obs;
   int chatId = 0;
   int peerId = 0;

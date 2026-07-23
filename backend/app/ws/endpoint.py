@@ -70,8 +70,7 @@ async def _authenticate_ws(token: str | None) -> int | None:
     return user_id
 
 
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)) -> None:
+async def _websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)) -> None:
     from app.core.config import get_settings
 
     # Prefer Authorization / subprotocol. Query-string tokens leak via logs/proxies.
@@ -141,15 +140,23 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(def
                 except (TypeError, ValueError):
                     continue
                 is_typing = bool(data.get("is_typing"))
+                activity_raw = data.get("activity")
+                activity = (
+                    str(activity_raw).strip().lower()
+                    if activity_raw is not None and str(activity_raw).strip()
+                    else ("typing" if is_typing else "")
+                )
+                if activity not in {"", "typing", "photo", "file", "voice", "video"}:
+                    activity = "typing" if is_typing else ""
 
-                # Flood control: at most one typing event per ~400ms per chat.
+                # Flood control: at most one typing event per ~350ms per chat.
                 allowed = await redis.set(
                     f"ws:typing:{user_id}:{chat_id}",
                     "1",
                     nx=True,
-                    px=400,
+                    px=350,
                 )
-                if not allowed:
+                if not allowed and is_typing:
                     continue
 
                 factory = get_session_factory()
@@ -173,6 +180,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(def
                         "chat_id": chat_id,
                         "user_id": user_id,
                         "is_typing": is_typing,
+                        "activity": activity if is_typing else "",
                     },
                 )
     except WebSocketDisconnect:
@@ -191,3 +199,15 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(def
             logger.exception("Failed to close pubsub for user %s", user_id)
         await hub.set_offline(redis, user_id)
         await broadcast_presence(user_id, is_online=False)
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)) -> None:
+    await _websocket_endpoint(websocket, token)
+
+
+@router.websocket("/ws/")
+async def websocket_endpoint_slash(
+    websocket: WebSocket, token: str | None = Query(default=None)
+) -> None:
+    await _websocket_endpoint(websocket, token)
