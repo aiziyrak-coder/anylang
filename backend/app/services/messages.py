@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError
 from app.integrations.storage import get_storage
-from app.integrations.translation import translate
+from app.integrations.translation import _normalize_lang, translate
 from app.models.chat import Chat, ChatMedia, Message, MessageHide, MessageRead, MessageTranslation
 from app.models.user import User
 from app.services.chats import _get_chat_for_user, _other_user_id
@@ -58,8 +58,15 @@ MEDIA_RULES: dict[str, dict] = {
 }
 
 
-def _normalize_lang(code: str) -> str:
-    return code.split("_")[0].lower()
+def _pick_translation_text(message: Message, viewer_language: str) -> str | None:
+    """Viewer tilidagi tarjimani qaytaradi; bo'sh qatorni e'tiborsiz qoldiradi."""
+    lang = _normalize_lang(viewer_language)
+    for tr in message.translations or []:
+        if _normalize_lang(tr.language) != lang:
+            continue
+        if (tr.text or "").strip():
+            return tr.text
+    return None
 
 
 async def _load_recipient(db: AsyncSession, chat: Chat, sender_id: int) -> User:
@@ -76,13 +83,8 @@ def _reply_preview_text(message: Message, viewer_language: str) -> str | None:
         return None
     if message.type != "text":
         return None
-    text = message.text_original
-    lang = _normalize_lang(viewer_language)
-    for tr in message.translations or []:
-        if _normalize_lang(tr.language) == lang:
-            text = tr.text
-            break
-    return text
+    translated = _pick_translation_text(message, viewer_language)
+    return translated if translated is not None else message.text_original
 
 
 def _serialize_reply_to(
@@ -151,11 +153,9 @@ def _serialize_message(
         text_original = message.text_original
         text = message.text_original
         if message.type == "text" and message.sender_id != viewer_id:
-            lang = _normalize_lang(viewer_language)
-            for tr in message.translations or []:
-                if _normalize_lang(tr.language) == lang:
-                    text = tr.text
-                    break
+            translated = _pick_translation_text(message, viewer_language)
+            if translated is not None:
+                text = translated
         meta = message.meta
 
     read_by_recipient = False
@@ -349,10 +349,12 @@ async def create_message(
             raise AppError(message="Javob xabari topilmadi", error_code="MESSAGE_NOT_FOUND", status_code=404)
 
     existing = await db.execute(
-        select(Message).where(
+        select(Message)
+        .where(
             Message.chat_id == chat_id,
             Message.client_message_id == client_message_id,
         )
+        .options(selectinload(Message.translations))
     )
     duplicate = existing.scalar_one_or_none()
     if duplicate is not None:
@@ -385,15 +387,20 @@ async def create_message(
     translations: list[MessageTranslation] = []
     if msg_type == "text" and text:
         target_lang = _normalize_lang(recipient.native_language)
+        source_lang = _normalize_lang(original_language) if original_language else None
         try:
-            translated = await translate(text, target_lang, source_lang=original_language)
+            translated = await translate(text, target_lang, source_lang=source_lang)
             status = "done"
         except Exception as exc:  # noqa: BLE001 — keep message even if AI is down
             logger = __import__("logging").getLogger(__name__)
             logger.warning("Message translation failed (%s); keeping original", exc)
             translated = text
             status = "failed"
-        if translated != text or target_lang != (original_language or ""):
+        # Hech qachon bo'sh tarjimani saqlamang — UI bo'sh bubble chiqaradi.
+        if not (translated or "").strip():
+            translated = text
+            status = "failed"
+        if translated != text or target_lang != (source_lang or ""):
             tr = MessageTranslation(
                 message_id=message.id,
                 language=target_lang,

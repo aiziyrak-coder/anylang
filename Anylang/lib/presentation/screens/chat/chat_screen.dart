@@ -184,7 +184,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final created = DateTime.tryParse(json['created_at']?.toString() ?? '');
     final textTranslated = json['text'] as String?;
     final textOriginal = json['text_original'] as String?;
-    final text = textTranslated ?? textOriginal ?? '';
+    final text = _nonEmpty(textTranslated) ?? _nonEmpty(textOriginal) ?? '';
     final type = (json['type'] as String?) ?? 'text';
     final reply = _replyFromApi(json, me) ?? fallbackReply;
     final status = _statusFromApi(json, outgoing: outgoing);
@@ -300,6 +300,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       return '${(bytes / 1024).toStringAsFixed(0)} KB';
     }
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String? _nonEmpty(String? value) {
+    final t = value?.trim();
+    if (t == null || t.isEmpty) return null;
+    return value;
   }
 
   ChatReply? _replyFromApi(Map<String, dynamic> json, int? me) {

@@ -16,7 +16,7 @@ class ApiService {
         baseUrl: kBaseUrl,
         connectTimeout: const Duration(seconds: 12),
         sendTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 25),
+        receiveTimeout: const Duration(seconds: 45),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',

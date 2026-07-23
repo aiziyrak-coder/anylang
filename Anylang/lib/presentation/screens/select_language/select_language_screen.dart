@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
+import '../../../data/local/session_store.dart';
 import '../../ui/theme/theme_controller.dart';
 import '../../utils/language_localizations.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -35,7 +36,7 @@ class SelectLanguageScreen extends Screen<SelectLanguageState, void> {
       case SelectLang a:
         state.selectedKey.value = a.key;
         final box = Hive.box('user');
-        await box.put('native_language', a.langCode);
+        await box.put('native_language', SessionStore.normalizeLangCode(a.langCode));
         if (a.localeCode != null) {
           LanguageLocalizations.changeLocale(a.localeCode!);
         }
@@ -49,7 +50,7 @@ class SelectLanguageScreen extends Screen<SelectLanguageState, void> {
           orElse: () => languageOptions.first,
         );
         final box = Hive.box('user');
-        await box.put('native_language', selected.langCode);
+        await box.put('native_language', SessionStore.normalizeLangCode(selected.langCode));
         if (selected.localeCode != null) {
           LanguageLocalizations.changeLocale(selected.localeCode!);
         }

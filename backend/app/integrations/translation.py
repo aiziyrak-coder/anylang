@@ -29,9 +29,20 @@ _LANG_NAMES = {
     "tg": "Tajik",
 }
 
+# UI / locale leftovers → ISO 639-1 used by translation + DB matching.
+_LANG_ALIASES = {
+    "us": "en",
+    "gb": "en",
+    "eng": "en",
+    "ua": "uk",
+}
 
-def _normalize_lang(code: str) -> str:
-    return code.split("_")[0].lower()
+
+def _normalize_lang(code: str | None) -> str:
+    raw = (code or "").strip().split("_")[0].split("-")[0].lower()
+    if not raw:
+        return "uz"
+    return _LANG_ALIASES.get(raw, raw)
 
 
 def _lang_name(code: str | None) -> str:
@@ -42,7 +53,7 @@ def _lang_name(code: str | None) -> str:
 
 
 def _deepl_lang(code: str) -> str:
-    return code.split("_")[0].upper()
+    return _normalize_lang(code).upper()
 
 
 async def _translate_openai(text: str, target: str, source: str | None) -> str:
@@ -111,8 +122,19 @@ async def _translate_deepl(text: str, target: str, source: str | None) -> str:
         data = response.json()
         translations = data.get("translations") or []
         if translations:
-            return str(translations[0].get("text", text))
-    return text
+            out = str(translations[0].get("text") or "").strip()
+            if out:
+                return out
+            raise AppError(
+                message="Tarjima javobi bo'sh",
+                error_code="TRANSLATION_FAILED",
+                status_code=502,
+            )
+    raise AppError(
+        message="Tarjima javobi bo'sh",
+        error_code="TRANSLATION_FAILED",
+        status_code=502,
+    )
 
 
 async def translate(text: str, target_lang: str, source_lang: str | None = None) -> str:
@@ -136,7 +158,7 @@ async def translate(text: str, target_lang: str, source_lang: str | None = None)
                 status_code=503,
             )
         try:
-            return await _translate_openai(text, target, source)
+            out = await _translate_openai(text, target, source)
         except AppError:
             raise
         except httpx.HTTPError as exc:
@@ -146,6 +168,13 @@ async def translate(text: str, target_lang: str, source_lang: str | None = None)
                 error_code="TRANSLATION_FAILED",
                 status_code=502,
             ) from exc
+        if not (out or "").strip():
+            raise AppError(
+                message="Tarjima javobi bo'sh",
+                error_code="TRANSLATION_FAILED",
+                status_code=502,
+            )
+        return out.strip()
 
     if provider == "deepl":
         if not settings.deepl_api_key:
@@ -155,7 +184,9 @@ async def translate(text: str, target_lang: str, source_lang: str | None = None)
                 status_code=503,
             )
         try:
-            return await _translate_deepl(text, target, source)
+            out = await _translate_deepl(text, target, source)
+        except AppError:
+            raise
         except httpx.HTTPError as exc:
             logger.warning("DeepL translation failed (%s)", exc)
             if settings.is_production:
@@ -164,7 +195,14 @@ async def translate(text: str, target_lang: str, source_lang: str | None = None)
                     error_code="TRANSLATION_FAILED",
                     status_code=502,
                 ) from exc
-            return f"[{target_lang}] {text}"
+            return f"[{target}] {text}"
+        if not (out or "").strip():
+            raise AppError(
+                message="Tarjima javobi bo'sh",
+                error_code="TRANSLATION_FAILED",
+                status_code=502,
+            )
+        return out.strip()
 
     # mock
     if settings.is_production and not settings.allow_mock_translation:
@@ -173,4 +211,4 @@ async def translate(text: str, target_lang: str, source_lang: str | None = None)
             error_code="TRANSLATION_UNAVAILABLE",
             status_code=503,
         )
-    return f"[{target_lang}] {text}"
+    return f"[{target}] {text}"

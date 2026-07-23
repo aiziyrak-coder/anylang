@@ -109,10 +109,14 @@ class ChatMessage {
   String get displayText {
     if (showingOriginal &&
         textOriginal != null &&
-        textOriginal!.isNotEmpty) {
+        textOriginal!.trim().isNotEmpty) {
       return textOriginal!;
     }
-    return text ?? '';
+    final translated = text?.trim();
+    if (translated != null && translated.isNotEmpty) return text!;
+    final original = textOriginal?.trim();
+    if (original != null && original.isNotEmpty) return textOriginal!;
+    return '';
   }
 
   ChatMessage withToggleOriginal() => ChatMessage(

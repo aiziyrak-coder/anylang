@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError
 from app.core.pagination import normalize_page
+from app.integrations.translation import _normalize_lang
 from app.models.chat import Chat, Message, MessageHide, MessageRead
 from app.models.user import User
 from app.ws.hub import get_hub
@@ -75,10 +76,6 @@ async def _serialize_interlocutor(
     }
 
 
-def _normalize_lang(code: str) -> str:
-    return (code or "").split("_")[0].split("-")[0].lower()
-
-
 def _preview_text(message: Message, *, viewer_id: int, viewer_language: str) -> str | None:
     if message.type != "text":
         return None
@@ -87,7 +84,9 @@ def _preview_text(message: Message, *, viewer_id: int, viewer_language: str) -> 
     lang = _normalize_lang(viewer_language)
     for translation in message.translations or []:
         if _normalize_lang(translation.language) == lang:
-            return translation.text
+            if (translation.text or "").strip():
+                return translation.text
+            break
     return message.text_original
 
 

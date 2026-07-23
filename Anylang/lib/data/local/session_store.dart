@@ -72,6 +72,10 @@ class SessionStore {
 
     if (user != null) {
       await _box.put('user', user);
+      final native = user['native_language']?.toString();
+      if (native != null && native.isNotEmpty) {
+        await _box.put('native_language', normalizeLangCode(native));
+      }
     }
   }
 
@@ -108,9 +112,22 @@ class SessionStore {
 
   static String nativeLanguage() {
     final stored = _box.get('native_language') as String?;
-    if (stored != null && stored.isNotEmpty) return stored;
-    final app = appLanguage();
-    return app.split('_').first;
+    if (stored != null && stored.isNotEmpty) {
+      return normalizeLangCode(stored);
+    }
+    final fromUser = user()?['native_language']?.toString();
+    if (fromUser != null && fromUser.isNotEmpty) {
+      return normalizeLangCode(fromUser);
+    }
+    return normalizeLangCode(appLanguage());
+  }
+
+  /// ISO 639-1 + UI locale aliaslari (`us_US` → `en`).
+  static String normalizeLangCode(String code) {
+    final base = code.split('_').first.split('-').first.toLowerCase().trim();
+    const aliases = {'us': 'en', 'gb': 'en', 'eng': 'en'};
+    if (base.isEmpty) return 'uz';
+    return aliases[base] ?? base;
   }
 
   static Map<String, dynamic>? user() {
