@@ -297,13 +297,10 @@ async def patch_subscription(
         sub.plan = plan
 
     if billing_cycle is not None:
-        if billing_cycle not in {"monthly", "yearly"}:
-            raise AppError(
-                message="Invalid billing_cycle",
-                error_code="VALIDATION_ERROR",
-                status_code=400,
-            )
-        sub.billing_cycle = billing_cycle
+        from app.services.subscription import billing_cycle_code, normalize_billing_months
+
+        months = normalize_billing_months(billing_cycle)
+        sub.billing_cycle = billing_cycle_code(months)
 
     if expires_at is not None:
         sub.expires_at = expires_at
@@ -316,9 +313,9 @@ async def patch_subscription(
     if sub.plan in {"premium", "business"} and sub.is_active:
         now = datetime.now(UTC)
         if sub.billing_cycle is None:
-            sub.billing_cycle = "monthly"
+            sub.billing_cycle = "1"
         if sub.expires_at is None or sub.expires_at <= now:
-            sub.expires_at = now + _cycle_delta(sub.billing_cycle or "monthly")
+            sub.expires_at = now + _cycle_delta(sub.billing_cycle or "1")
         if sub.started_at is None:
             sub.started_at = now
         if auto_renew is None and plan is not None:

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../domain/models/country_option.dart';
+import '../../presentation/screens/select_language/select_language_option.dart'
+    show flagUrlForCountry;
 import '../../presentation/ui/theme/colors.dart';
 import '../../presentation/ui/theme/gradients.dart';
 import '../local/countries_service.dart';
-import '../../domain/models/country_option.dart';
 import 'country_names.dart';
 
 export 'country_names.dart' show resolveCountryName;
@@ -162,10 +164,20 @@ String formatSubscriptionPeriod({
   DateTime? expiresAt,
 }) {
   final cycle = billingCycle?.toLowerCase();
-  if (cycle == 'yearly' || cycle == 'year' || cycle == 'annual') {
+  if (cycle == 'yearly' || cycle == 'year' || cycle == 'annual' || cycle == '12') {
     return '12 ${'subscription_months_short'.tr}';
   }
-  if (cycle == 'monthly' || cycle == 'month') {
+  if (cycle == '6' || cycle == '6m' || cycle == 'm6') {
+    return '6 ${'subscription_months_short'.tr}';
+  }
+  if (cycle == '3' || cycle == '3m' || cycle == 'm3') {
+    return '3 ${'subscription_months_short'.tr}';
+  }
+  if (cycle == 'monthly' ||
+      cycle == 'month' ||
+      cycle == '1' ||
+      cycle == '1m' ||
+      cycle == 'm1') {
     return '1 ${'subscription_months_short'.tr}';
   }
   if (startedAt != null && expiresAt != null) {
@@ -194,26 +206,26 @@ String formatSubscriptionLabel({
   return '$planLabel · $period';
 }
 
-/// Bayroq asset (mavjudlar); noma'lum → UZ.
+/// Bayroq URL (davlat kodi → anylang.uz/flags).
 String flagAssetForCountry(String? code) {
   switch (code?.toUpperCase()) {
     case 'TR':
-      return 'assets/images/flag_tr.png';
+      return flagUrlForCountry('tr');
     case 'RU':
-      return 'assets/images/flag_ru.png';
+      return flagUrlForCountry('ru');
     case 'DE':
-      return 'assets/images/flag_de.png';
+      return flagUrlForCountry('de');
     case 'ES':
-      return 'assets/images/flag_es.png';
+      return flagUrlForCountry('es');
     case 'FR':
-      return 'assets/images/flag_fr.png';
+      return flagUrlForCountry('fr');
     case 'US':
     case 'GB':
     case 'EN':
-      return 'assets/images/flag_en.png';
+      return flagUrlForCountry('gb');
     case 'UZ':
     default:
-      return 'assets/images/flag_uz.png';
+      return flagUrlForCountry((code ?? 'uz').toLowerCase());
   }
 }
 

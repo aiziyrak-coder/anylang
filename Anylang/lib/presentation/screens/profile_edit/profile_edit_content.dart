@@ -10,6 +10,7 @@ import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
+import '../../ui/textfields/birth_date_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/formatters/time_formatter.dart';
@@ -25,6 +26,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
+  late final TextEditingController _birthCtrl;
   Worker? _formWorker;
   bool _hydrateBound = false;
 
@@ -32,19 +34,22 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   void initContent() {
     _nameCtrl = TextEditingController();
     _emailCtrl = TextEditingController();
+    _birthCtrl = TextEditingController();
   }
 
   void _bindHydrate(ProfileEditState state) {
     if (_hydrateBound) return;
     _hydrateBound = true;
-    _formWorker = ever(state.formEpoch, (_) {
+    void apply() {
       final acc = state.account.value;
       _nameCtrl.text = acc?.name ?? '';
       _emailCtrl.text = acc?.email ?? '';
-    });
-    final acc = state.account.value;
-    _nameCtrl.text = acc?.name ?? '';
-    _emailCtrl.text = acc?.email ?? '';
+      final bd = state.birthDate.value;
+      _birthCtrl.text = bd == null ? '' : formatDateDots(bd);
+    }
+
+    _formWorker = ever(state.formEpoch, (_) => apply());
+    apply();
   }
 
   @override
@@ -52,11 +57,13 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
     _formWorker?.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
+    _birthCtrl.dispose();
   }
 
   @override
   Widget build(BuildContext context, ProfileEditState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
+    final now = DateTime.now();
     _bindHydrate(state);
 
     return GradientBackground(
@@ -122,33 +129,24 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                       keyboardType: TextInputType.name,
                     ),
                     SizedBox(height: 16.dp),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Obx(() => AppPickerField(
-                                label: 'birth_date'.tr,
-                                hint: '14.03.1998',
-                                icon: Icons.calendar_today_outlined,
-                                value: state.birthDate.value == null ? null : formatDateDots(state.birthDate.value!),
-                                onTap: () => _pickDate(context, state, sendAction),
-                              )),
-                        ),
-                        SizedBox(width: 12.dp),
-                        Expanded(
-                          child: Obx(() {
-                            final code = state.country.value;
-                            return AppPickerField(
-                              label: 'country'.tr,
-                              hint: 'O‘zbekiston',
-                              icon: Icons.keyboard_arrow_down_rounded,
-                              value: code.isEmpty ? null : formatCountryName(code),
-                              onTap: () => _pickCountry(context, state, sendAction),
-                            );
-                          }),
-                        ),
-                      ],
-                    ),
+                    Obx(() => BirthDateField(
+                          controller: _birthCtrl,
+                          date: state.birthDate.value,
+                          firstDate: DateTime(1920),
+                          lastDate: now,
+                          onChanged: (d) => sendAction(SelectProfileBirthDate(d)),
+                        )),
+                    SizedBox(height: 16.dp),
+                    Obx(() {
+                      final code = state.country.value;
+                      return AppPickerField(
+                        label: 'country'.tr,
+                        hint: 'O‘zbekiston',
+                        icon: Icons.keyboard_arrow_down_rounded,
+                        value: code.isEmpty ? null : formatCountryName(code),
+                        onTap: () => _pickCountry(context, state, sendAction),
+                      );
+                    }),
                     SizedBox(height: 16.dp),
                     Text(
                       'gender'.tr,
@@ -198,17 +196,6 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
 
   void _save(void Function(MyAction) sendAction) {
     sendAction(SaveProfileEdit(fullName: _nameCtrl.text, email: _emailCtrl.text));
-  }
-
-  Future<void> _pickDate(BuildContext context, ProfileEditState state, void Function(MyAction) sendAction) async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: state.birthDate.value ?? DateTime(2000),
-      firstDate: DateTime(1920),
-      lastDate: now,
-    );
-    if (picked != null) sendAction(SelectProfileBirthDate(picked));
   }
 
   Future<void> _pickCountry(

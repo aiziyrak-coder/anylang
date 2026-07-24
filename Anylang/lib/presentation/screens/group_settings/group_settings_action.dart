@@ -35,6 +35,8 @@ class TransferOwnershipAction extends GroupSettingsAction {
 
 class DeleteGroupAction extends GroupSettingsAction {}
 
+class AddGroupMembers extends GroupSettingsAction {}
+
 class CopyInviteLink extends GroupSettingsAction {}
 
 class RegenerateInviteLink extends GroupSettingsAction {}

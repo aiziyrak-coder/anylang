@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/app_top_bar.dart';
+import '../../ui/buttons/primary_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/items/plan_card.dart';
 import '../../ui/items/segmented_toggle.dart';
+import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
@@ -13,9 +15,15 @@ import 'subscription_action.dart';
 import 'subscription_plan.dart';
 import 'subscription_state.dart';
 
-/// S16 — Tariflar / Obuna. Oylik/Yillik davr tanlanadi, 3 ta tarif kartasi
-/// (Basic/Premium/Business) ko'rsatiladi.
+/// S16 — Tariflar / Obuna. 1/3/6/12 oy + promokod.
 class SubscriptionContent extends ScreenContent<SubscriptionState> {
+  final TextEditingController _promoCtrl = TextEditingController();
+
+  @override
+  void onClose() {
+    _promoCtrl.dispose();
+  }
+
   @override
   Widget build(
     BuildContext context,
@@ -86,7 +94,9 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                           decoration: BoxDecoration(
                             color: c.accentSoft,
                             borderRadius: BorderRadius.circular(12.dp),
-                            border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+                            border: Border.all(
+                              color: c.accent.withValues(alpha: 0.35),
+                            ),
                           ),
                           child: Text(
                             text,
@@ -115,24 +125,33 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                     }),
                     SizedBox(height: 20.dp),
                     Obx(
-                      () => SegmentedToggle<BillingCycle>(
-                        value: state.billingCycle.value,
-                        onChanged: (cycle) =>
-                            sendAction(SelectBillingCycle(cycle)),
+                      () => SegmentedToggle<int>(
+                        value: state.billingMonths.value,
+                        onChanged: (months) =>
+                            sendAction(SelectBillingMonths(months)),
                         options: [
                           SegmentOption(
-                            value: BillingCycle.monthly,
-                            label: 'subscription_monthly'.tr,
+                            value: 1,
+                            label: 'subscription_period_1'.tr,
                           ),
                           SegmentOption(
-                            value: BillingCycle.yearly,
-                            label: 'subscription_yearly'.tr,
-                            badge: '-20%',
+                            value: 3,
+                            label: 'subscription_period_3'.tr,
+                          ),
+                          SegmentOption(
+                            value: 6,
+                            label: 'subscription_period_6'.tr,
+                          ),
+                          SegmentOption(
+                            value: 12,
+                            label: 'subscription_period_12'.tr,
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: 24.dp),
+                    SizedBox(height: 16.dp),
+                    _promoBlock(context, state, sendAction),
+                    SizedBox(height: 20.dp),
                     Obx(() {
                       if (state.loading.value && state.plans.isEmpty) {
                         return Padding(
@@ -168,7 +187,7 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                           for (final plan in state.plans) ...[
                             _planCard(
                               plan,
-                              state.billingCycle.value,
+                              state.billingMonths.value,
                               sendAction,
                             ),
                             SizedBox(height: 16.dp),
@@ -201,22 +220,99 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
     );
   }
 
+  Widget _promoBlock(
+    BuildContext context,
+    SubscriptionState state,
+    void Function(MyAction) sendAction,
+  ) {
+    final c = context.appColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppTextField(
+          label: 'subscription_promo_label'.tr,
+          hint: 'subscription_promo_hint'.tr,
+          controller: _promoCtrl,
+          textInputAction: TextInputAction.done,
+          onChanged: (v) => state.promoInput.value = v,
+        ),
+        SizedBox(height: 10.dp),
+        Obx(() {
+          final preview = state.promoPreview.value;
+          final loading = state.promoLoading.value;
+          return PrimaryButton(
+            text: preview == null
+                ? 'subscription_promo_apply'.tr
+                : 'subscription_promo_clear'.tr,
+            enabled: !loading,
+            isLoading: loading,
+            onTap: () {
+              if (preview != null) {
+                _promoCtrl.clear();
+              }
+              sendAction(
+                preview == null ? ApplyPromoCode() : ClearPromoCode(),
+              );
+            },
+          );
+        }),
+        Obx(() {
+          final preview = state.promoPreview.value;
+          if (preview == null) return const SizedBox.shrink();
+          return Padding(
+            padding: EdgeInsets.only(top: 10.dp),
+            child: Container(
+              padding: EdgeInsets.all(12.dp),
+              decoration: BoxDecoration(
+                color: c.accentSoft,
+                borderRadius: BorderRadius.circular(12.dp),
+                border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+              ),
+              child: Text(
+                'subscription_promo_discount'.trParams({
+                  'code': preview.code,
+                  'before': '\$${preview.amountBefore}',
+                  'discount': '\$${preview.discountAmount}',
+                  'after': '\$${preview.amountAfter}',
+                }),
+                style: TextStyle(
+                  color: c.accentText,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _planCard(
     SubscriptionPlan plan,
-    BillingCycle cycle,
+    int months,
     void Function(MyAction) sendAction,
   ) {
     String? note;
-    if (!plan.isFree &&
-        cycle == BillingCycle.yearly &&
-        plan.yearlyTotal != null) {
-      note = 'subscription_billed_yearly'.trParams({
-        'total': plan.yearlyTotal!,
-      });
+    if (!plan.isFree) {
+      final total = plan.totalFor(months);
+      if (total != null && months > 1) {
+        note = 'subscription_billed_period'.trParams({
+          'months': '$months',
+          'total': total,
+        });
+      }
+      final savings = plan.savingsFor(months);
+      if (savings != null && savings > 0) {
+        final saveNote = 'subscription_save_percent'.trParams({
+          'percent': '$savings',
+        });
+        note = note == null ? saveNote : '$note · $saveNote';
+      }
     }
     return PlanCard(
       title: plan.title,
-      price: plan.isFree ? 'subscription_free'.tr : plan.priceFor(cycle),
+      price: plan.isFree ? 'subscription_free'.tr : plan.priceFor(months),
       priceSuffix: plan.isFree ? null : 'subscription_per_month'.tr,
       priceNote: note,
       features: plan.features,

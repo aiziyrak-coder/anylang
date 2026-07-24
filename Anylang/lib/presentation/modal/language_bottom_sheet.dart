@@ -61,7 +61,8 @@ class _LanguageBottomSheetState extends State<_LanguageBottomSheet> {
       }
       if (query.isEmpty) return true;
       return o.nativeName.toLowerCase().contains(query) ||
-          o.key.tr.toLowerCase().contains(query);
+          o.key.tr.toLowerCase().contains(query) ||
+          o.langCode.toLowerCase().contains(query);
     }).toList();
 
     final viewInsets = MediaQuery.viewInsetsOf(context).bottom;
@@ -178,6 +179,7 @@ class _LanguageBottomSheetState extends State<_LanguageBottomSheet> {
                         final o = items[i];
                         return LanguageItem(
                           flagAsset: o.flag,
+                          flagEmoji: o.flagEmoji,
                           nativeName: o.nativeName,
                           localizedName: o.key.tr,
                           selected: o.key == _selectedKey,

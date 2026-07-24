@@ -57,6 +57,26 @@ def _schedule_translation_jobs(background_tasks: BackgroundTasks, jobs: list[dic
             recipient_id=job.get("recipient_id"),
             recipient_language=job.get("recipient_language"),
         )
+
+
+def _schedule_voice_jobs(background_tasks: BackgroundTasks, jobs: list[dict] | None) -> None:
+    if not jobs:
+        return
+    for job in jobs:
+        background_tasks.add_task(
+            messages_service.finish_voice_transcription_job,
+            message_id=job["message_id"],
+            chat_id=job["chat_id"],
+            audio_url=job["audio_url"],
+            content_type=job.get("content_type"),
+            filename=job.get("filename"),
+            source_lang=job.get("source_lang"),
+            sender_id=job["sender_id"],
+            sender_language=job["sender_language"],
+            recipient_ids=job.get("recipient_ids"),
+        )
+
+
 messages_router = APIRouter()
 
 
@@ -546,11 +566,13 @@ async def send_message(
         media_id=body.media_id,
     )
     jobs = data.pop("_translation_jobs", None)
+    voice_jobs = data.pop("_voice_jobs", None)
     legacy = data.pop("_translation_job", None)
     if not jobs and legacy is not None:
         jobs = [legacy]
     await db.commit()
     _schedule_translation_jobs(background_tasks, jobs)
+    _schedule_voice_jobs(background_tasks, voice_jobs)
     return MessageOut.model_validate(data)
 
 

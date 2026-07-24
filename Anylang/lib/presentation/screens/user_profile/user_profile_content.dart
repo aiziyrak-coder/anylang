@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import '../../../data/local/session_store.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_top_bar.dart';
@@ -10,9 +11,11 @@ import '../../ui/gradient_background.dart';
 import '../../ui/items/info_row.dart';
 import '../../ui/items/pill_badge.dart';
 import '../../ui/items/product_grid_card.dart';
+import '../../ui/language_flag.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
+import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -52,7 +55,7 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
                             _businessBadge(c),
                           ],
                           SizedBox(height: 18.dp),
-                          _actions(c, d, sendAction),
+                          _actions(c, state, d, sendAction),
                           SizedBox(height: 18.dp),
                           _infoCard(c, d, sendAction),
                           if (d.business) ...[
@@ -124,9 +127,10 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3.dp),
-          child: Image.asset(d.flagAsset, width: 18.dp, height: 13.dp, fit: BoxFit.cover),
+        LanguageFlag(
+          url: d.flagAsset,
+          width: 18.dp,
+          height: 13.dp,
         ),
         SizedBox(width: 6.dp),
         Flexible(
@@ -151,8 +155,15 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
     );
   }
 
-  Widget _actions(AppColors c, UserProfilePayload d, void Function(MyAction) sendAction) {
+  Widget _actions(
+    AppColors c,
+    UserProfileState state,
+    UserProfilePayload d,
+    void Function(MyAction) sendAction,
+  ) {
     final radius = BorderRadius.circular(14.dp);
+    final me = SessionStore.userId();
+    final showFriend = d.id > 0 && (me == null || d.id != me);
     return Row(
       children: [
         Expanded(
@@ -168,18 +179,10 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
             decoration: BoxDecoration(gradient: limeButtonGradient, borderRadius: radius),
           ),
         ),
-        SizedBox(width: 10.dp),
-        if ((d.phone).trim().isNotEmpty)
-          MyIconButton(
-            onClick: () => sendAction(CallUser()),
-            svgIcon: 'assets/icons/ic_phone.svg',
-            iconColor: c.textPrimary,
-            iconSize: 20.dp,
-            backgroundColor: c.surface,
-            borderRadius: 14.dp,
-            padding: EdgeInsets.all(14.dp),
-            border: Border.all(color: c.outline, width: 0.7),
-          ),
+        if (showFriend) ...[
+          SizedBox(width: 10.dp),
+          Obx(() => _friendButton(c, state, sendAction)),
+        ],
         if (d.business && (d.website ?? '').trim().isNotEmpty) ...[
           SizedBox(width: 10.dp),
           MyIconButton(
@@ -194,6 +197,65 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _friendButton(
+    AppColors c,
+    UserProfileState state,
+    void Function(MyAction) sendAction,
+  ) {
+    final status = state.friendshipStatus.value;
+    final incoming = state.isRequestIncoming.value;
+    final busy = state.friendBusy.value;
+
+    if (status == 'accepted') {
+      return MyIconButton(
+        onClick: () => showAppMessage('add_friend_is_friend'.tr),
+        svgIcon: 'assets/icons/ic_friends.svg',
+        iconColor: c.accentText,
+        iconSize: 20.dp,
+        backgroundColor: c.accentSoft,
+        borderRadius: 14.dp,
+        padding: EdgeInsets.all(14.dp),
+        border: Border.all(color: c.accent.withValues(alpha: 0.45), width: 0.7),
+      );
+    }
+
+    if (status == 'pending' && incoming) {
+      return MyIconButton(
+        onClick: busy ? () {} : () => sendAction(AcceptFriendFromProfile()),
+        icon: Icons.person_add_alt_1_rounded,
+        iconColor: c.onAccent,
+        iconSize: 22.dp,
+        backgroundColor: c.accent,
+        borderRadius: 14.dp,
+        padding: EdgeInsets.all(14.dp),
+      );
+    }
+
+    if (status == 'pending') {
+      return MyIconButton(
+        onClick: busy ? () {} : () => sendAction(CancelFriendFromProfile()),
+        svgIcon: 'assets/icons/ic_friends.svg',
+        iconColor: c.textFaint,
+        iconSize: 20.dp,
+        backgroundColor: c.surface,
+        borderRadius: 14.dp,
+        padding: EdgeInsets.all(14.dp),
+        border: Border.all(color: c.outline, width: 0.7),
+      );
+    }
+
+    return MyIconButton(
+      onClick: busy ? () {} : () => sendAction(AddFriendFromProfile()),
+      svgIcon: 'assets/icons/ic_friends.svg',
+      iconColor: c.textPrimary,
+      iconSize: 20.dp,
+      backgroundColor: c.surface,
+      borderRadius: 14.dp,
+      padding: EdgeInsets.all(14.dp),
+      border: Border.all(color: c.outline, width: 0.7),
     );
   }
 

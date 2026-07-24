@@ -67,7 +67,6 @@ class ChatComposer extends StatelessWidget {
     final c = context.appColors;
 
     return FrostedBar(
-      border: Border(top: BorderSide(color: c.outline.withValues(alpha: 0.45))),
       child: SafeArea(
         top: false,
         child: Padding(

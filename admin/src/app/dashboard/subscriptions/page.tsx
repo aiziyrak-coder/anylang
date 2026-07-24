@@ -117,7 +117,7 @@ export default function SubscriptionsPage() {
     expires.setDate(expires.getDate() + 30);
     await patchSub(userId, {
       plan: nextPlan,
-      billing_cycle: "monthly",
+      billing_cycle: "1",
       expires_at: expires.toISOString(),
       is_active: true,
       auto_renew: false,

@@ -52,6 +52,7 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
 ALLOWED_AUDIO_TYPES = {
     "audio/mp4",
+    "audio/m4a",
     "audio/aac",
     "audio/x-m4a",
     "audio/wav",
@@ -159,6 +160,12 @@ async def _load_group_recipients(db: AsyncSession, chat_id: int, sender_id: int)
 def _reply_preview_text(message: Message, viewer_language: str) -> str | None:
     if message.is_deleted or message.deleted_for_everyone:
         return None
+    if message.type == "voice":
+        translated = _pick_translation_text(message, viewer_language)
+        caption = translated if translated is not None else message.text_original
+        if caption and caption.strip():
+            return caption.strip()
+        return None
     if message.type != "text":
         return None
     translated = _pick_translation_text(message, viewer_language)
@@ -261,7 +268,7 @@ def _serialize_message(
     else:
         text_original = message.text_original
         text = message.text_original
-        if message.type == "text" and message.sender_id != viewer_id:
+        if message.type in {"text", "voice"} and message.sender_id != viewer_id:
             translated = _pick_translation_text(message, viewer_language)
             if translated is not None:
                 text = translated
@@ -401,7 +408,7 @@ async def list_messages(
     missing_jobs: list[dict] = []
     viewer_lang = user_preferred_lang(user)
     for m in visible:
-        if m.type != "text" or m.sender_id == user.id:
+        if m.type not in {"text", "voice"} or m.sender_id == user.id:
             continue
         src_text = (m.text_original or "").strip()
         if not src_text:
@@ -634,6 +641,26 @@ async def create_message(
         )
         if jobs:
             payload["_translation_jobs"] = jobs
+    elif msg_type == "voice":
+        audio_url = (meta_payload or {}).get("url")
+        if audio_url:
+            payload["_voice_jobs"] = [
+                {
+                    "message_id": message.id,
+                    "chat_id": chat_id,
+                    "audio_url": audio_url,
+                    "content_type": (meta_payload or {}).get("content_type")
+                    or (meta_payload or {}).get("mime")
+                    or "audio/mp4",
+                    "filename": (meta_payload or {}).get("filename")
+                    or (meta_payload or {}).get("name")
+                    or "voice.m4a",
+                    "source_lang": user_preferred_lang(user),
+                    "sender_id": user.id,
+                    "sender_language": user_preferred_lang(user),
+                    "recipient_ids": [p.id for p in recipients],
+                }
+            ]
 
     return payload
 
@@ -803,6 +830,183 @@ async def finish_message_translation_job(
         except Exception as exc:  # noqa: BLE001
             await db.rollback()
             logger.warning("Background translation job failed for message %s: %s", message_id, exc)
+
+
+async def _download_audio_bytes(url: str) -> tuple[bytes, str | None]:
+    import httpx
+
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        ctype = response.headers.get("content-type")
+        return response.content, ctype
+
+
+async def _republish_message_to_members(
+    db: AsyncSession,
+    *,
+    message: Message,
+    chat_id: int,
+    sender_id: int,
+    member_ids: list[int],
+) -> None:
+    hub = get_hub()
+    sender_map = await _load_sender_public_map(db, {sender_id})
+    s_name, s_avatar = sender_map.get(sender_id, (None, None))
+    users_result = await db.execute(select(User).where(User.id.in_(member_ids)))
+    users = list(users_result.scalars().all())
+    event_data = {"chat_id": chat_id}
+    try:
+        for peer in users:
+            peer_reply_map = await _load_reply_to_payloads(
+                db, [message], viewer_language=user_preferred_lang(peer)
+            )
+            peer_reply = (
+                peer_reply_map.get(message.reply_to_id) if message.reply_to_id else None
+            )
+            peer_payload = _serialize_message(
+                message,
+                viewer_id=peer.id,
+                viewer_language=user_preferred_lang(peer),
+                reply_to=peer_reply,
+                sender_name=s_name,
+                sender_avatar_url=s_avatar,
+            )
+            await hub.publish(
+                peer.id, "new_message", {**event_data, "message": peer_payload}
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Realtime republish after voice STT failed for chat %s: %s", chat_id, exc)
+
+
+async def finish_voice_transcription_job(
+    *,
+    message_id: int,
+    chat_id: int,
+    audio_url: str,
+    content_type: str | None,
+    filename: str | None,
+    source_lang: str | None,
+    sender_id: int,
+    sender_language: str,
+    recipient_ids: list[int] | None = None,
+) -> None:
+    """Voice → STT → text_original, then per-recipient translation jobs."""
+    from app.integrations.stt import transcribe_audio
+
+    factory = get_session_factory()
+    async with factory() as db:
+        try:
+            result = await db.execute(
+                select(Message)
+                .where(Message.id == message_id)
+                .options(selectinload(Message.translations))
+            )
+            message = result.scalar_one_or_none()
+            if message is None or message.type != "voice":
+                return
+            if (message.text_original or "").strip():
+                # Already transcribed (retry / duplicate job).
+                transcript = message.text_original.strip()
+            else:
+                try:
+                    audio_bytes, fetched_ct = await _download_audio_bytes(audio_url)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Voice download failed for message %s: %s", message_id, exc
+                    )
+                    return
+                try:
+                    transcript = await transcribe_audio(
+                        audio_bytes,
+                        content_type=content_type or fetched_ct or "audio/mp4",
+                        language=source_lang or sender_language,
+                        filename=filename or "voice.m4a",
+                    )
+                except AppError as exc:
+                    logger.warning(
+                        "Voice STT failed for message %s (%s): %s",
+                        message_id,
+                        exc.error_code,
+                        exc.message,
+                    )
+                    return
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Voice STT failed for message %s: %s", message_id, exc)
+                    return
+
+                transcript = (transcript or "").strip()
+                if not transcript:
+                    return
+                message.text_original = transcript
+                message.original_language = source_lang or sender_language
+                await db.flush()
+
+            peers = list(recipient_ids or [])
+            if not peers:
+                member_ids = await list_chat_member_ids(db, chat_id)
+                peers = [uid for uid in member_ids if uid != sender_id]
+
+            # Publish transcript to sender + peers (before translations).
+            publish_ids = list({sender_id, *peers})
+            await _republish_message_to_members(
+                db,
+                message=message,
+                chat_id=chat_id,
+                sender_id=sender_id,
+                member_ids=publish_ids,
+            )
+            await db.commit()
+        except Exception as exc:  # noqa: BLE001
+            await db.rollback()
+            logger.warning(
+                "Background voice transcription failed for message %s: %s",
+                message_id,
+                exc,
+            )
+            return
+
+    # Separate session for translations (same pattern as text jobs).
+    peers = list(recipient_ids or [])
+    async with factory() as db:
+        try:
+            if not peers:
+                member_ids = await list_chat_member_ids(db, chat_id)
+                peers = [uid for uid in member_ids if uid != sender_id]
+            if not peers:
+                return
+            result = await db.execute(select(User).where(User.id.in_(peers)))
+            recipients = list(result.scalars().all())
+            result = await db.execute(select(Message).where(Message.id == message_id))
+            message = result.scalar_one_or_none()
+            if message is None or not (message.text_original or "").strip():
+                return
+            jobs = build_translation_jobs(
+                message_id=message_id,
+                chat_id=chat_id,
+                text=message.text_original or "",
+                source_lang=message.original_language or source_lang,
+                sender_id=sender_id,
+                sender_language=sender_language,
+                recipients=recipients,
+            )
+            for job in jobs:
+                await finish_message_translation_job(
+                    message_id=job["message_id"],
+                    chat_id=job["chat_id"],
+                    text=job["text"],
+                    target_lang=job["target_lang"],
+                    source_lang=job.get("source_lang"),
+                    sender_id=job["sender_id"],
+                    sender_language=job["sender_language"],
+                    recipient_ids=job.get("recipient_ids"),
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Voice translation scheduling failed for message %s: %s",
+                message_id,
+                exc,
+            )
 
 
 async def mark_messages_read(

@@ -163,3 +163,8 @@ class OpenSenderProfile extends ChatAction {
   final int userId;
   OpenSenderProfile(this.userId);
 }
+
+class JoinGroupInvite extends ChatAction {
+  final String token;
+  JoinGroupInvite(this.token);
+}

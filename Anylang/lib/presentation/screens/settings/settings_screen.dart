@@ -45,14 +45,20 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
   @override
   void initState(SettingsPayload? payload) {
     state.focus.value = payload?.focus ?? SettingsFocus.app;
-    final locale = Get.locale;
-    if (locale != null) {
-      final code = '${locale.languageCode}_${locale.countryCode}';
-      final match = languageOptions.firstWhere(
-        (o) => o.localeCode == code,
-        orElse: () => languageOptions.first,
-      );
-      state.currentLanguageKey.value = match.key;
+    final native = SessionStore.nativeLanguage();
+    final byNative = languageOptions.where((o) => o.langCode == native);
+    if (byNative.isNotEmpty) {
+      state.currentLanguageKey.value = byNative.first.key;
+    } else {
+      final locale = Get.locale;
+      if (locale != null) {
+        final code = '${locale.languageCode}_${locale.countryCode}';
+        final match = languageOptions.firstWhere(
+          (o) => o.localeCode == code,
+          orElse: () => languageOptions.first,
+        );
+        state.currentLanguageKey.value = match.key;
+      }
     }
     state.newMessagesEnabled.value =
         SessionStore.newMessagesNotificationsEnabled();
@@ -91,16 +97,13 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
             isoCode: a.language.langCode,
           );
         } else {
-          // UI tarjimasi yo'q tillar — faqat chat tarjima tilini yangilaydi.
-          await SessionStore.applyAppLanguage(
-            localeCode: SessionStore.appLanguage(),
-            isoCode: a.language.langCode,
-          );
+          // UI tiliga tegilmaydi — faqat chat tarjima (ona) tili.
+          await SessionStore.applyNativeLanguage(a.language.langCode);
         }
         try {
           final result = await Get.find<ProfileRepository>().updateMe({
             'app_language': SessionStore.appLanguage(),
-            'native_language': SessionStore.preferredLanguage(),
+            'native_language': SessionStore.nativeLanguage(),
           });
           final map = asMap(result.dataOrNull);
           if (map != null) {

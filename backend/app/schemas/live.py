@@ -14,6 +14,10 @@ class LiveLanguageOut(BaseModel):
     stt: bool
     tts: bool
     tts_voices: list[str]
+    native_name: str | None = None
+    flag_emoji: str | None = None
+    flag_url: str | None = None
+    flag_country: str | None = None
 
 
 class LiveLanguagesOut(BaseModel):

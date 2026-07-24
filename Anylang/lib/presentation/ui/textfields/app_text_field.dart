@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 
@@ -16,6 +17,8 @@ class AppTextField extends StatefulWidget {
   final int? maxLength;
   final String? prefixText;
   final ValueChanged<String>? onChanged;
+  final List<TextInputFormatter>? inputFormatters;
+  final Widget? suffix;
 
   const AppTextField({
     super.key,
@@ -30,6 +33,8 @@ class AppTextField extends StatefulWidget {
     this.maxLength,
     this.prefixText,
     this.onChanged,
+    this.inputFormatters,
+    this.suffix,
   });
 
   @override
@@ -109,6 +114,7 @@ class _AppTextFieldState extends State<AppTextField> {
                   obscureText: _obscure,
                   keyboardType: widget.keyboardType,
                   textInputAction: widget.textInputAction,
+                  inputFormatters: widget.inputFormatters,
                   cursorColor: c.accent,
                   maxLines: widget.isPassword ? 1 : widget.maxLines,
                   minLines: widget.minLines,
@@ -158,7 +164,9 @@ class _AppTextFieldState extends State<AppTextField> {
                     color: c.textSecondary,
                     size: 20.dp,
                   ),
-                ),
+                )
+              else if (widget.suffix != null)
+                widget.suffix!,
             ],
           ),
         ),

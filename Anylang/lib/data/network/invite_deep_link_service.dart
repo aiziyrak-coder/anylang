@@ -16,6 +16,31 @@ class InviteDeepLinkService extends GetxService {
   StreamSubscription<Uri>? _sub;
   final _links = AppLinks();
 
+  static final RegExp inviteTokenInText = RegExp(
+    r'(?:https?://(?:www\.)?anylang\.uz/g/|anylang://g/)([A-Za-z0-9_-]+)',
+    caseSensitive: false,
+  );
+
+  static String? tokenFromText(String? text) {
+    if (text == null || text.trim().isEmpty) return null;
+    final m = inviteTokenInText.firstMatch(text.trim());
+    return m?.group(1);
+  }
+
+  static String? tokenFromUri(Uri uri) {
+    if (uri.host == 'anylang.uz' &&
+        uri.pathSegments.length >= 2 &&
+        uri.pathSegments.first == 'g') {
+      return uri.pathSegments[1];
+    }
+    if (uri.scheme == 'anylang' && uri.host == 'g') {
+      return uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.first
+          : uri.path.replaceFirst('/', '');
+    }
+    return null;
+  }
+
   Future<InviteDeepLinkService> init() async {
     try {
       final initial = await _links.getInitialLink();
@@ -28,15 +53,19 @@ class InviteDeepLinkService extends GetxService {
   }
 
   Future<void> _handle(Uri uri) async {
-    final token = _tokenFrom(uri);
+    final token = tokenFromUri(uri);
     if (token == null || token.isEmpty) return;
-    if ((SessionStore.accessToken ?? '').isEmpty) {
-      return;
-    }
-    if (!Get.isRegistered<ChatRepository>()) return;
+    await joinAndOpen(token);
+  }
+
+  Future<bool> joinAndOpen(String token) async {
+    if ((SessionStore.accessToken ?? '').isEmpty) return false;
+    if (!Get.isRegistered<ChatRepository>()) return false;
     final result = await Get.find<ChatRepository>().joinByToken(token);
+    var ok = false;
     result.when(
       success: (data) {
+        ok = true;
         final map = asMap(data) ?? {};
         final chatId = (map['id'] as num?)?.toInt() ?? 0;
         if (chatId <= 0) return;
@@ -64,16 +93,7 @@ class InviteDeepLinkService extends GetxService {
       },
       failure: showAppError,
     );
-  }
-
-  String? _tokenFrom(Uri uri) {
-    if (uri.host == 'anylang.uz' && uri.pathSegments.length >= 2 && uri.pathSegments.first == 'g') {
-      return uri.pathSegments[1];
-    }
-    if (uri.scheme == 'anylang' && uri.host == 'g') {
-      return uri.pathSegments.isNotEmpty ? uri.pathSegments.first : uri.path.replaceFirst('/', '');
-    }
-    return null;
+    return ok;
   }
 
   @override

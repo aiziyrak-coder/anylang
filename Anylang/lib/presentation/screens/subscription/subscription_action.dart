@@ -4,9 +4,9 @@ import 'subscription_plan.dart';
 /// Faqat Tariflar (Obuna) ekraniga xos action'lar.
 class SubscriptionAction extends MyAction {}
 
-class SelectBillingCycle extends SubscriptionAction {
-  final BillingCycle cycle;
-  SelectBillingCycle(this.cycle);
+class SelectBillingMonths extends SubscriptionAction {
+  final int months;
+  SelectBillingMonths(this.months);
 }
 
 class SelectPlan extends SubscriptionAction {
@@ -19,3 +19,7 @@ class CancelSubscription extends SubscriptionAction {}
 class RetryLoadPlans extends SubscriptionAction {}
 
 class CheckPendingPayment extends SubscriptionAction {}
+
+class ApplyPromoCode extends SubscriptionAction {}
+
+class ClearPromoCode extends SubscriptionAction {}

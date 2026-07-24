@@ -13,6 +13,7 @@ class CheckoutIn(BaseModel):
     kind: PaymentKind
     plan: SubscriptionPlan | None = None
     billing_cycle: BillingCycle | None = None
+    promo_code: str | None = Field(default=None, min_length=3, max_length=64)
     number: str | None = Field(default=None, min_length=7, max_length=7)
     chat_id: int | None = None
 
@@ -28,6 +29,9 @@ class CheckoutOut(BaseModel):
     stripe_session_id: str | None = None
     client_secret: str | None = None
     mock_confirm: bool = False
+    amount_before: str | None = None
+    discount_amount: str | None = None
+    promo_code: str | None = None
 
 
 class PaymentOut(BaseModel):

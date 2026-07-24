@@ -9,11 +9,29 @@ class PaymentRepository {
   Future<BaseResult> checkoutSubscription({
     required String plan,
     required String billingCycle,
+    String? promoCode,
   }) {
     return _client.post(
       api: 'api/v1/payments/checkout',
       data: {
         'kind': 'subscription',
+        'plan': plan,
+        'billing_cycle': billingCycle,
+        if (promoCode != null && promoCode.trim().isNotEmpty)
+          'promo_code': promoCode.trim(),
+      },
+    );
+  }
+
+  Future<BaseResult> validatePromo({
+    required String code,
+    required String plan,
+    required String billingCycle,
+  }) {
+    return _client.post(
+      api: 'api/v1/payments/promo/validate',
+      data: {
+        'code': code.trim(),
         'plan': plan,
         'billing_cycle': billingCycle,
       },

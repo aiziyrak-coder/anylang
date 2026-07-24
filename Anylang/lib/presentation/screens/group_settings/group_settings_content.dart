@@ -111,29 +111,43 @@ class GroupSettingsContent extends ScreenContent<GroupSettingsState> {
                       style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
                     ),
                     SizedBox(height: 16.dp),
-                    if (isAdmin) ...[
-                      Text(
-                        'group_settings_invite'.tr,
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.person_add_alt_1_rounded, color: c.accentText),
+                      title: Text(
+                        'group_settings_add_members'.tr,
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           color: c.textPrimary,
                         ),
                       ),
-                      SizedBox(height: 8.dp),
-                      if ((state.inviteLink.value ?? '').isNotEmpty)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            state.inviteLink.value!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13.sp, color: c.textSecondary),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.copy),
-                            onPressed: () => sendAction(CopyInviteLink()),
-                          ),
+                      trailing: Icon(Icons.chevron_right_rounded, color: c.textFaint),
+                      onTap: () => sendAction(AddGroupMembers()),
+                    ),
+                    SizedBox(height: 8.dp),
+                    Text(
+                      'group_settings_invite'.tr,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: c.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 8.dp),
+                    if ((state.inviteLink.value ?? '').isNotEmpty)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          state.inviteLink.value!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13.sp, color: c.textSecondary),
                         ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.copy),
+                          onPressed: () => sendAction(CopyInviteLink()),
+                        ),
+                      ),
+                    if (isAdmin)
                       Row(
                         children: [
                           TextButton(
@@ -146,8 +160,7 @@ class GroupSettingsContent extends ScreenContent<GroupSettingsState> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 12.dp),
-                    ],
+                    SizedBox(height: 12.dp),
                     if (isOwner && !state.isSuper.value) ...[
                       ListTile(
                         contentPadding: EdgeInsets.zero,

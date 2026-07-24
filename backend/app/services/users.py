@@ -224,7 +224,7 @@ async def get_public_profile(
             },
         }
 
-    return {
+    payload = {
         "id": user.id,
         "is_business": is_business,
         "name": name,
@@ -236,7 +236,16 @@ async def get_public_profile(
         "number": user.number,
         "avatar_url": avatar_url,
         "business": business_payload,
+        "friendship_status": "none",
+        "friendship_request_id": None,
+        "is_request_incoming": False,
     }
+    if viewer is not None and viewer.id != user.id:
+        status, request_id, is_incoming = await _friendship_context(db, viewer.id, user.id)
+        payload["friendship_status"] = status
+        payload["friendship_request_id"] = request_id
+        payload["is_request_incoming"] = is_incoming
+    return payload
 
 
 async def search_users(

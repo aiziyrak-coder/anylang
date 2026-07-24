@@ -4,140 +4,158 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AnyLang — Har til. Bitta suhbat.</title>
-  <meta name="description" content="AnyLang — jonli tarjima bilan global muloqot. Gapiring. Har kim tushunadi." />
-  <meta property="og:title" content="AnyLang" />
-  <meta property="og:description" content="Dunyo tillarida suhbat — bir ilovada." />
+  <meta name="description" content="AnyLang — jonli tarjima bilan global muloqot. Gapiring, yozing — suhbatdosh o‘z tilida tushunadi." />
+  <meta property="og:title" content="AnyLang — Har til. Bitta suhbat." />
+  <meta property="og:description" content="Dunyo tillarida suhbat. Telegramdek sodda, tarjima avtomatik." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://anylang.uz/" />
+  <meta name="theme-color" content="#F4F8FB" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/landing.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%2300D4C8'/%3E%3Cstop offset='1' stop-color='%230A84FF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='%230B1220'/%3E%3Cpath d='M14 40c8-18 28-18 36 0' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='24' r='6' fill='%2300D4C8'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23B8F25A'/%3E%3Cstop offset='1' stop-color='%2300C4B8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='%230B1A14'/%3E%3Cpath d='M16 38c7-14 25-14 32 0' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='22' r='6' fill='%23B8F25A'/%3E%3C/svg%3E" />
 </head>
 <body>
-  <div class="noise" aria-hidden="true"></div>
-  <div class="aurora" aria-hidden="true"></div>
+  <div class="sky" aria-hidden="true"></div>
+  <div class="mesh" aria-hidden="true"></div>
 
-  <header class="top">
-    <a class="brand" href="/" aria-label="AnyLang">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span class="brand-name">AnyLang</span>
+  <header class="nav">
+    <a class="logo" href="/" aria-label="AnyLang bosh sahifa">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">AnyLang</span>
     </a>
-    <nav class="top-nav" aria-label="Asosiy">
-      <a href="#features">Imkoniyatlar</a>
-      <a href="#how">Qanday ishlaydi</a>
-      <a href="#download">Yuklab olish</a>
+    <nav class="nav-links" aria-label="Asosiy">
+      <a href="#essence">Nima bu?</a>
+      <a href="#flow">Qanday</a>
+      <a href="#get">Yuklash</a>
     </nav>
+    <a class="nav-cta" href="#get">APK</a>
   </header>
 
   <main>
-    <section class="hero" id="top">
-      <div class="hero-copy">
-        <p class="eyebrow">Global messaging · Live translation</p>
-        <h1 class="brand-hero">AnyLang</h1>
-        <p class="lede">Gapiring. Har kim tushunadi. Telegramdek sodda — tillar oraligʻida esa chegara yoʻq.</p>
-        <div class="cta-row" id="download">
-          <a class="store store-apple" href="https://apps.apple.com/search?term=AnyLang" target="_blank" rel="noopener noreferrer" aria-label="App Store">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.37 12.29c.03 3.12 2.74 4.16 2.77 4.17-.02.07-.43 1.48-1.43 2.93-.86 1.25-1.76 2.5-3.17 2.53-1.39.03-1.84-.82-3.43-.82-1.6 0-2.09.8-3.41.85-1.37.05-2.41-1.35-3.28-2.59C2.55 16.4 1.2 12.1 3.1 9.2c.94-1.44 2.62-2.35 4.44-2.38 1.38-.03 2.69.93 3.43.93.74 0 2.3-1.15 3.88-.98.66.03 2.52.27 3.71 2.02-.1.06-2.21 1.29-2.19 3.5ZM14.7 5.45c.75-.9 1.25-2.16 1.11-3.41-1.07.04-2.37.71-3.14 1.61-.69.8-1.29 2.08-1.13 3.3 1.2.09 2.42-.61 3.16-1.5Z"/></svg>
-            <span>
-              <small>Yuklab oling</small>
-              <strong>App Store</strong>
+    <section class="hero">
+      <div class="hero-stage">
+        <p class="hero-kicker">Live translation messaging</p>
+        <h1 class="hero-brand">AnyLang</h1>
+        <p class="hero-line">Gapiring. Har kim tushunadi.</p>
+        <p class="hero-sub">Ona tilingizda yozing yoki gapiring — suhbatdosh o‘z tilida o‘qiydi. Chegarasiz suhbat, bitta ilova.</p>
+        <div class="hero-actions" id="get">
+          <a
+            class="btn btn-primary"
+            id="apk-download"
+            href="/download/anylang-latest.apk"
+            download="AnyLang.apk"
+          >
+            <span class="btn-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M17.6 9.48 19.4 6.3a.5.5 0 0 0-.87-.5l-1.84 3.18A8 8 0 0 0 7.3 8.98L5.47 5.8a.5.5 0 1 0-.87.5l1.8 3.18A7.95 7.95 0 0 0 4 15.5V16a2 2 0 0 0 2 2h1v2.5a1.5 1.5 0 0 0 3 0V18h4v2.5a1.5 1.5 0 0 0 3 0V18h1a2 2 0 0 0 2-2v-.5a7.95 7.95 0 0 0-2.4-5.02ZM8.5 13.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm7 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
             </span>
+            Android APK yuklash
           </a>
-          <a class="store store-google" href="https://play.google.com/store/search?q=AnyLang&c=apps" target="_blank" rel="noopener noreferrer" aria-label="Google Play">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3.6 2.3c-.4.2-.6.6-.6 1.1v17.2c0 .5.2.9.6 1.1l9.7-9.7L3.6 2.3Zm11.2 6.4-2.2 2.2 2.2 2.2 4.8-2.7c.6-.3.6-1.1 0-1.4l-4.8-2.7ZM2.7 21.9l9.9-9.9-2.2-2.2L2.7 19.5v2.4Zm11.9-7.1-2.2 2.2 4.9 4.9c.7.3 1.5-.1 1.5-.9v-1.3l-4.2-4.9Z"/></svg>
-            <span>
-              <small>Yuklab oling</small>
-              <strong>Google Play</strong>
-            </span>
-          </a>
+          <p class="apk-meta" id="apk-meta">Eng so‘nggi release · Play Market chiqquncha</p>
         </div>
       </div>
 
-      <div class="hero-visual" aria-hidden="true">
-        <div class="orbit"></div>
-        <div class="phone">
-          <div class="phone-bezel">
-            <div class="phone-notch"></div>
-            <div class="chat">
-              <div class="chat-top">
-                <span class="dot"></span>
-                <span>Sofiya · DE</span>
-              </div>
-              <div class="bubble in delay-1">
-                <p class="src">Hallo! Wie geht’s dir heute?</p>
-                <p class="dst">Salom! Bugun kayfiyating qanday?</p>
-              </div>
-              <div class="bubble out delay-2">
-                <p class="src">Aʻlo — AnyLang orqali suhbatlashyapmiz.</p>
-                <p class="dst">Sehr gut — wir chatten über AnyLang.</p>
-              </div>
-              <div class="bubble in delay-3">
-                <p class="src">Unglaublich. Echtzeit?</p>
-                <p class="dst">Ajoyib. Jonli tarjimami?</p>
-              </div>
-              <div class="composer">
-                <span>Xabar yozing…</span>
-                <span class="send">↑</span>
-              </div>
+      <div class="hero-device" aria-hidden="true">
+        <div class="device-glow"></div>
+        <div class="device">
+          <div class="device-bar">
+            <span class="device-avatar">S</span>
+            <div>
+              <strong>Sofiya</strong>
+              <small>DE · tarjima yoqilgan</small>
             </div>
+          </div>
+          <div class="device-thread">
+            <div class="msg in anim-1">
+              <span class="msg-src">Hallo! Wie geht’s dir?</span>
+              <span class="msg-dst">Salom! Qalaysiz?</span>
+            </div>
+            <div class="msg out anim-2">
+              <span class="msg-src">Yaxshi — AnyLang orqali gaplashyapmiz.</span>
+              <span class="msg-dst">Gut — wir sprechen über AnyLang.</span>
+            </div>
+            <div class="msg in anim-3">
+              <span class="msg-src">Echtzeit-Übersetzung?</span>
+              <span class="msg-dst">Jonli tarjimami?</span>
+            </div>
+          </div>
+          <div class="device-input">
+            <span>Xabar yozing…</span>
+            <span class="send">↑</span>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="band" id="features">
-      <h2>Tillar oraligʻida yoʻl ochiladi</h2>
-      <p class="band-lead">Xabar, ovoz, jonli rejim — hammasi ona tilingizda. Suhbatdosh esa oʻzinikida.</p>
+    <section class="essence" id="essence">
+      <div class="essence-head">
+        <h2>Tillar oralig‘ida yo‘l ochiladi</h2>
+        <p>AnyLang — global messaging. Matn, ovoz va jonli rejim: siz o‘zingizniki bilan, ular o‘ziniki bilan.</p>
+      </div>
+      <div class="essence-grid">
+        <article class="pillar">
+          <span class="pillar-num">01</span>
+          <h3>Jonli tarjima</h3>
+          <p>Har xabar ikki qatlamda: asl matn va sizning tilingiz. Ovoz ham matnga aylanadi.</p>
+        </article>
+        <article class="pillar">
+          <span class="pillar-num">02</span>
+          <h3>AnyLang raqami</h3>
+          <p>7 xonali global ID. Telefon raqamisiz topiling — dunyo bo‘ylab bitta identifikator.</p>
+        </article>
+        <article class="pillar">
+          <span class="pillar-num">03</span>
+          <h3>Biznes ochiq</h3>
+          <p>Mahsulotlar, guruhlar, profil. Do‘koningizni oching — til to‘siq emas.</p>
+        </article>
+      </div>
     </section>
 
-    <section class="features">
-      <article class="feat">
-        <h3>Jonli tarjima</h3>
-        <p>Matn va ovoz bir zumda. Chat ichida ikki qatlam: asl matn va sizning tilingiz.</p>
-      </article>
-      <article class="feat">
-        <h3>AnyLang raqami</h3>
-        <p>7 xonali global identifikator. Telefon raqamisiz ham topilishingiz mumkin.</p>
-      </article>
-      <article class="feat">
-        <h3>Biznes profil</h3>
-        <p>Mahsulotlar, pin, arxiv — doʻkoningizni dunyoga oching, tillar avtomatik.</p>
-      </article>
-    </section>
-
-    <section class="how" id="how">
-      <div class="how-copy">
+    <section class="flow" id="flow">
+      <div class="flow-copy">
         <h2>Uch qadam. Cheksiz suhbat.</h2>
-        <ol>
-          <li><strong>Ilovani yuklang</strong> — App Store yoki Google Play.</li>
-          <li><strong>Ona tilingizni tanlang</strong> — barcha xabarlar shu tilga keladi.</li>
-          <li><strong>Yozing yoki gapiring</strong> — dunyo javob beradi.</li>
+        <ol class="steps">
+          <li>
+            <strong>Yuklang</strong>
+            <span>Saytdan eng so‘nggi Android APK.</span>
+          </li>
+          <li>
+            <strong>Tilni tanlang</strong>
+            <span>Ona tilingiz — barcha xabarlar shu tilga keladi.</span>
+          </li>
+          <li>
+            <strong>Suhbat boshlang</strong>
+            <span>Yozing yoki gapiring. Dunyo javob beradi.</span>
+          </li>
         </ol>
-        <div class="cta-row compact">
-          <a class="store store-apple" href="https://apps.apple.com/search?term=AnyLang" target="_blank" rel="noopener noreferrer">
-            <span><small>App Store</small><strong>Hozir yuklash</strong></span>
-          </a>
-          <a class="store store-google" href="https://play.google.com/store/search?q=AnyLang&c=apps" target="_blank" rel="noopener noreferrer">
-            <span><small>Google Play</small><strong>Hozir yuklash</strong></span>
-          </a>
-        </div>
+        <a class="btn btn-primary btn-sm" href="/download/anylang-latest.apk" download="AnyLang.apk">Hozir yuklash</a>
       </div>
-      <div class="signal" aria-hidden="true">
-        <div class="wave w1"></div>
-        <div class="wave w2"></div>
-        <div class="wave w3"></div>
-        <div class="core">AL</div>
+      <div class="flow-visual" aria-hidden="true">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="lang-chip chip-1">O‘zbek</div>
+        <div class="lang-chip chip-2">English</div>
+        <div class="lang-chip chip-3">Русский</div>
+        <div class="lang-chip chip-4">Deutsch</div>
+        <div class="lang-chip chip-5">中文</div>
+        <div class="flow-core">⇄</div>
       </div>
+    </section>
+
+    <section class="close">
+      <h2>Bir suhbat. Barcha tillar.</h2>
+      <p>Play Market chiqquncha release APK shu yerdan. Yangilang — yangi imkoniyatlar bilan.</p>
+      <a class="btn btn-primary" href="/download/anylang-latest.apk" download="AnyLang.apk">AnyLang yuklab olish</a>
+      <p class="soon">Google Play va App Store — tez orada</p>
     </section>
   </main>
 
   <footer class="foot">
-    <div class="foot-brand">
-      <span class="brand-mark sm"></span>
-      <span>AnyLang</span>
-    </div>
+    <a class="logo foot-logo" href="/">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">AnyLang</span>
+    </a>
     <p>© <span id="y"></span> AnyLang. Har til. Bitta suhbat.</p>
   </footer>
 

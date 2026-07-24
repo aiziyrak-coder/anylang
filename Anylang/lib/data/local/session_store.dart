@@ -110,13 +110,10 @@ class SessionStore {
     return lang;
   }
 
-  /// Tarjima maqsad tili = tizim (app) tili. Ona tili bilan bir xil.
-  static String preferredLanguage() => normalizeLangCode(appLanguage());
+  /// Tarjima maqsad tili = ona tili (native_language).
+  static String preferredLanguage() => nativeLanguage();
 
   static String nativeLanguage() {
-    // Tizim tili asosiy manba — sozlamada o'zgartiriladi.
-    final fromApp = preferredLanguage();
-    if (fromApp.isNotEmpty) return fromApp;
     final stored = _box.get('native_language') as String?;
     if (stored != null && stored.isNotEmpty) {
       return normalizeLangCode(stored);
@@ -125,7 +122,8 @@ class SessionStore {
     if (fromUser != null && fromUser.isNotEmpty) {
       return normalizeLangCode(fromUser);
     }
-    return 'uz';
+    // Legacy: faqat app tili bor bo'lsa
+    return normalizeLangCode(appLanguage());
   }
 
   /// ISO 639-1 + UI locale aliaslari (`us_US` → `en`).
@@ -150,6 +148,15 @@ class SessionStore {
     await _box.put('user', u);
   }
 
+  /// Tarjima (chat) tilini alohida o'rnatadi — UI locale o'zgarmaydi.
+  static Future<void> applyNativeLanguage(String isoCode) async {
+    final iso = normalizeLangCode(isoCode);
+    await _box.put('native_language', iso);
+    final u = Map<String, dynamic>.from(user() ?? {});
+    u['native_language'] = iso;
+    await _box.put('user', u);
+  }
+
   static Map<String, dynamic>? user() {
     final raw = _box.get('user');
     if (raw is Map<String, dynamic>) return raw;
@@ -160,15 +167,13 @@ class SessionStore {
   /// Persist refreshed `/users/me` (or login user) without touching tokens.
   static Future<void> saveUser(Map<String, dynamic> user) async {
     await _box.put('user', user);
+    final native = user['native_language']?.toString();
+    if (native != null && native.isNotEmpty) {
+      await _box.put('native_language', normalizeLangCode(native));
+    }
     final app = user['app_language']?.toString();
     if (app != null && app.isNotEmpty) {
       await _box.put('language', app);
-      await _box.put('native_language', normalizeLangCode(app));
-    } else {
-      final native = user['native_language']?.toString();
-      if (native != null && native.isNotEmpty) {
-        await _box.put('native_language', normalizeLangCode(native));
-      }
     }
   }
 

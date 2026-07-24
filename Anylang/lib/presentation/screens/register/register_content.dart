@@ -6,8 +6,8 @@ import '../../ui/gradient_background.dart';
 import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
+import '../../ui/textfields/birth_date_field.dart';
 import '../../ui/theme/colors.dart';
-import '../../utils/formatters/time_formatter.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -20,12 +20,14 @@ class RegisterContent extends ScreenContent<RegisterState> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _passCtrl;
+  late final TextEditingController _birthCtrl;
 
   @override
   void initContent() {
     _nameCtrl = TextEditingController();
     _emailCtrl = TextEditingController();
     _passCtrl = TextEditingController();
+    _birthCtrl = TextEditingController();
   }
 
   @override
@@ -33,11 +35,13 @@ class RegisterContent extends ScreenContent<RegisterState> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
+    _birthCtrl.dispose();
   }
 
   @override
   Widget build(BuildContext context, RegisterState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
+    final now = DateTime.now();
 
     return GradientBackground(
       child: SafeArea(
@@ -63,30 +67,21 @@ class RegisterContent extends ScreenContent<RegisterState> {
                 keyboardType: TextInputType.name,
               ),
               SizedBox(height: 16.dp),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Obx(() => AppPickerField(
-                          label: 'birth_date'.tr,
-                          hint: '14.03.1998',
-                          icon: Icons.calendar_today_outlined,
-                          value: state.birthDate.value == null ? null : formatDateDots(state.birthDate.value!),
-                          onTap: () => _pickDate(context, state, sendAction),
-                        )),
-                  ),
-                  SizedBox(width: 12.dp),
-                  Expanded(
-                    child: Obx(() => AppPickerField(
-                          label: 'country'.tr,
-                          hint: 'O‘zbekiston',
-                          icon: Icons.keyboard_arrow_down_rounded,
-                          value: state.country.value.isEmpty ? null : state.country.value,
-                          onTap: () => _pickCountry(context, state, sendAction),
-                        )),
-                  ),
-                ],
-              ),
+              Obx(() => BirthDateField(
+                    controller: _birthCtrl,
+                    date: state.birthDate.value,
+                    firstDate: DateTime(1920),
+                    lastDate: now,
+                    onChanged: (d) => sendAction(SelectBirthDate(d)),
+                  )),
+              SizedBox(height: 16.dp),
+              Obx(() => AppPickerField(
+                    label: 'country'.tr,
+                    hint: 'O‘zbekiston',
+                    icon: Icons.keyboard_arrow_down_rounded,
+                    value: state.country.value.isEmpty ? null : state.country.value,
+                    onTap: () => _pickCountry(context, state, sendAction),
+                  )),
               SizedBox(height: 16.dp),
               Text(
                 'gender'.tr,
@@ -211,17 +206,6 @@ class RegisterContent extends ScreenContent<RegisterState> {
         ),
       );
     });
-  }
-
-  Future<void> _pickDate(BuildContext context, RegisterState state, void Function(MyAction) sendAction) async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: state.birthDate.value ?? DateTime(2000),
-      firstDate: DateTime(1920),
-      lastDate: now,
-    );
-    if (picked != null) sendAction(SelectBirthDate(picked));
   }
 
   Future<void> _pickCountry(

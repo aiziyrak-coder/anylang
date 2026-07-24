@@ -6,7 +6,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 AppLanguage = Literal["uz_UZ", "ru_RU", "us_US"]
 Gender = Literal["male", "female"]
 SubscriptionPlan = Literal["basic", "premium", "business"]
-BillingCycle = Literal["monthly", "yearly"]
+# Canonical: "1"|"3"|"6"|"12". Legacy aliases also accepted: monthly|yearly
+BillingCycle = str
 SubscriptionSource = Literal["purchase", "number_bonus", "admin"]
 BusinessRole = Literal["manufacturer", "distributor", "retail", "service"]
 

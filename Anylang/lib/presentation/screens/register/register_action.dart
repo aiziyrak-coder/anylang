@@ -9,7 +9,7 @@ class SelectGender extends RegisterAction {
 }
 
 class SelectBirthDate extends RegisterAction {
-  final DateTime date;
+  final DateTime? date;
   SelectBirthDate(this.date);
 }
 

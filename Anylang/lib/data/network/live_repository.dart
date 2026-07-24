@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 
 import '../core/buildNetwork/base_result.dart';
 import '../core/buildNetwork/network_client.dart';
@@ -36,10 +37,15 @@ class LiveRepository {
     required String clientTurnId,
   }) async {
     final name = filePath.split(RegExp(r'[\\/]')).last;
+    final filename = name.toLowerCase().endsWith('.m4a') ? name : '$name.m4a';
     final form = FormData.fromMap({
       'speaker': speaker,
       'client_turn_id': clientTurnId,
-      'audio': await MultipartFile.fromFile(filePath, filename: name),
+      'audio': await MultipartFile.fromFile(
+        filePath,
+        filename: filename,
+        contentType: MediaType('audio', 'mp4'),
+      ),
     });
     return _client.post(
       api: 'api/v1/live/sessions/$sessionId/turns',

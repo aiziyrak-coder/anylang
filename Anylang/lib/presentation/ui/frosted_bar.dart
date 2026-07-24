@@ -35,10 +35,7 @@ class FrostedBar extends StatelessWidget {
           padding: padding,
           decoration: BoxDecoration(
             color: tint,
-            border: border ??
-                Border(
-                  top: BorderSide(color: c.outline, width: 0.6),
-                ),
+            border: border,
           ),
           child: child,
         ),

@@ -29,10 +29,27 @@ class ChatContent extends ScreenContent<ChatState> {
   Worker? _searchWorker;
   Worker? _loadingWorker;
   int _lastMessageCount = 0;
-  bool _pinnedToBottom = false;
+  /// Telegram: pastda bo'lsa yangi xabar / keyboard bilan pastga yopishadi.
+  bool _pinnedToBottom = true;
+  double _lastKeyboardInset = 0;
+  static const double _bottomStickThreshold = 72;
+
+  @override
+  void initContent() {
+    _scroll.addListener(_onScroll);
+  }
 
   @override
   void onClose() {
+    _scroll.removeListener(_onScroll);
+    // Keyingi ochilishda (shu chat) scroll holatini tiklash.
+    if (_scroll.hasClients && Get.isRegistered<ChatState>()) {
+      final s = Get.find<ChatState>();
+      s.rememberScroll(
+        pinnedToBottom: _isNearBottom(),
+        offset: _scroll.offset,
+      );
+    }
     _messagesWorker?.dispose();
     _inputWorker?.dispose();
     _searchWorker?.dispose();
@@ -45,30 +62,75 @@ class ChatContent extends ScreenContent<ChatState> {
     }
   }
 
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    _pinnedToBottom = _isNearBottom();
+  }
+
+  bool _isNearBottom() {
+    if (!_scroll.hasClients) return _pinnedToBottom;
+    final pos = _scroll.position;
+    if (!pos.hasPixels || !pos.hasContentDimensions) return _pinnedToBottom;
+    return pos.maxScrollExtent - pos.pixels <= _bottomStickThreshold;
+  }
+
+  /// Telegram: keyboard ochilganda pastda bo'lsa oxirgi xabarlar ko'rinsin;
+  /// yuqoriga scroll qilingan bo'lsa — o'qish joyi saqlansin (offset + delta).
+  void _onKeyboardInsetChanged(double inset) {
+    final delta = inset - _lastKeyboardInset;
+    if (delta.abs() < 0.5) {
+      _lastKeyboardInset = inset;
+      return;
+    }
+    final stick = _pinnedToBottom || _isNearBottom();
+    _lastKeyboardInset = inset;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      final pos = _scroll.position;
+      if (!pos.hasContentDimensions) return;
+      if (stick) {
+        _pinnedToBottom = true;
+        final target = pos.maxScrollExtent;
+        if ((pos.pixels - target).abs() > 0.5) {
+          _scroll.jumpTo(target);
+        }
+      } else {
+        final next = (pos.pixels + delta).clamp(0.0, pos.maxScrollExtent);
+        if ((pos.pixels - next).abs() > 0.5) {
+          _scroll.jumpTo(next);
+        }
+      }
+    });
+  }
+
   @override
   void uiBuildFinished(ChatState state) {
     _lastMessageCount = state.messages.length;
-    _pinnedToBottom = false;
+    _lastKeyboardInset = 0;
     // Faqat yangi xabar qo'shilganda pastga — status yangilanishida sakramasin.
     _messagesWorker = ever(state.messages, (list) {
       final n = list.length;
       if (n > _lastMessageCount) {
-        final bulkOrFirst = !_pinnedToBottom || n - _lastMessageCount > 1;
-        if (bulkOrFirst) {
-          _jumpToBottomSettled();
-        } else {
-          _scrollToBottom(animate: true);
+        final newest = n > 0 ? list.last : null;
+        final mine = newest?.isOutgoing == true;
+        // O'z xabari yoki pastga yopishgan bo'lsa — pastga.
+        if (mine || _pinnedToBottom || _isNearBottom()) {
+          final bulkOrFirst = n - _lastMessageCount > 1;
+          if (bulkOrFirst || mine) {
+            _jumpToBottomSettled();
+          } else {
+            _scrollToBottom(animate: true);
+          }
         }
       }
       _lastMessageCount = n;
     });
-    // Yuklash tugagach — eng pastdan ochilsin (animatsiyasiz).
+    // Yuklash tugagach — saqlangan scroll yoki past.
     _loadingWorker = ever(state.loading, (loading) {
       if (!loading && state.messages.isNotEmpty) {
-        _jumpToBottomSettled();
+        _restoreOrJumpBottom(state);
       }
       if (loading) {
-        _pinnedToBottom = false;
         _lastMessageCount = 0;
       }
     });
@@ -90,8 +152,28 @@ class ChatContent extends ScreenContent<ChatState> {
       }
     });
     if (!state.loading.value && state.messages.isNotEmpty) {
-      _jumpToBottomSettled();
+      _restoreOrJumpBottom(state);
     }
+  }
+
+  void _restoreOrJumpBottom(ChatState state) {
+    if (state.scrollPinnedToBottom || state.savedScrollOffset == null) {
+      _jumpToBottomSettled();
+      return;
+    }
+    final saved = state.savedScrollOffset!;
+    _pinnedToBottom = false;
+    void jump() {
+      if (!_scroll.hasClients) return;
+      final max = _scroll.position.maxScrollExtent;
+      _scroll.jumpTo(saved.clamp(0.0, max));
+      _pinnedToBottom = _isNearBottom();
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      jump();
+      WidgetsBinding.instance.addPostFrameCallback((_) => jump());
+    });
   }
 
   /// Layout barqaror bo‘lguncha bir necha frame jump — ochilishda scroll animatsiyasi yo‘q.
@@ -115,6 +197,7 @@ class ChatContent extends ScreenContent<ChatState> {
   }
 
   void _scrollToBottom({bool animate = true}) {
+    _pinnedToBottom = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
       final target = _scroll.position.maxScrollExtent;
@@ -194,12 +277,17 @@ class ChatContent extends ScreenContent<ChatState> {
     final recorder = Get.find<VoiceRecorderService>();
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    // Keyboard ochilishi/yopilishi — Telegram scroll qoidasi.
+    if ((keyboardInset - _lastKeyboardInset).abs() > 0.5) {
+      _onKeyboardInsetChanged(keyboardInset);
+    }
     // App bar / composer taxminiy balandligi — list padding.
     final topPad = topInset + 66.dp;
 
     return ChatWallpaperBackground(
       child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        padding: EdgeInsets.only(bottom: keyboardInset),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -422,6 +510,9 @@ class ChatContent extends ScreenContent<ChatState> {
               onProductTap: msg.type == ChatMsgType.product
                   ? () => sendAction(OpenChatProduct(msg))
                   : null,
+              onJoinGroupInvite: selecting
+                  ? null
+                  : (token) => sendAction(JoinGroupInvite(token)),
             ),
           );
         },

@@ -13,7 +13,13 @@ from app.core.errors import AppError
 from app.models.payment import Payment
 from app.models.user import User
 from app.services import numbers as numbers_service
-from app.services.subscription import PLAN_PRICES, activate_paid_subscription
+from app.services import promo as promo_service
+from app.services.subscription import (
+    billing_cycle_code,
+    compute_period_price,
+    normalize_billing_months,
+    activate_paid_subscription,
+)
 from app.services.users import load_user_for_response, serialize_user
 
 PaymentKind = Literal["subscription", "number", "super_group"]
@@ -21,22 +27,10 @@ PaymentKind = Literal["subscription", "number", "super_group"]
 SUPER_GROUP_PRICE = Decimal("10.00")
 
 
-def _compute_subscription_amount(plan: str, billing_cycle: str) -> Decimal:
-    prices = PLAN_PRICES.get(plan)
-    if prices is None:
-        raise AppError(message="Noto'g'ri tarif", error_code="PAYMENT_INVALID", status_code=400)
-
-    if billing_cycle == "monthly":
-        monthly = prices.get("monthly_price")
-        if monthly is None:
-            raise AppError(message="Tarif bepul", error_code="PAYMENT_INVALID", status_code=400)
-        return monthly
-
-    yearly = prices.get("yearly_price")
-    if yearly is None:
-        raise AppError(message="Tarif bepul", error_code="PAYMENT_INVALID", status_code=400)
-    return yearly * 12
-
+def _compute_subscription_amount(plan: str, billing_cycle: str) -> tuple[Decimal, int, str]:
+    months = normalize_billing_months(billing_cycle)
+    total, _per_month, _savings = compute_period_price(plan, months)
+    return total, months, billing_cycle_code(months)
 
 def _resolve_provider() -> str:
     settings = get_settings()
@@ -95,10 +89,14 @@ async def create_checkout(
     billing_cycle: str | None = None,
     number: str | None = None,
     chat_id: int | None = None,
+    promo_code: str | None = None,
 ) -> dict[str, Any]:
     amount: Decimal
     currency = "USD"
     meta: dict[str, Any] = {}
+    amount_before: Decimal | None = None
+    discount_amount = Decimal("0.00")
+    applied_promo: str | None = None
 
     if kind == "subscription":
         if not plan or plan == "basic":
@@ -107,13 +105,35 @@ async def create_checkout(
                 error_code="PAYMENT_INVALID",
                 status_code=400,
             )
-        if billing_cycle not in ("monthly", "yearly"):
+        if not billing_cycle:
             raise AppError(
-                message="To'lov davri (oylik/yillik) talab qilinadi",
+                message="To'lov davri (1/3/6/12 oy) talab qilinadi",
                 error_code="VALIDATION_ERROR",
                 status_code=400,
             )
-        amount = _compute_subscription_amount(plan, billing_cycle)
+        amount, months, cycle_code = _compute_subscription_amount(plan, billing_cycle)
+        billing_cycle = cycle_code
+        amount_before = amount
+        if promo_code and promo_code.strip():
+            preview = await promo_service.validate_promo_for_checkout(
+                db,
+                user,
+                code=promo_code,
+                plan=plan,
+                months=months,
+                amount=amount,
+            )
+            discount_amount = Decimal(preview["discount_amount"])
+            amount = Decimal(preview["amount_after"])
+            applied_promo = preview["code"]
+            meta.update(
+                {
+                    "promo_id": preview["promo_id"],
+                    "promo_code": applied_promo,
+                    "amount_before": preview["amount_before"],
+                    "discount_amount": preview["discount_amount"],
+                }
+            )
     elif kind == "number":
         if not number:
             raise AppError(message="Raqam talab qilinadi", error_code="VALIDATION_ERROR", status_code=400)
@@ -136,6 +156,13 @@ async def create_checkout(
     else:
         raise AppError(message="Noto'g'ri to'lov turi", error_code="PAYMENT_INVALID", status_code=400)
 
+    if amount <= 0:
+        raise AppError(
+            message="To'lov summasi 0 dan katta bo'lishi kerak",
+            error_code="PAYMENT_INVALID",
+            status_code=400,
+        )
+
     provider = _resolve_provider()
     payment = Payment(
         user_id=user.id,
@@ -154,6 +181,10 @@ async def create_checkout(
 
     base = _serialize_payment(payment)
     base["client_secret"] = None
+    if amount_before is not None:
+        base["amount_before"] = f"{amount_before:.2f}"
+        base["discount_amount"] = f"{discount_amount:.2f}"
+        base["promo_code"] = applied_promo
 
     if provider == "mock":
         base["mock_confirm"] = True
@@ -199,7 +230,6 @@ async def create_checkout(
     base["stripe_session_id"] = session.id
     base["mock_confirm"] = False
     return base
-
 
 async def get_payment(db: AsyncSession, user: User, payment_id: int) -> dict[str, Any]:
     payment = await _get_owned_payment(db, user, payment_id)
@@ -276,6 +306,17 @@ async def apply_payment(db: AsyncSession, payment: Payment) -> dict[str, Any]:
                 plan=payment.plan,  # type: ignore[arg-type]
                 billing_cycle=payment.billing_cycle,  # type: ignore[arg-type]
             )
+            promo_id = (payment.meta or {}).get("promo_id")
+            if promo_id:
+                await promo_service.redeem_promo_on_payment(
+                    db,
+                    promo_id=int(promo_id),
+                    user_id=user.id,
+                    payment_id=payment.id,
+                    amount_before=Decimal(str((payment.meta or {}).get("amount_before") or payment.amount)),
+                    discount_amount=Decimal(str((payment.meta or {}).get("discount_amount") or "0")),
+                    amount_after=payment.amount,
+                )
         elif payment.kind == "number":
             if not payment.number:
                 raise AppError(message="Noto'g'ri raqam to'lovi", error_code="PAYMENT_INVALID", status_code=400)

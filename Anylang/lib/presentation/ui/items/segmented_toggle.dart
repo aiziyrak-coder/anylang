@@ -68,14 +68,17 @@ class SegmentedToggle<T> extends StatelessWidget {
                   option.label,
                   style: TextStyle(
                     color: selected ? c.textPrimary : c.textSecondary,
-                    fontSize: 14.sp,
+                    fontSize: options.length > 2 ? 11.sp : 14.sp,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 if (option.badge != null) ...[
-                  SizedBox(width: 6.dp),
+                  SizedBox(width: options.length > 2 ? 3.dp : 6.dp),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6.dp, vertical: 2.dp),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: options.length > 2 ? 4.dp : 6.dp,
+                      vertical: 2.dp,
+                    ),
                     decoration: BoxDecoration(
                       color: c.accent,
                       borderRadius: BorderRadius.circular(99.dp),

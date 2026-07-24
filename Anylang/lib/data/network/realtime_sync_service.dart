@@ -437,6 +437,8 @@ ChatMessage mapChatMessageFromApi(
       downloaded: url != null && url.isNotEmpty,
       status: status,
       reply: reply,
+      text: textTranslated,
+      textOriginal: textOriginal,
     );
   } else {
     final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});

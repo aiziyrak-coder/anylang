@@ -114,9 +114,10 @@ class ProfileScreen extends Screen<ProfileState, void> {
         );
         await _load();
       case OpenAccountSettings _:
+        // Akkaunt sozlamalari olib tashlandi — tizim sozlamalariga yo'naltiriladi.
         await navigate(
           SettingsScreen(),
-          payload: const SettingsPayload(focus: SettingsFocus.account),
+          payload: const SettingsPayload(focus: SettingsFocus.app),
         );
         await _load();
       case EditPersonalProfile _:

@@ -22,23 +22,18 @@ ALLOWED_AUDIO_CONTENT_TYPES = {
     "audio/mp4",
     "audio/aac",
     "audio/x-m4a",
+    "audio/m4a",
     "audio/wav",
     "audio/x-wav",
     "audio/ogg",
     "audio/mpeg",
     "audio/mp3",
+    "application/octet-stream",
 }
 
-LIVE_LANGUAGES: list[dict] = [
-    {"code": "uz", "stt": True, "tts": True, "tts_voices": ["female", "male"]},
-    {"code": "en", "stt": True, "tts": True, "tts_voices": ["female", "male"]},
-    {"code": "ru", "stt": True, "tts": True, "tts_voices": ["female"]},
-    {"code": "de", "stt": True, "tts": True, "tts_voices": ["female"]},
-    {"code": "ja", "stt": True, "tts": False, "tts_voices": []},
-    {"code": "zh", "stt": True, "tts": True, "tts_voices": ["female"]},
-    {"code": "tr", "stt": True, "tts": True, "tts_voices": ["female"]},
-]
+from app.services.language_catalog import live_language_dicts
 
+LIVE_LANGUAGES: list[dict] = live_language_dicts()
 LANGUAGE_BY_CODE = {lang["code"]: lang for lang in LIVE_LANGUAGES}
 
 
@@ -261,6 +256,7 @@ async def create_turn(
         data,
         content_type=content_type or "application/octet-stream",
         language=source_language,
+        filename=filename,
     )
     if not text_original.strip():
         raise AppError(

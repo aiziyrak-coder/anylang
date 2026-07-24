@@ -57,7 +57,6 @@ class ChatAppBar extends StatelessWidget {
     final c = context.appColors;
 
     return FrostedBar(
-      border: Border(bottom: BorderSide(color: c.outline.withValues(alpha: 0.45))),
       child: SafeArea(
         bottom: false,
         child: Padding(

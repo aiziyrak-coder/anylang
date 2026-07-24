@@ -6,11 +6,14 @@ import '../data/core/buildNetwork/api_service.dart';
 import '../data/core/buildNetwork/network_client.dart';
 import '../data/core/buildNetwork/token_refresher.dart';
 import '../data/local/countries_service.dart';
+import '../data/local/flag_cache_service.dart';
+import '../data/local/languages_service.dart';
 import '../data/network/auth_repository.dart';
 import '../data/network/chat_repository.dart';
 import '../data/network/countries_repository.dart';
 import '../data/network/friends_repository.dart';
 import '../data/network/google_auth_service.dart';
+import '../data/network/languages_repository.dart';
 import '../data/network/live_repository.dart';
 import '../data/network/numbers_repository.dart';
 import '../data/network/payment_repository.dart';
@@ -66,8 +69,20 @@ class DataModule {
       CountriesRepository(client: Get.find()),
       permanent: true,
     );
+    Get.put<LanguagesRepository>(
+      LanguagesRepository(client: Get.find()),
+      permanent: true,
+    );
     Get.put<CountriesService>(
       await CountriesService(repo: Get.find()).init(),
+      permanent: true,
+    );
+    Get.put<LanguagesService>(
+      await LanguagesService(repo: Get.find()).init(),
+      permanent: true,
+    );
+    Get.put<FlagCacheService>(
+      await FlagCacheService(dio: api.dio).init(),
       permanent: true,
     );
     Get.put<GoogleAuthService>(GoogleAuthService(), permanent: true);

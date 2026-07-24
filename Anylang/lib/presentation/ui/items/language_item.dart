@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
+import '../language_flag.dart';
 
 /// Til tanlash ro'yxatining bitta elementi (bayroq + nom + tanlangan belgisi).
 class LanguageItem extends StatelessWidget {
@@ -9,6 +10,7 @@ class LanguageItem extends StatelessWidget {
   final String localizedName;
   final bool selected;
   final VoidCallback onTap;
+  final String? flagEmoji;
 
   const LanguageItem({
     super.key,
@@ -17,6 +19,7 @@ class LanguageItem extends StatelessWidget {
     required this.localizedName,
     required this.selected,
     required this.onTap,
+    this.flagEmoji,
   });
 
   @override
@@ -41,14 +44,12 @@ class LanguageItem extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 16.dp, vertical: 14.dp),
           child: Row(
             children: [
-              ClipRRect(
+              LanguageFlag(
+                url: flagAsset,
+                emoji: flagEmoji,
+                width: 32.dp,
+                height: 24.dp,
                 borderRadius: BorderRadius.circular(6.dp),
-                child: Image.asset(
-                  flagAsset,
-                  width: 32.dp,
-                  height: 24.dp,
-                  fit: BoxFit.cover,
-                ),
               ),
               SizedBox(width: 14.dp),
               Expanded(

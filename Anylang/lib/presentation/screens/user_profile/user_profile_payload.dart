@@ -21,6 +21,12 @@ class UserProfilePayload {
   final List<String> factoryImageUrls;
   final int listings;
   final String? avatarUrl;
+  /// Agar chatdan ochilgan bo'lsa — "Xabar yozish" yangi ChatScreen ochmasdan orqaga qaytadi.
+  final int? existingChatId;
+  /// none | pending | accepted
+  final String friendshipStatus;
+  final int? friendshipRequestId;
+  final bool isRequestIncoming;
 
   const UserProfilePayload({
     required this.business,
@@ -40,9 +46,16 @@ class UserProfilePayload {
     this.factoryImageUrls = const [],
     this.listings = 0,
     this.avatarUrl,
+    this.existingChatId,
+    this.friendshipStatus = 'none',
+    this.friendshipRequestId,
+    this.isRequestIncoming = false,
   });
 
-  factory UserProfilePayload.fromApi(Map<String, dynamic> json) {
+  factory UserProfilePayload.fromApi(
+    Map<String, dynamic> json, {
+    int? existingChatId,
+  }) {
     final id = (json['id'] as num?)?.toInt() ?? 0;
     final isBusiness = json['is_business'] == true;
     final name = (json['name'] as String?) ??
@@ -104,6 +117,10 @@ class UserProfilePayload {
       flagAsset: flagAssetForCountry(country),
       verified: json['verified_badge'] == true,
       avatarUrl: avatar,
+      existingChatId: existingChatId,
+      friendshipStatus: (json['friendship_status'] as String?) ?? 'none',
+      friendshipRequestId: (json['friendship_request_id'] as num?)?.toInt(),
+      isRequestIncoming: json['is_request_incoming'] == true,
     );
   }
 }

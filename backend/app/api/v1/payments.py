@@ -3,7 +3,10 @@ from fastapi import APIRouter, Request
 from app.api.deps_auth import CurrentUser
 from app.core.deps import DbSession
 from app.schemas.payment import CheckoutIn, CheckoutOut, ConfirmPaymentOut, PaymentOut
+from app.schemas.promo import PromoValidateIn, PromoValidateOut
 from app.services import payments as payments_service
+from app.services import promo as promo_service
+from app.services.subscription import compute_period_price, normalize_billing_months
 
 router = APIRouter()
 
@@ -15,6 +18,25 @@ async def stripe_webhook(request: Request, db: DbSession) -> dict[str, str]:
     result = await payments_service.handle_stripe_webhook(db, payload, sig_header)
     await db.commit()
     return result
+
+
+@router.post("/promo/validate", response_model=PromoValidateOut)
+async def validate_promo(
+    body: PromoValidateIn,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> PromoValidateOut:
+    months = normalize_billing_months(body.billing_cycle)
+    amount, _, _ = compute_period_price(body.plan, months)
+    data = await promo_service.validate_promo_for_checkout(
+        db,
+        current_user,
+        code=body.code,
+        plan=body.plan,
+        months=months,
+        amount=amount,
+    )
+    return PromoValidateOut.model_validate(data)
 
 
 @router.post("/checkout", response_model=CheckoutOut)
@@ -31,6 +53,7 @@ async def create_checkout(
         billing_cycle=body.billing_cycle,
         number=body.number,
         chat_id=body.chat_id,
+        promo_code=body.promo_code,
     )
     await db.commit()
     return CheckoutOut.model_validate(data)

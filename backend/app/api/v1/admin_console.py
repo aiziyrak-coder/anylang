@@ -308,3 +308,134 @@ async def purge_expired(db: DbSession, admin: SuperAdmin, request: Request) -> d
         ip=client_ip(request),
     )
     return {"purged": count}
+
+
+class PromoCreateBody(BaseModel):
+    code: str = Field(min_length=3, max_length=64)
+    description: str | None = Field(default=None, max_length=2000)
+    discount_type: Literal["percent", "fixed"] = "percent"
+    discount_value: float = Field(gt=0)
+    applies_to_plans: list[str] | None = None
+    min_months: int | None = Field(default=None, ge=1, le=12)
+    max_uses: int | None = Field(default=None, ge=1)
+    max_uses_per_user: int = Field(default=1, ge=1, le=100)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    is_active: bool = True
+
+
+class PromoUpdateBody(BaseModel):
+    code: str | None = Field(default=None, min_length=3, max_length=64)
+    description: str | None = Field(default=None, max_length=2000)
+    discount_type: Literal["percent", "fixed"] | None = None
+    discount_value: float | None = Field(default=None, gt=0)
+    applies_to_plans: list[str] | None = None
+    min_months: int | None = Field(default=None, ge=1, le=12)
+    max_uses: int | None = Field(default=None, ge=1)
+    max_uses_per_user: int | None = Field(default=None, ge=1, le=100)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    is_active: bool | None = None
+
+
+@router.get("/promo-codes")
+async def list_promo_codes(
+    db: DbSession,
+    _admin: ModeratorPlus,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=100),
+    q: str | None = None,
+    active_only: bool = False,
+) -> dict:
+    from app.services import promo as promo_service
+
+    return await promo_service.list_promos(
+        db, page=page, limit=limit, q=q, active_only=active_only
+    )
+
+
+@router.post("/promo-codes")
+async def create_promo_code(
+    body: PromoCreateBody,
+    db: DbSession,
+    admin: ModeratorPlus,
+    request: Request,
+) -> dict:
+    from decimal import Decimal
+
+    from app.services import promo as promo_service
+
+    data = await promo_service.create_promo(
+        db,
+        code=body.code,
+        description=body.description,
+        discount_type=body.discount_type,
+        discount_value=Decimal(str(body.discount_value)),
+        applies_to_plans=body.applies_to_plans,
+        min_months=body.min_months,
+        max_uses=body.max_uses,
+        max_uses_per_user=body.max_uses_per_user,
+        valid_from=body.valid_from,
+        valid_until=body.valid_until,
+        is_active=body.is_active,
+    )
+    await write_audit(
+        db,
+        admin=admin,
+        action="promo.create",
+        target_type="promo_code",
+        target_id=data["id"],
+        meta={"code": data["code"]},
+        ip=client_ip(request),
+    )
+    return data
+
+
+@router.patch("/promo-codes/{promo_id}")
+async def update_promo_code(
+    promo_id: int,
+    body: PromoUpdateBody,
+    db: DbSession,
+    admin: ModeratorPlus,
+    request: Request,
+) -> dict:
+    from decimal import Decimal
+
+    from app.services import promo as promo_service
+
+    payload = body.model_dump(exclude_unset=True)
+    if "discount_value" in payload and payload["discount_value"] is not None:
+        payload["discount_value"] = Decimal(str(payload["discount_value"]))
+    data = await promo_service.update_promo(db, promo_id, **payload)
+    await write_audit(
+        db,
+        admin=admin,
+        action="promo.patch",
+        target_type="promo_code",
+        target_id=promo_id,
+        meta={"code": data["code"]},
+        ip=client_ip(request),
+    )
+    return data
+
+
+@router.delete("/promo-codes/{promo_id}")
+async def delete_promo_code(
+    promo_id: int,
+    db: DbSession,
+    admin: SuperAdmin,
+    request: Request,
+) -> dict:
+    from app.services import promo as promo_service
+
+    await promo_service.delete_promo(db, promo_id)
+    await write_audit(
+        db,
+        admin=admin,
+        action="promo.delete",
+        target_type="promo_code",
+        target_id=promo_id,
+        ip=client_ip(request),
+    )
+    return {"ok": True}
+

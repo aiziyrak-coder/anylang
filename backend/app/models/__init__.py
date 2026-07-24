@@ -15,7 +15,9 @@ from app.models.chat import (
     MessageRead,
     MessageTranslation,
 )
+from app.models.language import Language
 from app.models.payment import Payment
+from app.models.promo import PromoCode, PromoRedemption
 from app.models.product import (
     Product,
     ProductFavorite,
@@ -39,7 +41,10 @@ from app.models.user import (
 
 __all__ = [
     "TimestampMixin",
+    "Language",
     "Payment",
+    "PromoCode",
+    "PromoRedemption",
     "User",
     "RefreshToken",
     "OtpCode",

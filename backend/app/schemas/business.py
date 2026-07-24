@@ -58,6 +58,9 @@ class PublicUserProfileOut(BaseModel):
     number: str
     avatar_url: str | None = None
     business: PublicBusinessOut | None = None
+    friendship_status: str = "none"
+    friendship_request_id: int | None = None
+    is_request_incoming: bool = False
 
 
 class UserSearchItemOut(BaseModel):

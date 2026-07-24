@@ -6,7 +6,7 @@ class ProfileEditAction extends MyAction {}
 class ChangeProfilePhoto extends ProfileEditAction {}
 
 class SelectProfileBirthDate extends ProfileEditAction {
-  final DateTime date;
+  final DateTime? date;
   SelectProfileBirthDate(this.date);
 }
 

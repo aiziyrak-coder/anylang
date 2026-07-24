@@ -15,17 +15,13 @@ import 'settings_action.dart';
 import 'settings_payload.dart';
 import 'settings_state.dart';
 
-/// Sozlamalar — [SettingsFocus.app] (dastur) yoki [SettingsFocus.account] (akkaunt).
+/// Yagona sozlamalar: til, ko‘rinish, bildirishnomalar, maxfiylik, hisob.
 class SettingsContent extends ScreenContent<SettingsState> {
   String _visibilityLabel(String key) => 'settings_visibility_$key'.tr;
 
   @override
   Widget build(BuildContext context, SettingsState state, void Function(MyAction action) sendAction) {
     final c = context.appColors;
-    final focus = state.focus.value;
-    final title = focus == SettingsFocus.app
-        ? 'settings_app_title'.tr
-        : 'settings_account_title'.tr;
 
     return GradientBackground(
       child: SafeArea(
@@ -33,18 +29,18 @@ class SettingsContent extends ScreenContent<SettingsState> {
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(16.dp, 4.dp, 16.dp, 0),
-              child: AppTopBar(title: title, onBack: () => sendAction(Back())),
+              child: AppTopBar(
+                title: 'settings_app_title'.tr,
+                onBack: () => sendAction(Back()),
+              ),
             ),
             Expanded(
-              child: Obx(() {
-                final f = state.focus.value;
-                return SingleChildScrollView(
+              child: Obx(
+                () => SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(16.dp, 16.dp, 16.dp, 24.dp),
-                  child: f == SettingsFocus.app
-                      ? _appBody(context, c, state, sendAction)
-                      : _accountBody(c, state, sendAction),
-                );
-              }),
+                  child: _body(context, c, state, sendAction),
+                ),
+              ),
             ),
           ],
         ),
@@ -52,7 +48,7 @@ class SettingsContent extends ScreenContent<SettingsState> {
     );
   }
 
-  Widget _appBody(
+  Widget _body(
     BuildContext context,
     AppColors c,
     SettingsState state,
@@ -61,13 +57,6 @@ class SettingsContent extends ScreenContent<SettingsState> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _intro(
-          c,
-          icon: Icons.tune_rounded,
-          title: 'settings_app_title'.tr,
-          subtitle: 'settings_app_desc'.tr,
-        ),
-        SizedBox(height: 20.dp),
         _sectionLabel(c, 'settings_general'.tr),
         SizedBox(height: 9.dp),
         _card(c, [
@@ -121,53 +110,6 @@ class SettingsContent extends ScreenContent<SettingsState> {
               )),
         ]),
         SizedBox(height: 20.dp),
-        Text(
-          'settings_app_version'.tr,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: c.textFaint, fontSize: 12.sp, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-
-  Widget _accountBody(
-    AppColors c,
-    SettingsState state,
-    void Function(MyAction) sendAction,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _intro(
-          c,
-          icon: Icons.manage_accounts_rounded,
-          title: 'settings_account_title'.tr,
-          subtitle: 'settings_account_desc'.tr,
-        ),
-        SizedBox(height: 20.dp),
-        _sectionLabel(c, 'settings_account_profile'.tr),
-        SizedBox(height: 9.dp),
-        _card(c, [
-          InfoRow(
-            icon: Icons.edit_outlined,
-            label: 'profile_edit'.tr,
-            showChevron: true,
-            onTap: () => sendAction(OpenEditProfileFromSettings()),
-          ),
-          InfoRow(
-            icon: Icons.dialpad_rounded,
-            label: 'numbers_title'.tr,
-            showChevron: true,
-            onTap: () => sendAction(OpenNumbersFromSettings()),
-          ),
-          InfoRow(
-            icon: Icons.workspace_premium_outlined,
-            label: 'profile_plans'.tr,
-            showChevron: true,
-            onTap: () => sendAction(OpenSubscriptionFromSettings()),
-          ),
-        ], padHorizontal: false),
-        SizedBox(height: 20.dp),
         _sectionLabel(c, 'settings_privacy'.tr),
         SizedBox(height: 9.dp),
         _card(c, [
@@ -212,65 +154,13 @@ class SettingsContent extends ScreenContent<SettingsState> {
           textAlign: TextAlign.center,
           style: TextStyle(color: c.textFaint, fontSize: 12.sp, fontWeight: FontWeight.w500),
         ),
+        SizedBox(height: 20.dp),
+        Text(
+          'settings_app_version'.tr,
+          textAlign: TextAlign.center,
+          style: TextStyle(color: c.textFaint, fontSize: 12.sp, fontWeight: FontWeight.w600),
+        ),
       ],
-    );
-  }
-
-  Widget _intro(
-    AppColors c, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Container(
-      padding: EdgeInsets.all(16.dp),
-      decoration: BoxDecoration(
-        color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
-        borderRadius: BorderRadius.circular(20.dp),
-        border: Border.all(color: c.surfaceBorder, width: 0.7),
-        boxShadow: c.glassShadow,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 44.dp,
-            height: 44.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: c.accentSoft,
-              borderRadius: BorderRadius.circular(14.dp),
-            ),
-            child: Icon(icon, color: c.accentText, size: 22.dp),
-          ),
-          SizedBox(width: 12.dp),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 4.dp),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: c.textSecondary,
-                    fontSize: 13.sp,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 

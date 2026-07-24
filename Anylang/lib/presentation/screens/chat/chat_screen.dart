@@ -14,6 +14,7 @@ import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/forward_pending_store.dart';
 import '../../../data/network/friends_repository.dart';
+import '../../../data/network/invite_deep_link_service.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/network/realtime_sync_service.dart';
@@ -220,6 +221,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         senderId: msg.senderId,
         senderName: msg.senderName,
         senderAvatarUrl: msg.senderAvatarUrl,
+        text: msg.text,
+        textOriginal: msg.textOriginal,
+        showingOriginal: msg.showingOriginal,
       );
     }
     return ChatMessage.text(
@@ -450,6 +454,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       case OpenSenderProfile a:
         await _openUserProfile(a.userId);
 
+      case JoinGroupInvite a:
+        final ok = await Get.find<InviteDeepLinkService>().joinAndOpen(a.token);
+        if (ok) showAppMessage('group_join_ok'.tr);
+
       case OpenGroupSettings _:
         await navigate(
           GroupSettingsScreen(),
@@ -679,6 +687,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               senderId: real.senderId,
               senderName: real.senderName,
               senderAvatarUrl: real.senderAvatarUrl,
+              text: real.text,
+              textOriginal: real.textOriginal,
+              showingOriginal: real.showingOriginal,
             );
             final idx = state.messages.indexWhere((m) => m.id == clientId || m.id == real.id);
             if (idx >= 0) state.messages[idx] = merged;
@@ -723,10 +734,13 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _openPeerProfile() async {
-    await _openUserProfile(state.peerId.value);
+    await _openUserProfile(
+      state.peerId.value,
+      returnToChatId: state.isGroup.value ? null : state.chatId.value,
+    );
   }
 
-  Future<void> _openUserProfile(int userId) async {
+  Future<void> _openUserProfile(int userId, {int? returnToChatId}) async {
     if (userId <= 0) {
       showAppWarning('chat_profile_unavailable'.tr);
       return;
@@ -736,9 +750,18 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       success: (data) {
         final map = asMap(data);
         if (map == null) return;
+        final backChatId = returnToChatId ??
+            (!state.isGroup.value &&
+                    userId == state.peerId.value &&
+                    state.chatId.value > 0
+                ? state.chatId.value
+                : null);
         navigate(
           UserProfileScreen(),
-          payload: UserProfilePayload.fromApi(map),
+          payload: UserProfilePayload.fromApi(
+            map,
+            existingChatId: backChatId,
+          ),
         );
       },
       failure: showAppError,

@@ -50,8 +50,8 @@ async def _count_members(db: AsyncSession, chat_id: int) -> int:
     return int(result.scalar() or 0)
 
 
-async def _require_group_admin(
-    db: AsyncSession, chat_id: int, user_id: int, *, owner_only: bool = False
+async def _require_group_member(
+    db: AsyncSession, chat_id: int, user_id: int
 ) -> tuple[Chat, ChatParticipant]:
     chat = await _get_chat_for_user(db, chat_id, user_id)
     if not _is_group(chat):
@@ -59,6 +59,13 @@ async def _require_group_admin(
     part = await _get_participant(db, chat_id, user_id)
     if part is None:
         raise AppError(message="Ruxsat yo'q", error_code="FORBIDDEN", status_code=403)
+    return chat, part
+
+
+async def _require_group_admin(
+    db: AsyncSession, chat_id: int, user_id: int, *, owner_only: bool = False
+) -> tuple[Chat, ChatParticipant]:
+    chat, part = await _require_group_member(db, chat_id, user_id)
     if owner_only and part.role != "owner":
         raise AppError(message="Faqat asosiy admin", error_code="FORBIDDEN", status_code=403)
     if not owner_only and part.role not in {"owner", "admin"}:
@@ -72,7 +79,8 @@ async def enrich_chat_dict(db: AsyncSession, data: dict, *, viewer: User, chat: 
     data["is_super"] = bool(chat.is_super)
     data["created_by"] = chat.created_by
     data["member_limit"] = member_cap(chat)
-    if part and part.role in {"owner", "admin"} and chat.invite_enabled and chat.invite_token:
+    # Har qanday a'zo invite linkni ko'ra/ulasha oladi
+    if part and chat.invite_enabled and chat.invite_token:
         data["invite_link"] = _invite_link(chat.invite_token)
     else:
         data["invite_link"] = None
@@ -112,7 +120,8 @@ async def add_members(
     user_ids: list[int],
     redis: Redis | None = None,
 ) -> dict:
-    chat, _ = await _require_group_admin(db, chat_id, user.id)
+    # Guruh a'zosining har biri do'stlarini qo'sha oladi
+    chat, _ = await _require_group_member(db, chat_id, user.id)
     cap = member_cap(chat)
     current = await _count_members(db, chat_id)
     unique: list[int] = []
@@ -256,15 +265,16 @@ async def demote_admin(db: AsyncSession, *, user: User, chat_id: int, target_use
 
 
 async def get_invite(db: AsyncSession, *, user: User, chat_id: int) -> dict:
-    chat, _ = await _require_group_admin(db, chat_id, user.id)
-    if not chat.invite_token:
+    chat, part = await _require_group_member(db, chat_id, user.id)
+    # Yangi token yaratish — faqat admin; oddiy a'zo mavjud linkni oladi
+    if part.role in {"owner", "admin"} and not chat.invite_token:
         chat.invite_token = _new_invite_token()
         chat.invite_enabled = True
         await db.flush()
     return {
-        "token": chat.invite_token,
-        "link": _invite_link(chat.invite_token) if chat.invite_enabled else None,
-        "enabled": chat.invite_enabled,
+        "token": chat.invite_token if chat.invite_enabled else None,
+        "link": _invite_link(chat.invite_token) if chat.invite_enabled and chat.invite_token else None,
+        "enabled": bool(chat.invite_enabled and chat.invite_token),
     }
 
 

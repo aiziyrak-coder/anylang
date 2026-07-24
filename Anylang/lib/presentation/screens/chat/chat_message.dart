@@ -308,6 +308,9 @@ class ChatMessage {
     int? senderId,
     String? senderName,
     String? senderAvatarUrl,
+    String? text,
+    String? textOriginal,
+    bool showingOriginal = false,
   }) =>
       ChatMessage(
         id: id,
@@ -320,6 +323,9 @@ class ChatMessage {
         senderId: senderId,
         senderName: senderName,
         senderAvatarUrl: senderAvatarUrl,
+        text: text,
+        textOriginal: textOriginal,
+        showingOriginal: showingOriginal,
         voiceDuration: duration,
         voiceDownloaded: downloaded,
         voicePath: path,
@@ -451,6 +457,8 @@ class ChatMessage {
       case ChatMsgType.image:
         return 'chat_preview_photo'.tr;
       case ChatMsgType.voice:
+        final caption = displayText.trim();
+        if (caption.isNotEmpty) return caption;
         return 'chat_preview_voice'.tr;
       case ChatMsgType.product:
         return productTitle ?? 'chat_preview_product'.tr;

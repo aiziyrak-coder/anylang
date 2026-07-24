@@ -39,7 +39,8 @@ class ApiService {
               path.contains('auth/verify-email') ||
               path.contains('auth/resend') ||
               path.contains('auth/password') ||
-              path.contains('countries');
+              path.contains('countries') ||
+              path.contains('languages');
 
           if (!skipAuth) {
             final token = await this.tokenRefresher.getToken();

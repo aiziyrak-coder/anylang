@@ -38,6 +38,23 @@ class ChatState extends GetxController {
   final RxString searchQuery = ''.obs;
   final RxBool muted = false.obs;
 
+  /// Telegram: chatlar bo'yicha scroll holati (qayta ochganda).
+  final Map<int, double> _scrollOffsetByChat = {};
+  final Map<int, bool> _scrollPinnedByChat = {};
+  bool scrollPinnedToBottom = true;
+  double? savedScrollOffset;
+
+  void rememberScroll({required bool pinnedToBottom, double? offset}) {
+    final id = chatId.value;
+    if (id <= 0) return;
+    _scrollPinnedByChat[id] = pinnedToBottom;
+    if (pinnedToBottom) {
+      _scrollOffsetByChat.remove(id);
+    } else if (offset != null) {
+      _scrollOffsetByChat[id] = offset;
+    }
+  }
+
   void bindPayload(ChatPayload p) {
     sessionId.value++;
     chatId.value = p.chatId;
@@ -66,5 +83,8 @@ class ChatState extends GetxController {
     sending.value = false;
     messages.clear();
     loading.value = true;
+    scrollPinnedToBottom = _scrollPinnedByChat[p.chatId] ?? true;
+    savedScrollOffset =
+        scrollPinnedToBottom ? null : _scrollOffsetByChat[p.chatId];
   }
 }

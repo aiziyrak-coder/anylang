@@ -1,8 +1,13 @@
-"""Speech-to-text: Deepgram → OpenAI Whisper → mock (non-prod only)."""
+"""Speech-to-text: OpenAI Whisper (preferred) → Deepgram → mock (non-prod only).
+
+Whisper is preferred because Deepgram nova-2 poorly handles Uzbek and some
+Turkic languages — empty transcripts were surfacing as NO_SPEECH_DETECTED.
+"""
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import httpx
 
@@ -14,39 +19,118 @@ logger = logging.getLogger(__name__)
 DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
 OPENAI_WHISPER_URL = "https://api.openai.com/v1/audio/transcriptions"
 
+# Deepgram nova-2 has weak / no support for these ISO codes.
+_DEEPGRAM_WEAK_LANGS = frozenset({"uz", "kk", "ky", "tg", "tk"})
+
+
+def _iso_lang(language: str | None) -> str | None:
+    if not language:
+        return None
+    code = language.strip().lower().replace("-", "_").split("_")[0]
+    return code or None
+
+
+def _guess_ext(content_type: str | None, filename: str | None) -> str:
+    name = (filename or "").lower()
+    suffix = Path(name).suffix.lstrip(".")
+    if suffix in {"m4a", "mp3", "mp4", "wav", "webm", "ogg", "aac", "flac", "mpeg"}:
+        return "m4a" if suffix == "aac" else suffix
+
+    mime = (content_type or "").split(";")[0].strip().lower()
+    return {
+        "audio/mpeg": "mp3",
+        "audio/mp3": "mp3",
+        "audio/mp4": "m4a",
+        "audio/m4a": "m4a",
+        "audio/x-m4a": "m4a",
+        "audio/aac": "m4a",
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/webm": "webm",
+        "audio/ogg": "ogg",
+        "application/octet-stream": "m4a",
+    }.get(mime, "m4a")
+
 
 async def transcribe_audio(
     data: bytes,
     *,
     content_type: str,
     language: str | None = None,
+    filename: str | None = None,
 ) -> str:
-    settings = get_settings()
-
-    if settings.deepgram_api_key:
-        return await _deepgram_transcribe(
-            data,
-            content_type=content_type,
-            language=language,
-            api_key=settings.deepgram_api_key,
+    if not data:
+        raise AppError(
+            message="Audioda nutq topilmadi",
+            error_code="NO_SPEECH_DETECTED",
+            status_code=400,
         )
+
+    settings = get_settings()
+    lang = _iso_lang(language)
+    ext = _guess_ext(content_type, filename)
+    mime = (content_type or "").split(";")[0].strip().lower() or f"audio/{ext}"
+
+    # Prefer Whisper (Uzbek / multilingual). Fall back to Deepgram, then retry
+    # Whisper without a hard language lock if the first pass was empty.
+    errors: list[str] = []
 
     if settings.openai_api_key:
-        return await _openai_whisper_transcribe(
-            data,
-            content_type=content_type,
-            language=language,
-            api_key=settings.openai_api_key,
-        )
+        try:
+            text = await _openai_whisper_transcribe(
+                data,
+                content_type=mime,
+                language=lang,
+                api_key=settings.openai_api_key,
+                ext=ext,
+            )
+            if text:
+                return text
+        except AppError as exc:
+            if exc.error_code != "NO_SPEECH_DETECTED":
+                errors.append(str(exc.message))
+                logger.warning("Whisper STT failed (%s); trying fallback", exc.error_code)
+            else:
+                # Retry auto-detect once — forced `uz` sometimes returns empty on short clips.
+                if lang:
+                    try:
+                        text = await _openai_whisper_transcribe(
+                            data,
+                            content_type=mime,
+                            language=None,
+                            api_key=settings.openai_api_key,
+                            ext=ext,
+                        )
+                        if text:
+                            return text
+                    except AppError:
+                        pass
+
+    use_deepgram = bool(settings.deepgram_api_key) and lang not in _DEEPGRAM_WEAK_LANGS
+    if use_deepgram or (settings.deepgram_api_key and not settings.openai_api_key):
+        try:
+            text = await _deepgram_transcribe(
+                data,
+                content_type=mime,
+                language=lang if lang not in _DEEPGRAM_WEAK_LANGS else None,
+                api_key=settings.deepgram_api_key,
+            )
+            if text:
+                return text
+        except AppError as exc:
+            if exc.error_code != "NO_SPEECH_DETECTED":
+                errors.append(str(exc.message))
+                logger.warning("Deepgram STT failed (%s)", exc.error_code)
 
     if settings.is_production:
         raise AppError(
-            message="STT sozlanmagan",
-            error_code="STT_UNAVAILABLE",
-            status_code=503,
+            message="Audioda nutq topilmadi. Yaxshiroq eshitiladigan qilib qayta yozing",
+            error_code="NO_SPEECH_DETECTED",
+            status_code=400,
+            extra={"detail": "; ".join(errors)} if errors else None,
         )
 
-    logger.warning("No STT provider configured — using local mock (non-production only)")
+    logger.warning("No STT provider succeeded — using local mock (non-production only)")
     return "Hello"
 
 
@@ -56,28 +140,15 @@ async def _openai_whisper_transcribe(
     content_type: str,
     language: str | None,
     api_key: str,
+    ext: str = "m4a",
 ) -> str:
-    # Whisper expects a filename with extension for format detection.
-    mime = (content_type or "audio/mpeg").split(";")[0].strip().lower()
-    ext = {
-        "audio/mpeg": "mp3",
-        "audio/mp3": "mp3",
-        "audio/mp4": "mp4",
-        "audio/m4a": "m4a",
-        "audio/wav": "wav",
-        "audio/x-wav": "wav",
-        "audio/webm": "webm",
-        "audio/ogg": "ogg",
-        "application/octet-stream": "mp3",
-    }.get(mime, "mp3")
-
-    form_file = (f"audio.{ext}", data, mime or f"audio/{ext}")
+    form_file = (f"audio.{ext}", data, content_type or f"audio/{ext}")
     data_fields: dict[str, str] = {
         "model": "whisper-1",
         "response_format": "json",
     }
     if language:
-        data_fields["language"] = language.split("_")[0].lower()
+        data_fields["language"] = language
 
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
@@ -117,7 +188,7 @@ async def _deepgram_transcribe(
 ) -> str:
     params: dict[str, str] = {"model": "nova-2", "smart_format": "true"}
     if language:
-        params["language"] = language.split("_")[0].lower()
+        params["language"] = language
 
     headers = {
         "Authorization": f"Token {api_key}",

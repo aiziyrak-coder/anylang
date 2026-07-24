@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../data/audio/voice_player_service.dart';
+import '../../../data/network/invite_deep_link_service.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../screens/chat/chat_message.dart';
 import '../../utils/size_controller.dart';
@@ -38,6 +39,8 @@ class ChatMessageItem extends StatelessWidget {
   /// Multi-select rejimi.
   final bool selecting;
   final bool selected;
+  /// Guruh invite linki ostidagi "Qo'shilish" tugmasi.
+  final ValueChanged<String>? onJoinGroupInvite;
 
   const ChatMessageItem({
     super.key,
@@ -52,6 +55,7 @@ class ChatMessageItem extends StatelessWidget {
     this.showAvatar = false,
     this.selecting = false,
     this.selected = false,
+    this.onJoinGroupInvite,
   });
 
   bool get _out => message.isOutgoing;
@@ -415,6 +419,14 @@ class ChatMessageItem extends StatelessWidget {
   // ---------------------------------------------------------------------------
 
   Widget _text(AppColors c) {
+    final inviteToken = InviteDeepLinkService.tokenFromText(
+      '${message.displayText}\n${message.textOriginal ?? ''}',
+    );
+    final showJoin = !_out &&
+        inviteToken != null &&
+        inviteToken.isNotEmpty &&
+        onJoinGroupInvite != null;
+
     // IntrinsicWidth: qisqa matn bubble'ni kontentga qisqartiradi;
     // tashqi ConstrainedBox maxWidth (~76%) chegara sifatida qoladi.
     return _bubble(
@@ -434,6 +446,39 @@ class ChatMessageItem extends StatelessWidget {
                 height: 1.3,
               ),
             ),
+            if (showJoin) ...[
+              SizedBox(height: 10.dp),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => onJoinGroupInvite!(inviteToken),
+                  borderRadius: BorderRadius.circular(12.dp),
+                  child: Ink(
+                    padding: EdgeInsets.symmetric(vertical: 10.dp, horizontal: 12.dp),
+                    decoration: BoxDecoration(
+                      color: c.accent.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(12.dp),
+                      border: Border.all(color: c.accent.withValues(alpha: 0.55)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.group_add_rounded, size: 18.dp, color: c.accentText),
+                        SizedBox(width: 8.dp),
+                        Text(
+                          'group_join_button'.tr,
+                          style: TextStyle(
+                            color: c.accentText,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
             SizedBox(height: 4.dp),
             Align(alignment: Alignment.centerRight, child: _meta(c)),
           ],
@@ -680,6 +725,23 @@ class ChatMessageItem extends StatelessWidget {
                 ),
               ],
             ),
+            if (message.displayText.trim().isNotEmpty) ...[
+              SizedBox(height: 8.dp),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: SizeController.screenWidth * 0.62,
+                ),
+                child: Text(
+                  message.displayText,
+                  style: TextStyle(
+                    color: _primaryText(c),
+                    fontSize: 14.sp,
+                    fontWeight: _out ? FontWeight.w600 : FontWeight.w400,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       }),

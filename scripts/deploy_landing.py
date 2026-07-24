@@ -69,16 +69,23 @@ def main() -> None:
         str(ROOT / "scripts" / "patch_landing_nginx.py"),
         "/tmp/patch_landing_nginx.py",
     )
+    sftp.put(
+        str(ROOT / "scripts" / "patch_apk_download_nginx.py"),
+        "/tmp/patch_apk_download_nginx.py",
+    )
     sftp.close()
     os.unlink(tar_path)
 
     sudo(c, f"mkdir -p {REMOTE} && tar -xzf /tmp/anylang-landing-deploy.tgz -C {REMOTE}")
     sudo(
         c,
-        "mkdir -p /var/www/anylang && rsync -a --delete /home/admin_root/anylang/landing/ /var/www/anylang/ "
-        "&& chown -R www-data:www-data /var/www/anylang && chmod -R a+rX /var/www/anylang",
+        "mkdir -p /var/www/anylang /var/www/anylang-apk && "
+        "rsync -a --delete /home/admin_root/anylang/landing/ /var/www/anylang/ "
+        "&& chown -R www-data:www-data /var/www/anylang /var/www/anylang-apk "
+        "&& chmod -R a+rX /var/www/anylang && chmod 755 /var/www/anylang-apk",
     )
     sudo(c, "python3 /tmp/patch_landing_nginx.py")
+    sudo(c, "python3 /tmp/patch_apk_download_nginx.py")
     sudo(c, "nginx -t && systemctl reload nginx")
     print("\n=== Rebuild admin ===")
     sudo(

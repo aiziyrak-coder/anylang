@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../../../data/audio/voice_recorder_service.dart';
 import '../../modal/language_bottom_sheet.dart';
+import '../../ui/language_flag.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../ui/waveform_bars.dart';
@@ -79,7 +80,12 @@ class JonliContent extends ScreenContent<JonliState> {
                     SizedBox(height: 3.dp),
                     Row(
                       children: [
-                        _flag(lang.flag),
+                        LanguageFlag(
+                          url: lang.flagUrl,
+                          emoji: lang.flagEmoji,
+                          width: 20.dp,
+                          height: 14.dp,
+                        ),
                         SizedBox(width: 7.dp),
                         Flexible(child: Text(lang.nativeName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.textPrimary, fontSize: 15.sp, fontWeight: FontWeight.w600))),
                       ],
@@ -143,8 +149,7 @@ class JonliContent extends ScreenContent<JonliState> {
   Widget _recordingCenter(AppColors c, JonliState state, bool isMe) {
     final color = isMe ? kLime : kSpeakBlue;
     final gradient = isMe ? limeButtonGradient : speakingBlueGradient;
-    final flag = isMe ? state.myLanguage.value.flag : state.otherLanguage.value.flag;
-    final lang = isMe ? state.myLanguage.value.nativeName : state.otherLanguage.value.nativeName;
+    final langOpt = isMe ? state.myLanguage.value : state.otherLanguage.value;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -163,9 +168,14 @@ class JonliContent extends ScreenContent<JonliState> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _flag(flag),
+            LanguageFlag(
+              url: langOpt.flagUrl,
+              emoji: langOpt.flagEmoji,
+              width: 20.dp,
+              height: 14.dp,
+            ),
             SizedBox(width: 6.dp),
-            Text(lang, style: TextStyle(color: c.textSecondary, fontSize: 13.sp)),
+            Text(langOpt.nativeName, style: TextStyle(color: c.textSecondary, fontSize: 13.sp)),
           ],
         ),
       ],
@@ -310,7 +320,12 @@ class JonliContent extends ScreenContent<JonliState> {
               SizedBox(width: 8.dp),
               Text('jonli_reading_to_you'.tr, style: TextStyle(color: c.accent, fontSize: 12.sp, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
               const Spacer(),
-              _flag(state.myLanguage.value.flag),
+              LanguageFlag(
+                url: state.myLanguage.value.flagUrl,
+                emoji: state.myLanguage.value.flagEmoji,
+                width: 20.dp,
+                height: 14.dp,
+              ),
               SizedBox(width: 6.dp),
               Text(state.myLanguage.value.nativeName, style: TextStyle(color: c.textSecondary, fontSize: 12.sp)),
             ],
@@ -355,8 +370,7 @@ class JonliContent extends ScreenContent<JonliState> {
     return Obx(() {
       final active = state.mode.value == (isMe ? JonliMode.me : JonliMode.other);
       final gradient = active ? (isMe ? limeButtonGradient : speakingBlueGradient) : null;
-      final flag = isMe ? state.myLanguage.value.flag : state.otherLanguage.value.flag;
-      final lang = isMe ? state.myLanguage.value.nativeName : state.otherLanguage.value.nativeName;
+      final langOpt = isMe ? state.myLanguage.value : state.otherLanguage.value;
       final labelColor = active ? c.onAccent : c.textSecondary;
 
       return Material(
@@ -398,14 +412,29 @@ class JonliContent extends ScreenContent<JonliState> {
                     style: TextStyle(color: labelColor, fontSize: 16.sp, fontWeight: FontWeight.w700),
                   ),
                   SizedBox(height: 2.dp),
-                  Text(
-                    '$flag $lang',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: labelColor.withValues(alpha: 0.75),
-                      fontSize: 11.sp,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      LanguageFlag(
+                        url: langOpt.flagUrl,
+                        emoji: langOpt.flagEmoji,
+                        width: 16.dp,
+                        height: 11.dp,
+                      ),
+                      SizedBox(width: 5.dp),
+                      Flexible(
+                        child: Text(
+                          langOpt.nativeName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: labelColor.withValues(alpha: 0.75),
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: 3.dp),
                   if (active)
@@ -417,12 +446,5 @@ class JonliContent extends ScreenContent<JonliState> {
         ),
       );
     });
-  }
-
-  Widget _flag(String asset) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3.dp),
-      child: Image.asset(asset, width: 20.dp, height: 14.dp, fit: BoxFit.cover),
-    );
   }
 }

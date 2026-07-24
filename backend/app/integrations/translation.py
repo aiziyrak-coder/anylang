@@ -17,18 +17,63 @@ _LANG_NAMES = {
     "ru": "Russian",
     "en": "English",
     "tr": "Turkish",
-    "de": "German",
-    "fr": "French",
-    "es": "Spanish",
-    "ar": "Arabic",
-    "zh": "Chinese",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "hi": "Hindi",
     "kk": "Kazakh",
     "ky": "Kyrgyz",
     "tg": "Tajik",
+    "az": "Azerbaijani",
+    "tk": "Turkmen",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "pt": "Portuguese",
+    "it": "Italian",
+    "pl": "Polish",
     "uk": "Ukrainian",
+    "nl": "Dutch",
+    "sv": "Swedish",
+    "no": "Norwegian",
+    "da": "Danish",
+    "fi": "Finnish",
+    "el": "Greek",
+    "cs": "Czech",
+    "sk": "Slovak",
+    "ro": "Romanian",
+    "hu": "Hungarian",
+    "bg": "Bulgarian",
+    "sr": "Serbian",
+    "hr": "Croatian",
+    "bs": "Bosnian",
+    "ar": "Arabic",
+    "fa": "Persian (Farsi)",
+    "he": "Hebrew",
+    "ka": "Georgian",
+    "hy": "Armenian",
+    "zh": "Chinese (Simplified)",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "hi": "Hindi",
+    "bn": "Bengali",
+    "ur": "Urdu",
+    "pa": "Punjabi",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "mr": "Marathi",
+    "gu": "Gujarati",
+    "kn": "Kannada",
+    "ml": "Malayalam",
+    "si": "Sinhala",
+    "ne": "Nepali",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "id": "Indonesian",
+    "ms": "Malay",
+    "tl": "Filipino (Tagalog)",
+    "my": "Burmese",
+    "km": "Khmer",
+    "sw": "Swahili",
+    "am": "Amharic",
+    "ha": "Hausa",
+    "yo": "Yoruba",
 }
 
 # UI / locale leftovers → ISO 639-1 used by translation + DB matching.
@@ -67,11 +112,42 @@ def _normalize_lang(code: str | None) -> str:
 
 
 def user_preferred_lang(user) -> str:
-    """Tarjima maqsad tili: tizim (app) tili = ona tili (bir xil)."""
-    app = getattr(user, "app_language", None)
+    """Tarjima maqsad tili: ona tili (native); yo'q bo'lsa app tili."""
     native = getattr(user, "native_language", None)
-    # App language — sozlamalardan keladi; native fallback.
-    return _normalize_lang(app or native or "uz")
+    app = getattr(user, "app_language", None)
+    return _normalize_lang(native or app or "uz")
+
+
+_URL_TOKEN_RE = re.compile(
+    r"(https?://[^\s<>\"']+|anylang://[^\s<>\"']+)",
+    re.IGNORECASE,
+)
+
+
+def _is_url_only_message(text: str) -> bool:
+    stripped = (text or "").strip()
+    if not stripped:
+        return True
+    parts = stripped.split()
+    return bool(parts) and all(_URL_TOKEN_RE.fullmatch(p) for p in parts)
+
+
+def _protect_urls(text: str) -> tuple[str, list[str]]:
+    urls: list[str] = []
+
+    def _stash(match: re.Match[str]) -> str:
+        urls.append(match.group(0))
+        return f"⟦URL{len(urls) - 1}⟧"
+
+    return _URL_TOKEN_RE.sub(_stash, text), urls
+
+
+def _restore_urls(text: str, urls: list[str]) -> str:
+    out = text
+    for i, url in enumerate(urls):
+        out = out.replace(f"⟦URL{i}⟧", url)
+        out = out.replace(f"[URL{i}]", url)
+    return out
 
 
 def app_locale_for_iso(iso: str) -> str:
@@ -288,7 +364,18 @@ async def translate(text: str, target_lang: str, source_lang: str | None = None)
         return text
     if source and source == target:
         return text
+    # Faqat URL / invite link — tarjima qilinmasin
+    if _is_url_only_message(text):
+        return text
 
+    protected, urls = _protect_urls(text)
+    out = await _translate_provider(protected, target, source, settings)
+    return _restore_urls(out, urls)
+
+
+async def _translate_provider(
+    text: str, target: str, source: str | None, settings
+) -> str:
     provider = (settings.translation_provider or "mock").strip().lower()
 
     if provider == "openai":

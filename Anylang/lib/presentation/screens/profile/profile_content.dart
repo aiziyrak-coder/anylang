@@ -7,6 +7,7 @@ import '../../ui/buttons/secondary_button.dart';
 import '../../ui/items/info_row.dart';
 import '../../ui/items/pill_badge.dart';
 import '../../ui/items/profile_stat_card.dart';
+import '../../ui/language_flag.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/formatters/time_formatter.dart';
@@ -153,14 +154,10 @@ class ProfileContent extends ScreenContent<ProfileState> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3.dp),
-          child: Image.asset(
-            d.flagAsset,
-            width: 18.dp,
-            height: 13.dp,
-            fit: BoxFit.cover,
-          ),
+        LanguageFlag(
+          url: d.flagAsset,
+          width: 18.dp,
+          height: 13.dp,
         ),
         SizedBox(width: 6.dp),
         Flexible(
@@ -263,26 +260,34 @@ class ProfileContent extends ScreenContent<ProfileState> {
   Widget _personalActions(AppColors c, void Function(MyAction) sendAction) {
     return Column(
       children: [
-        PrimaryButton(
+        Row(
+          children: [
+            Expanded(
+              child: SecondaryButton(
+                text: 'profile_edit'.tr,
+                startIcon: Icon(Icons.edit_outlined, size: 18.dp),
+                onTap: () => sendAction(EditPersonalProfile()),
+              ),
+            ),
+            SizedBox(width: 10.dp),
+            Expanded(
+              child: PrimaryButton(
+                text: 'profile_plans'.tr,
+                startIcon: const Icon(
+                  Icons.workspace_premium_rounded,
+                  color: kNavy,
+                  size: 18,
+                ),
+                onTap: () => sendAction(OpenSubscription()),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12.dp),
+        SecondaryButton(
           text: 'numbers_title'.tr,
-          startIcon: const Icon(
-            Icons.dialpad_rounded,
-            color: kNavy,
-            size: 18,
-          ),
+          startIcon: Icon(Icons.dialpad_rounded, size: 18.dp),
           onTap: () => sendAction(OpenNumbers()),
-        ),
-        SizedBox(height: 12.dp),
-        SecondaryButton(
-          text: 'profile_plans'.tr,
-          startIcon: Icon(Icons.workspace_premium_rounded, size: 18.dp),
-          onTap: () => sendAction(OpenSubscription()),
-        ),
-        SizedBox(height: 12.dp),
-        SecondaryButton(
-          text: 'profile_edit'.tr,
-          startIcon: Icon(Icons.edit_outlined, size: 18.dp),
-          onTap: () => sendAction(EditPersonalProfile()),
         ),
         SizedBox(height: 18.dp),
         _settingsHub(c, sendAction),
@@ -305,13 +310,13 @@ class ProfileContent extends ScreenContent<ProfileState> {
             SizedBox(width: 10.dp),
             Expanded(
               child: PrimaryButton(
-                text: 'profile_add_product'.tr,
+                text: 'profile_plans'.tr,
                 startIcon: const Icon(
-                  Icons.add_rounded,
+                  Icons.workspace_premium_rounded,
                   color: kNavy,
-                  size: 20,
+                  size: 18,
                 ),
-                onTap: () => sendAction(AddProductRequested()),
+                onTap: () => sendAction(OpenSubscription()),
               ),
             ),
           ],
@@ -321,12 +326,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
           text: 'numbers_title'.tr,
           startIcon: Icon(Icons.dialpad_rounded, size: 18.dp),
           onTap: () => sendAction(OpenNumbers()),
-        ),
-        SizedBox(height: 12.dp),
-        SecondaryButton(
-          text: 'profile_plans'.tr,
-          startIcon: Icon(Icons.workspace_premium_outlined, size: 18.dp),
-          onTap: () => sendAction(OpenSubscription()),
         ),
         SizedBox(height: 18.dp),
         _settingsHub(c, sendAction),
@@ -354,14 +353,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
           title: 'settings_app_title'.tr,
           subtitle: 'settings_app_desc'.tr,
           onTap: () => sendAction(OpenAppSettings()),
-        ),
-        SizedBox(height: 10.dp),
-        _settingsTile(
-          c,
-          icon: Icons.manage_accounts_rounded,
-          title: 'settings_account_title'.tr,
-          subtitle: 'settings_account_desc'.tr,
-          onTap: () => sendAction(OpenAccountSettings()),
         ),
       ],
     );
@@ -487,20 +478,10 @@ class ProfileContent extends ScreenContent<ProfileState> {
         ),
         SizedBox(height: 12.dp),
         if (d.listings.isEmpty)
-          Column(
-            children: [
-              AppEmptyState(
-                icon: Icons.inventory_2_outlined,
-                title: 'profile_listings_empty'.tr,
-                subtitle: 'profile_listings_empty_hint'.tr,
-              ),
-              SizedBox(height: 12.dp),
-              SecondaryButton(
-                text: 'profile_add_product'.tr,
-                startIcon: Icon(Icons.add_rounded, size: 18.dp),
-                onTap: () => sendAction(AddProductRequested()),
-              ),
-            ],
+          AppEmptyState(
+            icon: Icons.inventory_2_outlined,
+            title: 'profile_listings_empty'.tr,
+            subtitle: 'profile_listings_empty_hint'.tr,
           )
         else
           GridView.builder(

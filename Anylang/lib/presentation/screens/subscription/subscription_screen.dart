@@ -120,6 +120,27 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           final code = raw['code']?.toString() ?? '';
           final isCurrent = currentCode != null &&
               currentCode == code.toLowerCase();
+          final periods = <int, PlanPeriod>{};
+          final periodsRaw = raw['periods'];
+          if (periodsRaw is List) {
+            for (final p in periodsRaw) {
+              if (p is! Map) continue;
+              final months = p['months'];
+              final m = months is int
+                  ? months
+                  : (months is num ? months.toInt() : int.tryParse('$months'));
+              if (m == null) continue;
+              final sp = p['savings_percent'];
+              periods[m] = PlanPeriod(
+                months: m,
+                total: p['total']?.toString() ?? '',
+                perMonth: p['per_month']?.toString() ?? '',
+                savingsPercent: sp is int
+                    ? sp
+                    : (sp is num ? sp.toInt() : null),
+              );
+            }
+          }
           items.add(SubscriptionPlan(
             code: code,
             title: raw['title']?.toString() ?? '',
@@ -135,6 +156,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
                 : raw['badge']?.toString(),
             features: features,
             isCurrent: isCurrent,
+            periods: periods,
           ));
         }
         if (items.isEmpty) {
@@ -164,8 +186,9 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
     switch (action) {
       case Back _:
         popBackNavigate();
-      case SelectBillingCycle a:
-        state.billingCycle.value = a.cycle;
+      case SelectBillingMonths a:
+        state.billingMonths.value = a.months;
+        state.promoPreview.value = null;
       case RetryLoadPlans _:
         await _loadAll();
       case CheckPendingPayment _:
@@ -174,7 +197,54 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         await _selectPlan(a.plan);
       case CancelSubscription _:
         await _cancelSubscription();
+      case ApplyPromoCode _:
+        await _applyPromo();
+      case ClearPromoCode _:
+        state.promoPreview.value = null;
+        state.promoInput.value = '';
     }
+  }
+
+  Future<void> _applyPromo() async {
+    final code = state.promoInput.value.trim();
+    if (code.isEmpty) {
+      showAppMessage('subscription_promo_empty'.tr);
+      return;
+    }
+    // Preview against first paid plan for UX; checkout re-validates per plan.
+    SubscriptionPlan? paid;
+    for (final p in state.plans) {
+      if (!p.isFree) {
+        paid = p;
+        break;
+      }
+    }
+    if (paid == null) {
+      showAppMessage('subscription_promo_need_plan'.tr);
+      return;
+    }
+    state.promoLoading.value = true;
+    final payments = Get.find<PaymentRepository>();
+    final result = await payments.validatePromo(
+      code: code,
+      plan: paid.code,
+      billingCycle: '${state.billingMonths.value}',
+    );
+    state.promoLoading.value = false;
+    result.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) return;
+        state.promoPreview.value = PromoPreview(
+          code: map['code']?.toString() ?? code.toUpperCase(),
+          amountBefore: map['amount_before']?.toString() ?? '',
+          discountAmount: map['discount_amount']?.toString() ?? '',
+          amountAfter: map['amount_after']?.toString() ?? '',
+        );
+        showAppMessage('subscription_promo_ok'.tr);
+      },
+      failure: showAppError,
+    );
   }
 
   Future<void> _cancelSubscription() async {
@@ -296,11 +366,15 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
     }
 
     final payments = Get.find<PaymentRepository>();
-    final cycle =
-        state.billingCycle.value == BillingCycle.yearly ? 'yearly' : 'monthly';
+    final cycle = '${state.billingMonths.value}';
+    final promo = state.promoPreview.value?.code ??
+        (state.promoInput.value.trim().isEmpty
+            ? null
+            : state.promoInput.value.trim());
     final checkout = await payments.checkoutSubscription(
       plan: plan.code,
       billingCycle: cycle,
+      promoCode: promo,
     );
 
     await checkout.when<Future<void>>(

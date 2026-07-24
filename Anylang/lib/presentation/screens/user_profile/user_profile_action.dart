@@ -7,8 +7,14 @@ class UserProfileAction extends MyAction {}
 /// "Yozish" — suhbat ochish.
 class WriteMessage extends UserProfileAction {}
 
-/// Telefon qilish.
-class CallUser extends UserProfileAction {}
+/// Do'stlarga qo'shish / so'rov yuborish.
+class AddFriendFromProfile extends UserProfileAction {}
+
+/// Yuborilgan do'stlik so'rovini bekor qilish.
+class CancelFriendFromProfile extends UserProfileAction {}
+
+/// Kelgan do'stlik so'rovini qabul qilish.
+class AcceptFriendFromProfile extends UserProfileAction {}
 
 /// Veb-saytni ochish.
 class OpenWebsite extends UserProfileAction {}

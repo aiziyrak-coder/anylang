@@ -77,6 +77,7 @@ class SelectLanguageContent extends ScreenContent<SelectLanguageState> {
                       final o = items[i];
                       return LanguageItem(
                         flagAsset: o.flag,
+                        flagEmoji: o.flagEmoji,
                         nativeName: o.nativeName,
                         localizedName: o.key.tr,
                         selected: o.key == selected,

@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("/plans", response_model=PlansOut)
 async def list_plans(
     language: str | None = Query(default=None),
-    billing_cycle: str | None = Query(default=None, pattern="^(monthly|yearly)$"),
+    billing_cycle: str | None = Query(default=None),
 ) -> PlansOut:
     data = subscription_service.get_plans(language=language, billing_cycle=billing_cycle)
     return PlansOut.model_validate(data)
