@@ -14,6 +14,9 @@ class Product {
   final List<String> imageUrls;
   final int sellerId;
   final bool isFavorited;
+  final bool isTop;
+  final String status;
+  final String? topRequestStatus;
 
   const Product({
     required this.id,
@@ -27,6 +30,9 @@ class Product {
     this.imageUrls = const [],
     this.sellerId = 0,
     this.isFavorited = false,
+    this.isTop = false,
+    this.status = 'published',
+    this.topRequestStatus,
   });
 
   factory Product.fromApi(Map<String, dynamic> json) {
@@ -49,6 +55,11 @@ class Product {
         !imageUrls.contains(primaryUrl)) {
       imageUrls.insert(0, primaryUrl);
     }
+    final topReq = json['top_request'];
+    String? topStatus;
+    if (topReq is Map) {
+      topStatus = topReq['status']?.toString();
+    }
     return Product(
       id: id,
       iconAsset: 'assets/icons/ic_prod_image.svg',
@@ -61,6 +72,33 @@ class Product {
       imageUrls: imageUrls,
       sellerId: (json['seller_id'] as num?)?.toInt() ?? 0,
       isFavorited: json['is_favorited'] == true,
+      isTop: json['is_top'] == true,
+      status: (json['status'] as String?) ?? 'published',
+      topRequestStatus: topStatus,
+    );
+  }
+
+  Product copyWith({
+    bool? isFavorited,
+    bool? isTop,
+    String? status,
+    String? topRequestStatus,
+  }) {
+    return Product(
+      id: id,
+      iconAsset: iconAsset,
+      tileGradient: tileGradient,
+      name: name,
+      subtitle: subtitle,
+      price: price,
+      views: views,
+      imageUrl: imageUrl,
+      imageUrls: imageUrls,
+      sellerId: sellerId,
+      isFavorited: isFavorited ?? this.isFavorited,
+      isTop: isTop ?? this.isTop,
+      status: status ?? this.status,
+      topRequestStatus: topRequestStatus ?? this.topRequestStatus,
     );
   }
 }

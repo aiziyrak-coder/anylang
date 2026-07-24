@@ -58,9 +58,9 @@ class UserOut(BaseModel):
     email: EmailStr
     birth_date: date | None = None
     gender: Gender | None = None
-    country: str | None = Field(default=None, min_length=2, max_length=2)
+    country: str | None = Field(default=None, max_length=2)
     avatar_url: str | None = None
-    app_language: AppLanguage
+    app_language: str
     native_language: str
 
     is_verified: bool
@@ -68,6 +68,7 @@ class UserOut(BaseModel):
     is_active: bool
     profile_completed: bool
     created_at: datetime
+    last_number_change_at: datetime | None = None
 
     subscription: SubscriptionOut
     is_business: bool

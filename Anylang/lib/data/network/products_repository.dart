@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 
 import '../core/buildNetwork/base_result.dart';
 import '../core/buildNetwork/network_client.dart';
@@ -41,10 +43,26 @@ class ProductsRepository {
     return _client.get(api: 'api/v1/products/categories');
   }
 
-  Future<BaseResult> uploadImage(String filePath) async {
+  Future<MultipartFile> _imagePart(String filePath) async {
     final name = filePath.split(RegExp(r'[\\/]')).last;
+    final mime = lookupMimeType(filePath) ??
+        lookupMimeType(name) ??
+        'image/jpeg';
+    final parts = mime.split('/');
+    final filename = name.contains('.') ? name : '$name.jpg';
+    return MultipartFile.fromFile(
+      filePath,
+      filename: filename,
+      contentType: MediaType(
+        parts.isNotEmpty ? parts[0] : 'image',
+        parts.length > 1 ? parts[1] : 'jpeg',
+      ),
+    );
+  }
+
+  Future<BaseResult> uploadImage(String filePath) async {
     final form = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath, filename: name),
+      'file': await _imagePart(filePath),
     });
     return _client.post(
       api: 'api/v1/products/images',
@@ -55,6 +73,14 @@ class ProductsRepository {
 
   Future<BaseResult> create(Map<String, dynamic> body) {
     return _client.post(api: 'api/v1/products', data: body);
+  }
+
+  Future<BaseResult> update(int productId, Map<String, dynamic> body) {
+    return _client.patch(api: 'api/v1/products/$productId', data: body);
+  }
+
+  Future<BaseResult> archive(int productId) {
+    return _client.delete(api: 'api/v1/products/$productId');
   }
 
   Future<BaseResult> listByUser(int userId, {int page = 1, int limit = 40}) {
@@ -77,5 +103,16 @@ class ProductsRepository {
 
   Future<BaseResult> unfavorite(int id) {
     return _client.delete(api: 'api/v1/products/$id/favorite');
+  }
+
+  Future<BaseResult> requestTop(int productId, {String note = ''}) {
+    return _client.post(
+      api: 'api/v1/products/$productId/top-request',
+      data: {'note': note},
+    );
+  }
+
+  Future<BaseResult> cancelTopRequest(int productId) {
+    return _client.delete(api: 'api/v1/products/$productId/top-request');
   }
 }

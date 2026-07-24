@@ -26,7 +26,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   Worker? _formWorker;
-  int _lastEpoch = -1;
+  bool _hydrateBound = false;
 
   @override
   void initContent() {
@@ -35,19 +35,16 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   }
 
   void _bindHydrate(ProfileEditState state) {
-    _formWorker?.dispose();
+    if (_hydrateBound) return;
+    _hydrateBound = true;
     _formWorker = ever(state.formEpoch, (_) {
       final acc = state.account.value;
       _nameCtrl.text = acc?.name ?? '';
       _emailCtrl.text = acc?.email ?? '';
-      _lastEpoch = state.formEpoch.value;
     });
-    if (state.formEpoch.value != _lastEpoch) {
-      final acc = state.account.value;
-      _nameCtrl.text = acc?.name ?? '';
-      _emailCtrl.text = acc?.email ?? '';
-      _lastEpoch = state.formEpoch.value;
-    }
+    final acc = state.account.value;
+    _nameCtrl.text = acc?.name ?? '';
+    _emailCtrl.text = acc?.email ?? '';
   }
 
   @override
@@ -88,9 +85,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                             initial: account?.initial ?? '',
                             gradient: account?.avatarGradient ?? avatarTealGradient,
                             imageUrl: account?.avatarUrl,
-                            shape: account?.isBusiness == true
-                                ? ProfileAvatarShape.roundedSquare
-                                : ProfileAvatarShape.circle,
+                            shape: ProfileAvatarShape.circle,
                             onEdit: () => sendAction(ChangeProfilePhoto()),
                           );
                         },

@@ -11,10 +11,20 @@ class ChatRepository {
 
   ChatRepository({required NetworkClient client}) : _client = client;
 
-  Future<BaseResult> listChats({int page = 1, int limit = 50}) {
+  Future<BaseResult> listChats({
+    int page = 1,
+    int limit = 50,
+    String sort = 'activity',
+    String? type,
+  }) {
     return _client.get(
       api: 'api/v1/chats',
-      queryParameters: {'page': page, 'limit': limit},
+      queryParameters: {
+        'page': page,
+        'limit': limit,
+        'sort': sort,
+        if (type != null && type.isNotEmpty) 'type': type,
+      },
     );
   }
 
@@ -24,6 +34,28 @@ class ChatRepository {
       data: {'user_id': userId},
       notify: SnackNotify.none,
     );
+  }
+
+  Future<BaseResult> createGroup({
+    required String title,
+    required List<int> userIds,
+  }) {
+    return _client.post(
+      api: 'api/v1/chats/groups',
+      data: {
+        'title': title,
+        'user_ids': userIds,
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> pinChat(int chatId) {
+    return _client.post(api: 'api/v1/chats/$chatId/pin', notify: SnackNotify.none);
+  }
+
+  Future<BaseResult> unpinChat(int chatId) {
+    return _client.delete(api: 'api/v1/chats/$chatId/pin', notify: SnackNotify.none);
   }
 
   Future<BaseResult> listMessages(int chatId, {int? beforeId, int limit = 50}) {
@@ -137,8 +169,186 @@ class ChatRepository {
     );
   }
 
+  Future<BaseResult> updateGroup({
+    required int chatId,
+    String? title,
+  }) {
+    return _client.patch(
+      api: 'api/v1/chats/$chatId',
+      data: {
+        if (title != null) 'title': title,
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> clearHistory(int chatId, {bool forEveryone = false}) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/clear',
+      data: {'for_everyone': forEveryone},
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> editMessage(int messageId, {required String text}) {
+    return _client.patch(
+      api: 'api/v1/messages/$messageId',
+      data: {'text': text},
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> forwardMessage(
+    int messageId, {
+    required List<int> chatIds,
+    bool hideSender = false,
+  }) {
+    return _client.post(
+      api: 'api/v1/messages/$messageId/forward',
+      data: {
+        'chat_ids': chatIds,
+        'hide_sender': hideSender,
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> pinMessage(int chatId, int messageId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/messages/$messageId/pin',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> unpinMessage(int chatId, int messageId) {
+    return _client.delete(
+      api: 'api/v1/chats/$chatId/messages/$messageId/pin',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> listPinnedMessages(int chatId) {
+    return _client.get(api: 'api/v1/chats/$chatId/pinned-messages');
+  }
+
+  Future<BaseResult> setReaction(int messageId, {required String emoji}) {
+    return _client.post(
+      api: 'api/v1/messages/$messageId/reactions',
+      data: {'emoji': emoji},
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> removeReaction(int messageId) {
+    return _client.delete(
+      api: 'api/v1/messages/$messageId/reactions',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> listReactions(int messageId) {
+    return _client.get(api: 'api/v1/messages/$messageId/reactions');
+  }
+
+  Future<BaseResult> listMembers(int chatId) {
+    return _client.get(api: 'api/v1/chats/$chatId/members');
+  }
+
+  Future<BaseResult> addMembers(int chatId, {required List<int> userIds}) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/members',
+      data: {'user_ids': userIds},
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> removeMember(int chatId, int userId) {
+    return _client.delete(
+      api: 'api/v1/chats/$chatId/members/$userId',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> leaveGroup(int chatId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/leave',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> transferOwnership(int chatId, {required int userId}) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/transfer-ownership',
+      data: {'user_id': userId},
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> deleteGroup(int chatId) {
+    return _client.delete(
+      api: 'api/v1/chats/$chatId',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> promoteAdmin(int chatId, int userId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/admins/$userId',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> demoteAdmin(int chatId, int userId) {
+    return _client.delete(
+      api: 'api/v1/chats/$chatId/admins/$userId',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> getInvite(int chatId) {
+    return _client.get(api: 'api/v1/chats/$chatId/invite');
+  }
+
+  Future<BaseResult> regenerateInvite(int chatId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/invite',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> disableInvite(int chatId) {
+    return _client.delete(
+      api: 'api/v1/chats/$chatId/invite',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> joinByToken(String token) {
+    return _client.post(
+      api: 'api/v1/chats/join/$token',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> uploadGroupAvatar(int chatId, String filePath) async {
+    final name = filePath.split(RegExp(r'[\\/]')).last;
+    final mime = lookupMimeType(filePath) ?? 'image/jpeg';
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: name,
+        contentType: MediaType.parse(mime),
+      ),
+    });
+    return _client.post(
+      api: 'api/v1/chats/$chatId/avatar',
+      data: form,
+      notify: SnackNotify.none,
+    );
+  }
+
   Future<BaseResult> hideChat(int chatId) {
-    return _client.post(api: 'api/v1/chats/$chatId/hide');
+    return _client.post(api: 'api/v1/chats/$chatId/hide', notify: SnackNotify.none);
   }
 
   Future<BaseResult> muteChat(int chatId) {

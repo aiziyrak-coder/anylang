@@ -141,12 +141,13 @@ class AddProductScreen extends Screen<AddProductState, void> {
         imageIds.add(id);
       }
       final cat = _kCategoryCodes[state.category.value] ?? 'other';
+      final short = shortDescription.isNotEmpty ? shortDescription : name;
+      final detailed =
+          detailedDescription.isEmpty ? short : detailedDescription;
       final result = await repo.create({
         'name': name,
-        'short_description': shortDescription,
-        'description': detailedDescription.isEmpty
-            ? shortDescription
-            : detailedDescription,
+        'short_description': short,
+        'description': detailed,
         'price': price,
         'currency': state.currency.value,
         'category': cat,
@@ -155,16 +156,14 @@ class AddProductScreen extends Screen<AddProductState, void> {
         'status': status,
       });
       if (result.dataOrNull != null) {
-        showAppMessage(
-          status == 'draft'
-              ? 'add_product_draft_saved'.tr
-              : 'add_product_published'.tr,
-        );
+        showAppMessage('action_done'.tr);
         popBackNavigate();
         return;
       }
       final err = result.errorOrNull?.toString() ?? '';
-      if (err.contains('NOT_A_BUSINESS') || err.contains('business')) {
+      if (err.contains('NOT_A_BUSINESS') ||
+          err.toLowerCase().contains('biznes') ||
+          err.toLowerCase().contains('business')) {
         showAppError('add_product_business_required'.tr);
       } else {
         showAppError(result.errorOrNull ?? 'error'.tr);

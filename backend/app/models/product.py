@@ -78,3 +78,24 @@ class ProductView(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     day_bucket: Mapped[str] = mapped_column(String(10), nullable=False)  # YYYY-MM-DD UTC
+
+
+class ProductTopRequest(Base, TimestampMixin):
+    """Seller so'rovi: mahsulotni TOP (pin) ga chiqarish."""
+
+    __tablename__ = "product_top_requests"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    seller_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), default="pending", index=True, nullable=False
+    )  # pending | approved | rejected | cancelled
+    note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    admin_note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    reviewed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

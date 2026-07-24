@@ -21,6 +21,7 @@ import '../profile_edit/profile_edit_screen.dart';
 import '../settings/settings_payload.dart';
 import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
+import '../numbers/numbers_screen.dart';
 import 'profile_account.dart';
 import 'profile_action.dart';
 import 'profile_content.dart';
@@ -79,6 +80,9 @@ class ProfileScreen extends Screen<ProfileState, void> {
             name: p.name,
             price: p.price,
             imageUrl: p.imageUrl,
+            status: p.status,
+            isTop: p.isTop,
+            topRequestStatus: p.topRequestStatus,
           ),
         )
         .toList();
@@ -93,6 +97,9 @@ class ProfileScreen extends Screen<ProfileState, void> {
     switch (action) {
       case OpenSubscription _:
         await navigate(SubscriptionScreen());
+        await _load();
+      case OpenNumbers _:
+        await navigate(NumbersScreen());
         await _load();
       case OpenSettings _:
         await navigate(

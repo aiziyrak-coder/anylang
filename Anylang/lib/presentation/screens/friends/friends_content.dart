@@ -173,6 +173,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
         online: f.online,
         unread: 0,
         highlighted: false,
+        avatarUrl: f.avatarUrl,
         onTap: () => sendAction(OpenChat(f)),
       ),
     );

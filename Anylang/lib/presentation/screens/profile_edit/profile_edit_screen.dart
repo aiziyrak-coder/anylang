@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/image_picker.dart';
 import '../../utils/app_snackbar.dart';
@@ -16,11 +19,13 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
 
   @override
   void initState(ProfileAccount? payload) {
+    state.isSaving.value = false;
     state.account.value = payload;
     state.country.value = payload?.countryCode ?? '';
     state.gender.value = 'male';
+    state.birthDate.value = null;
     if (payload != null) state.formEpoch.value++;
-    _hydrateFromApi();
+    unawaited(_hydrateFromApi());
   }
 
   Future<void> _hydrateFromApi() async {
@@ -29,6 +34,7 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
       success: (data) {
         final map = asMap(data);
         if (map == null) return;
+        unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
         final acc = ProfileAccount.fromApi(map);
         state.account.value = acc;
         final code = (map['country'] as String?)?.trim().toUpperCase() ?? '';
@@ -37,7 +43,8 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
         } else if (acc.countryCode.isNotEmpty) {
           state.country.value = acc.countryCode;
         }
-        state.gender.value = (map['gender'] as String?) ?? 'male';
+        final g = (map['gender'] as String?)?.toLowerCase();
+        state.gender.value = (g == 'female' || g == 'male') ? g! : 'male';
         final bd = map['birth_date']?.toString();
         if (bd != null && bd.isNotEmpty) {
           state.birthDate.value = DateTime.tryParse(bd);
@@ -64,24 +71,41 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
         if (file == null) return;
         state.isSaving.value = true;
         try {
-          final result =
-              await Get.find<ProfileRepository>().uploadAvatar(file.path);
-          result.when(
-            success: (data) {
+          final acc = state.account.value;
+          final result = acc?.isBusiness == true
+              ? await Get.find<ProfileRepository>()
+                  .uploadBusinessLogo(file.path)
+              : await Get.find<ProfileRepository>().uploadAvatar(file.path);
+          await result.when(
+            success: (data) async {
               final map = asMap(data);
-              final url =
-                  map?['avatar_url']?.toString() ?? map?['url']?.toString();
-              final acc = state.account.value;
-              if (acc != null && url != null) {
+              final url = map?['avatar_url']?.toString() ??
+                  map?['logo_url']?.toString() ??
+                  map?['url']?.toString();
+              if (acc != null && url != null && url.isNotEmpty) {
                 state.account.value = acc.copyWith(
                   avatarUrl: url,
                   initial: initialsOf(acc.name),
                 );
               }
               state.avatarEpoch.value++;
+              final me = await Get.find<ProfileRepository>().getMe();
+              me.when(
+                success: (raw) {
+                  final m = asMap(raw);
+                  if (m != null) {
+                    unawaited(
+                      SessionStore.saveUser(Map<String, dynamic>.from(m)),
+                    );
+                    state.account.value = ProfileAccount.fromApi(m);
+                    state.avatarEpoch.value++;
+                  }
+                },
+                failure: (_) {},
+              );
               showAppMessage('profile_avatar_updated'.tr);
             },
-            failure: showAppError,
+            failure: (e) async => showAppError(e),
           );
         } finally {
           state.isSaving.value = false;
@@ -89,7 +113,7 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
       case SelectProfileBirthDate a:
         state.birthDate.value = a.date;
       case SelectProfileCountry a:
-        state.country.value = a.country;
+        state.country.value = a.country.toUpperCase();
       case SelectProfileGender a:
         state.gender.value = a.gender;
       case SaveProfileEdit a:
@@ -104,17 +128,23 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
             'full_name': name,
             if (state.birthDate.value != null)
               'birth_date': _fmtDate(state.birthDate.value!),
-            if (state.gender.value.isNotEmpty) 'gender': state.gender.value,
+            if (state.gender.value == 'male' || state.gender.value == 'female')
+              'gender': state.gender.value,
             if (state.country.value.length == 2)
               'country': state.country.value.toUpperCase(),
           };
           final result = await Get.find<ProfileRepository>().updateMe(body);
-          result.when(
-            success: (_) {
+          await result.when(
+            success: (data) async {
+              final map = asMap(data);
+              if (map != null) {
+                await SessionStore.saveUser(Map<String, dynamic>.from(map));
+                state.account.value = ProfileAccount.fromApi(map);
+              }
               showAppMessage('profile_saved'.tr);
               popBackNavigate();
             },
-            failure: showAppError,
+            failure: (e) async => showAppError(e),
           );
         } finally {
           state.isSaving.value = false;

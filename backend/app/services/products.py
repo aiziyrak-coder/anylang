@@ -13,13 +13,14 @@ from sqlalchemy.orm import selectinload
 from app.core.errors import AppError
 from app.core.pagination import normalize_page
 from app.integrations.storage import get_storage
-from app.models.product import Product, ProductFavorite, ProductImage, ProductView
+from app.models.product import Product, ProductFavorite, ProductImage, ProductTopRequest, ProductView
 from app.models.user import Subscription, User
 from app.schemas.product import ProductCreateIn, ProductUpdateIn
 
 MAX_IMAGES_PER_PRODUCT = 10
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_PENDING_TOP_REQUESTS = 3
 
 PRODUCT_CATEGORIES: dict[str, dict[str, str]] = {
     "clothing_accessories": {
@@ -189,6 +190,39 @@ async def _top_product_ids(db: AsyncSession, *, limit: int = 10) -> list[int]:
     return selected[:limit]
 
 
+def _sniff_image_content_type(data: bytes, declared: str | None) -> str:
+    """Dio/Flutter ko'pincha application/octet-stream yuboradi — baytlardan aniqlaymiz."""
+    raw = (declared or "").split(";")[0].strip().lower()
+    if raw in ALLOWED_IMAGE_TYPES:
+        return raw
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if len(data) >= 12 and data[0:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    try:
+        with Image.open(BytesIO(data)) as img:
+            fmt = (img.format or "").upper()
+            if fmt in {"JPEG", "JPG"}:
+                return "image/jpeg"
+            if fmt == "PNG":
+                return "image/png"
+            if fmt == "WEBP":
+                return "image/webp"
+    except Exception:
+        pass
+    return raw or "application/octet-stream"
+
+
+def _normalize_short_description(name: str, short_description: str, description: str) -> str:
+    text = (short_description or "").strip()
+    if text:
+        return text[:120]
+    fallback = (description or "").strip() or (name or "").strip()
+    return fallback[:120]
+
+
 def _validate_published_payload(
     *,
     name: str,
@@ -222,7 +256,7 @@ def _validate_published_payload(
 
     if errors:
         raise AppError(
-            message="Validatsiya xatosi",
+            message="; ".join(errors),
             error_code="VALIDATION_ERROR",
             status_code=400,
         )
@@ -332,10 +366,12 @@ async def _serialize_product(
 
 
 async def _serialize_detail(
+    db: AsyncSession,
     product: Product,
     *,
     favorite_ids: set[int],
     top_ids: set[int] | None = None,
+    viewer: User | None = None,
 ) -> dict:
     base = await _serialize_product(product, favorite_ids=favorite_ids, top_ids=top_ids)
     base.update(
@@ -353,9 +389,35 @@ async def _serialize_detail(
             ],
             "attributes": list(product.attributes or []),
             "seller": _serialize_seller(product.seller),
+            "top_request": None,
         }
     )
+    if viewer is not None and viewer.id == product.seller_id:
+        result = await db.execute(
+            select(ProductTopRequest)
+            .where(ProductTopRequest.product_id == product.id)
+            .order_by(ProductTopRequest.created_at.desc())
+            .limit(1)
+        )
+        req = result.scalar_one_or_none()
+        if req is not None:
+            base["top_request"] = _serialize_top_request(req, product=product)
     return base
+
+
+def _serialize_top_request(req: ProductTopRequest, *, product: Product | None = None) -> dict:
+    return {
+        "id": req.id,
+        "product_id": req.product_id,
+        "seller_id": req.seller_id,
+        "status": req.status,
+        "note": req.note or "",
+        "admin_note": req.admin_note or "",
+        "created_at": req.created_at,
+        "reviewed_at": req.reviewed_at,
+        "product_name": product.name if product is not None else None,
+        "is_top_pinned": product.is_top_pinned if product is not None else None,
+    }
 
 
 async def _load_products_query(
@@ -501,7 +563,13 @@ async def get_product_detail(
 
     top_ids = set(await _top_product_ids(db))
     fav_ids = await _favorite_ids(db, viewer.id, [product.id])
-    return await _serialize_detail(product, favorite_ids=fav_ids, top_ids=top_ids)
+    return await _serialize_detail(
+        db,
+        product,
+        favorite_ids=fav_ids,
+        top_ids=top_ids,
+        viewer=viewer,
+    )
 
 
 async def _record_view(db: AsyncSession, *, product_id: int, viewer_id: int) -> None:
@@ -534,6 +602,7 @@ async def upload_product_image(
 ) -> dict:
     await _require_business_account(user)
 
+    content_type = _sniff_image_content_type(data, content_type)
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise AppError(
             message="Faqat JPEG, PNG yoki WebP ruxsat etilgan",
@@ -589,8 +658,14 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
             status_code=400,
         )
 
+    name = payload.name.strip()
+    short_description = _normalize_short_description(
+        name, payload.short_description, payload.description
+    )
+    description = payload.description.strip()
+
     if payload.status == "draft":
-        if not payload.name.strip():
+        if not name:
             raise AppError(
                 message="Qoralama uchun nom majburiy",
                 error_code="VALIDATION_ERROR",
@@ -598,9 +673,9 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
             )
     else:
         _validate_published_payload(
-            name=payload.name,
-            short_description=payload.short_description,
-            description=payload.description,
+            name=name,
+            short_description=short_description,
+            description=description,
             price=payload.price,
             currency=payload.currency,
             category=payload.category,
@@ -610,9 +685,9 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
 
     product = Product(
         seller_id=user.id,
-        name=payload.name.strip(),
-        short_description=payload.short_description.strip(),
-        description=payload.description.strip(),
+        name=name,
+        short_description=short_description,
+        description=description,
         price=payload.price,
         currency=payload.currency,
         category=payload.category,
@@ -643,7 +718,13 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
 
     fav_ids = await _favorite_ids(db, user.id, [product.id])
     top_ids = set(await _top_product_ids(db))
-    return await _serialize_detail(product, favorite_ids=fav_ids, top_ids=top_ids)
+    return await _serialize_detail(
+        db,
+        product,
+        favorite_ids=fav_ids,
+        top_ids=top_ids,
+        viewer=user,
+    )
 
 
 async def update_product(
@@ -677,6 +758,12 @@ async def update_product(
 
     target_status = new_status or product.status
     if target_status == "published":
+        short_description = product.short_description
+        if not short_description.strip():
+            short_description = _normalize_short_description(
+                product.name, product.short_description, product.description
+            )
+            product.short_description = short_description
         _validate_published_payload(
             name=product.name,
             short_description=product.short_description,
@@ -709,7 +796,13 @@ async def update_product(
     await db.refresh(product, attribute_names=["images", "seller"])
     fav_ids = await _favorite_ids(db, user.id, [product.id])
     top_ids = set(await _top_product_ids(db))
-    return await _serialize_detail(product, favorite_ids=fav_ids, top_ids=top_ids)
+    return await _serialize_detail(
+        db,
+        product,
+        favorite_ids=fav_ids,
+        top_ids=top_ids,
+        viewer=user,
+    )
 
 
 async def archive_product(db: AsyncSession, *, user: User, product_id: int) -> None:
@@ -876,3 +969,176 @@ async def list_favorites(
         "total": total,
         "has_more": params.offset + len(items) < total,
     }
+
+
+async def request_top_promotion(
+    db: AsyncSession,
+    *,
+    user: User,
+    product_id: int,
+    note: str = "",
+) -> dict:
+    await _require_business_account(user)
+    product = await _get_product_or_404(db, product_id, viewer=user, allow_owner_draft=True)
+    if product.seller_id != user.id:
+        raise AppError(
+            message="Bu mahsulot sizga tegishli emas",
+            error_code="NOT_PRODUCT_OWNER",
+            status_code=403,
+        )
+    if product.status != "published":
+        raise AppError(
+            message="Faqat e'lon qilingan mahsulot uchun TOP so'rov yuboriladi",
+            error_code="PRODUCT_NOT_PUBLISHED",
+            status_code=400,
+        )
+    if product.is_top_pinned:
+        raise AppError(
+            message="Mahsulot allaqachon TOP'da",
+            error_code="ALREADY_TOP_PINNED",
+            status_code=400,
+        )
+
+    pending = await db.execute(
+        select(ProductTopRequest).where(
+            ProductTopRequest.product_id == product_id,
+            ProductTopRequest.status == "pending",
+        )
+    )
+    if pending.scalar_one_or_none() is not None:
+        raise AppError(
+            message="Bu mahsulot uchun so'rov allaqachon yuborilgan",
+            error_code="TOP_REQUEST_ALREADY_PENDING",
+            status_code=409,
+        )
+
+    seller_pending_count = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(ProductTopRequest)
+                .where(
+                    ProductTopRequest.seller_id == user.id,
+                    ProductTopRequest.status == "pending",
+                )
+            )
+        ).scalar()
+        or 0
+    )
+    if seller_pending_count >= MAX_PENDING_TOP_REQUESTS:
+        raise AppError(
+            message=f"Bir vaqtda maksimal {MAX_PENDING_TOP_REQUESTS} ta TOP so'rov",
+            error_code="TOP_REQUEST_LIMIT",
+            status_code=400,
+        )
+
+    req = ProductTopRequest(
+        product_id=product.id,
+        seller_id=user.id,
+        status="pending",
+        note=(note or "").strip()[:300],
+    )
+    db.add(req)
+    await db.flush()
+    await db.refresh(req)
+    return _serialize_top_request(req, product=product)
+
+
+async def cancel_top_request(db: AsyncSession, *, user: User, product_id: int) -> dict:
+    product = await _get_product_or_404(db, product_id, viewer=user, allow_owner_draft=True)
+    if product.seller_id != user.id:
+        raise AppError(
+            message="Bu mahsulot sizga tegishli emas",
+            error_code="NOT_PRODUCT_OWNER",
+            status_code=403,
+        )
+    result = await db.execute(
+        select(ProductTopRequest)
+        .where(
+            ProductTopRequest.product_id == product_id,
+            ProductTopRequest.status == "pending",
+        )
+        .order_by(ProductTopRequest.created_at.desc())
+        .limit(1)
+    )
+    req = result.scalar_one_or_none()
+    if req is None:
+        raise AppError(
+            message="Kutilayotgan so'rov topilmadi",
+            error_code="TOP_REQUEST_NOT_FOUND",
+            status_code=404,
+        )
+    req.status = "cancelled"
+    req.reviewed_at = datetime.now(UTC)
+    await db.flush()
+    return _serialize_top_request(req, product=product)
+
+
+async def list_top_requests(
+    db: AsyncSession,
+    *,
+    status: str | None = None,
+    page: int | None = None,
+    limit: int | None = None,
+) -> dict:
+    params = normalize_page(page, limit, default_size=50, max_size=100)
+    query = select(ProductTopRequest, Product).join(
+        Product, Product.id == ProductTopRequest.product_id
+    )
+    if status in {"pending", "approved", "rejected", "cancelled"}:
+        query = query.where(ProductTopRequest.status == status)
+    query = query.order_by(ProductTopRequest.created_at.desc())
+
+    count_query = select(func.count()).select_from(query.order_by(None).subquery())
+    total = int((await db.execute(count_query)).scalar() or 0)
+    rows = list(
+        (await db.execute(query.offset(params.offset).limit(params.page_size))).all()
+    )
+    items = [_serialize_top_request(req, product=product) for req, product in rows]
+    return {
+        "items": items,
+        "page": params.page,
+        "limit": params.page_size,
+        "total": total,
+        "has_more": params.offset + len(items) < total,
+    }
+
+
+async def review_top_request(
+    db: AsyncSession,
+    *,
+    request_id: int,
+    approve: bool,
+    admin_id: int,
+    admin_note: str = "",
+) -> dict:
+    result = await db.execute(
+        select(ProductTopRequest, Product)
+        .join(Product, Product.id == ProductTopRequest.product_id)
+        .where(ProductTopRequest.id == request_id)
+    )
+    row = result.one_or_none()
+    if row is None:
+        raise AppError(
+            message="So'rov topilmadi",
+            error_code="TOP_REQUEST_NOT_FOUND",
+            status_code=404,
+        )
+    req, product = row
+    if req.status != "pending":
+        raise AppError(
+            message="So'rov allaqachon ko'rib chiqilgan",
+            error_code="TOP_REQUEST_NOT_PENDING",
+            status_code=400,
+        )
+
+    req.status = "approved" if approve else "rejected"
+    req.admin_note = (admin_note or "").strip()[:300]
+    req.reviewed_by = admin_id
+    req.reviewed_at = datetime.now(UTC)
+    if approve:
+        product.is_top_pinned = True
+        if product.status != "published":
+            product.status = "published"
+    await db.flush()
+    return _serialize_top_request(req, product=product)

@@ -9,6 +9,7 @@ import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../select_language/select_language_option.dart';
 import '../subscription/subscription_screen.dart';
 import 'jonli_action.dart';
 import 'jonli_content.dart';
@@ -21,7 +22,42 @@ class JonliScreen extends Screen<JonliState, void> {
 
   @override
   void initState(void payload) {
+    _loadLiveLanguages();
     _ensureSession();
+  }
+
+  Future<void> _loadLiveLanguages() async {
+    final result = await Get.find<LiveRepository>().languages();
+    final data = result.dataOrNull;
+    final codes = <String>{};
+    if (data is Map) {
+      final list = data['languages'];
+      if (list is List) {
+        for (final item in list) {
+          if (item is Map && item['code'] != null) {
+            codes.add(item['code'].toString());
+          }
+        }
+      }
+    }
+    if (codes.isEmpty) {
+      codes.addAll(const ['uz', 'en', 'ru', 'de', 'ja', 'zh', 'tr']);
+    }
+    state.liveLangCodes.assignAll(codes);
+    if (!codes.contains(state.myLanguage.value.langCode)) {
+      state.myLanguage.value = languageOptions.firstWhere(
+        (o) => codes.contains(o.langCode),
+        orElse: () => languageOptions.first,
+      );
+    }
+    if (!codes.contains(state.otherLanguage.value.langCode)) {
+      state.otherLanguage.value = languageOptions.firstWhere(
+        (o) =>
+            codes.contains(o.langCode) &&
+            o.langCode != state.myLanguage.value.langCode,
+        orElse: () => languageOptions.first,
+      );
+    }
   }
 
   @override

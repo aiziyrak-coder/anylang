@@ -65,11 +65,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  customBorder: d.isBusiness
-                      ? RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22.dp),
-                        )
-                      : const CircleBorder(),
+                  customBorder: const CircleBorder(),
                   onTap: (d.avatarUrl?.trim().isNotEmpty == true)
                       ? () => sendAction(OpenProfileAvatar())
                       : null,
@@ -77,9 +73,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                     initial: d.initial,
                     gradient: d.avatarGradient,
                     imageUrl: d.avatarUrl,
-                    shape: d.isBusiness
-                        ? ProfileAvatarShape.roundedSquare
-                        : ProfileAvatarShape.circle,
+                    shape: ProfileAvatarShape.circle,
                   ),
                 ),
               ),
@@ -185,6 +179,12 @@ class ProfileContent extends ScreenContent<ProfileState> {
     final subLabel = d.subscriptionLabel ?? d.subscriptionPlan ?? '';
     final rows = <Widget>[
       InfoRow(
+        icon: Icons.dialpad_rounded,
+        label: 'numbers_my_label'.tr,
+        value: d.username ?? '',
+        valueColor: c.accentText,
+      ),
+      InfoRow(
         icon: Icons.language_outlined,
         label: 'profile_native_language'.tr,
         value: d.nativeLanguage ?? '',
@@ -264,12 +264,18 @@ class ProfileContent extends ScreenContent<ProfileState> {
     return Column(
       children: [
         PrimaryButton(
-          text: 'profile_plans'.tr,
+          text: 'numbers_title'.tr,
           startIcon: const Icon(
-            Icons.workspace_premium_rounded,
+            Icons.dialpad_rounded,
             color: kNavy,
             size: 18,
           ),
+          onTap: () => sendAction(OpenNumbers()),
+        ),
+        SizedBox(height: 12.dp),
+        SecondaryButton(
+          text: 'profile_plans'.tr,
+          startIcon: Icon(Icons.workspace_premium_rounded, size: 18.dp),
           onTap: () => sendAction(OpenSubscription()),
         ),
         SizedBox(height: 12.dp),
@@ -309,6 +315,12 @@ class ProfileContent extends ScreenContent<ProfileState> {
               ),
             ),
           ],
+        ),
+        SizedBox(height: 12.dp),
+        SecondaryButton(
+          text: 'numbers_title'.tr,
+          startIcon: Icon(Icons.dialpad_rounded, size: 18.dp),
+          onTap: () => sendAction(OpenNumbers()),
         ),
         SizedBox(height: 12.dp),
         SecondaryButton(

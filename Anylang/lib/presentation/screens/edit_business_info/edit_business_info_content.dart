@@ -20,12 +20,18 @@ import '../../utils/size_controller.dart';
 import 'edit_business_info_action.dart';
 import 'edit_business_info_state.dart';
 
-const List<String> kBusinessRoles = [
-  'Ishlab chiqaruvchi',
-  'Distributor',
-  'Chakana savdo',
-  'Xizmat ko‘rsatuvchi',
+const List<String> kBusinessRoleCodes = [
+  'manufacturer',
+  'distributor',
+  'retail',
+  'service',
 ];
+
+String businessRoleTitle(String code) {
+  final key = 'business_role_$code';
+  final tr = key.tr;
+  return tr == key ? code : tr;
+}
 
 /// S17 — Biznes ma'lumot tahrirlash. Logotip, kompaniya ma'lumotlari,
 /// sertifikatlar va zavod rasmlari tahrirlanadi.
@@ -105,7 +111,7 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                               : 'A'),
                           gradient: avatarBrownGradient,
                           imageUrl: state.logoUrl.value,
-                          shape: ProfileAvatarShape.roundedSquare,
+                          shape: ProfileAvatarShape.circle,
                           onEdit: () => sendAction(ChangeLogo()),
                         ),
                       ),
@@ -147,7 +153,9 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                           child: Obx(() => AppPickerField(
                                 label: 'business_role'.tr,
                                 hint: 'business_role'.tr,
-                                value: state.role.value.isEmpty ? null : state.role.value,
+                                value: state.role.value.isEmpty
+                                    ? null
+                                    : businessRoleTitle(state.role.value),
                                 icon: Icons.keyboard_arrow_down_rounded,
                                 onTap: () => _pickRole(context, state, sendAction),
                               )),
@@ -251,12 +259,19 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
   }
 
   Future<void> _pickRole(BuildContext context, EditBusinessInfoState state, void Function(MyAction) sendAction) async {
+    final labels = kBusinessRoleCodes.map(businessRoleTitle).toList();
+    final selectedLabel = state.role.value.isEmpty
+        ? null
+        : businessRoleTitle(state.role.value);
     final picked = await showSimpleListPickerBottomSheet(
       context,
       title: 'business_role'.tr,
-      items: kBusinessRoles,
-      selected: state.role.value,
+      items: labels,
+      selected: selectedLabel,
     );
-    if (picked != null) sendAction(SelectBusinessRole(picked));
+    if (picked == null) return;
+    final idx = labels.indexOf(picked);
+    if (idx < 0) return;
+    sendAction(SelectBusinessRole(kBusinessRoleCodes[idx]));
   }
 }

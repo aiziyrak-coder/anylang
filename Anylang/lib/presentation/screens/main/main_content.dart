@@ -33,34 +33,41 @@ class MainContent extends ScreenContent<MainState> {
 
   @override
   Widget build(BuildContext context, MainState state, void Function(MyAction action) sendAction) {
-    return GradientBackground(
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: Obx(() => IndexedStack(
-                    index: state.currentTab.value,
-                    children: _tabBodies,
-                  )),
-            ),
-            // Pastki navigatsiya bari.
-            Obx(() {
-              final messagesBadge = Get.isRegistered<MessagesState>()
-                  ? Get.find<MessagesState>()
-                      .conversations
-                      .fold<int>(0, (sum, c) => sum + c.unread)
-                  : 0;
-              final friendsBadge = Get.isRegistered<FriendsState>()
-                  ? Get.find<FriendsState>().pendingCount.value
-                  : 0;
-              return MainBottomNav(
-                currentIndex: state.currentTab.value,
-                badgeCounts: [messagesBadge, friendsBadge, 0, 0, 0],
-                onTap: (i) => sendAction(TabSelected(i)),
-              );
-            }),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        sendAction(HandleSystemBack());
+      },
+      child: GradientBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: Obx(() => IndexedStack(
+                      index: state.currentTab.value,
+                      children: _tabBodies,
+                    )),
+              ),
+              // Pastki navigatsiya bari.
+              Obx(() {
+                final messagesBadge = Get.isRegistered<MessagesState>()
+                    ? Get.find<MessagesState>()
+                        .conversations
+                        .fold<int>(0, (sum, c) => sum + c.unread)
+                    : 0;
+                final friendsBadge = Get.isRegistered<FriendsState>()
+                    ? Get.find<FriendsState>().pendingCount.value
+                    : 0;
+                return MainBottomNav(
+                  currentIndex: state.currentTab.value,
+                  badgeCounts: [messagesBadge, friendsBadge, 0, 0, 0],
+                  onTap: (i) => sendAction(TabSelected(i)),
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );

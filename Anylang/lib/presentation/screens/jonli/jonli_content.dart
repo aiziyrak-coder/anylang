@@ -124,6 +124,7 @@ class JonliContent extends ScreenContent<JonliState> {
       title: 'jonli_my_lang'.tr,
       desc: 'jonli_my_lang_desc'.tr,
       selectedKey: state.myLanguage.value.key,
+      allowedLangCodes: state.liveLangCodes.toSet(),
     );
     if (picked != null) sendAction(SelectMyLanguage(picked));
   }
@@ -134,6 +135,7 @@ class JonliContent extends ScreenContent<JonliState> {
       title: 'jonli_interlocutor_title'.tr,
       desc: 'jonli_interlocutor_desc'.tr,
       selectedKey: state.otherLanguage.value.key,
+      allowedLangCodes: state.liveLangCodes.toSet(),
     );
     if (picked != null) sendAction(SelectOtherLanguage(picked));
   }

@@ -15,6 +15,7 @@ MessageType = Literal[
     "product",
     "location",
     "contact",
+    "system",
 ]
 
 
@@ -42,10 +43,21 @@ class LastMessagePreviewOut(BaseModel):
 
 class ChatOut(BaseModel):
     id: int
-    interlocutor: InterlocutorOut
+    type: Literal["direct", "group"] = "direct"
+    title: str | None = None
+    avatar_url: str | None = None
+    interlocutor: InterlocutorOut | None = None
+    participant_count: int = 0
     last_message: LastMessagePreviewOut | None = None
     unread_count: int = Field(ge=0, default=0)
     last_message_at: datetime | None = None
+    muted: bool = False
+    pinned: bool = False
+    my_role: str | None = None
+    is_super: bool = False
+    created_by: int | None = None
+    invite_link: str | None = None
+    member_limit: int | None = None
 
 
 class ChatListOut(BaseModel):
@@ -60,9 +72,49 @@ class ChatCreateIn(BaseModel):
     user_id: int
 
 
+class GroupCreateIn(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    user_ids: list[int] = Field(min_length=1, max_length=99)
+
+
+class GroupUpdateIn(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class GroupMembersAddIn(BaseModel):
+    user_ids: list[int] = Field(min_length=1, max_length=99)
+
+
+class TransferOwnershipIn(BaseModel):
+    user_id: int
+
+
+class MemberOut(BaseModel):
+    user_id: int
+    role: str
+    full_name: str
+    avatar_url: str | None = None
+    is_online: bool = False
+    number: str | None = None
+
+
+class MembersOut(BaseModel):
+    items: list[MemberOut]
+    total: int = 0
+    added: int | None = None
+
+
+class InviteOut(BaseModel):
+    token: str | None = None
+    link: str | None = None
+    enabled: bool = True
+
+
 class ChatSearchItemOut(BaseModel):
     id: int
-    interlocutor: InterlocutorOut
+    type: Literal["direct", "group"] = "direct"
+    title: str | None = None
+    interlocutor: InterlocutorOut | None = None
     last_message_at: datetime | None = None
 
 
@@ -89,6 +141,8 @@ class MessageOut(BaseModel):
     id: int
     chat_id: int
     sender_id: int
+    sender_name: str | None = None
+    sender_avatar_url: str | None = None
     client_message_id: str
     type: MessageType
     text: str | None = None
@@ -104,6 +158,9 @@ class MessageOut(BaseModel):
     translations: list[MessageTranslationOut] = Field(default_factory=list)
     read_by_recipient: bool = False
     created_at: datetime
+    edited_at: datetime | None = None
+    reactions: list[dict[str, Any]] = Field(default_factory=list)
+    pinned: bool = False
 
 
 class MessageListOut(BaseModel):
@@ -118,6 +175,23 @@ class MessageCreateIn(BaseModel):
     meta: dict[str, Any] | None = None
     reply_to_id: int | None = None
     media_id: int | None = None
+
+
+class MessageEditIn(BaseModel):
+    text: str = Field(min_length=1, max_length=8000)
+
+
+class MessageForwardIn(BaseModel):
+    chat_ids: list[int] = Field(min_length=1, max_length=20)
+    hide_sender: bool = False
+
+
+class ReactionIn(BaseModel):
+    emoji: str = Field(min_length=1, max_length=8)
+
+
+class ClearHistoryIn(BaseModel):
+    for_everyone: bool = False
 
 
 class ReadMessagesIn(BaseModel):

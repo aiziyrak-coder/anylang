@@ -21,16 +21,48 @@ from app.models.base import TimestampMixin
 
 class Chat(Base, TimestampMixin):
     __tablename__ = "chats"
-    __table_args__ = (UniqueConstraint("user_low_id", "user_high_id", name="uq_chat_pair"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_low_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    user_high_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # direct: pair ids; group: nullable
+    user_low_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    user_high_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    type: Mapped[str] = mapped_column(String(16), default="direct", index=True, nullable=False)
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     last_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_message_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     has_messages: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    invite_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    invite_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_super: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    member_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    super_payment_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     messages: Mapped[list[Message]] = relationship(back_populates="chat", cascade="all, delete-orphan")
+    participants: Mapped[list[ChatParticipant]] = relationship(
+        back_populates="chat", cascade="all, delete-orphan"
+    )
+
+
+class ChatParticipant(Base, TimestampMixin):
+    __tablename__ = "chat_participants"
+    __table_args__ = (UniqueConstraint("chat_id", "user_id", name="uq_chat_participant"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String(16), default="member", nullable=False)
+    pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    muted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    chat: Mapped[Chat] = relationship(back_populates="participants")
 
 
 class Message(Base, TimestampMixin):
@@ -50,6 +82,7 @@ class Message(Base, TimestampMixin):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     deleted_for_everyone: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     chat: Mapped[Chat] = relationship(back_populates="messages")
     translations: Mapped[list[MessageTranslation]] = relationship(
@@ -57,6 +90,33 @@ class Message(Base, TimestampMixin):
     )
     reads: Mapped[list[MessageRead]] = relationship(back_populates="message", cascade="all, delete-orphan")
     hidden_for: Mapped[list[MessageHide]] = relationship(back_populates="message", cascade="all, delete-orphan")
+    reactions: Mapped[list[MessageReaction]] = relationship(
+        back_populates="message", cascade="all, delete-orphan"
+    )
+
+
+class MessageReaction(Base):
+    __tablename__ = "message_reactions"
+    __table_args__ = (UniqueConstraint("message_id", "user_id", name="uq_msg_reaction_user"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    emoji: Mapped[str] = mapped_column(String(8), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    message: Mapped[Message] = relationship(back_populates="reactions")
+
+
+class MessagePin(Base):
+    __tablename__ = "message_pins"
+    __table_args__ = (UniqueConstraint("chat_id", "message_id", name="uq_chat_msg_pin"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"), index=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), index=True)
+    pinned_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    pinned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class MessageTranslation(Base, TimestampMixin):

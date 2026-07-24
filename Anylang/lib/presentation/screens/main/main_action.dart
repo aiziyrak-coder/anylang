@@ -8,3 +8,6 @@ class TabSelected extends MainAction {
   final int index;
   TabSelected(this.index);
 }
+
+/// Android/iOS tizim orqaga tugmasi (asosiy shell).
+class HandleSystemBack extends MainAction {}

@@ -35,6 +35,11 @@ class ChatMessage {
   final ChatStatus status; // faqat chiquvchi uchun
   final ChatReply? reply;
 
+  /// Guruh chatlari uchun jo'natuvchi (DM da ko'pincha null).
+  final int? senderId;
+  final String? senderName;
+  final String? senderAvatarUrl;
+
   // text
   final String? text;
   /// Jo'natuvchi asl matni (tarjima qilingan xabarlarda).
@@ -75,6 +80,12 @@ class ChatMessage {
   final String? contactPhone;
   final String? contactInitial;
 
+  /// Tahrirlangan vaqt (API edited_at).
+  final DateTime? editedAt;
+  /// [{emoji, count, mine}]
+  final List<Map<String, dynamic>> reactions;
+  final bool pinned;
+
   const ChatMessage({
     required this.id,
     required this.type,
@@ -83,6 +94,9 @@ class ChatMessage {
     this.createdAt,
     this.status = ChatStatus.read,
     this.reply,
+    this.senderId,
+    this.senderName,
+    this.senderAvatarUrl,
     this.text,
     this.textOriginal,
     this.showingOriginal = false,
@@ -107,6 +121,9 @@ class ChatMessage {
     this.contactName,
     this.contactPhone,
     this.contactInitial,
+    this.editedAt,
+    this.reactions = const [],
+    this.pinned = false,
   });
 
   bool get isOutgoing => dir == ChatDir.outgoing;
@@ -125,17 +142,32 @@ class ChatMessage {
     return '';
   }
 
-  ChatMessage withToggleOriginal() => ChatMessage(
+  ChatMessage _copy({
+    ChatStatus? status,
+    bool? showingOriginal,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
+    String? text,
+    String? textOriginal,
+    DateTime? editedAt,
+    List<Map<String, dynamic>>? reactions,
+    bool? pinned,
+  }) =>
+      ChatMessage(
         id: id,
         type: type,
         dir: dir,
         time: time,
         createdAt: createdAt,
-        status: status,
+        status: status ?? this.status,
         reply: reply,
-        text: text,
-        textOriginal: textOriginal,
-        showingOriginal: !showingOriginal,
+        senderId: senderId ?? this.senderId,
+        senderName: senderName ?? this.senderName,
+        senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
+        text: text ?? this.text,
+        textOriginal: textOriginal ?? this.textOriginal,
+        showingOriginal: showingOriginal ?? this.showingOriginal,
         imageGradient: imageGradient,
         imageUrl: imageUrl,
         voiceDuration: voiceDuration,
@@ -157,40 +189,47 @@ class ChatMessage {
         contactName: contactName,
         contactPhone: contactPhone,
         contactInitial: contactInitial,
+        editedAt: editedAt ?? this.editedAt,
+        reactions: reactions ?? this.reactions,
+        pinned: pinned ?? this.pinned,
       );
 
-  ChatMessage withStatus(ChatStatus status) => ChatMessage(
-        id: id,
-        type: type,
-        dir: dir,
-        time: time,
-        createdAt: createdAt,
-        status: status,
-        reply: reply,
+  ChatMessage withToggleOriginal() =>
+      _copy(showingOriginal: !showingOriginal);
+
+  ChatMessage withStatus(ChatStatus status) => _copy(status: status);
+
+  ChatMessage withSenderMeta({
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
+  }) =>
+      _copy(
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
+      );
+
+  ChatMessage withReactions(List<Map<String, dynamic>> reactions) =>
+      _copy(reactions: reactions);
+
+  ChatMessage withPinned(bool pinned) => _copy(pinned: pinned);
+
+  ChatMessage withEditedText(String text, {DateTime? editedAt}) => _copy(
         text: text,
-        textOriginal: textOriginal,
-        showingOriginal: showingOriginal,
-        imageGradient: imageGradient,
-        imageUrl: imageUrl,
-        voiceDuration: voiceDuration,
-        voiceDownloaded: voiceDownloaded,
-        voicePath: voicePath,
-        voiceSamples: voiceSamples,
-        voiceDurationMs: voiceDurationMs,
-        productTitle: productTitle,
-        productPrice: productPrice,
-        productId: productId,
-        locationLabel: locationLabel,
-        locationDistance: locationDistance,
-        latitude: latitude,
-        longitude: longitude,
-        fileName: fileName,
-        fileSize: fileSize,
-        fileExt: fileExt,
-        fileUrl: fileUrl,
-        contactName: contactName,
-        contactPhone: contactPhone,
-        contactInitial: contactInitial,
+        textOriginal: text,
+        editedAt: editedAt ?? DateTime.now().toUtc(),
+      );
+
+  ChatMessage withExtras({
+    DateTime? editedAt,
+    List<Map<String, dynamic>>? reactions,
+    bool? pinned,
+  }) =>
+      _copy(
+        editedAt: editedAt,
+        reactions: reactions,
+        pinned: pinned,
       );
 
   factory ChatMessage.text({
@@ -203,6 +242,9 @@ class ChatMessage {
     ChatStatus status = ChatStatus.read,
     ChatReply? reply,
     bool showingOriginal = false,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
   }) =>
       ChatMessage(
         id: id,
@@ -212,6 +254,9 @@ class ChatMessage {
         createdAt: createdAt,
         status: status,
         reply: reply,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
         text: text,
         textOriginal: textOriginal,
         showingOriginal: showingOriginal,
@@ -226,6 +271,9 @@ class ChatMessage {
     String? url,
     ChatStatus status = ChatStatus.read,
     ChatReply? reply,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
   }) =>
       ChatMessage(
         id: id,
@@ -235,6 +283,9 @@ class ChatMessage {
         createdAt: createdAt,
         status: status,
         reply: reply,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
         imageGradient: gradient,
         imageUrl: url,
       );
@@ -251,6 +302,9 @@ class ChatMessage {
     List<double> samples = const [],
     int? durationMs,
     ChatReply? reply,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
   }) =>
       ChatMessage(
         id: id,
@@ -260,6 +314,9 @@ class ChatMessage {
         createdAt: createdAt,
         status: status,
         reply: reply,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
         voiceDuration: duration,
         voiceDownloaded: downloaded,
         voicePath: path,
@@ -276,6 +333,9 @@ class ChatMessage {
     DateTime? createdAt,
     int? productId,
     ChatStatus status = ChatStatus.read,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
   }) =>
       ChatMessage(
         id: id,
@@ -284,6 +344,9 @@ class ChatMessage {
         time: time,
         createdAt: createdAt,
         status: status,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
         productTitle: title,
         productPrice: price,
         productId: productId,
@@ -299,6 +362,9 @@ class ChatMessage {
     double? latitude,
     double? longitude,
     ChatStatus status = ChatStatus.read,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
   }) =>
       ChatMessage(
         id: id,
@@ -307,6 +373,9 @@ class ChatMessage {
         time: time,
         createdAt: createdAt,
         status: status,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
         locationLabel: label,
         locationDistance: distance,
         latitude: latitude,
@@ -323,6 +392,9 @@ class ChatMessage {
     DateTime? createdAt,
     String? url,
     ChatStatus status = ChatStatus.read,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
   }) =>
       ChatMessage(
         id: id,
@@ -331,6 +403,9 @@ class ChatMessage {
         time: time,
         createdAt: createdAt,
         status: status,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
         fileName: name,
         fileSize: size,
         fileExt: ext,
@@ -346,6 +421,9 @@ class ChatMessage {
     required String initial,
     DateTime? createdAt,
     ChatStatus status = ChatStatus.read,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
   }) =>
       ChatMessage(
         id: id,
@@ -354,6 +432,9 @@ class ChatMessage {
         time: time,
         createdAt: createdAt,
         status: status,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
         contactName: name,
         contactPhone: phone,
         contactInitial: initial,

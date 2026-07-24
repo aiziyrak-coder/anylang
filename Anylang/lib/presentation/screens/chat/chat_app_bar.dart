@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/my_icon_button.dart';
 import '../../ui/frosted_bar.dart';
+import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/size_controller.dart';
 
-/// Chat ekrani yuqori paneli — orqaga tugmasi, suhbatdosh avatari (gradient +
-/// harf + onlayn nuqtasi), ismi va holati, hamda menyu tugmasi. Qidiruv
-/// rejimida app bar o‘rniga qidiruv maydoni chiqadi.
+/// Chat ekrani yuqori paneli — orqaga, suhbatdosh doira avatari (rasm), ism.
 class ChatAppBar extends StatelessWidget {
   final String name;
   final String initial;
   final LinearGradient avatarGradient;
+  final String? avatarUrl;
   final bool online;
   /// Agar berilsa — online/offline o‘rniga ko‘rsatiladi (masalan “Yozmoqda...”).
   final String? statusText;
@@ -19,10 +19,14 @@ class ChatAppBar extends StatelessWidget {
   final bool hasSearchQuery;
   final TextEditingController? searchController;
   final VoidCallback onBack;
-  final VoidCallback onMenu;
+  final ValueChanged<Rect> onMenu;
   final VoidCallback onPeerTap;
   final VoidCallback onCloseSearch;
   final ValueChanged<String>? onSearchChanged;
+  final bool selecting;
+  final int selectedCount;
+  final VoidCallback? onForwardSelected;
+  final VoidCallback? onDeleteSelected;
 
   const ChatAppBar({
     super.key,
@@ -30,6 +34,7 @@ class ChatAppBar extends StatelessWidget {
     required this.initial,
     required this.avatarGradient,
     required this.online,
+    this.avatarUrl,
     this.statusText,
     required this.onBack,
     required this.onMenu,
@@ -39,6 +44,10 @@ class ChatAppBar extends StatelessWidget {
     this.searchController,
     this.onCloseSearch = _noop,
     this.onSearchChanged,
+    this.selecting = false,
+    this.selectedCount = 0,
+    this.onForwardSelected,
+    this.onDeleteSelected,
   });
 
   static void _noop() {}
@@ -53,9 +62,58 @@ class ChatAppBar extends StatelessWidget {
         bottom: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(6.dp, 6.dp, 10.dp, 10.dp),
-          child: searching ? _searchRow(c) : _peerRow(c),
+          child: searching
+              ? _searchRow(c)
+              : selecting
+                  ? _selectRow(c)
+                  : _peerRow(c),
         ),
       ),
+    );
+  }
+
+  Widget _selectRow(AppColors c) {
+    return Row(
+      children: [
+        MyIconButton(
+          onClick: onBack,
+          icon: Icons.close_rounded,
+          iconColor: c.accentText,
+          iconSize: 22.dp,
+          backgroundColor: Colors.transparent,
+          borderRadius: 12.dp,
+          padding: EdgeInsets.all(6.dp),
+        ),
+        SizedBox(width: 8.dp),
+        Expanded(
+          child: Text(
+            '$selectedCount',
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        MyIconButton(
+          onClick: onForwardSelected ?? _noop,
+          icon: Icons.shortcut_rounded,
+          iconColor: c.textPrimary,
+          iconSize: 22.dp,
+          backgroundColor: Colors.transparent,
+          borderRadius: 12.dp,
+          padding: EdgeInsets.all(6.dp),
+        ),
+        MyIconButton(
+          onClick: onDeleteSelected ?? _noop,
+          icon: Icons.delete_outline_rounded,
+          iconColor: kListenRed,
+          iconSize: 22.dp,
+          backgroundColor: Colors.transparent,
+          borderRadius: 12.dp,
+          padding: EdgeInsets.all(6.dp),
+        ),
+      ],
     );
   }
 
@@ -117,14 +175,34 @@ class ChatAppBar extends StatelessWidget {
             ),
           ),
         ),
-        MyIconButton(
-          onClick: onMenu,
-          icon: Icons.more_vert_rounded,
-          iconColor: c.textSecondary,
-          iconSize: 20.dp,
-          backgroundColor: Colors.transparent,
-          borderRadius: 12.dp,
-          padding: EdgeInsets.all(6.dp),
+        Builder(
+          builder: (btnCtx) {
+            return MyIconButton(
+              onClick: () {
+                final box = btnCtx.findRenderObject() as RenderBox?;
+                if (box == null || !box.hasSize) {
+                  final size = MediaQuery.sizeOf(btnCtx);
+                  onMenu(Rect.fromLTWH(size.width - 56, 40, 40, 40));
+                  return;
+                }
+                final offset = box.localToGlobal(Offset.zero);
+                onMenu(
+                  Rect.fromLTWH(
+                    offset.dx,
+                    offset.dy,
+                    box.size.width,
+                    box.size.height,
+                  ),
+                );
+              },
+              icon: Icons.more_vert_rounded,
+              iconColor: c.textSecondary,
+              iconSize: 20.dp,
+              backgroundColor: Colors.transparent,
+              borderRadius: 12.dp,
+              padding: EdgeInsets.all(6.dp),
+            );
+          },
         ),
       ],
     );
@@ -176,45 +254,12 @@ class ChatAppBar extends StatelessWidget {
   }
 
   Widget _avatar(AppColors c) {
-    return SizedBox(
-      width: 44.dp,
-      height: 44.dp,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 44.dp,
-            height: 44.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: avatarGradient,
-            ),
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: kAvatarFg,
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          if (online)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 13.dp,
-                height: 13.dp,
-                decoration: BoxDecoration(
-                  color: kOnline,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.background, width: 2.2.dp),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return ProfileAvatar(
+      initial: initial,
+      gradient: avatarGradient,
+      imageUrl: avatarUrl,
+      size: 44,
+      online: online,
     );
   }
 }

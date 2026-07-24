@@ -69,12 +69,26 @@ class ProductOut(BaseModel):
         return value
 
 
+class ProductTopRequestOut(BaseModel):
+    id: int
+    product_id: int
+    seller_id: int
+    status: Literal["pending", "approved", "rejected", "cancelled"]
+    note: str = ""
+    admin_note: str = ""
+    created_at: datetime
+    reviewed_at: datetime | None = None
+    product_name: str | None = None
+    is_top_pinned: bool | None = None
+
+
 class ProductDetailOut(ProductOut):
     description: str
     category: str
     images: list[ProductImageOut]
     attributes: list[ProductAttributeOut]
     seller: ProductSellerOut
+    top_request: ProductTopRequestOut | None = None
 
 
 class ProductListOut(BaseModel):
@@ -96,6 +110,22 @@ class CategoryOut(BaseModel):
 
 class FavoriteStatusOut(BaseModel):
     is_favorited: bool
+
+
+class ProductTopRequestIn(BaseModel):
+    note: str = Field(default="", max_length=300)
+
+
+class ProductTopRequestListOut(BaseModel):
+    items: list[ProductTopRequestOut]
+    page: int = Field(ge=1)
+    limit: int = Field(ge=1)
+    total: int = Field(ge=0)
+    has_more: bool
+
+
+class AdminTopRequestReviewIn(BaseModel):
+    admin_note: str = Field(default="", max_length=300)
 
 
 class ProductCreateIn(BaseModel):

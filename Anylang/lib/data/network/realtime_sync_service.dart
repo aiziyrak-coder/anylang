@@ -22,6 +22,8 @@ class RealtimeSyncService extends GetxService {
   int? _activeChatId;
   Timer? _typingClearTimer;
 
+  int? get activeChatId => _activeChatId;
+
   void setActiveChat(int? chatId) => _activeChatId = chatId;
 
   @override
@@ -53,12 +55,89 @@ class RealtimeSyncService extends GetxService {
         _onMessagesRead(data);
       case 'message_deleted':
         _onMessageDeleted(data);
+      case 'message_edited':
+        _onMessageEdited(data);
+      case 'message_reaction':
+        _onMessageReaction(data);
+      case 'message_pinned':
+      case 'message_unpinned':
+        _onMessagePinEvent(data, pinned: type == 'message_pinned');
+      case 'history_cleared':
+        _onHistoryCleared(data);
+      case 'group_deleted':
+        _onGroupDeleted(data);
       case 'presence':
         _onPresence(data);
       case 'typing':
         _onTyping(data);
       default:
         break;
+    }
+  }
+
+  void _onMessageEdited(Map<String, dynamic> data) {
+    final chatId = _asInt(data['chat_id']);
+    final msgMap = asMap(data['message']);
+    if (chatId == null || msgMap == null) return;
+    if (!Get.isRegistered<ChatState>()) return;
+    final chat = Get.find<ChatState>();
+    if (chat.chatId.value != chatId) return;
+    final mapped = mapChatMessageFromApi(msgMap, me: SessionStore.userId(), peerName: chat.peerName.value);
+    final idx = chat.messages.indexWhere((m) => m.id == mapped.id);
+    if (idx >= 0) chat.messages[idx] = mapped;
+  }
+
+  void _onMessageReaction(Map<String, dynamic> data) {
+    final chatId = _asInt(data['chat_id']);
+    final messageId = '${data['message_id']}';
+    if (chatId == null) return;
+    if (!Get.isRegistered<ChatState>()) return;
+    final chat = Get.find<ChatState>();
+    if (chat.chatId.value != chatId) return;
+    final reactions = (data['reactions'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    final idx = chat.messages.indexWhere((m) => m.id == messageId);
+    if (idx >= 0) {
+      chat.messages[idx] = chat.messages[idx].withReactions(reactions);
+    }
+  }
+
+  void _onMessagePinEvent(Map<String, dynamic> data, {required bool pinned}) {
+    final chatId = _asInt(data['chat_id']);
+    final messageId = '${data['message_id']}';
+    if (chatId == null) return;
+    if (!Get.isRegistered<ChatState>()) return;
+    final chat = Get.find<ChatState>();
+    if (chat.chatId.value != chatId) return;
+    final idx = chat.messages.indexWhere((m) => m.id == messageId);
+    if (idx >= 0) {
+      final msg = chat.messages[idx].withPinned(pinned);
+      chat.messages[idx] = msg;
+      chat.pinnedBanner.value = pinned ? msg : (chat.pinnedBanner.value?.id == messageId ? null : chat.pinnedBanner.value);
+    }
+  }
+
+  void _onHistoryCleared(Map<String, dynamic> data) {
+    final chatId = _asInt(data['chat_id']);
+    if (chatId == null) return;
+    if (!Get.isRegistered<ChatState>()) return;
+    final chat = Get.find<ChatState>();
+    if (chat.chatId.value != chatId) return;
+    if (data['for_everyone'] == true) {
+      chat.messages.clear();
+      chat.pinnedBanner.value = null;
+    }
+  }
+
+  void _onGroupDeleted(Map<String, dynamic> data) {
+    final chatId = _asInt(data['chat_id']);
+    if (chatId == null) return;
+    if (Get.isRegistered<MessagesState>()) {
+      final messages = Get.find<MessagesState>();
+      messages.conversations.removeWhere((c) => c.id == chatId);
     }
   }
 
@@ -76,11 +155,11 @@ class RealtimeSyncService extends GetxService {
     // Open chat → append / merge
     if (Get.isRegistered<ChatState>()) {
       final chat = Get.find<ChatState>();
-      if (chat.chatId == chatId) {
+      if (chat.chatId.value == chatId) {
         final mapped = mapChatMessageFromApi(
           msgMap,
           me: me,
-          peerName: chat.peerName,
+          peerName: chat.peerName.value,
         );
         final idx = chat.messages.indexWhere(
           (m) =>
@@ -116,6 +195,18 @@ class RealtimeSyncService extends GetxService {
     final i = list.indexWhere((c) => c.id == chatId);
     if (i >= 0) {
       final old = list[i];
+      final filter = messages.listFilter.value;
+      // Aktiv filterga mos kelmasa (masalan Guruhlarda DM) — olib tashla.
+      if (filter == MessagesListFilter.groups && !old.isGroup) {
+        list.removeAt(i);
+        messages.conversations.assignAll(list);
+        return;
+      }
+      if (filter == MessagesListFilter.chats && old.isGroup) {
+        list.removeAt(i);
+        messages.conversations.assignAll(list);
+        return;
+      }
       final bumpUnread = !isMine && _activeChatId != chatId;
       final unread = bumpUnread ? old.unread + 1 : (isMine ? old.unread : 0);
       // If viewing this chat, unread stays 0 / cleared
@@ -146,7 +237,7 @@ class RealtimeSyncService extends GetxService {
     if (chatId == null || ids.isEmpty) return;
     if (!Get.isRegistered<ChatState>()) return;
     final chat = Get.find<ChatState>();
-    if (chat.chatId != chatId) return;
+    if (chat.chatId.value != chatId) return;
     for (var i = 0; i < chat.messages.length; i++) {
       final m = chat.messages[i];
       if (m.isOutgoing && ids.contains(m.id)) {
@@ -161,7 +252,7 @@ class RealtimeSyncService extends GetxService {
     if (chatId == null || messageId == null) return;
     if (Get.isRegistered<ChatState>()) {
       final chat = Get.find<ChatState>();
-      if (chat.chatId == chatId) {
+      if (chat.chatId.value == chatId) {
         chat.messages.removeWhere((m) => m.id == messageId);
       }
     }
@@ -175,7 +266,7 @@ class RealtimeSyncService extends GetxService {
 
     if (Get.isRegistered<ChatState>()) {
       final chat = Get.find<ChatState>();
-      if (chat.peerId == userId) {
+      if (chat.peerId.value == userId) {
         chat.peerOnline.value = online;
       }
     }
@@ -215,9 +306,12 @@ class RealtimeSyncService extends GetxService {
     if (chatId == null || userId == null) return;
     if (!Get.isRegistered<ChatState>()) return;
     final chat = Get.find<ChatState>();
-    if (chat.chatId != chatId || chat.peerId != userId) return;
+    if (chat.chatId.value != chatId) return;
+    // DM: faqat peer; guruh: har qanday a'zo (o'zimdan tashqari — server filtrlagan).
+    if (!chat.isGroup.value && chat.peerId.value != userId) return;
 
     chat.peerTyping.value = isTyping;
+    chat.typingUserId.value = isTyping ? userId : null;
     chat.peerActivity.value = isTyping
         ? (activityRaw.isNotEmpty ? activityRaw : 'typing')
         : '';
@@ -226,9 +320,10 @@ class RealtimeSyncService extends GetxService {
       _typingClearTimer = Timer(const Duration(seconds: 4), () {
         if (Get.isRegistered<ChatState>()) {
           final c = Get.find<ChatState>();
-          if (c.chatId == chatId) {
+          if (c.chatId.value == chatId) {
             c.peerTyping.value = false;
             c.peerActivity.value = '';
+            c.typingUserId.value = null;
           }
         }
       });
@@ -246,15 +341,34 @@ class RealtimeSyncService extends GetxService {
     if (!Get.isRegistered<MessagesState>() || !Get.isRegistered<ChatRepository>()) {
       return;
     }
-    final result = await Get.find<ChatRepository>().listChats();
+    final messages = Get.find<MessagesState>();
+    final filter = messages.listFilter.value;
+    final result = await Get.find<ChatRepository>().listChats(
+      sort: filter == MessagesListFilter.unread ? 'unread' : 'activity',
+      type: switch (filter) {
+        MessagesListFilter.chats => 'direct',
+        MessagesListFilter.groups => 'group',
+        _ => null,
+      },
+    );
     final data = result.dataOrNull;
     if (data == null) return;
-    final items = asList(data)
+    var items = asList(data)
         .whereType<Map>()
         .map((e) => Conversation.fromApi(Map<String, dynamic>.from(e)))
-        .where((c) => !SessionStore.isUserBlocked(c.peerId))
+        .where((c) => c.isGroup || !SessionStore.isUserBlocked(c.peerId))
         .toList();
-    Get.find<MessagesState>().conversations.assignAll(items);
+    switch (filter) {
+      case MessagesListFilter.groups:
+        items = items.where((c) => c.isGroup).toList();
+      case MessagesListFilter.chats:
+        items = items.where((c) => !c.isGroup).toList();
+      case MessagesListFilter.unread:
+        items = items.where((c) => c.unread > 0).toList();
+      case MessagesListFilter.all:
+        break;
+    }
+    messages.conversations.assignAll(items);
   }
 
   String _previewFromMessage(Map<String, dynamic> msg) {
@@ -295,6 +409,7 @@ ChatMessage mapChatMessageFromApi(
   final type = (json['type'] as String?) ?? 'text';
   final reply = _replyFromApi(json, me, peerName) ?? fallbackReply;
   final status = _statusFromApi(json, outgoing: outgoing);
+  final ChatMessage mapped;
   if (type == 'voice' || type == 'audio') {
     final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
     final durationMs = (meta['duration_ms'] as num?)?.toInt();
@@ -304,7 +419,7 @@ ChatMessage mapChatMessageFromApi(
             .toList() ??
         const <double>[];
     final url = meta['url']?.toString();
-    return ChatMessage.voice(
+    mapped = ChatMessage.voice(
       id: '${json['id']}',
       dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
       time: formatMessageClock(created),
@@ -319,88 +434,108 @@ ChatMessage mapChatMessageFromApi(
       status: status,
       reply: reply,
     );
+  } else {
+    final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
+    final dir = outgoing ? ChatDir.outgoing : ChatDir.incoming;
+    final time = formatMessageClock(created);
+    final id = '${json['id']}';
+    mapped = switch (type) {
+      'image' => ChatMessage.image(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          url: meta['url']?.toString(),
+          gradient: avatarTealGradient,
+          status: status,
+          reply: reply,
+        ),
+      'file' => () {
+          final name = meta['filename']?.toString() ?? 'file';
+          final size = meta['size'];
+          final ext =
+              name.contains('.') ? name.split('.').last.toUpperCase() : 'FILE';
+          return ChatMessage.file(
+            id: id,
+            dir: dir,
+            time: time,
+            createdAt: created,
+            name: name,
+            size: size is num ? _formatBytes(size.toInt()) : '—',
+            ext: ext,
+            url: meta['url']?.toString(),
+            status: status,
+          );
+        }(),
+      'product' => ChatMessage.product(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          title: meta['name']?.toString() ??
+              meta['product_name']?.toString() ??
+              'Mahsulot',
+          price: meta['price']?.toString() ?? '—',
+          productId: (meta['product_id'] as num?)?.toInt(),
+          status: status,
+        ),
+      'location' => ChatMessage.location(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          label: meta['label']?.toString() ?? 'Joylashuv',
+          distance: '',
+          latitude: (meta['latitude'] as num?)?.toDouble(),
+          longitude: (meta['longitude'] as num?)?.toDouble(),
+          status: status,
+        ),
+      'contact' => () {
+          final name = meta['contact_name']?.toString() ?? 'Kontakt';
+          return ChatMessage.contact(
+            id: id,
+            dir: dir,
+            time: time,
+            createdAt: created,
+            name: name,
+            phone: meta['contact_phone']?.toString() ?? '',
+            initial: initialsOf(name),
+            status: status,
+          );
+        }(),
+      _ => ChatMessage.text(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          text: text,
+          textOriginal: textOriginal,
+          status: status,
+          reply: reply,
+        ),
+    };
   }
-  final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
-  final dir = outgoing ? ChatDir.outgoing : ChatDir.incoming;
-  final time = formatMessageClock(created);
-  final id = '${json['id']}';
-  switch (type) {
-    case 'image':
-      return ChatMessage.image(
-        id: id,
-        dir: dir,
-        time: time,
-        createdAt: created,
-        url: meta['url']?.toString(),
-        gradient: avatarTealGradient,
-        status: status,
-        reply: reply,
+  final senderName = json['sender_name']?.toString().trim();
+  final senderAvatar = json['sender_avatar_url']?.toString().trim();
+  final editedAt = DateTime.tryParse(json['edited_at']?.toString() ?? '');
+  final reactions = (json['reactions'] as List?)
+          ?.whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList() ??
+      const <Map<String, dynamic>>[];
+  final pinned = json['pinned'] == true;
+  return mapped
+      .withSenderMeta(
+        senderId: senderId,
+        senderName: (senderName != null && senderName.isNotEmpty) ? senderName : null,
+        senderAvatarUrl:
+            (senderAvatar != null && senderAvatar.isNotEmpty) ? senderAvatar : null,
+      )
+      .withExtras(
+        editedAt: editedAt,
+        reactions: reactions,
+        pinned: pinned,
       );
-    case 'file':
-      final name = meta['filename']?.toString() ?? 'file';
-      final size = meta['size'];
-      final ext =
-          name.contains('.') ? name.split('.').last.toUpperCase() : 'FILE';
-      return ChatMessage.file(
-        id: id,
-        dir: dir,
-        time: time,
-        createdAt: created,
-        name: name,
-        size: size is num ? _formatBytes(size.toInt()) : '—',
-        ext: ext,
-        url: meta['url']?.toString(),
-        status: status,
-      );
-    case 'product':
-      return ChatMessage.product(
-        id: id,
-        dir: dir,
-        time: time,
-        createdAt: created,
-        title: meta['name']?.toString() ??
-            meta['product_name']?.toString() ??
-            'Mahsulot',
-        price: meta['price']?.toString() ?? '—',
-        productId: (meta['product_id'] as num?)?.toInt(),
-        status: status,
-      );
-    case 'location':
-      return ChatMessage.location(
-        id: id,
-        dir: dir,
-        time: time,
-        createdAt: created,
-        label: meta['label']?.toString() ?? 'Joylashuv',
-        distance: '',
-        latitude: (meta['latitude'] as num?)?.toDouble(),
-        longitude: (meta['longitude'] as num?)?.toDouble(),
-        status: status,
-      );
-    case 'contact':
-      final name = meta['contact_name']?.toString() ?? 'Kontakt';
-      return ChatMessage.contact(
-        id: id,
-        dir: dir,
-        time: time,
-        createdAt: created,
-        name: name,
-        phone: meta['contact_phone']?.toString() ?? '',
-        initial: initialsOf(name),
-        status: status,
-      );
-    default:
-      return ChatMessage.text(
-        id: id,
-        dir: dir,
-        time: time,
-        createdAt: created,
-        text: text,
-        textOriginal: textOriginal,
-        status: status,
-        reply: reply,
-      );
-  }
 }
 
 ChatStatus _statusFromApi(Map<String, dynamic> json, {required bool outgoing}) {

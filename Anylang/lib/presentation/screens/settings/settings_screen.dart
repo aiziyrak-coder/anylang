@@ -17,6 +17,7 @@ import '../login/login_screen.dart';
 import '../profile_edit/profile_edit_screen.dart';
 import '../select_language/select_language_option.dart';
 import '../subscription/subscription_screen.dart';
+import '../numbers/numbers_screen.dart';
 import '../../modal/simple_list_picker_bottom_sheet.dart';
 import 'blocked_users_bottom_sheet.dart';
 import 'settings_action.dart';
@@ -153,6 +154,8 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         }
       case OpenSubscriptionFromSettings _:
         await navigate(SubscriptionScreen());
+      case OpenNumbersFromSettings _:
+        await navigate(NumbersScreen());
     }
   }
 }

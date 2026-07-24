@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
+import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
@@ -54,6 +55,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   late bool _fav;
   bool _favLoading = false;
   bool _contacting = false;
+  bool _topBusy = false;
   late Product _product;
   String _description = '';
   List<String> _attributes = const [];
@@ -62,6 +64,11 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   String? _sellerAvatar;
   bool _sellerLoading = false;
   bool _detailErrorShown = false;
+
+  bool get _isOwner {
+    final me = SessionStore.userId();
+    return me != null && me > 0 && me == _product.sellerId;
+  }
 
   @override
   void initState() {
@@ -202,6 +209,40 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       },
     );
     setState(() => _favLoading = false);
+  }
+
+  Future<void> _requestTop() async {
+    if (_topBusy || _product.id <= 0) return;
+    setState(() => _topBusy = true);
+    final result = await Get.find<ProductsRepository>().requestTop(_product.id);
+    if (!mounted) return;
+    setState(() => _topBusy = false);
+    if (result.errorOrNull != null) {
+      showAppError(result.errorOrNull);
+      return;
+    }
+    final map = asMap(result.dataOrNull);
+    setState(() {
+      _product = _product.copyWith(
+        topRequestStatus: map?['status']?.toString() ?? 'pending',
+      );
+    });
+  }
+
+  Future<void> _cancelTopRequest() async {
+    if (_topBusy || _product.id <= 0) return;
+    setState(() => _topBusy = true);
+    final result =
+        await Get.find<ProductsRepository>().cancelTopRequest(_product.id);
+    if (!mounted) return;
+    setState(() => _topBusy = false);
+    if (result.errorOrNull != null) {
+      showAppError(result.errorOrNull);
+      return;
+    }
+    setState(() {
+      _product = _product.copyWith(topRequestStatus: 'cancelled');
+    });
   }
 
   @override
@@ -527,46 +568,157 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       ),
       child: Row(
         children: [
-          // Sevimli (heart)
+          if (!_isOwner) ...[
+            Material(
+              color: c.surface,
+              borderRadius: radius,
+              child: InkWell(
+                borderRadius: radius,
+                onTap: _favLoading ? null : _toggleFavorite,
+                child: Ink(
+                  decoration: BoxDecoration(
+                    borderRadius: radius,
+                    border: Border.all(color: c.outline),
+                  ),
+                  padding: EdgeInsets.all(15.dp),
+                  child: _fav
+                      ? Icon(Icons.favorite, color: c.accent, size: 22.dp)
+                      : SvgPicture.asset(
+                          'assets/icons/ic_heart.svg',
+                          width: 22.dp,
+                          height: 22.dp,
+                          colorFilter: ColorFilter.mode(
+                            c.textSecondary,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+            SizedBox(width: 12.dp),
+            Expanded(
+              child: RichButton(
+                text: 'product_contact'.tr,
+                onTap: _contactSeller,
+                iconNearText: true,
+                startIcon: SvgPicture.asset(
+                  'assets/icons/ic_contact.svg',
+                  width: 20.dp,
+                  height: 20.dp,
+                ),
+                textColor: c.onAccent,
+                textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
+                padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+                borderRadius: radius,
+                decoration: BoxDecoration(
+                  gradient: limeButtonGradient,
+                  borderRadius: radius,
+                ),
+              ),
+            ),
+          ] else
+            Expanded(child: _ownerTopAction(c, radius)),
+        ],
+      ),
+    );
+  }
+
+  Widget _ownerTopAction(AppColors c, BorderRadius radius) {
+    if (_product.isTop) {
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(color: c.outline),
+        ),
+        child: Text(
+          'product_already_top'.tr,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: c.textSecondary,
+            fontSize: 15.sp,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+    final status = _product.topRequestStatus;
+    if (status == 'pending') {
+      return Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 12.dp),
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(color: c.outline),
+              ),
+              child: Text(
+                'product_top_pending'.tr,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 10.dp),
           Material(
             color: c.surface,
             borderRadius: radius,
             child: InkWell(
               borderRadius: radius,
-              onTap: _favLoading ? null : _toggleFavorite,
+              onTap: _topBusy ? null : _cancelTopRequest,
               child: Ink(
                 decoration: BoxDecoration(
                   borderRadius: radius,
                   border: Border.all(color: c.outline),
                 ),
-                padding: EdgeInsets.all(15.dp),
-                child: _fav
-                    ? Icon(Icons.favorite, color: c.accent, size: 22.dp)
-                    : SvgPicture.asset(
-                        'assets/icons/ic_heart.svg',
-                        width: 22.dp,
-                        height: 22.dp,
-                        colorFilter: ColorFilter.mode(c.textSecondary, BlendMode.srcIn),
-                      ),
+                padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 14.dp),
+                child: Text(
+                  'product_top_cancel'.tr,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ),
-          SizedBox(width: 12.dp),
-          // Bog'lanish
-          Expanded(
-            child: RichButton(
-              text: 'product_contact'.tr,
-              onTap: _contactSeller,
-              iconNearText: true,
-              startIcon: SvgPicture.asset('assets/icons/ic_contact.svg', width: 20.dp, height: 20.dp),
-              textColor: c.onAccent,
-              textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
-              padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
-              borderRadius: radius,
-              decoration: BoxDecoration(gradient: limeButtonGradient, borderRadius: radius),
-            ),
-          ),
         ],
+      );
+    }
+    if (_product.status != 'published') {
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(color: c.outline),
+        ),
+        child: Text(
+          'product_top_publish_first'.tr,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: c.textSecondary,
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+    return RichButton(
+      text: 'product_request_top'.tr,
+      onTap: _topBusy ? () {} : _requestTop,
+      textColor: c.onAccent,
+      textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
+      padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+      borderRadius: radius,
+      decoration: BoxDecoration(
+        gradient: limeButtonGradient,
+        borderRadius: radius,
       ),
     );
   }

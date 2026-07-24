@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../ui/app_empty_state.dart';
 import '../../ui/buttons/rich_button.dart';
+import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/size_controller.dart';
@@ -165,48 +166,12 @@ class _FriendsRequestsSheetState extends State<_FriendsRequestsSheet> {
   }
 
   Widget _avatar(FriendRequest req) {
-    return SizedBox(
-      width: 48.dp,
-      height: 48.dp,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 48.dp,
-            height: 48.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: req.avatarGradient,
-            ),
-            child: Text(
-              req.initial,
-              style: TextStyle(
-                color: kAvatarFg,
-                fontSize: 17.sp,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          if (req.online)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 14.dp,
-                height: 14.dp,
-                decoration: BoxDecoration(
-                  color: kOnline,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: context.appColors.background,
-                    width: 2.5.dp,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return ProfileAvatar(
+      initial: req.initial,
+      gradient: req.avatarGradient,
+      imageUrl: req.avatarUrl,
+      size: 48,
+      online: req.online,
     );
   }
 

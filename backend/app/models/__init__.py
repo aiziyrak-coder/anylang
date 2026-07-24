@@ -4,16 +4,25 @@ from app.models.base import TimestampMixin
 from app.models.chat import (
     Chat,
     ChatMedia,
+    ChatParticipant,
     Friendship,
     LiveSession,
     LiveTurn,
     Message,
     MessageHide,
+    MessagePin,
+    MessageReaction,
     MessageRead,
     MessageTranslation,
 )
 from app.models.payment import Payment
-from app.models.product import Product, ProductFavorite, ProductImage, ProductView
+from app.models.product import (
+    Product,
+    ProductFavorite,
+    ProductImage,
+    ProductTopRequest,
+    ProductView,
+)
 from app.models.user import (
     AccountRestoreRequest,
     AdminAuditLog,
@@ -46,11 +55,15 @@ __all__ = [
     "ProductImage",
     "ProductFavorite",
     "ProductView",
+    "ProductTopRequest",
     "Chat",
+    "ChatParticipant",
     "Message",
     "MessageTranslation",
     "MessageRead",
     "MessageHide",
+    "MessagePin",
+    "MessageReaction",
     "ChatMedia",
     "Friendship",
     "LiveSession",

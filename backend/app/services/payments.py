@@ -16,7 +16,9 @@ from app.services import numbers as numbers_service
 from app.services.subscription import PLAN_PRICES, activate_paid_subscription
 from app.services.users import load_user_for_response, serialize_user
 
-PaymentKind = Literal["subscription", "number"]
+PaymentKind = Literal["subscription", "number", "super_group"]
+
+SUPER_GROUP_PRICE = Decimal("10.00")
 
 
 def _compute_subscription_amount(plan: str, billing_cycle: str) -> Decimal:
@@ -68,6 +70,8 @@ def _serialize_payment(payment: Payment) -> dict[str, Any]:
 def _checkout_description(payment: Payment) -> str:
     if payment.kind == "subscription":
         return f"AnyLang {payment.plan} ({payment.billing_cycle})"
+    if payment.kind == "super_group":
+        return f"AnyLang Super Group #{(payment.meta or {}).get('chat_id')}"
     return f"AnyLang number {payment.number}"
 
 
@@ -90,9 +94,11 @@ async def create_checkout(
     plan: str | None = None,
     billing_cycle: str | None = None,
     number: str | None = None,
+    chat_id: int | None = None,
 ) -> dict[str, Any]:
     amount: Decimal
     currency = "USD"
+    meta: dict[str, Any] = {}
 
     if kind == "subscription":
         if not plan or plan == "basic":
@@ -113,6 +119,20 @@ async def create_checkout(
             raise AppError(message="Raqam talab qilinadi", error_code="VALIDATION_ERROR", status_code=400)
         number, group, amount = await numbers_service.resolve_number_for_purchase(db, user, number)
         currency = group.currency
+    elif kind == "super_group":
+        if chat_id is None:
+            raise AppError(message="chat_id talab qilinadi", error_code="VALIDATION_ERROR", status_code=400)
+        from app.services.group_admin import _require_group_admin
+
+        chat, _ = await _require_group_admin(db, chat_id, user.id, owner_only=True)
+        if chat.is_super:
+            raise AppError(
+                message="Guruh allaqachon Super",
+                error_code="ALREADY_SUPER",
+                status_code=400,
+            )
+        amount = SUPER_GROUP_PRICE
+        meta = {"chat_id": chat_id}
     else:
         raise AppError(message="Noto'g'ri to'lov turi", error_code="PAYMENT_INVALID", status_code=400)
 
@@ -127,6 +147,7 @@ async def create_checkout(
         plan=plan,
         billing_cycle=billing_cycle,
         number=number,
+        meta=meta,
     )
     db.add(payment)
     await db.flush()
@@ -143,9 +164,9 @@ async def create_checkout(
         import stripe
     except ImportError as exc:
         raise AppError(
-            message="Stripe paketi o'rnatilmagan",
-            error_code="PAYMENT_INVALID",
-            status_code=500,
+            message="To'lov provayderi sozlanmagan. Keyinroq urinib ko'ring",
+            error_code="PAYMENT_UNAVAILABLE",
+            status_code=503,
         ) from exc
 
     stripe.api_key = settings.stripe_secret_key
@@ -259,6 +280,13 @@ async def apply_payment(db: AsyncSession, payment: Payment) -> dict[str, Any]:
             if not payment.number:
                 raise AppError(message="Noto'g'ri raqam to'lovi", error_code="PAYMENT_INVALID", status_code=400)
             await numbers_service.assign_purchased_number(db, user, payment.number)
+        elif payment.kind == "super_group":
+            chat_id = (payment.meta or {}).get("chat_id")
+            if not chat_id:
+                raise AppError(message="Noto'g'ri Super Group to'lovi", error_code="PAYMENT_INVALID", status_code=400)
+            from app.services.group_admin import mark_chat_super
+
+            await mark_chat_super(db, chat_id=int(chat_id), payment_id=payment.id)
         else:
             raise AppError(message="Noto'g'ri to'lov turi", error_code="PAYMENT_INVALID", status_code=400)
     except AppError as exc:
@@ -295,9 +323,9 @@ async def handle_stripe_webhook(
         import stripe
     except ImportError as exc:
         raise AppError(
-            message="Stripe paketi o'rnatilmagan",
-            error_code="PAYMENT_INVALID",
-            status_code=500,
+            message="To'lov provayderi sozlanmagan. Keyinroq urinib ko'ring",
+            error_code="PAYMENT_UNAVAILABLE",
+            status_code=503,
         ) from exc
 
     try:

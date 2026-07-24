@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.user import BillingCycle, SubscriptionPlan, UserOut
 
-PaymentKind = Literal["subscription", "number"]
+PaymentKind = Literal["subscription", "number", "super_group"]
 PaymentStatus = Literal["pending", "succeeded", "failed", "canceled"]
 PaymentProvider = Literal["mock", "stripe"]
 
@@ -14,6 +14,7 @@ class CheckoutIn(BaseModel):
     plan: SubscriptionPlan | None = None
     billing_cycle: BillingCycle | None = None
     number: str | None = Field(default=None, min_length=7, max_length=7)
+    chat_id: int | None = None
 
 
 class CheckoutOut(BaseModel):

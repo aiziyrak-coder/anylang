@@ -7,6 +7,7 @@ class AddFriendResult {
   final int id;
   final String initial;
   final LinearGradient avatarGradient;
+  final String? avatarUrl;
   final String name;
   final String subtitle;
   final bool online;
@@ -20,6 +21,7 @@ class AddFriendResult {
     required this.name,
     required this.subtitle,
     required this.action,
+    this.avatarUrl,
     this.online = false,
     this.requestId,
   });
@@ -27,11 +29,13 @@ class AddFriendResult {
   AddFriendResult copyWith({
     FriendActionState? action,
     int? requestId,
+    String? avatarUrl,
   }) {
     return AddFriendResult(
       id: id,
       initial: initial,
       avatarGradient: avatarGradient,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       name: name,
       subtitle: subtitle,
       online: online,
@@ -55,6 +59,7 @@ class AddFriendResult {
       id: id,
       initial: initialsOf(name),
       avatarGradient: avatarGradientFor(id),
+      avatarUrl: json['avatar_url'] as String?,
       name: name,
       subtitle: number.isEmpty
           ? (country.isEmpty ? '' : country)
@@ -76,7 +81,6 @@ class AddFriendResult {
     final name = (user['full_name'] as String?) ?? 'User';
     final number = user['number']?.toString() ?? '';
     final country = user['country']?.toString() ?? '';
-    // pending → So'rov yuborildi; none (rad) → Qo'shish
     final status = (json['status'] as String?) ?? 'pending';
     final action = status == 'pending'
         ? FriendActionState.requested
@@ -85,6 +89,7 @@ class AddFriendResult {
       id: id,
       initial: initialsOf(name),
       avatarGradient: avatarGradientFor(id),
+      avatarUrl: user['avatar_url'] as String?,
       name: name,
       subtitle: number.isEmpty
           ? (country.isEmpty ? '' : country)

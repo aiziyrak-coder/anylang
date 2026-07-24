@@ -17,4 +17,15 @@ class JonliState extends GetxController {
   final RxString lastOriginal = ''.obs;
   final RxString lastTranslated = ''.obs;
   final RxBool busy = false.obs;
+
+  /// Server Live API tillari (langCode).
+  final RxSet<String> liveLangCodes = <String>{
+    'uz',
+    'en',
+    'ru',
+    'de',
+    'ja',
+    'zh',
+    'tr',
+  }.obs;
 }

@@ -16,6 +16,8 @@ from app.schemas.product import (
     ProductImageUploadOut,
     ProductListOut,
     ProductTopOut,
+    ProductTopRequestIn,
+    ProductTopRequestOut,
     ProductUpdateIn,
 )
 from app.services import products as products_service
@@ -168,6 +170,40 @@ async def remove_favorite(
 ) -> FavoriteStatusOut:
     data = await products_service.remove_favorite(db, user=current_user, product_id=product_id)
     return FavoriteStatusOut.model_validate(data)
+
+
+@router.post(
+    "/{product_id}/top-request",
+    response_model=ProductTopRequestOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def request_top_promotion(
+    product_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+    body: ProductTopRequestIn | None = None,
+) -> ProductTopRequestOut:
+    data = await products_service.request_top_promotion(
+        db,
+        user=current_user,
+        product_id=product_id,
+        note=(body.note if body else ""),
+    )
+    return ProductTopRequestOut.model_validate(data)
+
+
+@router.delete("/{product_id}/top-request", response_model=ProductTopRequestOut)
+async def cancel_top_request(
+    product_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ProductTopRequestOut:
+    data = await products_service.cancel_top_request(
+        db,
+        user=current_user,
+        product_id=product_id,
+    )
+    return ProductTopRequestOut.model_validate(data)
 
 
 @users_router.get("/users/me/products", response_model=ProductListOut)

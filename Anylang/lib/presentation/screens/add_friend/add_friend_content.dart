@@ -124,6 +124,7 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
         return UserSearchItem(
           initial: r.initial,
           avatarGradient: r.avatarGradient,
+          avatarUrl: r.avatarUrl,
           name: r.name,
           subtitle: r.subtitle,
           online: r.online,
@@ -145,6 +146,7 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
     return FriendResultItem(
       initial: r.initial,
       avatarGradient: r.avatarGradient,
+      avatarUrl: r.avatarUrl,
       name: r.name,
       subtitle: r.subtitle,
       online: r.online,

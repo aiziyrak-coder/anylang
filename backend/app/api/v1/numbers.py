@@ -7,6 +7,7 @@ from app.core.deps import DbSession
 from app.core.pagination import normalize_page
 from app.schemas.numbers import (
     CatalogOut,
+    MyNumberOut,
     NumberGroupOut,
     PurchaseIn,
     RandomNumberOut,
@@ -17,6 +18,12 @@ from app.schemas.user import UserOut
 from app.services import numbers as numbers_service
 
 router = APIRouter()
+
+
+@router.get("/me", response_model=MyNumberOut)
+async def my_number(current_user: CurrentUser, db: DbSession) -> MyNumberOut:
+    data = await numbers_service.get_my_number(db, current_user)
+    return MyNumberOut.model_validate(data)
 
 
 @router.get("/catalog", response_model=CatalogOut)

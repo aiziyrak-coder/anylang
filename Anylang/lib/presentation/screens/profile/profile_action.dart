@@ -7,6 +7,9 @@ class ProfileAction extends MyAction {}
 /// "Tariflar" tugmasi bosilganda (S16).
 class OpenSubscription extends ProfileAction {}
 
+/// AnyLang raqami / katalog / almashtirish.
+class OpenNumbers extends ProfileAction {}
+
 /// "Tizim sozlamalari" — til, tema, bildirishnomalar.
 class OpenAppSettings extends ProfileAction {}
 

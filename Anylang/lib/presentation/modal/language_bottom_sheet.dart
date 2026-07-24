@@ -13,6 +13,7 @@ Future<LanguageOption?> showLanguageBottomSheet(
   required String title,
   required String desc,
   String? selectedKey,
+  Set<String>? allowedLangCodes,
 }) {
   return showModalBottomSheet<LanguageOption>(
     context: context,
@@ -23,6 +24,7 @@ Future<LanguageOption?> showLanguageBottomSheet(
       title: title,
       desc: desc,
       selectedKey: selectedKey,
+      allowedLangCodes: allowedLangCodes,
     ),
   );
 }
@@ -31,11 +33,13 @@ class _LanguageBottomSheet extends StatefulWidget {
   final String title;
   final String desc;
   final String? selectedKey;
+  final Set<String>? allowedLangCodes;
 
   const _LanguageBottomSheet({
     required this.title,
     required this.desc,
     this.selectedKey,
+    this.allowedLangCodes,
   });
 
   @override
@@ -51,6 +55,10 @@ class _LanguageBottomSheetState extends State<_LanguageBottomSheet> {
     final c = context.appColors;
     final query = _query.trim().toLowerCase();
     final items = languageOptions.where((o) {
+      final allowed = widget.allowedLangCodes;
+      if (allowed != null && allowed.isNotEmpty && !allowed.contains(o.langCode)) {
+        return false;
+      }
       if (query.isEmpty) return true;
       return o.nativeName.toLowerCase().contains(query) ||
           o.key.tr.toLowerCase().contains(query);

@@ -155,6 +155,12 @@ class SettingsContent extends ScreenContent<SettingsState> {
             onTap: () => sendAction(OpenEditProfileFromSettings()),
           ),
           InfoRow(
+            icon: Icons.dialpad_rounded,
+            label: 'numbers_title'.tr,
+            showChevron: true,
+            onTap: () => sendAction(OpenNumbersFromSettings()),
+          ),
+          InfoRow(
             icon: Icons.workspace_premium_outlined,
             label: 'profile_plans'.tr,
             showChevron: true,

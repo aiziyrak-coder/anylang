@@ -7,8 +7,10 @@ import '../utils/size_controller.dart';
 /// Chat app bar ⋮ menyusi natijasi (Telegram uslubi).
 enum ChatOverflowAction {
   profile,
+  groupSettings,
   search,
   mute,
+  pin,
   clearHistory,
   deleteChat,
   block,
@@ -18,6 +20,8 @@ enum ChatOverflowAction {
 Future<ChatOverflowAction?> showChatOverflowSheet(
   BuildContext context, {
   required bool muted,
+  bool pinned = false,
+  bool isGroup = false,
 }) {
   final c = context.appColors;
   return showModalBottomSheet<ChatOverflowAction>(
@@ -47,20 +51,6 @@ Future<ChatOverflowAction?> showChatOverflowSheet(
               _item(
                 ctx,
                 c,
-                Icons.person_outline_rounded,
-                'chat_overflow_profile'.tr,
-                ChatOverflowAction.profile,
-              ),
-              _item(
-                ctx,
-                c,
-                Icons.search_rounded,
-                'chat_overflow_search'.tr,
-                ChatOverflowAction.search,
-              ),
-              _item(
-                ctx,
-                c,
                 muted
                     ? Icons.notifications_active_outlined
                     : Icons.notifications_off_outlined,
@@ -69,6 +59,31 @@ Future<ChatOverflowAction?> showChatOverflowSheet(
                     : 'chat_overflow_mute'.tr,
                 ChatOverflowAction.mute,
               ),
+              _item(
+                ctx,
+                c,
+                pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                pinned
+                    ? 'chat_overflow_unpin'.tr
+                    : 'chat_overflow_pin'.tr,
+                ChatOverflowAction.pin,
+              ),
+              if (!isGroup)
+                _item(
+                  ctx,
+                  c,
+                  Icons.person_outline_rounded,
+                  'chat_overflow_profile'.tr,
+                  ChatOverflowAction.profile,
+                ),
+              if (isGroup)
+                _item(
+                  ctx,
+                  c,
+                  Icons.groups_outlined,
+                  'chat_overflow_group_settings'.tr,
+                  ChatOverflowAction.groupSettings,
+                ),
               Divider(height: 16.dp, color: c.outline),
               _item(
                 ctx,
@@ -85,14 +100,15 @@ Future<ChatOverflowAction?> showChatOverflowSheet(
                 ChatOverflowAction.deleteChat,
                 danger: true,
               ),
-              _item(
-                ctx,
-                c,
-                Icons.block_rounded,
-                'chat_overflow_block'.tr,
-                ChatOverflowAction.block,
-                danger: true,
-              ),
+              if (!isGroup)
+                _item(
+                  ctx,
+                  c,
+                  Icons.block_rounded,
+                  'chat_overflow_block'.tr,
+                  ChatOverflowAction.block,
+                  danger: true,
+                ),
             ],
           ),
         ),

@@ -30,6 +30,16 @@ class PaymentRepository {
     );
   }
 
+  Future<BaseResult> checkoutSuperGroup({required int chatId}) {
+    return _client.post(
+      api: 'api/v1/payments/checkout',
+      data: {
+        'kind': 'super_group',
+        'chat_id': chatId,
+      },
+    );
+  }
+
   Future<BaseResult> confirmMock(int paymentId) {
     return _client.post(api: 'api/v1/payments/$paymentId/confirm');
   }

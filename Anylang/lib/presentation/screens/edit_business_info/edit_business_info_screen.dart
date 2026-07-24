@@ -12,19 +12,7 @@ import 'edit_business_info_action.dart';
 import 'edit_business_info_content.dart';
 import 'edit_business_info_state.dart';
 
-const _roleToApi = {
-  'Ishlab chiqaruvchi': 'manufacturer',
-  'Distributor': 'distributor',
-  'Chakana savdo': 'retail',
-  'Xizmat ko‘rsatuvchi': 'service',
-};
-
-const _apiToRole = {
-  'manufacturer': 'Ishlab chiqaruvchi',
-  'distributor': 'Distributor',
-  'retail': 'Chakana savdo',
-  'service': 'Xizmat ko‘rsatuvchi',
-};
+const _roleCodes = ['manufacturer', 'distributor', 'retail', 'service'];
 
 class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
   EditBusinessInfoScreen() : super(mobileContent: EditBusinessInfoContent());
@@ -37,6 +25,7 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
     state.website.value = '';
     state.description.value = '';
     state.logoUrl.value = null;
+    state.role.value = 'manufacturer';
     state.loading.value = true;
     _load();
   }
@@ -50,9 +39,9 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
         if (map == null) return;
         state.companyName.value = (map['company_name'] as String?) ?? '';
         state.country.value = (map['country'] as String?) ?? '';
+        final role = (map['business_role'] as String?) ?? 'manufacturer';
         state.role.value =
-            _apiToRole[(map['business_role'] as String?) ?? ''] ??
-                'Ishlab chiqaruvchi';
+            _roleCodes.contains(role) ? role : 'manufacturer';
         state.website.value = (map['website'] as String?) ?? '';
         state.description.value = (map['description'] as String?) ?? '';
         final logo = map['logo_url']?.toString();
@@ -171,11 +160,10 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
               'company_name': a.companyName.trim(),
             if (state.country.value.length == 2)
               'country': state.country.value.toUpperCase(),
-            if (_roleToApi[state.role.value] != null)
-              'business_role': _roleToApi[state.role.value],
-            if (a.website.trim().isNotEmpty) 'website': a.website.trim(),
-            if (a.description.trim().isNotEmpty)
-              'description': a.description.trim(),
+            if (_roleCodes.contains(state.role.value))
+              'business_role': state.role.value,
+            'website': a.website.trim(),
+            'description': a.description.trim(),
             'certificates': state.certificates.toList(),
           };
           final result =

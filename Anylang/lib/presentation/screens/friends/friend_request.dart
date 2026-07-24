@@ -8,6 +8,7 @@ class FriendRequest {
   final int userId;
   final String initial;
   final LinearGradient avatarGradient;
+  final String? avatarUrl;
   final String name;
   final String subtitle;
   final bool online;
@@ -19,6 +20,7 @@ class FriendRequest {
     required this.avatarGradient,
     required this.name,
     required this.subtitle,
+    this.avatarUrl,
     this.online = false,
   });
 
@@ -34,6 +36,7 @@ class FriendRequest {
       userId: id,
       initial: initialsOf(name),
       avatarGradient: avatarGradientFor(id),
+      avatarUrl: user['avatar_url'] as String?,
       name: name,
       subtitle: number.isEmpty
           ? (country.isEmpty ? '' : country)

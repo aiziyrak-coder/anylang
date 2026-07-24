@@ -89,7 +89,7 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
     return ProfileAvatar(
       initial: d.initial,
       gradient: d.avatarGradient,
-      shape: d.business ? ProfileAvatarShape.roundedSquare : ProfileAvatarShape.circle,
+      shape: ProfileAvatarShape.circle,
       imageUrl: d.avatarUrl,
     );
   }

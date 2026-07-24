@@ -9,6 +9,13 @@ class ChatPayload {
   final LinearGradient avatarGradient;
   final bool online;
   final String? avatarUrl;
+  final bool isGroup;
+  final bool pinned;
+
+  /// Guruhdagi rol (owner|admin|member).
+  final String? myRole;
+  final bool isSuper;
+  final String? inviteLink;
 
   const ChatPayload({
     required this.chatId,
@@ -18,5 +25,10 @@ class ChatPayload {
     required this.avatarGradient,
     this.online = false,
     this.avatarUrl,
+    this.isGroup = false,
+    this.pinned = false,
+    this.myRole,
+    this.isSuper = false,
+    this.inviteLink,
   });
 }

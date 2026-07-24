@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import '../profile_avatar.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 
-/// Suhbatlar ro'yxatining bitta elementi: avatar (gradient + harf + onlayn
-/// nuqtasi) + ism + oxirgi xabar + vaqt + o'qilmagan belgisi.
+/// Suhbatlar / do‘stlar ro'yxati elementi: doira avatar (rasm yoki harf).
 class ConversationItem extends StatelessWidget {
   final String initial;
   final LinearGradient avatarGradient;
@@ -15,7 +15,12 @@ class ConversationItem extends StatelessWidget {
   final int unread;
   final bool highlighted;
   final bool muted;
+  final bool pinned;
+  final bool isGroup;
+  final String? avatarUrl;
   final VoidCallback onTap;
+  final ValueChanged<Rect>? onLongPress;
+  final bool selected;
 
   const ConversationItem({
     super.key,
@@ -29,7 +34,12 @@ class ConversationItem extends StatelessWidget {
     required this.unread,
     required this.highlighted,
     this.muted = false,
+    this.pinned = false,
+    this.isGroup = false,
+    this.avatarUrl,
     required this.onTap,
+    this.onLongPress,
+    this.selected = false,
   });
 
   @override
@@ -41,64 +51,44 @@ class ConversationItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress == null
+            ? null
+            : () {
+                final box = context.findRenderObject() as RenderBox?;
+                if (box == null || !box.hasSize) return;
+                final offset = box.localToGlobal(Offset.zero);
+                onLongPress!(
+                  Rect.fromLTWH(offset.dx, offset.dy, box.size.width, box.size.height),
+                );
+              },
         borderRadius: radius,
         child: Ink(
           decoration: BoxDecoration(
-            color: highlighted ? c.accentSoft : Colors.transparent,
+            color: selected
+                ? c.accentSoft
+                : (highlighted ? c.accentSoft : Colors.transparent),
             borderRadius: radius,
+            border: selected
+                ? Border.all(color: c.accent.withValues(alpha: 0.45))
+                : null,
           ),
           padding: EdgeInsets.symmetric(horizontal: 11.dp, vertical: 11.dp),
           child: Row(
             children: [
-              _avatar(c),
+              ProfileAvatar(
+                initial: initial,
+                gradient: avatarGradient,
+                imageUrl: avatarUrl,
+                size: 52,
+                online: online,
+              ),
               SizedBox(width: 12.dp),
               Expanded(child: _content(c)),
+              if (selected)
+                Icon(Icons.check_circle, color: c.accent, size: 22.dp),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _avatar(AppColors c) {
-    return SizedBox(
-      width: 52.dp,
-      height: 52.dp,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 52.dp,
-            height: 52.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: avatarGradient,
-            ),
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: initialColor,
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          if (online)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 15.dp,
-                height: 15.dp,
-                decoration: BoxDecoration(
-                  color: kOnline,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.background, width: 2.5.dp),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -123,6 +113,14 @@ class ConversationItem extends StatelessWidget {
               ),
             ),
             SizedBox(width: 8.dp),
+            if (isGroup) ...[
+              Icon(Icons.groups_rounded, color: c.textFaint, size: 14.dp),
+              SizedBox(width: 4.dp),
+            ],
+            if (pinned) ...[
+              Icon(Icons.push_pin_rounded, color: c.textFaint, size: 14.dp),
+              SizedBox(width: 4.dp),
+            ],
             if (muted) ...[
               Icon(Icons.notifications_off_outlined, color: c.textFaint, size: 14.dp),
               SizedBox(width: 4.dp),

@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 
 import '../core/buildNetwork/base_result.dart';
 import '../core/buildNetwork/network_client.dart';
@@ -16,16 +18,33 @@ class ProfileRepository {
     return _client.patch(api: 'api/v1/users/me', data: body);
   }
 
+  Future<MultipartFile> _imagePart(String filePath) async {
+    final name = filePath.split(RegExp(r'[\\/]')).last;
+    final mime = lookupMimeType(filePath, headerBytes: null) ??
+        lookupMimeType(name) ??
+        'image/jpeg';
+    final parts = mime.split('/');
+    final filename = name.contains('.') ? name : '$name.jpg';
+    return MultipartFile.fromFile(
+      filePath,
+      filename: filename,
+      contentType: MediaType(
+        parts.isNotEmpty ? parts[0] : 'image',
+        parts.length > 1 ? parts[1] : 'jpeg',
+      ),
+    );
+  }
+
   Future<BaseResult> uploadAvatar(String filePath) async {
     final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath),
+      'file': await _imagePart(filePath),
     });
     return _client.post(api: 'api/v1/users/me/avatar', data: formData);
   }
 
   Future<BaseResult> uploadBusinessLogo(String filePath) async {
     final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath),
+      'file': await _imagePart(filePath),
     });
     return _client.post(api: 'api/v1/users/me/business/logo', data: formData);
   }
@@ -51,7 +70,7 @@ class ProfileRepository {
 
   Future<BaseResult> uploadFactoryImage(String filePath) async {
     final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath),
+      'file': await _imagePart(filePath),
     });
     return _client.post(
       api: 'api/v1/users/me/business/factory-images',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/audio/voice_recorder_service.dart';
 import '../../../data/core/mappers.dart';
+import '../../../data/network/forward_pending_store.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/chat_wallpaper_background.dart';
@@ -26,13 +27,16 @@ class ChatContent extends ScreenContent<ChatState> {
   Worker? _messagesWorker;
   Worker? _inputWorker;
   Worker? _searchWorker;
+  Worker? _loadingWorker;
   int _lastMessageCount = 0;
+  bool _pinnedToBottom = false;
 
   @override
   void onClose() {
     _messagesWorker?.dispose();
     _inputWorker?.dispose();
     _searchWorker?.dispose();
+    _loadingWorker?.dispose();
     _input.dispose();
     _search.dispose();
     _scroll.dispose();
@@ -44,13 +48,29 @@ class ChatContent extends ScreenContent<ChatState> {
   @override
   void uiBuildFinished(ChatState state) {
     _lastMessageCount = state.messages.length;
+    _pinnedToBottom = false;
     // Faqat yangi xabar qo'shilganda pastga — status yangilanishida sakramasin.
     _messagesWorker = ever(state.messages, (list) {
       final n = list.length;
       if (n > _lastMessageCount) {
-        _scrollToBottom();
+        final bulkOrFirst = !_pinnedToBottom || n - _lastMessageCount > 1;
+        if (bulkOrFirst) {
+          _jumpToBottomSettled();
+        } else {
+          _scrollToBottom(animate: true);
+        }
       }
       _lastMessageCount = n;
+    });
+    // Yuklash tugagach — eng pastdan ochilsin (animatsiyasiz).
+    _loadingWorker = ever(state.loading, (loading) {
+      if (!loading && state.messages.isNotEmpty) {
+        _jumpToBottomSettled();
+      }
+      if (loading) {
+        _pinnedToBottom = false;
+        _lastMessageCount = 0;
+      }
     });
     // Yuborish xatosida matnni qaytarish — controller bilan sync.
     _inputWorker = ever(state.input, (v) {
@@ -69,7 +89,29 @@ class ChatContent extends ScreenContent<ChatState> {
         );
       }
     });
-    _scrollToBottom(animate: false);
+    if (!state.loading.value && state.messages.isNotEmpty) {
+      _jumpToBottomSettled();
+    }
+  }
+
+  /// Layout barqaror bo‘lguncha bir necha frame jump — ochilishda scroll animatsiyasi yo‘q.
+  void _jumpToBottomSettled() {
+    _pinnedToBottom = true;
+    void jump() {
+      if (!_scroll.hasClients) return;
+      final target = _scroll.position.maxScrollExtent;
+      if ((_scroll.offset - target).abs() > 1) {
+        _scroll.jumpTo(target);
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      jump();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        jump();
+        WidgetsBinding.instance.addPostFrameCallback((_) => jump());
+      });
+    });
   }
 
   void _scrollToBottom({bool animate = true}) {
@@ -116,6 +158,35 @@ class ChatContent extends ScreenContent<ChatState> {
     return out;
   }
 
+  ChatMessage? _prevMessage(List<Object> items, int index) {
+    for (var i = index - 1; i >= 0; i--) {
+      final item = items[i];
+      if (item is ChatMessage) return item;
+    }
+    return null;
+  }
+
+  ChatMessage? _nextMessage(List<Object> items, int index) {
+    for (var i = index + 1; i < items.length; i++) {
+      final item = items[i];
+      if (item is ChatMessage) return item;
+    }
+    return null;
+  }
+
+  bool _sameIncomingSender(ChatMessage a, ChatMessage b) {
+    if (a.isOutgoing || b.isOutgoing) return false;
+    if (a.senderId != null && b.senderId != null) {
+      return a.senderId == b.senderId;
+    }
+    final an = a.senderName?.trim();
+    final bn = b.senderName?.trim();
+    if (an != null && bn != null && an.isNotEmpty && bn.isNotEmpty) {
+      return an == bn;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context, ChatState state,
       void Function(MyAction action) sendAction) {
@@ -125,7 +196,6 @@ class ChatContent extends ScreenContent<ChatState> {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     // App bar / composer taxminiy balandligi — list padding.
     final topPad = topInset + 66.dp;
-    final bottomPad = bottomInset + 72.dp;
 
     return ChatWallpaperBackground(
       child: Padding(
@@ -134,10 +204,37 @@ class ChatContent extends ScreenContent<ChatState> {
           fit: StackFit.expand,
           children: [
             Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.only(top: topPad, bottom: bottomPad),
-                child: _list(c, state, sendAction),
-              ),
+              child: Obx(() {
+                final selecting = state.selecting.value;
+                final bottomPad =
+                    bottomInset + (selecting ? 12.dp : 72.dp);
+                return Padding(
+                  padding: EdgeInsets.only(top: topPad, bottom: bottomPad),
+                  child: Column(
+                    children: [
+                      Obx(() {
+                        final pin = state.pinnedBanner.value;
+                        if (pin == null) return const SizedBox.shrink();
+                        return Material(
+                          color: c.surface.withValues(alpha: 0.92),
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(Icons.push_pin, size: 18.dp, color: c.accentText),
+                            title: Text(
+                              pin.previewText(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 13.sp, color: c.textPrimary),
+                            ),
+                            onTap: () => _scrollToMessage(pin.id),
+                          ),
+                        );
+                      }),
+                      Expanded(child: _list(c, state, sendAction)),
+                    ],
+                  ),
+                );
+              }),
             ),
             Positioned(
               top: 0,
@@ -145,19 +242,24 @@ class ChatContent extends ScreenContent<ChatState> {
               right: 0,
               child: Obx(
                 () => ChatAppBar(
-                  name: state.peerName,
-                  initial: state.peerInitial,
-                  avatarGradient: state.peerAvatar,
+                  name: state.peerName.value,
+                  initial: state.peerInitial.value,
+                  avatarGradient: state.peerAvatar.value,
+                  avatarUrl: state.peerAvatarUrl.value,
                   online: state.peerOnline.value,
                   statusText: _peerStatusText(state),
                   searching: state.searching.value,
                   hasSearchQuery: state.searchQuery.value.trim().isNotEmpty,
                   searchController: _search,
+                  selecting: state.selecting.value,
+                  selectedCount: state.selectedIds.length,
                   onBack: () => sendAction(Back()),
-                  onMenu: () => sendAction(OpenChatMenu()),
+                  onMenu: (rect) => sendAction(OpenChatMenu(rect)),
                   onPeerTap: () => sendAction(OpenPeerProfile()),
                   onCloseSearch: () => sendAction(ToggleChatSearch()),
                   onSearchChanged: (v) => sendAction(ChatSearchChanged(v)),
+                  onForwardSelected: () => sendAction(ForwardSelectedMessages()),
+                  onDeleteSelected: () => sendAction(DeleteSelectedMessages()),
                 ),
               ),
             ),
@@ -167,16 +269,36 @@ class ChatContent extends ScreenContent<ChatState> {
               bottom: 0,
               child: Obx(
                 () {
+                  if (state.selecting.value) {
+                    return const SizedBox.shrink();
+                  }
                   final samples = List<double>.of(recorder.liveSamples);
+                  final fwd = Get.isRegistered<ForwardPendingStore>()
+                      ? Get.find<ForwardPendingStore>()
+                      : null;
+                  final hasFwd = fwd?.hasPending == true;
+                  final fwdItems = fwd?.items.toList() ?? const [];
+                  final showSender = fwd?.showSender.value ?? true;
                   return ChatComposer(
                     controller: _input,
                     recording: state.recording.value,
-                    showSend: state.input.value.trim().isNotEmpty &&
-                        !state.sending.value,
+                    showSend: !state.sending.value &&
+                        (state.input.value.trim().isNotEmpty || hasFwd),
                     reply: state.replyTo.value,
-                    peerName: state.peerName,
+                    peerName: state.peerName.value,
                     recordElapsed: recorder.elapsedLabel.value,
                     recordSamples: samples,
+                    forwardCount: fwdItems.length,
+                    forwardPreview: fwdItems.isEmpty
+                        ? null
+                        : fwdItems.first.preview,
+                    forwardSenderLabel: fwdItems.isEmpty
+                        ? null
+                        : fwdItems.first.senderLabel,
+                    forwardShowSender: showSender,
+                    onToggleForwardSender: () =>
+                        sendAction(ToggleForwardShowSender()),
+                    onCancelForward: () => sendAction(CancelForwardDraft()),
                     onChanged: (v) => sendAction(InputChanged(v)),
                     onSend: () => sendAction(SendText()),
                     onMic: () => sendAction(StartRecording()),
@@ -212,6 +334,8 @@ class ChatContent extends ScreenContent<ChatState> {
       void Function(MyAction action) sendAction) {
     return Obx(() {
       if (state.loading.value) return const AppLoading();
+      final selecting = state.selecting.value;
+      final selectedIds = state.selectedIds.toSet();
       final q = state.searchQuery.value.trim().toLowerCase();
       final messages = q.isEmpty
           ? state.messages.toList()
@@ -235,24 +359,64 @@ class ChatContent extends ScreenContent<ChatState> {
       final items = _buildListItems(messages);
       return ListView.builder(
         controller: _scroll,
-        padding: EdgeInsets.fromLTRB(14.dp, 12.dp, 14.dp, 12.dp),
+        padding: EdgeInsets.fromLTRB(
+          selecting ? 0 : 14.dp,
+          12.dp,
+          selecting ? 0 : 14.dp,
+          12.dp,
+        ),
         itemCount: items.length,
         itemBuilder: (_, i) {
           final item = items[i];
           if (item is String) {
-            return _dateChip(c, item);
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: selecting ? 14.dp : 0),
+              child: _dateChip(c, item),
+            );
           }
           final msg = item as ChatMessage;
           final key = _keyFor(msg.id);
+          final isGroup = state.isGroup.value;
+          var showSenderName = false;
+          var showAvatar = false;
+          if (isGroup && !msg.isOutgoing) {
+            final prev = _prevMessage(items, i);
+            final next = _nextMessage(items, i);
+            showSenderName =
+                prev == null || !_sameIncomingSender(prev, msg);
+            showAvatar = next == null || !_sameIncomingSender(msg, next);
+          }
           return KeyedSubtree(
             key: key,
             child: ChatMessageItem(
               message: msg,
+              isGroup: isGroup,
+              showSenderName: showSenderName,
+              showAvatar: showAvatar,
+              selecting: selecting,
+              selected: selectedIds.contains(msg.id),
+              onTap: selecting
+                  ? () => sendAction(ToggleSelectMessage(msg))
+                  : null,
+              onSenderTap: (!selecting &&
+                      isGroup &&
+                      !msg.isOutgoing &&
+                      (msg.senderId ?? 0) > 0)
+                  ? () => sendAction(OpenSenderProfile(msg.senderId!))
+                  : null,
               onLongPress: () {
                 final box = key.currentContext?.findRenderObject() as RenderBox?;
                 if (box == null || !box.hasSize) return;
                 final anchor = box.localToGlobal(Offset.zero) & box.size;
-                sendAction(LongPressMessage(msg, anchor));
+                sendAction(
+                  LongPressMessage(
+                    msg,
+                    anchor,
+                    isGroup: isGroup,
+                    showSenderName: showSenderName,
+                    showAvatar: showAvatar,
+                  ),
+                );
               },
               onReplyTap: _scrollToMessage,
               onProductTap: msg.type == ChatMsgType.product

@@ -2,6 +2,9 @@ import 'package:get/get.dart';
 import '../add_friend/add_friend_result.dart';
 import 'conversation.dart';
 
+/// Xabarlar filter bari: faqat bitta tanlov.
+enum MessagesListFilter { all, unread, chats, groups }
+
 class MessagesState extends GetxController {
   /// Suhbatlar ro'yxati (Screen.initState'da yuklanadi).
   RxList<Conversation> conversations = <Conversation>[].obs;
@@ -15,4 +18,11 @@ class MessagesState extends GetxController {
   RxString query = ''.obs;
   RxBool loading = true.obs;
   RxBool searching = false.obs;
+
+  /// Bir vaqtda faqat bitta filter.
+  final Rx<MessagesListFilter> listFilter = MessagesListFilter.all.obs;
+
+  /// Ro‘yxat multi-select.
+  final RxBool selecting = false.obs;
+  final RxSet<int> selectedIds = <int>{}.obs;
 }

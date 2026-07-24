@@ -12,11 +12,14 @@ import '../data/network/countries_repository.dart';
 import '../data/network/friends_repository.dart';
 import '../data/network/google_auth_service.dart';
 import '../data/network/live_repository.dart';
+import '../data/network/numbers_repository.dart';
 import '../data/network/payment_repository.dart';
 import '../data/network/products_repository.dart';
 import '../data/network/profile_repository.dart';
 import '../data/network/realtime_sync_service.dart';
 import '../data/network/socket_service.dart';
+import '../data/network/invite_deep_link_service.dart';
+import '../data/network/forward_pending_store.dart';
 
 class DataModule {
   Future<void> initModule() async {
@@ -55,6 +58,10 @@ class DataModule {
       LiveRepository(client: Get.find()),
       permanent: true,
     );
+    Get.put<NumbersRepository>(
+      NumbersRepository(client: Get.find()),
+      permanent: true,
+    );
     Get.put<CountriesRepository>(
       CountriesRepository(client: Get.find()),
       permanent: true,
@@ -66,7 +73,12 @@ class DataModule {
     Get.put<GoogleAuthService>(GoogleAuthService(), permanent: true);
     Get.put<SocketService>(SocketService(), permanent: true);
     Get.put<RealtimeSyncService>(RealtimeSyncService(), permanent: true);
+    Get.put<ForwardPendingStore>(ForwardPendingStore(), permanent: true);
     Get.put<VoiceRecorderService>(VoiceRecorderService(), permanent: true);
     Get.put<VoicePlayerService>(VoicePlayerService(), permanent: true);
+    await Get.putAsync<InviteDeepLinkService>(
+      () => InviteDeepLinkService().init(),
+      permanent: true,
+    );
   }
 }

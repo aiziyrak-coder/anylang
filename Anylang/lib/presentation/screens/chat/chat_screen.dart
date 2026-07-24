@@ -3,10 +3,8 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../data/audio/voice_player_service.dart';
 import '../../../data/audio/voice_recorder_service.dart';
@@ -14,13 +12,17 @@ import '../../../data/audio/waveform_utils.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
+import '../../../data/network/forward_pending_store.dart';
 import '../../../data/network/friends_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../../data/network/socket_service.dart';
+import '../../modal/telegram_action_sheet.dart';
 import '../../modal/attachment_bottom_sheet.dart';
+import '../../modal/location_picker_bottom_sheet.dart';
+import '../../modal/chat_overflow_dialog.dart';
 import '../../modal/chat_overflow_sheet.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/message_actions_dialog.dart';
@@ -30,6 +32,9 @@ import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
+import '../group_settings/group_settings_payload.dart';
+import '../group_settings/group_settings_screen.dart';
+import '../main/main_state.dart';
 import '../messages/messages_state.dart';
 import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
@@ -47,6 +52,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   int _seq = 0;
   Timer? _typingDebounce;
   bool _lastTypingSent = false;
+  int? _boundChatId;
 
   @override
   void initState(ChatPayload? payload) {
@@ -55,38 +61,44 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       popBackNavigate();
       return;
     }
-    state.peerName = p.name;
-    state.peerInitial = p.initial;
-    state.peerAvatar = p.avatarGradient;
-    state.peerOnline.value = p.online;
-    state.chatId = p.chatId;
-    state.peerId = p.peerId;
+    state.bindPayload(p);
+    _boundChatId = p.chatId;
+    state.muted.value = SessionStore.isChatMuted(p.chatId);
     if (Get.isRegistered<RealtimeSyncService>()) {
       Get.find<RealtimeSyncService>().setActiveChat(p.chatId);
     }
-    state.muted.value = SessionStore.isChatMuted(p.chatId);
-    state.searching.value = false;
-    state.searchQuery.value = '';
-    state.peerTyping.value = false;
-    state.peerActivity.value = '';
-
-    state.input.value = '';
-    state.replyTo.value = null;
-    state.recording.value = false;
-    state.sending.value = false;
-    state.loading.value = true;
     // Real-time: WS ulangani va tinglovchi qayta bog'langani shart.
     unawaited(connectRealtimeIfNeeded());
-    _loadMessages(p.chatId);
+    final session = state.sessionId.value;
+    _loadMessages(p.chatId, session);
   }
 
-  Future<void> _loadMessages(int chatId) async {
+  @override
+  void dispose() {
+    _typingDebounce?.cancel();
+    final bound = _boundChatId;
+    if (bound != null && Get.isRegistered<RealtimeSyncService>()) {
+      final sync = Get.find<RealtimeSyncService>();
+      // Keyingi chat ochilganda dispose keyinroq kelishi mumkin —
+      // faqat hali shu chat active bo'lsa tozalaymiz.
+      if (sync.activeChatId == bound) {
+        sync.setActiveChat(null);
+      }
+    }
+    super.dispose();
+  }
+
+  Future<void> _loadMessages(int chatId, int session) async {
     final result = await Get.find<ChatRepository>().listMessages(chatId);
-    // Chat almashgan bo'lsa — eski javobni yozmang.
-    if (state.chatId != chatId) return;
+    // Chat / session almashgan bo'lsa — eski javobni yozmang.
+    if (state.sessionId.value != session || state.chatId.value != chatId) {
+      return;
+    }
     result.when(
       success: (data) {
-        if (state.chatId != chatId) return;
+        if (state.sessionId.value != session || state.chatId.value != chatId) {
+          return;
+        }
         final me = SessionStore.userId();
         final raw = asList(data)
             .whereType<Map>()
@@ -94,19 +106,19 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             .toList();
         final items = raw.map((e) => _fromApi(e, me)).toList();
         final filled = _fillMissingReplies(items, raw, me);
-        // Live WS xabarlari yuklash davomida kelgan bo'lishi mumkin —
-        // id bo'yicha birlashtiramiz (assignAll o'chirib yubormasin).
-        final byId = {for (final m in state.messages) m.id: m};
-        for (final m in filled) {
-          byId[m.id] = m;
-        }
-        final merged = byId.values.toList()
+        // Faqat shu chatga tegishli live xabarlarni saqlab qolamiz.
+        final liveOnly = state.messages
+            .where((m) => filled.every((f) => f.id != m.id))
+            .toList();
+        final merged = [...filled, ...liveOnly]
           ..sort((a, b) {
             final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
             final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
             return at.compareTo(bt);
           });
         state.messages.assignAll(merged);
+        final pinned = merged.where((m) => m.pinned).toList();
+        state.pinnedBanner.value = pinned.isNotEmpty ? pinned.last : null;
         final ids = filled
             .where((m) => !m.isOutgoing)
             .map((m) => int.tryParse(m.id))
@@ -115,10 +127,46 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         if (ids.isNotEmpty) {
           Get.find<ChatRepository>().markRead(chatId, ids);
         }
+        if (chatId > 0) {
+          unawaited(_loadPinned(chatId, session));
+        }
       },
-      failure: showAppError,
+      failure: (err) {
+        if (state.sessionId.value == session && state.chatId.value == chatId) {
+          showAppError(err);
+        }
+      },
     );
-    if (state.chatId == chatId) state.loading.value = false;
+    if (state.sessionId.value == session && state.chatId.value == chatId) {
+      state.loading.value = false;
+    }
+  }
+
+  Future<void> _loadPinned(int chatId, int session) async {
+    final result = await Get.find<ChatRepository>().listPinnedMessages(chatId);
+    if (state.sessionId.value != session || state.chatId.value != chatId) {
+      return;
+    }
+    result.when(
+      success: (data) {
+        if (state.sessionId.value != session || state.chatId.value != chatId) {
+          return;
+        }
+        final items = asList(data)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        if (items.isEmpty) return;
+        final me = SessionStore.userId();
+        final mapped = mapChatMessageFromApi(
+          items.first,
+          me: me,
+          peerName: state.peerName.value,
+        );
+        state.pinnedBanner.value = mapped.withPinned(true);
+      },
+      failure: (_) {},
+    );
   }
 
   /// Eski API faqat `reply_to_id` bersa — lokal xabarlaridan sitata yig'iladi.
@@ -146,7 +194,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         continue;
       }
       final reply = ChatReply(
-        author: parent.isOutgoing ? 'chat_you'.tr : state.peerName,
+        author: parent.isOutgoing ? 'chat_you'.tr : state.peerName.value,
         preview: parent.previewText(),
         messageId: parent.id,
       );
@@ -169,6 +217,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         downloaded: msg.voiceDownloaded,
         status: msg.status,
         reply: reply,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        senderAvatarUrl: msg.senderAvatarUrl,
       );
     }
     return ChatMessage.text(
@@ -181,16 +232,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       showingOriginal: msg.showingOriginal,
       status: msg.status,
       reply: reply,
+      senderId: msg.senderId,
+      senderName: msg.senderName,
+      senderAvatarUrl: msg.senderAvatarUrl,
     );
-  }
-
-  ChatStatus _statusFromApi(Map<String, dynamic> json, {required bool outgoing}) {
-    if (!outgoing) return ChatStatus.read;
-    if (json['read_by_recipient'] == true) return ChatStatus.read;
-    final status = json['status']?.toString();
-    if (status == 'read') return ChatStatus.read;
-    if (status == 'delivered') return ChatStatus.delivered;
-    return ChatStatus.sent;
   }
 
   ChatMessage _fromApi(
@@ -198,122 +243,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     int? me, {
     ChatReply? fallbackReply,
   }) {
-    final senderId = (json['sender_id'] as num?)?.toInt();
-    final outgoing = me != null && senderId == me;
-    final created = DateTime.tryParse(json['created_at']?.toString() ?? '');
-    final textTranslated = json['text'] as String?;
-    final textOriginal = json['text_original'] as String?;
-    final text = _nonEmpty(textTranslated) ?? _nonEmpty(textOriginal) ?? '';
-    final type = (json['type'] as String?) ?? 'text';
-    final reply = _replyFromApi(json, me) ?? fallbackReply;
-    final status = _statusFromApi(json, outgoing: outgoing);
-    if (type == 'voice' || type == 'audio') {
-      final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
-      final durationMs = (meta['duration_ms'] as num?)?.toInt();
-      final samples = (meta['samples'] as List?)
-              ?.whereType<num>()
-              .map((e) => e.toDouble())
-              .toList() ??
-          const <double>[];
-      final url = meta['url']?.toString();
-      return ChatMessage.voice(
-        id: '${json['id']}',
-        dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
-        time: formatMessageClock(created),
-        createdAt: created,
-        duration: durationMs != null
-            ? WaveformUtils.formatDuration(Duration(milliseconds: durationMs))
-            : '0:00',
-        durationMs: durationMs,
-        path: url,
-        samples: samples,
-        downloaded: url != null && url.isNotEmpty,
-        status: status,
-        reply: reply,
-      );
-    }
-    final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
-    final dir = outgoing ? ChatDir.outgoing : ChatDir.incoming;
-    final time = formatMessageClock(created);
-    final id = '${json['id']}';
-    switch (type) {
-      case 'image':
-        return ChatMessage.image(
-          id: id,
-          dir: dir,
-          time: time,
-          createdAt: created,
-          url: meta['url']?.toString(),
-          gradient: avatarTealGradient,
-          status: status,
-          reply: reply,
-        );
-      case 'file':
-        final name = meta['filename']?.toString() ?? 'file';
-        final size = meta['size'];
-        final ext = name.contains('.')
-            ? name.split('.').last.toUpperCase()
-            : 'FILE';
-        return ChatMessage.file(
-          id: id,
-          dir: dir,
-          time: time,
-          createdAt: created,
-          name: name,
-          size: size is num ? _formatBytes(size.toInt()) : '—',
-          ext: ext,
-          url: meta['url']?.toString(),
-          status: status,
-        );
-      case 'product':
-        return ChatMessage.product(
-          id: id,
-          dir: dir,
-          time: time,
-          createdAt: created,
-          title: meta['name']?.toString() ??
-              meta['product_name']?.toString() ??
-              'chat_preview_product'.tr,
-          price: meta['price']?.toString() ?? '—',
-          productId: (meta['product_id'] as num?)?.toInt(),
-          status: status,
-        );
-      case 'location':
-        return ChatMessage.location(
-          id: id,
-          dir: dir,
-          time: time,
-          createdAt: created,
-          label: meta['label']?.toString() ?? 'chat_preview_location'.tr,
-          distance: '',
-          latitude: (meta['latitude'] as num?)?.toDouble(),
-          longitude: (meta['longitude'] as num?)?.toDouble(),
-          status: status,
-        );
-      case 'contact':
-        final name = meta['contact_name']?.toString() ?? 'chat_contact_fallback'.tr;
-        return ChatMessage.contact(
-          id: id,
-          dir: dir,
-          time: time,
-          createdAt: created,
-          name: name,
-          phone: meta['contact_phone']?.toString() ?? '',
-          initial: initialsOf(name),
-          status: status,
-        );
-      default:
-        return ChatMessage.text(
-          id: id,
-          dir: dir,
-          time: time,
-          createdAt: created,
-          text: text,
-          textOriginal: textOriginal,
-          status: status,
-          reply: reply,
-        );
-    }
+    return mapChatMessageFromApi(
+      json,
+      me: me,
+      peerName: state.peerName.value,
+      fallbackReply: fallbackReply,
+    );
   }
 
   String _formatBytes(int bytes) {
@@ -324,49 +259,6 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  String? _nonEmpty(String? value) {
-    final t = value?.trim();
-    if (t == null || t.isEmpty) return null;
-    return value;
-  }
-
-  ChatReply? _replyFromApi(Map<String, dynamic> json, int? me) {
-    final nested = asMap(json['reply_to']);
-    if (nested == null) return null;
-    final senderId = (nested['sender_id'] as num?)?.toInt();
-    final author = (me != null && senderId == me)
-        ? 'chat_you'.tr
-        : (nested['sender_name']?.toString().trim().isNotEmpty == true
-            ? nested['sender_name'].toString()
-            : state.peerName);
-    final type = nested['type']?.toString() ?? 'text';
-    final deleted = nested['is_deleted'] == true;
-    final previewRaw = nested['preview_text']?.toString().trim();
-    final previewText = deleted
-        ? 'chat_reply_deleted'.tr
-        : ((previewRaw != null && previewRaw.isNotEmpty)
-            ? previewRaw
-            : _previewForMsgType(type));
-    final id = nested['id'];
-    return ChatReply(
-      author: author,
-      preview: previewText,
-      messageId: id == null ? null : '$id',
-    );
-  }
-
-  String _previewForMsgType(String type) {
-    return switch (type) {
-      'image' => 'chat_preview_photo'.tr,
-      'voice' || 'audio' => 'chat_preview_voice'.tr,
-      'product' => 'chat_preview_product'.tr,
-      'location' => 'chat_preview_location'.tr,
-      'file' => 'chat_preview_file'.tr,
-      'contact' => 'chat_preview_contact'.tr,
-      _ => '',
-    };
-  }
-
   @override
   Future<void> actionHandler(ChatState state, MyAction action) async {
     switch (action) {
@@ -375,77 +267,14 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         _handleTyping(state, a.text);
 
       case SendText _:
-        final text = state.input.value.trim();
-        if (text.isEmpty) return;
-        if (state.chatId <= 0) {
-          showAppError('chat_send_unavailable'.tr);
-          return;
-        }
-        if (state.sending.value) return;
-        state.sending.value = true;
-        final clientId = 'c${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
-        final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
-        final replyUi = _replyFor(state);
-        final optimistic = ChatMessage.text(
-          id: clientId,
-          dir: ChatDir.outgoing,
-          time: formatMessageClock(DateTime.now()),
-          createdAt: DateTime.now(),
-          text: text,
-          status: ChatStatus.sent,
-          reply: replyUi,
-        );
-        state.messages.add(optimistic);
-        state.input.value = '';
-        state.replyTo.value = null;
-        _sendTyping(state, isTyping: false);
-
-        try {
-          final result = await Get.find<ChatRepository>().sendText(
-            chatId: state.chatId,
-            text: text,
-            clientMessageId: clientId,
-            replyToId: replyToId,
-          );
-          result.when(
-            success: (data) {
-              final map = asMap(data);
-              if (map == null) {
-                showAppError('chat_send_failed'.tr);
-                return;
-              }
-              final real = _fromApi(
-                map,
-                SessionStore.userId(),
-                fallbackReply: replyUi,
-              );
-              final idx = state.messages.indexWhere(
-                (m) => m.id == clientId || m.id == real.id,
-              );
-              if (idx >= 0) {
-                state.messages[idx] = real;
-              } else {
-                state.messages.add(real);
-              }
-            },
-            failure: (err) {
-              state.messages.removeWhere(
-                (m) => m.id == clientId || m.id == optimistic.id,
-              );
-              state.input.value = text;
-              showAppError(err);
-            },
-          );
-        } finally {
-          state.sending.value = false;
-        }
+        await _sendComposer(state);
 
       case OpenAttachMenu _:
         final kind = await showAttachmentBottomSheet(context);
         if (kind != null) sendAction(PickAttachment(kind));
 
       case PickAttachment a:
-        if (state.chatId <= 0 || state.sending.value) return;
+        if (state.chatId.value <= 0 || state.sending.value) return;
         switch (a.kind) {
           case AttachKind.gallery:
             await _attachImage(ImageSource.gallery);
@@ -463,16 +292,28 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
       case LongPressMessage a:
         final msg = a.message;
+        if (state.selecting.value) {
+          sendAction(ToggleSelectMessage(msg));
+          return;
+        }
         final hasOriginal = msg.textOriginal != null &&
             msg.textOriginal!.isNotEmpty &&
             msg.textOriginal != msg.text;
         final showTranslate =
             msg.type == ChatMsgType.text && !msg.isOutgoing && hasOriginal;
+        String? reactedEmoji;
         final chosen = await showMessageActionsDialog(
           context,
           message: msg,
           anchor: a.anchor,
+          isGroup: a.isGroup,
+          showSenderName: a.showSenderName,
+          showAvatar: a.showAvatar,
           showTranslate: showTranslate,
+          canPin: !state.isGroup.value ||
+              state.myRole == 'owner' ||
+              state.myRole == 'admin',
+          onReact: (emoji) => reactedEmoji = emoji,
         );
         switch (chosen) {
           case MessageMenuAction.reply:
@@ -480,12 +321,28 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           case MessageMenuAction.copy:
             sendAction(CopyMessage(msg));
           case MessageMenuAction.delete:
-            sendAction(DeleteMessage(msg));
+            await _deleteMessageFlow(msg);
           case MessageMenuAction.translate:
             final idx = state.messages.indexWhere((m) => m.id == msg.id);
             if (idx >= 0) {
               state.messages[idx] = msg.withToggleOriginal();
             }
+          case MessageMenuAction.edit:
+            sendAction(EditMessage(msg));
+          case MessageMenuAction.forward:
+            _startForward([msg]);
+          case MessageMenuAction.pin:
+            sendAction(ToggleMessagePin(msg));
+          case MessageMenuAction.select:
+            sendAction(EnterSelectMode(msg));
+          case MessageMenuAction.profile:
+            final sid = msg.senderId;
+            if (sid != null && sid > 0) {
+              sendAction(OpenSenderProfile(sid));
+            }
+          case MessageMenuAction.react:
+            final emoji = reactedEmoji;
+            if (emoji != null) sendAction(ReactToMessage(msg, emoji));
           case null:
             break;
         }
@@ -501,44 +358,78 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         _toast('chat_copied'.tr);
 
       case DeleteMessage a:
-        final ok = await _confirm(
-          title: 'common_delete'.tr,
-          body: 'chat_msg_delete_confirm'.tr,
-          confirmLabel: 'common_delete'.tr,
-          danger: true,
-        );
-        if (!ok) return;
-        final msg = a.message;
-        final id = int.tryParse(msg.id);
-        final idx = state.messages.indexWhere((m) => m.id == msg.id);
-        state.messages.removeWhere((m) => m.id == msg.id);
-        if (state.replyTo.value?.id == msg.id) {
-          state.replyTo.value = null;
+        await _performDelete(a.message, forEveryone: a.forEveryone);
+
+      case EditMessage a:
+        await _editMessageFlow(a.message);
+
+      case ToggleMessagePin a:
+        await _togglePin(a.message);
+
+      case ReactToMessage a:
+        await _react(a.message, a.emoji);
+
+      case EnterSelectMode a:
+        state.selecting.value = true;
+        state.selectedIds.clear();
+        if (a.seed != null) state.selectedIds.add(a.seed!.id);
+        state.selectedIds.refresh();
+
+      case ExitSelectMode _:
+        state.selecting.value = false;
+        state.selectedIds.clear();
+        state.selectedIds.refresh();
+
+      case ToggleSelectMessage a:
+        if (state.selectedIds.contains(a.message.id)) {
+          state.selectedIds.remove(a.message.id);
+        } else {
+          state.selectedIds.add(a.message.id);
         }
-        if (id != null) {
-          final result = await Get.find<ChatRepository>().deleteMessage(id);
-          result.when(
-            success: (_) {},
-            failure: (err) {
-              final insertAt = idx >= 0 ? idx.clamp(0, state.messages.length) : state.messages.length;
-              state.messages.insert(insertAt, msg);
-              showAppError(err);
-            },
-          );
+        state.selectedIds.refresh();
+        if (state.selectedIds.isEmpty) {
+          state.selecting.value = false;
         }
 
-      case OpenChatMenu _:
-        final chosen = await showChatOverflowSheet(
+      case ForwardSelectedMessages _:
+        final ids = state.selectedIds.toSet();
+        final selected =
+            state.messages.where((m) => ids.contains(m.id)).toList();
+        _startForward(selected);
+
+      case DeleteSelectedMessages _:
+        await _deleteSelectedMessages();
+
+      case CancelForwardDraft _:
+        if (Get.isRegistered<ForwardPendingStore>()) {
+          Get.find<ForwardPendingStore>().clear();
+        }
+
+      case ToggleForwardShowSender _:
+        if (Get.isRegistered<ForwardPendingStore>()) {
+          Get.find<ForwardPendingStore>().toggleShowSender();
+        }
+
+
+      case OpenChatMenu a:
+        final chosen = await showChatOverflowDialog(
           context,
+          anchor: a.anchor,
           muted: state.muted.value,
+          pinned: state.pinned.value,
+          isGroup: state.isGroup.value,
         );
         switch (chosen) {
           case ChatOverflowAction.profile:
             sendAction(OpenPeerProfile());
+          case ChatOverflowAction.groupSettings:
+            sendAction(OpenGroupSettings());
           case ChatOverflowAction.search:
-            sendAction(ToggleChatSearch());
+            break;
           case ChatOverflowAction.mute:
             sendAction(ToggleChatMute());
+          case ChatOverflowAction.pin:
+            sendAction(ToggleChatPin());
           case ChatOverflowAction.clearHistory:
             sendAction(ClearChatHistory());
           case ChatOverflowAction.deleteChat:
@@ -550,7 +441,27 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         }
 
       case OpenPeerProfile _:
+        if (state.isGroup.value) {
+          sendAction(OpenGroupSettings());
+          return;
+        }
         await _openPeerProfile();
+
+      case OpenSenderProfile a:
+        await _openUserProfile(a.userId);
+
+      case OpenGroupSettings _:
+        await navigate(
+          GroupSettingsScreen(),
+          payload: GroupSettingsPayload(
+            chatId: state.chatId.value,
+            title: state.peerName.value,
+            avatarUrl: state.peerAvatarUrl.value,
+            myRole: state.myRole,
+            isSuper: state.isSuper,
+            inviteLink: state.inviteLink,
+          ),
+        );
 
       case ToggleChatSearch _:
         final next = !state.searching.value;
@@ -563,38 +474,54 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       case ToggleChatMute _:
         final next = !state.muted.value;
         state.muted.value = next;
-        await SessionStore.setChatMuted(state.chatId, next);
-        if (state.chatId > 0) {
+        await SessionStore.setChatMuted(state.chatId.value, next);
+        if (state.chatId.value > 0) {
           final repo = Get.find<ChatRepository>();
           final result = next
-              ? await repo.muteChat(state.chatId)
-              : await repo.unmuteChat(state.chatId);
+              ? await repo.muteChat(state.chatId.value)
+              : await repo.unmuteChat(state.chatId.value);
           if (result.errorOrNull != null) {
             state.muted.value = !next;
-            await SessionStore.setChatMuted(state.chatId, !next);
+            await SessionStore.setChatMuted(state.chatId.value, !next);
             showAppError(result.errorOrNull);
             return;
           }
         }
         _toast(next ? 'chat_muted'.tr : 'chat_unmuted'.tr);
 
+      case ToggleChatPin _:
+        if (state.chatId.value <= 0) return;
+        final next = !state.pinned.value;
+        state.pinned.value = next;
+        final repo = Get.find<ChatRepository>();
+        final result = next
+            ? await repo.pinChat(state.chatId.value)
+            : await repo.unpinChat(state.chatId.value);
+        if (result.errorOrNull != null) {
+          state.pinned.value = !next;
+          showAppError(result.errorOrNull);
+          return;
+        }
+        _toast(next ? 'chat_pinned'.tr : 'chat_unpinned'.tr);
+
       case ClearChatHistory _:
-        final ok = await _confirm(
-          title: 'chat_overflow_clear'.tr,
-          body: 'chat_clear_confirm'.tr,
-          confirmLabel: 'chat_overflow_clear'.tr,
-        );
-        if (ok) await _clearHistory(showToast: true);
+        await _clearHistoryFlow();
 
       case DeleteChat _:
-        final ok = await _confirm(
-          title: 'chat_overflow_delete_chat'.tr,
+        final choice = await showTelegramActionSheet(
+          context,
+          title: 'chat_delete_chat_title'.tr,
           body: 'chat_delete_confirm'.tr,
-          confirmLabel: 'chat_overflow_delete_chat'.tr,
-          danger: true,
+          actions: [
+            TelegramSheetAction(
+              id: 'delete',
+              label: 'chat_overflow_delete_chat'.tr,
+              danger: true,
+            ),
+          ],
         );
-        if (!ok) return;
-        final chatId = state.chatId;
+        if (choice != 'delete') return;
+        final chatId = state.chatId.value;
         if (chatId > 0) {
           final hide = await Get.find<ChatRepository>().hideChat(chatId);
           if (hide.errorOrNull != null) {
@@ -602,7 +529,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             return;
           }
         }
-        await _clearHistory(showToast: false);
+        await _clearHistory(showToast: false, forEveryone: false);
         if (Get.isRegistered<MessagesState>()) {
           Get.find<MessagesState>().conversations.removeWhere((c) => c.id == chatId);
         }
@@ -616,27 +543,34 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         _toast('chat_deleted'.tr);
 
       case BlockPeer _:
-        final ok = await _confirm(
-          title: 'chat_overflow_block'.tr,
+        if (state.isGroup.value) return;
+        final blockChoice = await showTelegramActionSheet(
+          context,
+          title: 'chat_block_title'.tr,
           body: 'chat_block_confirm'.tr,
-          confirmLabel: 'chat_overflow_block'.tr,
-          danger: true,
+          actions: [
+            TelegramSheetAction(
+              id: 'block',
+              label: 'chat_overflow_block'.tr,
+              danger: true,
+            ),
+          ],
         );
-        if (!ok) return;
-        if (state.peerId > 0) {
-          await SessionStore.setUserBlocked(state.peerId, true);
-          await Get.find<ProfileRepository>().blockUser(state.peerId);
-          await Get.find<FriendsRepository>().removeFriend(state.peerId);
+        if (blockChoice != 'block') return;
+        if (state.peerId.value > 0) {
+          await SessionStore.setUserBlocked(state.peerId.value, true);
+          await Get.find<ProfileRepository>().blockUser(state.peerId.value);
+          await Get.find<FriendsRepository>().removeFriend(state.peerId.value);
         }
-        if (state.chatId > 0) {
-          await Get.find<ChatRepository>().hideChat(state.chatId);
+        if (state.chatId.value > 0) {
+          await Get.find<ChatRepository>().hideChat(state.chatId.value);
           if (Get.isRegistered<MessagesState>()) {
             Get.find<MessagesState>()
                 .conversations
-                .removeWhere((c) => c.id == state.chatId);
+                .removeWhere((c) => c.id == state.chatId.value);
           }
         }
-        await _clearHistory(showToast: false);
+        await _clearHistory(showToast: false, forEveryone: false);
         await Get.find<VoiceRecorderService>().cancel();
         await Get.find<VoicePlayerService>().stop(save: true);
         popBackNavigate();
@@ -665,7 +599,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         if (state.sending.value) return;
         final recorded = await Get.find<VoiceRecorderService>().stop();
         state.recording.value = false;
-        if (recorded == null || state.chatId <= 0) {
+        if (recorded == null || state.chatId.value <= 0) {
           _sendTyping(state, isTyping: false);
           return;
         }
@@ -711,7 +645,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
         final downsampled = WaveformUtils.resampleBars(recorded.samples, 40);
         final send = await Get.find<ChatRepository>().sendVoice(
-          chatId: state.chatId,
+          chatId: state.chatId.value,
           clientMessageId: clientId,
           mediaId: mediaId,
           meta: {
@@ -742,6 +676,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
                   : real.voiceSamples,
               status: real.status,
               reply: real.reply ?? replyUi,
+              senderId: real.senderId,
+              senderName: real.senderName,
+              senderAvatarUrl: real.senderAvatarUrl,
             );
             final idx = state.messages.indexWhere((m) => m.id == clientId || m.id == real.id);
             if (idx >= 0) state.messages[idx] = merged;
@@ -757,6 +694,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       case Back _:
         _typingDebounce?.cancel();
         _sendTyping(state, isTyping: false);
+        if (state.selecting.value) {
+          sendAction(ExitSelectMode());
+          return;
+        }
         if (state.searching.value) {
           state.searching.value = false;
           state.searchQuery.value = '';
@@ -766,10 +707,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           Get.find<RealtimeSyncService>().setActiveChat(null);
         }
         // Open chat'dan chiqganda unread tozalangan ko‘rinsin.
-        if (Get.isRegistered<MessagesState>() && state.chatId > 0) {
+        if (Get.isRegistered<MessagesState>() && state.chatId.value > 0) {
           final ms = Get.find<MessagesState>();
           final list = ms.conversations.toList();
-          final i = list.indexWhere((c) => c.id == state.chatId);
+          final i = list.indexWhere((c) => c.id == state.chatId.value);
           if (i >= 0 && list[i].unread > 0) {
             list[i] = list[i].copyWith(unread: 0, highlighted: false);
             ms.conversations.assignAll(list);
@@ -782,12 +723,15 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _openPeerProfile() async {
-    if (state.peerId <= 0) {
+    await _openUserProfile(state.peerId.value);
+  }
+
+  Future<void> _openUserProfile(int userId) async {
+    if (userId <= 0) {
       showAppWarning('chat_profile_unavailable'.tr);
       return;
     }
-    final result =
-        await Get.find<ProfileRepository>().getPublicUser(state.peerId);
+    final result = await Get.find<ProfileRepository>().getPublicUser(userId);
     result.when(
       success: (data) {
         final map = asMap(data);
@@ -801,53 +745,430 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     );
   }
 
-  Future<bool> _confirm({
-    required String title,
-    required String body,
-    required String confirmLabel,
-    bool danger = false,
+  bool _isGroupAdmin() =>
+      state.myRole == 'owner' || state.myRole == 'admin';
+
+  /// Telegram: DM da hammaga; guruhda o'z xabari yoki admin.
+  bool _canDeleteMessageForEveryone(ChatMessage msg) {
+    if (!state.isGroup.value) return true;
+    if (msg.isOutgoing) return true;
+    return _isGroupAdmin();
+  }
+
+  Future<void> _clearHistoryFlow() async {
+    final isGroup = state.isGroup.value;
+    final canEveryone = !isGroup || _isGroupAdmin();
+    final body = !isGroup
+        ? 'chat_clear_body_dm'.tr
+        : (canEveryone
+            ? 'chat_clear_body_group_admin'.tr
+            : 'chat_clear_body_group'.tr);
+    final actions = <TelegramSheetAction>[
+      if (canEveryone)
+        TelegramSheetAction(
+          id: 'everyone',
+          label: 'chat_clear_for_everyone'.tr,
+          danger: true,
+        ),
+      TelegramSheetAction(
+        id: 'me',
+        label: 'chat_clear_for_me'.tr,
+        danger: true,
+      ),
+    ];
+    final choice = await showTelegramActionSheet(
+      context,
+      title: 'chat_clear_title'.tr,
+      body: body,
+      actions: actions,
+    );
+    if (choice == null) return;
+    await _clearHistory(
+      showToast: true,
+      forEveryone: choice == 'everyone',
+    );
+  }
+
+  Future<void> _clearHistory({
+    required bool showToast,
+    bool forEveryone = false,
   }) async {
-    final result = await showDialog<bool>(
+    state.messages.clear();
+    state.replyTo.value = null;
+    state.pinnedBanner.value = null;
+    if (state.chatId.value > 0) {
+      final result = await Get.find<ChatRepository>().clearHistory(
+        state.chatId.value,
+        forEveryone: forEveryone,
+      );
+      result.when(
+        success: (_) {},
+        failure: showAppError,
+      );
+    }
+    if (showToast) _toast('chat_history_cleared'.tr);
+  }
+
+  void _startForward(List<ChatMessage> messages) {
+    if (messages.isEmpty) return;
+    if (!Get.isRegistered<ForwardPendingStore>()) return;
+    Get.find<ForwardPendingStore>().beginFromMessages(
+      sourceChatId: state.chatId.value,
+      messages: messages,
+      peerName: state.peerName.value,
+      youLabel: 'chat_you'.tr,
+    );
+    state.selecting.value = false;
+    state.selectedIds.clear();
+    state.selectedIds.refresh();
+    if (Get.isRegistered<MainState>()) {
+      Get.find<MainState>().currentTab.value = 0;
+    }
+    showAppMessage('chat_forward_pick'.tr);
+    _typingDebounce?.cancel();
+    _sendTyping(state, isTyping: false);
+    if (Get.isRegistered<RealtimeSyncService>()) {
+      final sync = Get.find<RealtimeSyncService>();
+      final bound = _boundChatId;
+      if (bound != null && sync.activeChatId == bound) {
+        sync.setActiveChat(null);
+      }
+    }
+    popBackNavigate();
+  }
+
+  Future<void> _sendComposer(ChatState state) async {
+    final fwd = Get.isRegistered<ForwardPendingStore>()
+        ? Get.find<ForwardPendingStore>()
+        : null;
+    final hasFwd = fwd?.hasPending == true;
+    final text = state.input.value.trim();
+    if (text.isEmpty && !hasFwd) return;
+    if (state.chatId.value <= 0) {
+      showAppError('chat_send_unavailable'.tr);
+      return;
+    }
+    if (state.sending.value) return;
+    state.sending.value = true;
+    try {
+      if (hasFwd) {
+        final ok = await _sendPendingForwards(state);
+        if (!ok) return;
+      }
+      if (text.isNotEmpty) {
+        await _sendPlainText(state, text);
+      }
+    } finally {
+      state.sending.value = false;
+    }
+  }
+
+  Future<bool> _sendPendingForwards(ChatState state) async {
+    final store = Get.find<ForwardPendingStore>();
+    final items = store.items.toList();
+    if (items.isEmpty) return true;
+    final hideSender = !store.showSender.value;
+    final repo = Get.find<ChatRepository>();
+    final targetChatId = state.chatId.value;
+    var failed = false;
+    for (final item in items) {
+      final result = await repo.forwardMessage(
+        item.messageId,
+        chatIds: [targetChatId],
+        hideSender: hideSender,
+      );
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final list = (map?['items'] as List?) ?? const [];
+          for (final raw in list) {
+            if (raw is! Map) continue;
+            final real = _fromApi(
+              Map<String, dynamic>.from(raw),
+              SessionStore.userId(),
+            );
+            final idx = state.messages.indexWhere((m) => m.id == real.id);
+            if (idx >= 0) {
+              state.messages[idx] = real;
+            } else {
+              state.messages.add(real);
+            }
+          }
+        },
+        failure: (err) {
+          failed = true;
+          showAppError(err);
+        },
+      );
+      if (failed) break;
+    }
+    if (!failed) {
+      store.clear();
+      _toast('chat_forward_sent'.tr);
+    }
+    return !failed;
+  }
+
+  Future<void> _sendPlainText(ChatState state, String text) async {
+    final clientId = 'c${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
+    final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
+    final replyUi = _replyFor(state);
+    final optimistic = ChatMessage.text(
+      id: clientId,
+      dir: ChatDir.outgoing,
+      time: formatMessageClock(DateTime.now()),
+      createdAt: DateTime.now(),
+      text: text,
+      status: ChatStatus.sent,
+      reply: replyUi,
+    );
+    state.messages.add(optimistic);
+    state.input.value = '';
+    state.replyTo.value = null;
+    _sendTyping(state, isTyping: false);
+
+    final result = await Get.find<ChatRepository>().sendText(
+      chatId: state.chatId.value,
+      text: text,
+      clientMessageId: clientId,
+      replyToId: replyToId,
+    );
+    result.when(
+      success: (data) {
+        final map = asMap(data);
+        if (map == null) {
+          showAppError('chat_send_failed'.tr);
+          return;
+        }
+        final real = _fromApi(
+          map,
+          SessionStore.userId(),
+          fallbackReply: replyUi,
+        );
+        final idx = state.messages.indexWhere(
+          (m) => m.id == clientId || m.id == real.id,
+        );
+        if (idx >= 0) {
+          state.messages[idx] = real;
+        } else {
+          state.messages.add(real);
+        }
+      },
+      failure: (err) {
+        state.messages.removeWhere(
+          (m) => m.id == clientId || m.id == optimistic.id,
+        );
+        state.input.value = text;
+        showAppError(err);
+      },
+    );
+  }
+
+  Future<void> _deleteMessageFlow(ChatMessage msg) async {
+    final canEveryone = _canDeleteMessageForEveryone(msg);
+    final actions = <TelegramSheetAction>[
+      if (canEveryone)
+        TelegramSheetAction(
+          id: 'everyone',
+          label: 'chat_msg_delete_everyone'.tr,
+          danger: true,
+        ),
+      TelegramSheetAction(
+        id: 'me',
+        label: 'chat_msg_delete_me'.tr,
+        danger: true,
+      ),
+    ];
+    final choice = await showTelegramActionSheet(
+      context,
+      title: 'chat_msg_delete_title'.tr,
+      body: 'chat_msg_delete_choose'.tr,
+      actions: actions,
+    );
+    if (choice == null) return;
+    await _performDelete(msg, forEveryone: choice == 'everyone');
+  }
+
+  Future<void> _deleteSelectedMessages() async {
+    final ids = state.selectedIds.toSet();
+    if (ids.isEmpty) return;
+    final selected = state.messages.where((m) => ids.contains(m.id)).toList();
+    if (selected.isEmpty) return;
+
+    final canEveryone = !state.isGroup.value ||
+        _isGroupAdmin() ||
+        selected.every((m) => m.isOutgoing);
+
+    final actions = <TelegramSheetAction>[
+      if (canEveryone)
+        TelegramSheetAction(
+          id: 'everyone',
+          label: 'chat_msg_delete_everyone'.tr,
+          danger: true,
+        ),
+      TelegramSheetAction(
+        id: 'me',
+        label: 'chat_msg_delete_me'.tr,
+        danger: true,
+      ),
+    ];
+    final choice = await showTelegramActionSheet(
+      context,
+      title: selected.length == 1
+          ? 'chat_msg_delete_title'.tr
+          : 'chat_msg_delete_title_n'.trParams({'n': '${selected.length}'}),
+      body: 'chat_msg_delete_choose'.tr,
+      actions: actions,
+    );
+    if (choice == null) return;
+
+    final forEveryone = choice == 'everyone';
+    final snapshot = List<ChatMessage>.from(selected);
+    final toDelete = forEveryone && state.isGroup.value && !_isGroupAdmin()
+        ? snapshot.where((m) => m.isOutgoing).toList()
+        : snapshot;
+    if (toDelete.isEmpty) return;
+    final deleteIds = toDelete.map((m) => m.id).toSet();
+    state.messages.removeWhere((m) => deleteIds.contains(m.id));
+    if (state.replyTo.value != null &&
+        deleteIds.contains(state.replyTo.value!.id)) {
+      state.replyTo.value = null;
+    }
+    state.selecting.value = false;
+    state.selectedIds.clear();
+    state.selectedIds.refresh();
+
+    final repo = Get.find<ChatRepository>();
+    for (final msg in toDelete) {
+      final id = int.tryParse(msg.id);
+      if (id == null) continue;
+      final result = await repo.deleteMessage(id, forEveryone: forEveryone);
+      result.when(
+        success: (_) {},
+        failure: (err) {
+          state.messages.add(msg);
+          state.messages.sort((a, b) {
+            final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return at.compareTo(bt);
+          });
+          showAppError(err);
+        },
+      );
+    }
+  }
+
+  Future<void> _performDelete(
+    ChatMessage msg, {
+    required bool forEveryone,
+  }) async {
+    final id = int.tryParse(msg.id);
+    final idx = state.messages.indexWhere((m) => m.id == msg.id);
+    state.messages.removeWhere((m) => m.id == msg.id);
+    if (state.replyTo.value?.id == msg.id) {
+      state.replyTo.value = null;
+    }
+    if (id != null) {
+      final result = await Get.find<ChatRepository>().deleteMessage(
+        id,
+        forEveryone: forEveryone,
+      );
+      result.when(
+        success: (_) {},
+        failure: (err) {
+          final insertAt =
+              idx >= 0 ? idx.clamp(0, state.messages.length) : state.messages.length;
+          state.messages.insert(insertAt, msg);
+          showAppError(err);
+        },
+      );
+    }
+  }
+
+  Future<void> _editMessageFlow(ChatMessage msg) async {
+    final ctrl = TextEditingController(text: msg.displayText);
+    final next = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
+        title: Text('chat_menu_edit'.tr),
+        content: TextField(controller: ctrl, maxLines: 4, autofocus: true),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('settings_cancel'.tr),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('common_cancel'.tr),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              confirmLabel,
-              style: TextStyle(
-                color: danger ? const Color(0xFFB42318) : null,
-              ),
-            ),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: Text('common_save'.tr),
           ),
         ],
       ),
     );
-    return result == true;
+    if (next == null || next.isEmpty) return;
+    final id = int.tryParse(msg.id);
+    if (id == null) return;
+    final result =
+        await Get.find<ChatRepository>().editMessage(id, text: next);
+    result.when(
+      success: (_) {
+        final idx = state.messages.indexWhere((m) => m.id == msg.id);
+        if (idx >= 0) {
+          state.messages[idx] = msg.withEditedText(next);
+        }
+      },
+      failure: showAppError,
+    );
   }
 
-  Future<void> _clearHistory({required bool showToast}) async {
-    final ids = state.messages
-        .map((m) => int.tryParse(m.id))
-        .whereType<int>()
-        .toList();
-    state.messages.clear();
-    state.replyTo.value = null;
+  Future<void> _togglePin(ChatMessage msg) async {
+    final id = int.tryParse(msg.id);
+    if (id == null || state.chatId.value <= 0) return;
     final repo = Get.find<ChatRepository>();
-    await Future.wait(ids.map((id) => repo.deleteMessage(id)));
-    if (showToast) _toast('chat_history_cleared'.tr);
+    final result = msg.pinned
+        ? await repo.unpinMessage(state.chatId.value, id)
+        : await repo.pinMessage(state.chatId.value, id);
+    result.when(
+      success: (_) {
+        final idx = state.messages.indexWhere((m) => m.id == msg.id);
+        if (idx >= 0) {
+          state.messages[idx] = msg.withPinned(!msg.pinned);
+        }
+        if (!msg.pinned) {
+          state.pinnedBanner.value = msg.withPinned(true);
+        } else if (state.pinnedBanner.value?.id == msg.id) {
+          state.pinnedBanner.value = null;
+        }
+      },
+      failure: showAppError,
+    );
+  }
+
+  Future<void> _react(ChatMessage msg, String emoji) async {
+    final id = int.tryParse(msg.id);
+    if (id == null) return;
+    final result =
+        await Get.find<ChatRepository>().setReaction(id, emoji: emoji);
+    result.when(
+      success: (data) {
+        final map = asMap(data) ?? {};
+        final reactions = (map['reactions'] as List?)
+                ?.whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList() ??
+            const <Map<String, dynamic>>[];
+        final idx = state.messages.indexWhere((m) => m.id == msg.id);
+        if (idx >= 0) {
+          state.messages[idx] = msg.withReactions(reactions);
+        }
+      },
+      failure: showAppError,
+    );
   }
 
   String _nextId() => 'm${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
 
   void _handleTyping(ChatState state, String text) {
-    if (state.chatId <= 0 || !Get.isRegistered<SocketService>()) return;
+    if (state.chatId.value <= 0 || !Get.isRegistered<SocketService>()) return;
     if (text.isEmpty) {
       _typingDebounce?.cancel();
       _sendTyping(state, isTyping: false);
@@ -868,12 +1189,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     required bool isTyping,
     String activity = 'typing',
   }) {
-    if (state.chatId <= 0 || !Get.isRegistered<SocketService>()) return;
+    if (state.chatId.value <= 0 || !Get.isRegistered<SocketService>()) return;
     if (!isTyping && !_lastTypingSent) return;
     Get.find<SocketService>().sendRaw({
       'type': 'typing',
       'data': {
-        'chat_id': state.chatId,
+        'chat_id': state.chatId.value,
         'is_typing': isTyping,
         if (isTyping) 'activity': activity,
       },
@@ -885,7 +1206,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final r = state.replyTo.value;
     if (r == null) return null;
     return ChatReply(
-      author: r.isOutgoing ? 'chat_you'.tr : state.peerName,
+      author: r.isOutgoing ? 'chat_you'.tr : state.peerName.value,
       preview: r.previewText(),
       messageId: r.id,
     );
@@ -970,64 +1291,33 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _attachLocation() async {
-    final status = await Permission.locationWhenInUse.request();
-    if (!status.isGranted) {
-      showAppMessage('location_permission_needed'.tr);
-      return;
-    }
-    final serviceOn = await Geolocator.isLocationServiceEnabled();
-    if (!serviceOn) {
-      if (!context.mounted) return;
-      final open = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          content: Text('location_gps_off'.tr),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('common_cancel'.tr),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('open_settings'.tr),
-            ),
-          ],
-        ),
-      );
-      if (open == true) await openAppSettings();
-      return;
-    }
-    Position pos;
-    try {
-      pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-    } catch (_) {
-      showAppMessage('location_fetch_failed'.tr);
-      return;
-    }
-    final label =
-        '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+    if (!context.mounted) return;
+    final picked = await showLocationPickerBottomSheet(context);
+    if (picked == null) return;
+    final label = picked.label.trim().isNotEmpty
+        ? picked.label.trim()
+        : 'chat_my_location'.tr;
     final optimistic = ChatMessage.location(
       id: _nextId(),
       dir: ChatDir.outgoing,
       time: formatMessageClock(DateTime.now()),
       createdAt: DateTime.now(),
       label: label,
-      distance: '',
-      latitude: pos.latitude,
-      longitude: pos.longitude,
+      distance: picked.accuracyMeters != null
+          ? '~${picked.accuracyMeters!.round()} m'
+          : '',
+      latitude: picked.latitude,
+      longitude: picked.longitude,
       status: ChatStatus.sent,
     );
     await _sendMetaMessage(
       type: 'location',
       meta: {
-        'latitude': pos.latitude,
-        'longitude': pos.longitude,
+        'latitude': picked.latitude,
+        'longitude': picked.longitude,
         'label': label,
+        if (picked.accuracyMeters != null)
+          'accuracy_m': picked.accuracyMeters,
       },
       optimistic: optimistic,
     );
@@ -1065,7 +1355,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     required ChatMessage optimistic,
     Map<String, dynamic>? extraMeta,
   }) async {
-    if (state.sending.value || state.chatId <= 0) return;
+    if (state.sending.value || state.chatId.value <= 0) return;
     state.sending.value = true;
     final activity = switch (messageType) {
       'image' => 'photo',
@@ -1126,7 +1416,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     }
 
     final send = await repo.sendMessage(
-      chatId: state.chatId,
+      chatId: state.chatId.value,
       clientMessageId: clientId,
       type: messageType,
       mediaId: mediaId,
@@ -1157,6 +1447,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               gradient: avatarTealGradient,
               status: real.status,
               reply: real.reply ?? replyUi,
+              senderId: real.senderId,
+              senderName: real.senderName,
+              senderAvatarUrl: real.senderAvatarUrl,
             );
           } else {
             state.messages[idx] = real;
@@ -1177,7 +1470,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     required Map<String, dynamic> meta,
     required ChatMessage optimistic,
   }) async {
-    if (state.sending.value || state.chatId <= 0) return;
+    if (state.sending.value || state.chatId.value <= 0) return;
     state.sending.value = true;
     final clientId = 'a${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
     final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
@@ -1185,7 +1478,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     state.messages.add(optimistic);
 
     final send = await Get.find<ChatRepository>().sendMessage(
-      chatId: state.chatId,
+      chatId: state.chatId.value,
       clientMessageId: clientId,
       type: type,
       meta: meta,

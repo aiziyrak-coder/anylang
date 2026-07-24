@@ -161,28 +161,48 @@ async def _websocket_endpoint(websocket: WebSocket, token: str | None = Query(de
 
                 factory = get_session_factory()
                 async with factory() as db:
+                    from app.models.chat import ChatParticipant
+
                     result = await db.execute(select(Chat).where(Chat.id == chat_id))
                     chat = result.scalar_one_or_none()
                     if chat is None:
                         continue
-                    if user_id not in (chat.user_low_id, chat.user_high_id):
-                        continue
-                    peer_id = (
-                        chat.user_high_id
-                        if user_id == chat.user_low_id
-                        else chat.user_low_id
+                    member = await db.execute(
+                        select(ChatParticipant.user_id).where(
+                            ChatParticipant.chat_id == chat_id,
+                            ChatParticipant.user_id == user_id,
+                        )
                     )
+                    if member.scalar_one_or_none() is None:
+                        # Legacy DM pair without participant row
+                        if chat.type == "direct" and user_id in (
+                            chat.user_low_id,
+                            chat.user_high_id,
+                        ):
+                            peer_ids = [
+                                pid
+                                for pid in (chat.user_low_id, chat.user_high_id)
+                                if pid is not None and pid != user_id
+                            ]
+                        else:
+                            continue
+                    else:
+                        peers = await db.execute(
+                            select(ChatParticipant.user_id).where(
+                                ChatParticipant.chat_id == chat_id,
+                                ChatParticipant.user_id != user_id,
+                            )
+                        )
+                        peer_ids = list(peers.scalars().all())
 
-                await hub.publish(
-                    peer_id,
-                    "typing",
-                    {
-                        "chat_id": chat_id,
-                        "user_id": user_id,
-                        "is_typing": is_typing,
-                        "activity": activity if is_typing else "",
-                    },
-                )
+                payload = {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "is_typing": is_typing,
+                    "activity": activity if is_typing else "",
+                }
+                for peer_id in peer_ids:
+                    await hub.publish(peer_id, "typing", payload)
     except WebSocketDisconnect:
         pass
     finally:

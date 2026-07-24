@@ -16,6 +16,7 @@ FILES = [
     "backend/app/integrations/translation.py",
     "backend/app/services/messages.py",
     "backend/app/services/chats.py",
+    "backend/app/api/v1/chats.py",
 ]
 
 

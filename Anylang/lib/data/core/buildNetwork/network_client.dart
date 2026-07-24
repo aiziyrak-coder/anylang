@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:get/get.dart' hide Response;
 
 import '../../../presentation/utils/app_snackbar.dart';
 import 'api_service.dart';
@@ -10,13 +9,13 @@ import 'utils.dart';
 
 /// Mutatsiya so'rovlarida snackbar qanday chiqishi.
 enum SnackNotify {
-  /// Hech narsa ko'rsatilmaydi (chat xabar, read va h.k.).
+  /// Hech narsa ko'rsatilmaydi (chat xabar, read, sessiyani tiklash va h.k.).
   none,
 
   /// Faqat xato.
   errors,
 
-  /// Muvaffaqiyat + xato.
+  /// Faqat API body'da `message` bo'lsa muvaffaqiyat + xato.
   all,
 }
 
@@ -115,15 +114,21 @@ class NetworkClient {
     try {
       final response = await call();
       final result = Success(response.data);
-      _toast(result, notify: notify);
+      try {
+        _toast(result, notify: notify);
+      } catch (_) {}
       return result;
     } on DioException catch (e) {
       final result = dioToError(e);
-      _toast(result, notify: notify);
+      try {
+        _toast(result, notify: notify);
+      } catch (_) {}
       return result;
     } catch (e) {
       final result = Error("Noma'lum xatolik");
-      _toast(result, notify: notify);
+      try {
+        _toast(result, notify: notify);
+      } catch (_) {}
       return result;
     }
   }
@@ -134,7 +139,10 @@ class NetworkClient {
     result.when(
       success: (data) {
         if (notify != SnackNotify.all) return;
-        final msg = successMessageFromBody(data) ?? 'action_done'.tr;
+        // Faqat server aniq `message` qaytarsa — umumiy action_done chiqarmaymiz
+        // (sessiya tiklash / pin / create kabi javoblarda keraksiz success bo'lmasin).
+        final msg = successMessageFromBody(data);
+        if (msg == null || msg.isEmpty) return;
         showAppMessage(msg);
       },
       failure: (err) {

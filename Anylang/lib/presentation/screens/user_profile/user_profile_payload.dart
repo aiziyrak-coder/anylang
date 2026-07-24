@@ -51,9 +51,9 @@ class UserProfilePayload {
     final country = (json['country'] as String?) ?? '';
     final biz = json['business'] as Map?;
     final number = json['number']?.toString() ?? '';
-    final avatar = isBusiness
-        ? (biz?['logo_url'] as String?)
-        : (json['avatar_url'] as String?);
+    final avatar = (json['avatar_url'] as String?)?.trim().isNotEmpty == true
+        ? json['avatar_url'] as String?
+        : (biz?['logo_url'] as String?);
     final roleRaw = ((json['subtitle_role'] as String?) ??
             (biz?['business_role'] as String?) ??
             '')

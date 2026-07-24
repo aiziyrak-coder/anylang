@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'theme/colors.dart';
 import '../utils/size_controller.dart';
 
-/// Shaxsiy profil — doira. Biznes profil — yumshoq kvadrat (squircle).
+/// Shaxsiy / biznes — doira avatar (rasm yoki bosh harf).
 enum ProfileAvatarShape { circle, roundedSquare }
 
-/// Profil avatari: gradient fon + bosh harf. Ixtiyoriy onlayn nuqta
-/// (`online`) va tahrirlash tugmasi (`onEdit`) bilan.
+/// Profil avatari: gradient + harf; `imageUrl` bo‘lsa doira ichida rasm.
+/// Theme almashtirilganda rasm yo‘qolmasligi uchun loadingda initialga qaytmaydi.
 class ProfileAvatar extends StatelessWidget {
   final String initial;
   final LinearGradient gradient;
@@ -31,9 +31,8 @@ class ProfileAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.appColors;
     final s = size.dp;
-    final borderRadius = shape == ProfileAvatarShape.circle
-        ? BorderRadius.circular(s / 2)
-        : BorderRadius.circular(s * 0.25);
+    // Har doim doira — light/dark va barcha ekranlarda bir xil.
+    final borderRadius = BorderRadius.circular(s / 2);
 
     return SizedBox(
       width: s,
@@ -44,15 +43,15 @@ class ProfileAvatar extends StatelessWidget {
           _avatarBody(c, s, borderRadius),
           if (online)
             Positioned(
-              right: 0,
-              bottom: 0,
+              right: -1.dp,
+              bottom: -1.dp,
               child: Container(
-                width: s * 0.17,
-                height: s * 0.17,
+                width: (s * 0.28).clamp(12.dp, 18.dp),
+                height: (s * 0.28).clamp(12.dp, 18.dp),
                 decoration: BoxDecoration(
                   color: kOnline,
                   shape: BoxShape.circle,
-                  border: Border.all(color: c.background, width: 2.5.dp),
+                  border: Border.all(color: c.background, width: 2.dp),
                 ),
               ),
             ),
@@ -84,21 +83,31 @@ class ProfileAvatar extends StatelessWidget {
 
   Widget _avatarBody(AppColors c, double s, BorderRadius borderRadius) {
     final url = imageUrl?.trim();
-    if (url != null && url.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: borderRadius,
-        child: Image.network(
-          url,
-          key: ValueKey(url),
-          width: s,
-          height: s,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) => _initialBody(c, s, borderRadius),
+    final fallback = _initialBody(c, s, borderRadius);
+    if (url == null || url.isEmpty) return fallback;
+
+    return ClipOval(
+      child: SizedBox(
+        width: s,
+        height: s,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            fallback,
+            Image.network(
+              url,
+              key: ValueKey(url),
+              width: s,
+              height: s,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          ],
         ),
-      );
-    }
-    return _initialBody(c, s, borderRadius);
+      ),
+    );
   }
 
   Widget _initialBody(AppColors c, double s, BorderRadius borderRadius) {

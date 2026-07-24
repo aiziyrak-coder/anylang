@@ -8,9 +8,11 @@ import '../../../data/audio/voice_player_service.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../screens/chat/chat_message.dart';
 import '../../utils/size_controller.dart';
+import '../profile_avatar.dart';
 import '../theme/colors.dart';
 import '../theme/gradients.dart';
 import '../waveform_bars.dart';
+import '../../../data/core/mappers.dart';
 
 /// Chat ichidagi rasm bubble kengligi (balandlik aspect ratio bo'yicha).
 const double _kChatImageWidth = 220;
@@ -22,15 +24,34 @@ const double _kChatImageWidth = 220;
 class ChatMessageItem extends StatelessWidget {
   final ChatMessage message;
   final VoidCallback onLongPress;
+  final VoidCallback? onTap;
   final ValueChanged<String>? onReplyTap;
   final VoidCallback? onProductTap;
+  /// Guruh — yuboruvchi avatar/ismiga bosilganda.
+  final VoidCallback? onSenderTap;
+  /// Guruh chat — Telegram uslubi (avatar + ism).
+  final bool isGroup;
+  /// Bir xil jo'natuvchi ketma-ketligida faqat birinchida ism.
+  final bool showSenderName;
+  /// Ketma-ketlikning oxirgi xabarida avatar (past chap).
+  final bool showAvatar;
+  /// Multi-select rejimi.
+  final bool selecting;
+  final bool selected;
 
   const ChatMessageItem({
     super.key,
     required this.message,
     required this.onLongPress,
+    this.onTap,
     this.onReplyTap,
     this.onProductTap,
+    this.onSenderTap,
+    this.isGroup = false,
+    this.showSenderName = false,
+    this.showAvatar = false,
+    this.selecting = false,
+    this.selected = false,
   });
 
   bool get _out => message.isOutgoing;
@@ -38,25 +59,139 @@ class ChatMessageItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final maxW = SizeController.screenWidth * 0.76;
+    final maxW = SizeController.screenWidth * (isGroup && !_out ? 0.72 : 0.76);
 
-    return Align(
-      alignment: _out ? Alignment.centerRight : Alignment.centerLeft,
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 4.dp),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxW),
-          // Material ota sifatida — ichkaridagi reply-sitata tap'i ishlayveradi.
-          // Pufakcha foni `Ink` — ripple ustida ko'rinadi.
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: _bubbleRadius,
-              onLongPress: onLongPress,
-              child: _body(context, c),
+    Widget bubble = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxW),
+      child: Column(
+        crossAxisAlignment:
+            _out ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          _body(context, c),
+          if (message.reactions.isNotEmpty) ...[
+            SizedBox(height: 4.dp),
+            Wrap(
+              spacing: 4.dp,
+              runSpacing: 4.dp,
+              children: [
+                for (final r in message.reactions)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6.dp, vertical: 2.dp),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(12.dp),
+                      border: Border.all(
+                        color: (r['me'] == true)
+                            ? c.accent
+                            : c.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Text(
+                      '${r['emoji'] ?? ''} ${r['count'] ?? ''}'.trim(),
+                      style: TextStyle(fontSize: 12.sp),
+                    ),
+                  ),
+              ],
             ),
+          ],
+          if (message.editedAt != null)
+            Padding(
+              padding: EdgeInsets.only(top: 2.dp),
+              child: Text(
+                'edited',
+                style: TextStyle(fontSize: 10.sp, color: c.textFaint),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (isGroup && !_out) {
+      const avatarSize = 32.0;
+      bubble = Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: avatarSize.dp,
+            height: avatarSize.dp,
+            child: showAvatar
+                ? GestureDetector(
+                    onTap: onSenderTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: ProfileAvatar(
+                      initial: initialsOf(message.senderName ?? '?'),
+                      gradient: avatarGradientFor(message.senderId ?? 0),
+                      imageUrl: message.senderAvatarUrl,
+                      size: avatarSize,
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
+          SizedBox(width: 6.dp),
+          Flexible(child: bubble),
+        ],
+      );
+    }
+
+    final mark = selecting ? _selectMark(c) : null;
+    final aligned = selecting
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: _out
+                ? [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: bubble,
+                      ),
+                    ),
+                    mark!,
+                  ]
+                : [
+                    mark!,
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: bubble,
+                      ),
+                    ),
+                  ],
+          )
+        : Align(
+            alignment: _out ? Alignment.centerRight : Alignment.centerLeft,
+            child: bubble,
+          );
+
+    return Material(
+      color: selected
+          ? c.accent.withValues(alpha: 0.14)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: selecting ? onTap : null,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: selecting ? 10.dp : 0,
+            vertical: 4.dp,
+          ),
+          child: aligned,
         ),
+      ),
+    );
+  }
+
+  Widget _selectMark(AppColors c) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: _out ? 8.dp : 4.dp,
+        right: _out ? 4.dp : 8.dp,
+        bottom: 6.dp,
+      ),
+      child: Icon(
+        selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+        size: 22.dp,
+        color: selected ? c.accent : c.textFaint.withValues(alpha: 0.9),
       ),
     );
   }
@@ -93,6 +228,10 @@ class ChatMessageItem extends StatelessWidget {
 
   Widget _bubble(AppColors c, Widget child) {
     final radius = _bubbleRadius;
+    final name = message.senderName?.trim();
+    final showName = showSenderName && !_out && name != null && name.isNotEmpty;
+    final nameColor = avatarGradientFor(message.senderId ?? 0).colors.first;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
@@ -129,7 +268,31 @@ class ChatMessageItem extends StatelessWidget {
                     width: 0.7,
                   ),
           ),
-          child: child,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showName) ...[
+                GestureDetector(
+                  onTap: onSenderTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: nameColor,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      height: 1.15,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 4.dp),
+              ],
+              child,
+            ],
+          ),
         ),
       ),
     );
@@ -328,7 +491,11 @@ class ChatMessageItem extends StatelessWidget {
     }
 
     final openable = isNet || isFile;
-    return ClipRRect(
+    final name = message.senderName?.trim();
+    final showName = showSenderName && !_out && name != null && name.isNotEmpty;
+    final nameColor = avatarGradientFor(message.senderId ?? 0).colors.first;
+
+    Widget imageBubble = ClipRRect(
       borderRadius: _bubbleRadius,
       child: Stack(
         children: [
@@ -362,6 +529,28 @@ class ChatMessageItem extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (!showName) return imageBubble;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: 4.dp, bottom: 4.dp),
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: nameColor,
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        imageBubble,
+      ],
     );
   }
 
@@ -565,56 +754,167 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Widget _location(AppColors c) {
-    return GestureDetector(
-      onTap: () async {
-        HapticFeedback.selectionClick();
-        final lat = message.latitude;
-        final lng = message.longitude;
-        final uri = (lat != null && lng != null)
-            ? Uri.parse(
-                'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
-              )
-            : Uri.parse(
-                'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(message.locationLabel ?? '')}',
-              );
-        if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-          Get.snackbar('error'.tr, 'maps_open_failed'.tr);
-        }
-      },
-      child: _bubble(
-        c,
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10.dp),
-              child: Container(
-                width: 200.dp,
-                height: 110.dp,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(gradient: prodTealGradient),
-                child: Icon(Icons.location_on, size: 30.dp, color: c.accent),
-              ),
-            ),
-            SizedBox(height: 8.dp),
-            Row(
+    final lat = message.latitude;
+    final lng = message.longitude;
+    final hasCoords = lat != null && lng != null;
+    // Telegram uslubi: katta xarita preview + markazda pin + past o'ngda vaqt.
+    final mapUrl = hasCoords
+        ? 'https://staticmap.openstreetmap.de/staticmap.php'
+            '?center=$lat,$lng&zoom=16&size=640x360&maptype=mapnik'
+            '&markers=$lat,$lng,lightblue1'
+        : null;
+    final title = (message.locationLabel?.trim().isNotEmpty == true)
+        ? message.locationLabel!.trim()
+        : 'chat_my_location'.tr;
+    final showTitle = title != 'chat_my_location'.tr;
+
+    final mapW = 220.dp;
+    final mapH = 140.dp;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: _bubbleRadius,
+        onTap: () async {
+          HapticFeedback.selectionClick();
+          final uri = hasCoords
+              ? Uri.parse(
+                  'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+                )
+              : Uri.parse(
+                  'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(title)}',
+                );
+          if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+            Get.snackbar('error'.tr, 'maps_open_failed'.tr);
+          }
+        },
+        onLongPress: onLongPress,
+        child: ClipRRect(
+          borderRadius: _bubbleRadius,
+          child: SizedBox(
+            width: mapW,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.place_outlined, size: 14.dp, color: c.accent),
-                SizedBox(width: 4.dp),
-                Flexible(
-                  child: Text(
-                    message.locationLabel ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                SizedBox(
+                  width: mapW,
+                  height: mapH,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ColoredBox(
+                        color: c.isDark
+                            ? const Color(0xFF1A3148)
+                            : const Color(0xFFE8EEF4),
+                      ),
+                      if (mapUrl != null)
+                        Image.network(
+                          mapUrl,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          errorBuilder: (_, _, _) => Center(
+                            child: Icon(
+                              Icons.map_rounded,
+                              size: 36.dp,
+                              color: c.textFaint,
+                            ),
+                          ),
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return Center(
+                              child: SizedBox(
+                                width: 20.dp,
+                                height: 20.dp,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: c.accent,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      // Telegram uslubidagi markaziy pin
+                      Align(
+                        alignment: const Alignment(0, -0.05),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 28.dp,
+                              height: 28.dp,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.25),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.circle,
+                                size: 12.dp,
+                                color: const Color(0xFF3390EC),
+                              ),
+                            ),
+                            CustomPaint(
+                              size: Size(3.dp, 14.dp),
+                              painter: _PinStemPainter(
+                                color: const Color(0xFF3390EC),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        right: 8.dp,
+                        bottom: 6.dp,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 7.dp,
+                            vertical: 3.dp,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(10.dp),
+                          ),
+                          child: _meta(
+                            c.copyWith(
+                              onAccent: Colors.white,
+                              textSecondary: Colors.white70,
+                              textFaint: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (showTitle)
+                  Container(
+                    color: _out
+                        ? c.accent
+                        : (c.isDark
+                            ? const Color(0xF21A3148)
+                            : const Color(0xFFFFFFFF)),
+                    padding: EdgeInsets.fromLTRB(12.dp, 8.dp, 12.dp, 10.dp),
+                    child: Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _primaryText(c),
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
-            SizedBox(height: 6.dp),
-            Align(alignment: Alignment.centerRight, child: _meta(c)),
-          ],
+          ),
         ),
       ),
     );
@@ -912,5 +1212,29 @@ class _ChatAdaptiveImageState extends State<_ChatAdaptiveImage> {
       ),
     );
   }
+}
+
+/// Joylashuv pinining pastki uchi (Telegram uslubi).
+class _PinStemPainter extends CustomPainter {
+  final Color color;
+
+  _PinStemPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = size.width
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(size.width / 2, 0),
+      Offset(size.width / 2, size.height),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PinStemPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 

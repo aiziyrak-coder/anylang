@@ -44,6 +44,34 @@ async def _ensure_business_profile(db: AsyncSession, user: User) -> BusinessProf
     return profile
 
 
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+def _sniff_image_content_type(data: bytes, declared: str | None) -> str:
+    """Dio/Flutter ko'pincha application/octet-stream yuboradi — baytlardan aniqlaymiz."""
+    raw = (declared or "").split(";")[0].strip().lower()
+    if raw in ALLOWED_CONTENT_TYPES:
+        return raw
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if len(data) >= 12 and data[0:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            fmt = (img.format or "").upper()
+            if fmt in {"JPEG", "JPG"}:
+                return "image/jpeg"
+            if fmt == "PNG":
+                return "image/png"
+            if fmt == "WEBP":
+                return "image/webp"
+    except Exception:
+        pass
+    return raw or "application/octet-stream"
+
+
 async def _process_image(data: bytes, content_type: str) -> tuple[bytes, str]:
     if len(data) > MAX_IMAGE_BYTES:
         raise AppError(
@@ -51,6 +79,7 @@ async def _process_image(data: bytes, content_type: str) -> tuple[bytes, str]:
             error_code="FILE_TOO_LARGE",
             status_code=400,
         )
+    content_type = _sniff_image_content_type(data, content_type)
     if content_type not in ALLOWED_CONTENT_TYPES:
         raise AppError(
             message="Faqat JPEG, PNG yoki WebP qabul qilinadi",
@@ -115,13 +144,34 @@ async def update_user_profile(
     native_language: str | None = None,
 ) -> dict:
     if full_name is not None:
-        user.full_name = full_name.strip()
+        cleaned = full_name.strip()
+        if len(cleaned) < 2:
+            raise AppError(
+                message="Ism juda qisqa",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        user.full_name = cleaned
     if birth_date is not None:
         user.birth_date = birth_date
     if gender is not None:
-        user.gender = gender
+        g = gender.strip().lower()
+        if g not in {"male", "female"}:
+            raise AppError(
+                message="Jins noto'g'ri",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        user.gender = g
     if country is not None:
-        user.country = country.upper()
+        code = country.strip().upper()
+        if len(code) != 2:
+            raise AppError(
+                message="Davlat kodi noto'g'ri",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        user.country = code
     if app_language is not None:
         user.app_language = app_language
     if native_language is not None:
@@ -134,11 +184,12 @@ async def update_user_profile(
 
 
 async def upload_avatar(db: AsyncSession, user: User, file: UploadFile) -> dict:
-    key = f"avatars/{user.id}.webp"
+    # Unique key — URL o'zgaradi, telefon cache eski rasmni ko'rsatmaydi.
+    key = f"avatars/{user.id}/{uuid.uuid4().hex}.webp"
     url = await _upload_image(file, key)
     if user.avatar_url:
         old_key = _key_from_url(user.avatar_url)
-        if old_key:
+        if old_key and old_key != key:
             try:
                 await get_storage().delete_object(old_key)
             except Exception:
@@ -216,11 +267,11 @@ async def update_business(
 
 async def upload_business_logo(db: AsyncSession, user: User, file: UploadFile) -> dict:
     business = await _ensure_business_profile(db, user)
-    key = f"logos/{user.id}.webp"
+    key = f"logos/{user.id}/{uuid.uuid4().hex}.webp"
     url = await _upload_image(file, key)
     if business.logo_url:
         old_key = _key_from_url(business.logo_url)
-        if old_key:
+        if old_key and old_key != key:
             try:
                 await get_storage().delete_object(old_key)
             except Exception:

@@ -55,3 +55,12 @@ class ReserveOut(BaseModel):
 
 class PurchaseIn(BaseModel):
     number: str = Field(min_length=7, max_length=7)
+
+
+class MyNumberOut(BaseModel):
+    number: str
+    group: NumberGroupBriefOut | None = None
+    last_number_change_at: datetime | None = None
+    can_change_free: bool = True
+    cooldown_seconds: int = 0
+    cooldown_days: int = 90

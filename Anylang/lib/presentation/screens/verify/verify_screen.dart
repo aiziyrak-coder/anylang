@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/network/auth_repository.dart';
 import '../../../data/network/session_bootstrap.dart';
+import '../../ui/my_snackbar.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -72,6 +73,7 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
           );
           result.when(
             success: (_) async {
+              MySnackBar.dismiss();
               await connectRealtimeIfNeeded();
               navigateAndRemoveUntil(MainScreen());
             },

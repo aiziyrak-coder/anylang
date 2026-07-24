@@ -30,6 +30,7 @@ async def create_checkout(
         plan=body.plan,
         billing_cycle=body.billing_cycle,
         number=body.number,
+        chat_id=body.chat_id,
     )
     await db.commit()
     return CheckoutOut.model_validate(data)

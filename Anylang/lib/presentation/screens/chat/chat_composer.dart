@@ -8,7 +8,7 @@ import '../../ui/waveform_bars.dart';
 import '../../utils/size_controller.dart';
 import 'chat_message.dart';
 
-/// Suhbat pastki paneli: reply ko'rinishi + input/record almashinuvi.
+/// Suhbat pastki paneli: reply / forward ko'rinishi + input/record.
 class ChatComposer extends StatelessWidget {
   final TextEditingController controller;
   final bool recording;
@@ -17,6 +17,14 @@ class ChatComposer extends StatelessWidget {
   final String peerName;
   final String recordElapsed;
   final List<double> recordSamples;
+
+  /// Uzatish drafti (Telegram uslubi).
+  final int forwardCount;
+  final String? forwardPreview;
+  final String? forwardSenderLabel;
+  final bool forwardShowSender;
+  final VoidCallback? onToggleForwardSender;
+  final VoidCallback? onCancelForward;
 
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
@@ -44,7 +52,15 @@ class ChatComposer extends StatelessWidget {
     this.recordElapsed = '0:00',
     this.recordSamples = const [],
     this.onMicTapHint,
+    this.forwardCount = 0,
+    this.forwardPreview,
+    this.forwardSenderLabel,
+    this.forwardShowSender = true,
+    this.onToggleForwardSender,
+    this.onCancelForward,
   });
+
+  bool get _hasForward => forwardCount > 0;
 
   @override
   Widget build(BuildContext context) {
@@ -59,8 +75,93 @@ class ChatComposer extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (reply != null && !recording) _replyPreview(c),
+              if (_hasForward && !recording) _forwardPreview(c),
+              if (!_hasForward && reply != null && !recording) _replyPreview(c),
               recording ? _recordRow(c) : _inputRow(c),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _forwardPreview(AppColors c) {
+    final title = forwardShowSender
+        ? (forwardCount > 1
+            ? 'chat_forward_n'.trParams({'n': '$forwardCount'})
+            : 'chat_forward_from'.trParams({
+                'name': forwardSenderLabel ?? '',
+              }))
+        : (forwardCount > 1
+            ? 'chat_forward_n_hidden'.trParams({'n': '$forwardCount'})
+            : 'chat_forward_hidden'.tr);
+    final subtitle = forwardShowSender
+        ? (forwardPreview ?? '')
+        : 'chat_forward_hide_hint'.tr;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onToggleForwardSender,
+        borderRadius: BorderRadius.circular(12.dp),
+        child: Container(
+          margin: EdgeInsets.only(bottom: 8.dp),
+          padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 8.dp),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(12.dp),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 3.dp,
+                height: 40.dp,
+                decoration: BoxDecoration(
+                  color: c.accentText,
+                  borderRadius: BorderRadius.circular(2.dp),
+                ),
+              ),
+              SizedBox(width: 10.dp),
+              Icon(
+                Icons.shortcut_rounded,
+                size: 18.dp,
+                color: c.accentText,
+              ),
+              SizedBox(width: 8.dp),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: c.accentText,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 2.dp),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: c.textFaint, fontSize: 13.sp),
+                    ),
+                  ],
+                ),
+              ),
+              MyIconButton(
+                onClick: onCancelForward ?? () {},
+                icon: Icons.close_rounded,
+                iconColor: c.textSecondary,
+                iconSize: 18.dp,
+                backgroundColor: Colors.transparent,
+                borderRadius: 12.dp,
+                padding: EdgeInsets.all(4.dp),
+              ),
             ],
           ),
         ),

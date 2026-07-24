@@ -32,7 +32,17 @@ class PickAttachment extends ChatAction {
 class LongPressMessage extends ChatAction {
   final ChatMessage message;
   final Rect anchor;
-  LongPressMessage(this.message, this.anchor);
+  final bool isGroup;
+  final bool showSenderName;
+  final bool showAvatar;
+
+  LongPressMessage(
+    this.message,
+    this.anchor, {
+    this.isGroup = false,
+    this.showSenderName = false,
+    this.showAvatar = false,
+  });
 }
 
 /// "Javob berish" — reply rejimini yoqish.
@@ -53,8 +63,52 @@ class CopyMessage extends ChatAction {
 /// "O'chirish".
 class DeleteMessage extends ChatAction {
   final ChatMessage message;
-  DeleteMessage(this.message);
+  final bool forEveryone;
+  DeleteMessage(this.message, {this.forEveryone = false});
 }
+
+/// Xabarni tahrirlash.
+class EditMessage extends ChatAction {
+  final ChatMessage message;
+  EditMessage(this.message);
+}
+
+/// Pin / unpin.
+class ToggleMessagePin extends ChatAction {
+  final ChatMessage message;
+  ToggleMessagePin(this.message);
+}
+
+/// Reaksiya.
+class ReactToMessage extends ChatAction {
+  final ChatMessage message;
+  final String emoji;
+  ReactToMessage(this.message, this.emoji);
+}
+
+/// Tanlash rejimi.
+class EnterSelectMode extends ChatAction {
+  final ChatMessage? seed;
+  EnterSelectMode([this.seed]);
+}
+
+class ExitSelectMode extends ChatAction {}
+
+class ToggleSelectMessage extends ChatAction {
+  final ChatMessage message;
+  ToggleSelectMessage(this.message);
+}
+
+class ForwardSelectedMessages extends ChatAction {}
+
+class DeleteSelectedMessages extends ChatAction {}
+
+class CancelForwardDraft extends ChatAction {}
+
+class ToggleForwardShowSender extends ChatAction {}
+
+/// Guruh sozlamalari.
+class OpenGroupSettings extends ChatAction {}
 
 /// Mikrofon — ovoz yozishni boshlash (composer record holatiga o'tadi).
 class StartRecording extends ChatAction {}
@@ -65,8 +119,11 @@ class CancelRecording extends ChatAction {}
 /// Yozilgan ovozni yuborish.
 class SendVoice extends ChatAction {}
 
-/// App bar ⋮ — suhbat menyusi.
-class OpenChatMenu extends ChatAction {}
+/// App bar ⋮ — suhbat menyusi (anchor bilan oynacha).
+class OpenChatMenu extends ChatAction {
+  final Rect anchor;
+  OpenChatMenu(this.anchor);
+}
 
 /// Suhbatdosh profilini ochish (avatar / ism / menyu).
 class OpenPeerProfile extends ChatAction {}
@@ -83,6 +140,9 @@ class ChatSearchChanged extends ChatAction {
 /// Bildirishnomalarni o‘chirish / yoqish.
 class ToggleChatMute extends ChatAction {}
 
+/// Suhbatni yuqoriga qadash / olish.
+class ToggleChatPin extends ChatAction {}
+
 /// Tarixni tozalash (men uchun).
 class ClearChatHistory extends ChatAction {}
 
@@ -96,4 +156,10 @@ class BlockPeer extends ChatAction {}
 class OpenChatProduct extends ChatAction {
   final ChatMessage message;
   OpenChatProduct(this.message);
+}
+
+/// Guruhda yuboruvchi avatar/ismiga bosilganda profil.
+class OpenSenderProfile extends ChatAction {
+  final int userId;
+  OpenSenderProfile(this.userId);
 }

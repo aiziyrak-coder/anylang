@@ -26,11 +26,14 @@ def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> d
     is_business = bool(
         user.subscription and user.subscription.plan == "business" and user.subscription.is_active
     )
+    avatar_url = user.avatar_url
+    if is_business and user.business is not None and user.business.logo_url:
+        avatar_url = user.business.logo_url
     return {
         "id": user.id,
         "full_name": user.full_name,
         "number": user.number,
-        "avatar_url": user.avatar_url,
+        "avatar_url": avatar_url,
         "is_online": False,
         "last_seen_at": None,
         "native_language": user.native_language,
@@ -53,7 +56,7 @@ async def _load_user(db: AsyncSession, user_id: int) -> User:
     result = await db.execute(
         select(User)
         .where(User.id == user_id, User.is_active.is_(True))
-        .options(selectinload(User.subscription))
+        .options(selectinload(User.subscription), selectinload(User.business))
     )
     user = result.scalar_one_or_none()
     if user is None:
@@ -157,7 +160,7 @@ async def list_friends(
     users_query = (
         select(User)
         .where(User.id.in_(other_ids))
-        .options(selectinload(User.subscription))
+        .options(selectinload(User.subscription), selectinload(User.business))
     )
     if search:
         pattern = f"%{search.strip()}%"

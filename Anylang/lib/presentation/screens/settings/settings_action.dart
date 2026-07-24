@@ -22,6 +22,7 @@ class OpenBlockedUsers extends SettingsAction {}
 class OpenChangePassword extends SettingsAction {}
 class OpenEditProfileFromSettings extends SettingsAction {}
 class OpenSubscriptionFromSettings extends SettingsAction {}
+class OpenNumbersFromSettings extends SettingsAction {}
 class SettingsLogoutRequested extends SettingsAction {}
 
 class SettingsDeleteAccountRequested extends SettingsAction {}

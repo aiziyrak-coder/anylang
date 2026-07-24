@@ -8,6 +8,9 @@ class OwnListing {
   final String name;
   final String price;
   final String? imageUrl;
+  final String status;
+  final bool isTop;
+  final String? topRequestStatus;
 
   const OwnListing({
     required this.tileGradient,
@@ -15,6 +18,9 @@ class OwnListing {
     required this.price,
     this.id = 0,
     this.imageUrl,
+    this.status = 'published',
+    this.isTop = false,
+    this.topRequestStatus,
   });
 }
 
@@ -146,9 +152,16 @@ class ProfileAccount {
       rating: (biz?['stats'] is Map)
           ? ((biz!['stats'] as Map)['rating'] as num?)?.toDouble()
           : null,
-      avatarUrl: isBusiness
-          ? (biz == null ? null : biz['logo_url'] as String?)
-          : json['avatar_url'] as String?,
+      avatarUrl: (() {
+        final top = (json['avatar_url'] as String?)?.trim();
+        final logo = (biz == null ? null : biz['logo_url'] as String?)?.trim();
+        if (isBusiness) {
+          if (logo != null && logo.isNotEmpty) return logo;
+          if (top != null && top.isNotEmpty) return top;
+          return null;
+        }
+        return (top != null && top.isNotEmpty) ? top : null;
+      })(),
       email: json['email'] as String?,
     );
   }

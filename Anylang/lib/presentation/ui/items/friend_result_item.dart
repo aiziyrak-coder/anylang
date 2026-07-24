@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../profile_avatar.dart';
 import '../theme/colors.dart';
 import '../theme/gradients.dart';
 import '../../utils/size_controller.dart';
@@ -6,11 +7,11 @@ import '../../utils/size_controller.dart';
 /// Do'st qo'shish natijasi tugmasining holati.
 enum FriendActionState { add, message, requested }
 
-/// "Do'st qo'shish" ro'yxati elementi: avatar + ism + subtitle + holatga qarab
-/// tugma (Qo'shish / Yozish / So'rov yuborildi).
+/// "Do'st qo'shish" ro'yxati elementi: doira avatar + ism + subtitle + tugma.
 class FriendResultItem extends StatelessWidget {
   final String initial;
   final LinearGradient avatarGradient;
+  final String? avatarUrl;
   final String name;
   final String subtitle;
   final bool online;
@@ -28,6 +29,7 @@ class FriendResultItem extends StatelessWidget {
     required this.action,
     required this.actionLabel,
     required this.onAction,
+    this.avatarUrl,
   });
 
   @override
@@ -38,7 +40,13 @@ class FriendResultItem extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 11.dp),
       child: Row(
         children: [
-          _avatar(c),
+          ProfileAvatar(
+            initial: initial,
+            gradient: avatarGradient,
+            imageUrl: avatarUrl,
+            size: 48,
+            online: online,
+          ),
           SizedBox(width: 12.dp),
           Expanded(
             child: Column(
@@ -67,46 +75,6 @@ class FriendResultItem extends StatelessWidget {
           ),
           SizedBox(width: 10.dp),
           _actionButton(c),
-        ],
-      ),
-    );
-  }
-
-  Widget _avatar(AppColors c) {
-    return SizedBox(
-      width: 48.dp,
-      height: 48.dp,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 48.dp,
-            height: 48.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, gradient: avatarGradient),
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: kAvatarFg,
-                fontSize: 17.sp,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          if (online)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 14.dp,
-                height: 14.dp,
-                decoration: BoxDecoration(
-                  color: kOnline,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.background, width: 2.5.dp),
-                ),
-              ),
-            ),
         ],
       ),
     );

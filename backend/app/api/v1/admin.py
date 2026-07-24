@@ -16,7 +16,9 @@ from app.models.product import Product
 from app.models.user import NumberGroup, Subscription, User
 from app.services import admin_auth
 from app.services import numbers as numbers_service
+from app.services import products as products_service
 from app.services.admin_ops import ModeratorPlus, client_ip, write_audit
+from app.schemas.product import AdminTopRequestReviewIn
 
 router = APIRouter()
 
@@ -429,6 +431,76 @@ async def admin_archive_product(
         ip=client_ip(request),
     )
     return {"id": product.id, "status": product.status}
+
+
+@router.get("/product-top-requests")
+async def admin_list_top_requests(
+    db: DbSession,
+    _admin: ModeratorPlus,
+    status_filter: str | None = Query(default="pending", alias="status"),
+    page: int | None = Query(default=None, ge=1),
+    limit: int | None = Query(default=None, ge=1, le=100),
+) -> dict:
+    return await products_service.list_top_requests(
+        db,
+        status=status_filter,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.post("/product-top-requests/{request_id}/approve")
+async def admin_approve_top_request(
+    request_id: int,
+    db: DbSession,
+    admin: ModeratorPlus,
+    request: Request,
+    body: AdminTopRequestReviewIn | None = None,
+) -> dict:
+    data = await products_service.review_top_request(
+        db,
+        request_id=request_id,
+        approve=True,
+        admin_id=admin.id,
+        admin_note=(body.admin_note if body else ""),
+    )
+    await write_audit(
+        db,
+        admin=admin,
+        action="product.top_request.approve",
+        target_type="product_top_request",
+        target_id=request_id,
+        meta={"product_id": data.get("product_id")},
+        ip=client_ip(request),
+    )
+    return data
+
+
+@router.post("/product-top-requests/{request_id}/reject")
+async def admin_reject_top_request(
+    request_id: int,
+    db: DbSession,
+    admin: ModeratorPlus,
+    request: Request,
+    body: AdminTopRequestReviewIn | None = None,
+) -> dict:
+    data = await products_service.review_top_request(
+        db,
+        request_id=request_id,
+        approve=False,
+        admin_id=admin.id,
+        admin_note=(body.admin_note if body else ""),
+    )
+    await write_audit(
+        db,
+        admin=admin,
+        action="product.top_request.reject",
+        target_type="product_top_request",
+        target_id=request_id,
+        meta={"product_id": data.get("product_id")},
+        ip=client_ip(request),
+    )
+    return data
 
 
 @router.get("/stats", response_model=AdminStatsOut)

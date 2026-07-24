@@ -38,7 +38,7 @@ class AuthRepository {
         'app_language': appLanguage ?? SessionStore.appLanguage(),
         'native_language': nativeLanguage ?? SessionStore.nativeLanguage(),
       },
-      notify: SnackNotify.errors,
+      notify: SnackNotify.none,
     );
   }
 
@@ -86,10 +86,9 @@ class AuthRepository {
       return (result: result, body: null);
     } on DioException catch (e) {
       final result = dioToError(e);
-      showAppError(result.error);
+      // Toast — faqat screen; ikki marta chiqmasin.
       return (result: result, body: dioErrorBody(e));
     } catch (e) {
-      showAppError("Noma'lum xatolik");
       return (result: Error("Noma'lum xatolik"), body: null);
     }
   }
@@ -116,10 +115,9 @@ class AuthRepository {
       return (result: result, body: null);
     } on DioException catch (e) {
       final result = dioToError(e);
-      showAppError(result.error);
+      // Toast — faqat screen (login_screen); ikki marta chiqmasin.
       return (result: result, body: dioErrorBody(e));
     } catch (e) {
-      showAppError("Google orqali kirib bo'lmadi");
       return (result: Error("Google orqali kirib bo'lmadi"), body: null);
     }
   }
@@ -129,6 +127,7 @@ class AuthRepository {
     final result = await _client.post(
       api: 'api/v1/auth/logout',
       data: {'refresh_token': refresh},
+      notify: SnackNotify.none,
     );
     await SessionStore.clear();
     return result;

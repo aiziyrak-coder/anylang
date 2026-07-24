@@ -32,11 +32,30 @@ type ListResp = {
   has_more: boolean;
 };
 
+type TopRequestRow = {
+  id: number;
+  product_id: number;
+  seller_id: number;
+  status: string;
+  note: string;
+  product_name: string | null;
+  created_at: string;
+};
+
+type TopListResp = {
+  items: TopRequestRow[];
+  page: number;
+  limit: number;
+  total: number;
+  has_more: boolean;
+};
+
 export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ListResp | null>(null);
+  const [topRequests, setTopRequests] = useState<TopListResp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -55,10 +74,25 @@ export default function ProductsPage() {
     }
   }, [page, search, status]);
 
+  const loadTopRequests = useCallback(async () => {
+    try {
+      const res = await apiFetch<TopListResp>(
+        `/api/v1/admin/product-top-requests?status=pending&limit=50`,
+      );
+      setTopRequests(res);
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(load, 250);
     return () => clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    void loadTopRequests();
+  }, [loadTopRequests]);
 
   async function pinProduct(id: number, pinned: boolean) {
     setBusyId(id);
@@ -92,6 +126,26 @@ export default function ProductsPage() {
     }
   }
 
+  async function reviewTopRequest(id: number, approve: boolean) {
+    setBusyId(id);
+    try {
+      await apiFetch(
+        `/api/v1/admin/product-top-requests/${id}/${approve ? "approve" : "reject"}`,
+        { method: "POST", body: JSON.stringify({ admin_note: "" }) },
+      );
+      setToast(
+        approve
+          ? t("products.approvedToast", { id })
+          : t("products.rejectedToast", { id }),
+      );
+      await Promise.all([load(), loadTopRequests()]);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("app.error"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title={t("products.title")} subtitle={t("products.subtitle")}>
@@ -121,6 +175,66 @@ export default function ProductsPage() {
 
       {toast ? <Alert variant="success">{toast}</Alert> : null}
       {error ? <Alert variant="error">{error}</Alert> : null}
+
+      <section className="overflow-hidden rounded-xl border bg-white">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold text-zinc-900">
+            {t("products.topRequests")}
+            {topRequests ? (
+              <span className="ml-2 text-xs font-normal text-zinc-500">
+                ({topRequests.total})
+              </span>
+            ) : null}
+          </h2>
+        </div>
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+            <tr>
+              <th className="px-4 py-3">{t("products.colId")}</th>
+              <th className="px-4 py-3">{t("products.colProduct")}</th>
+              <th className="px-4 py-3">{t("products.colSeller")}</th>
+              <th className="px-4 py-3">{t("products.colNote")}</th>
+              <th className="px-4 py-3">{t("app.actions")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(topRequests?.items ?? []).map((r) => (
+              <tr key={r.id} className="border-t hover:bg-zinc-50">
+                <td className="px-4 py-3 tabular-nums text-zinc-500">#{r.id}</td>
+                <td className="px-4 py-3">
+                  <div className="font-medium">{r.product_name ?? `#${r.product_id}`}</div>
+                  <div className="text-xs text-zinc-500">product #{r.product_id}</div>
+                </td>
+                <td className="px-4 py-3 tabular-nums">{r.seller_id}</td>
+                <td className="px-4 py-3 text-zinc-600">{r.note || "—"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => reviewTopRequest(r.id, true)}
+                      className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-800 disabled:opacity-40"
+                    >
+                      {t("products.approve")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => reviewTopRequest(r.id, false)}
+                      className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-40"
+                    >
+                      {t("products.reject")}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!topRequests?.items.length ? (
+          <EmptyState message={t("products.topRequestsEmpty")} />
+        ) : null}
+      </section>
 
       <div className="overflow-hidden rounded-xl border bg-white">
         <table className="min-w-full text-left text-sm">

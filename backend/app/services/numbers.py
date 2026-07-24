@@ -23,11 +23,12 @@ RANDOM_COOLDOWN_DAYS = 90
 
 SPECIAL_PATTERNS = frozenset({"sequential_asc", "sequential_desc", "palindrome", "mirror"})
 
+# Old max was $499 (Platina). Scaled so Platina = $2000; others keep relative ratios.
 SEED_GROUPS: list[dict] = [
     {
         "name": "Platina",
         "patterns": ["AAAAAAA"],
-        "price": Decimal("499.00"),
+        "price": Decimal("2000.00"),
         "bonus_plan": "business",
         "bonus_duration_months": 24,
         "priority": 100,
@@ -35,7 +36,7 @@ SEED_GROUPS: list[dict] = [
     {
         "name": "Brilliant",
         "patterns": ["AAAAABB", "AABBBBB"],
-        "price": Decimal("299.00"),
+        "price": Decimal("1198.00"),
         "bonus_plan": "business",
         "bonus_duration_months": 12,
         "priority": 90,
@@ -43,7 +44,7 @@ SEED_GROUPS: list[dict] = [
     {
         "name": "Oltin",
         "patterns": ["AAABBCC", "AAABBAA"],
-        "price": Decimal("149.00"),
+        "price": Decimal("597.00"),
         "bonus_plan": "premium",
         "bonus_duration_months": 12,
         "priority": 80,
@@ -51,7 +52,7 @@ SEED_GROUPS: list[dict] = [
     {
         "name": "Oltin — ketma-ket",
         "patterns": ["sequential_asc", "sequential_desc"],
-        "price": Decimal("129.00"),
+        "price": Decimal("517.00"),
         "bonus_plan": "premium",
         "bonus_duration_months": 12,
         "priority": 78,
@@ -59,7 +60,7 @@ SEED_GROUPS: list[dict] = [
     {
         "name": "Kumush",
         "patterns": ["AAAABBB", "palindrome"],
-        "price": Decimal("79.00"),
+        "price": Decimal("317.00"),
         "bonus_plan": "premium",
         "bonus_duration_months": 6,
         "priority": 70,
@@ -67,7 +68,7 @@ SEED_GROUPS: list[dict] = [
     {
         "name": "Kumush — juft",
         "patterns": ["ABABABA", "AABBAAB"],
-        "price": Decimal("49.00"),
+        "price": Decimal("196.00"),
         "bonus_plan": "premium",
         "bonus_duration_months": 3,
         "priority": 60,
@@ -75,7 +76,7 @@ SEED_GROUPS: list[dict] = [
     {
         "name": "Bronza",
         "patterns": ["AAA****", "****AAA"],
-        "price": Decimal("19.00"),
+        "price": Decimal("76.00"),
         "bonus_plan": None,
         "bonus_duration_months": None,
         "priority": 40,
@@ -83,7 +84,7 @@ SEED_GROUPS: list[dict] = [
     {
         "name": "Bronza — oson",
         "patterns": ["**AA*AA", "*AA*AA*"],
-        "price": Decimal("9.00"),
+        "price": Decimal("36.00"),
         "bonus_plan": None,
         "bonus_duration_months": None,
         "priority": 30,
@@ -100,22 +101,28 @@ SEED_GROUPS: list[dict] = [
 
 
 def _is_sequential_asc(number: str) -> bool:
+    if len(number) != 7 or not number.isdigit():
+        return False
     digits = [int(c) for c in number]
     return all(digits[i + 1] - digits[i] == 1 for i in range(6))
 
 
 def _is_sequential_desc(number: str) -> bool:
+    if len(number) != 7 or not number.isdigit():
+        return False
     digits = [int(c) for c in number]
     return all(digits[i] - digits[i + 1] == 1 for i in range(6))
 
 
 def _is_palindrome(number: str) -> bool:
-    return number == number[::-1]
+    return len(number) == 7 and number.isdigit() and number == number[::-1]
 
 
 def _is_mirror(number: str) -> bool:
     return (
-        number[0] == number[6]
+        len(number) == 7
+        and number.isdigit()
+        and number[0] == number[6]
         and number[1] == number[5]
         and number[2] == number[4]
     )
@@ -191,10 +198,12 @@ def _generate_from_mask(pattern: str) -> Iterator[str]:
 
 def _generate_special(pattern: str) -> Iterator[str]:
     if pattern == "sequential_asc":
+        # 0123456 … 3456789 — oxirgi raqam 9 dan oshmasligi kerak
         for start in range(4):
             yield "".join(str(start + i) for i in range(7))
     elif pattern == "sequential_desc":
-        for start in range(9, 3, -1):
+        # 9876543 … 6543210 — manfiy raqam chiqmasligi kerak
+        for start in range(9, 5, -1):
             yield "".join(str(start - i) for i in range(7))
     elif pattern == "palindrome":
         for a in range(10):
@@ -214,21 +223,10 @@ def _generate_special(pattern: str) -> Iterator[str]:
 
 def _generate_mask_iterative(pattern: str) -> Iterator[str]:
     """Generate numbers matching a 7-char mask with A-Z and *."""
-    slots: list[list[str]] = []
-    letters_order: list[str] = []
-    seen_letters: set[str] = set()
-
-    for ch in pattern:
-        if ch == "*":
-            slots.append(list("0123456789"))
-        elif ch.isalpha():
-            upper = ch.upper()
-            if upper not in seen_letters:
-                seen_letters.add(upper)
-                letters_order.append(upper)
-            slots.append([upper])  # placeholder — resolved via letter assignment
-        else:
-            return
+    if len(pattern) != 7:
+        return
+    if any(ch != "*" and not ch.isalpha() for ch in pattern):
+        return
 
     letter_digits: dict[str, str] = {}
 
@@ -241,7 +239,7 @@ def _generate_mask_iterative(pattern: str) -> Iterator[str]:
         if ch == "*":
             for d in "0123456789":
                 yield from resolve_slot(slot_idx + 1, current + [d])
-        elif ch.isalpha():
+        else:
             upper = ch.upper()
             if upper not in letter_digits:
                 used = set(letter_digits.values())
@@ -429,6 +427,27 @@ async def assign_random_number_for_user(db: AsyncSession, user: User) -> dict:
     }
 
 
+async def get_my_number(db: AsyncSession, user: User) -> dict:
+    groups = await _load_groups(db)
+    group = classify_number(user.number, groups) if user.number else None
+    now = datetime.now(UTC)
+    cooldown_seconds = 0
+    can_change = True
+    if user.last_number_change_at is not None:
+        cooldown_end = user.last_number_change_at + timedelta(days=RANDOM_COOLDOWN_DAYS)
+        if now < cooldown_end:
+            can_change = False
+            cooldown_seconds = int((cooldown_end - now).total_seconds())
+    return {
+        "number": user.number,
+        "group": _serialize_group_brief(group) if group else None,
+        "last_number_change_at": user.last_number_change_at,
+        "can_change_free": can_change,
+        "cooldown_seconds": cooldown_seconds,
+        "cooldown_days": RANDOM_COOLDOWN_DAYS,
+    }
+
+
 async def get_groups(db: AsyncSession) -> list[dict]:
     groups = await _load_groups(db)
     assignments = await _assignment_map(db)
@@ -471,6 +490,8 @@ async def get_catalog(
     seen: set[str] = set()
 
     def consider(num: str, group: NumberGroup) -> None:
+        if len(num) != 7 or not num.isdigit():
+            return
         if num in seen:
             return
         if not _is_available(num, assignments):

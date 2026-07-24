@@ -6,6 +6,7 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:anylang/presentation/screens/login/login_screen.dart';
 import 'package:anylang/presentation/screens/main/main_screen.dart';
 import 'package:anylang/presentation/screens/select_language/select_language_screen.dart';
+import 'package:anylang/presentation/ui/my_snackbar.dart';
 import 'data/core/buildNetwork/api_config.dart';
 import 'data/core/buildNetwork/api_service.dart';
 import 'data/core/buildNetwork/token_refresher.dart';
@@ -48,13 +49,15 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Worker? _sessionWorker;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _sessionWorker = ever<int>(Get.find<SessionExpiredBus>().tick, (_) async {
+      MySnackBar.dismiss();
       await SessionStore.clear();
       Get.offAll(() => LoginScreen().build());
     });
@@ -62,8 +65,17 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _sessionWorker?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Fon/chiqishdan qaytganda eski success toast qolib ketmasin.
+    if (state == AppLifecycleState.resumed) {
+      MySnackBar.dismiss();
+    }
   }
 
   @override
@@ -131,6 +143,7 @@ class _BootstrapHomeState extends State<_BootstrapHome> {
   }
 
   Future<void> _resolve() async {
+    MySnackBar.dismiss();
     if (!SessionStore.hasSession) {
       setState(() => _child = SelectLanguageScreen().build());
       return;
@@ -139,6 +152,7 @@ class _BootstrapHomeState extends State<_BootstrapHome> {
       final token = await Get.find<TokenRefresher>().getNewToken();
       if (token != 'none' && token.isNotEmpty) {
         await connectRealtimeIfNeeded();
+        MySnackBar.dismiss();
         setState(() => _child = MainScreen().build());
         return;
       }
