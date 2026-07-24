@@ -16,7 +16,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.session import get_session_factory
 from app.integrations.storage import get_storage
-from app.integrations.translation import _normalize_lang, translate
+from app.integrations.translation import _normalize_lang, translate, user_preferred_lang
 from app.models.chat import Chat, ChatMedia, Message, MessageHide, MessageRead, MessageTranslation
 from app.models.user import User
 from app.services.chats import (
@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 def _translation_timeout_seconds() -> float:
     provider = (get_settings().translation_provider or "mock").strip().lower()
     if provider == "openai":
-        return 25.0
+        # Translate + grammar proofread (2 OpenAI calls).
+        return 55.0
     if provider == "deepl":
         return 10.0
     return 3.0
@@ -80,7 +81,7 @@ MEDIA_RULES: dict[str, dict] = {
 
 
 def _pick_translation_text(message: Message, viewer_language: str) -> str | None:
-    """Viewer tilidagi tarjimani qaytaradi; bo'sh qatorni e'tiborsiz qoldiradi."""
+    """Viewer tilidagi tayyor (done) tarjimani qaytaradi; bo'sh qatorni e'tiborsiz qoldiradi."""
     insp = sa_inspect(message)
     if "translations" in insp.unloaded:
         return None
@@ -88,9 +89,46 @@ def _pick_translation_text(message: Message, viewer_language: str) -> str | None
     for tr in message.translations or []:
         if _normalize_lang(tr.language) != lang:
             continue
+        if (tr.status or "done") != "done":
+            continue
         if (tr.text or "").strip():
             return tr.text
     return None
+
+
+def build_translation_jobs(
+    *,
+    message_id: int,
+    chat_id: int,
+    text: str,
+    source_lang: str | None,
+    sender_id: int,
+    sender_language: str,
+    recipients: list[User],
+) -> list[dict]:
+    """Har bir noyob recipient ona tili uchun bitta background tarjima job."""
+    if not (text or "").strip() or not recipients:
+        return []
+    source = _normalize_lang(source_lang) if source_lang else _normalize_lang(sender_language)
+    by_lang: dict[str, list[User]] = {}
+    for peer in recipients:
+        tlang = user_preferred_lang(peer)
+        if tlang == source:
+            continue
+        by_lang.setdefault(tlang, []).append(peer)
+    return [
+        {
+            "message_id": message_id,
+            "chat_id": chat_id,
+            "text": text,
+            "target_lang": lang,
+            "source_lang": source,
+            "sender_id": sender_id,
+            "sender_language": sender_language,
+            "recipient_ids": [p.id for p in peers],
+        }
+        for lang, peers in by_lang.items()
+    ]
 
 
 async def _load_recipient(db: AsyncSession, chat: Chat, sender_id: int) -> User:
@@ -338,7 +376,7 @@ async def list_messages(
         read_ids = set(read_result.scalars().all())
 
     reply_map = await _load_reply_to_payloads(
-        db, visible, viewer_language=user.native_language
+        db, visible, viewer_language=user_preferred_lang(user)
     )
     sender_map = await _load_sender_public_map(
         db, {m.sender_id for m in visible}
@@ -351,7 +389,7 @@ async def list_messages(
             _serialize_message(
                 m,
                 viewer_id=user.id,
-                viewer_language=user.native_language,
+                viewer_language=user_preferred_lang(user),
                 read_message_ids=read_ids if m.sender_id == user.id else None,
                 reply_to=reply_map.get(m.reply_to_id) if m.reply_to_id else None,
                 sender_name=s_name,
@@ -359,7 +397,41 @@ async def list_messages(
             )
         )
 
-    return {"items": items, "has_more": has_more}
+    # Tarix ochilganda yetishmayotgan tarjimalarni backgroundda to'ldirish.
+    missing_jobs: list[dict] = []
+    viewer_lang = user_preferred_lang(user)
+    for m in visible:
+        if m.type != "text" or m.sender_id == user.id:
+            continue
+        src_text = (m.text_original or "").strip()
+        if not src_text:
+            continue
+        source = _normalize_lang(m.original_language) if m.original_language else None
+        # original_language noto'g'ri bo'lishi mumkin — tarjima yo'q bo'lsa baribir urinadi.
+        if _pick_translation_text(m, viewer_lang) is not None:
+            continue
+        if source and source == viewer_lang:
+            # Bir xil til deb belgilangan, lekin matn boshqa tilda bo'lishi mumkin:
+            # AI o'zi aniqlaydi (source_lang=None).
+            source = None
+        missing_jobs.append(
+            {
+                "message_id": m.id,
+                "chat_id": chat_id,
+                "text": src_text,
+                "target_lang": viewer_lang,
+                "source_lang": source,
+                "sender_id": m.sender_id,
+                "sender_language": m.original_language or source or viewer_lang,
+                "recipient_ids": [user.id],
+            }
+        )
+
+    out: dict = {"items": items, "has_more": has_more}
+    if missing_jobs:
+        # Bir ochishda OpenAI ni bosib yubormaslik uchun limit.
+        out["_translation_jobs"] = missing_jobs[:20]
+    return out
 
 
 async def create_message(
@@ -403,7 +475,7 @@ async def create_message(
                 status_code=400,
             )
         text = text.strip()
-        original_language = _normalize_lang(user.native_language)
+        original_language = user_preferred_lang(user)
         meta_payload = meta
     elif msg_type in {"product", "location", "contact"}:
         if not meta or not isinstance(meta, dict):
@@ -414,7 +486,7 @@ async def create_message(
             )
         meta_payload = dict(meta)
         text = text.strip() if text else None
-        original_language = _normalize_lang(user.native_language) if text else None
+        original_language = user_preferred_lang(user) if text else None
     else:
         if media_id is not None:
             media_result = await db.execute(
@@ -448,7 +520,7 @@ async def create_message(
                 status_code=400,
             )
         text = text.strip() if text else None
-        original_language = _normalize_lang(user.native_language) if text else None
+        original_language = user_preferred_lang(user) if text else None
 
     if reply_to_id is not None:
         reply = await db.get(Message, reply_to_id)
@@ -466,13 +538,13 @@ async def create_message(
     duplicate = existing.scalar_one_or_none()
     if duplicate is not None:
         reply_map = await _load_reply_to_payloads(
-            db, [duplicate], viewer_language=user.native_language
+            db, [duplicate], viewer_language=user_preferred_lang(user)
         )
         s_name, s_avatar = _sender_public_fields(user)
         return _serialize_message(
             duplicate,
             viewer_id=user.id,
-            viewer_language=user.native_language,
+            viewer_language=user_preferred_lang(user),
             reply_to=reply_map.get(duplicate.reply_to_id) if duplicate.reply_to_id else None,
             sender_name=s_name,
             sender_avatar_url=s_avatar,
@@ -503,7 +575,7 @@ async def create_message(
 
     # Avval real-time yetkazish (tarjima kutmasdan) — Telegram uslubi.
     reply_map = await _load_reply_to_payloads(
-        db, [message], viewer_language=user.native_language
+        db, [message], viewer_language=user_preferred_lang(user)
     )
     reply_payload = reply_map.get(message.reply_to_id) if message.reply_to_id else None
     hub = get_hub()
@@ -513,7 +585,7 @@ async def create_message(
         sender_payload = _serialize_message(
             msg,
             viewer_id=user.id,
-            viewer_language=user.native_language,
+            viewer_language=user_preferred_lang(user),
             reply_to=reply_payload,
             sender_name=s_name,
             sender_avatar_url=s_avatar,
@@ -522,11 +594,11 @@ async def create_message(
         try:
             await hub.publish(user.id, "new_message", {**event_data, "message": sender_payload})
             for peer in recipients:
-                if _normalize_lang(peer.native_language) == _normalize_lang(user.native_language):
+                if user_preferred_lang(peer) == user_preferred_lang(user):
                     peer_reply = reply_payload
                 else:
                     peer_reply_map = await _load_reply_to_payloads(
-                        db, [msg], viewer_language=peer.native_language
+                        db, [msg], viewer_language=user_preferred_lang(peer)
                     )
                     peer_reply = (
                         peer_reply_map.get(msg.reply_to_id) if msg.reply_to_id else None
@@ -534,7 +606,7 @@ async def create_message(
                 peer_payload = _serialize_message(
                     msg,
                     viewer_id=peer.id,
-                    viewer_language=peer.native_language,
+                    viewer_language=user_preferred_lang(peer),
                     reply_to=peer_reply,
                     sender_name=s_name,
                     sender_avatar_url=s_avatar,
@@ -548,23 +620,20 @@ async def create_message(
 
     payload = await _publish(message)
 
-    # Tarjima HTTP javobini bloklamasin — BackgroundTasks orqali (chats.send_message).
-    # Bu yerda faqat job ma'lumotini qaytaramiz; sync fallback testlar uchun.
+    # Tarjima HTTP javobini bloklamasin — BackgroundTasks (chats.send_message).
+    # Guruhda har bir a'zo ona tili uchun alohida job (bir xil tillar guruhlanadi).
     if msg_type == "text" and text:
-        target_lang = _normalize_lang(recipient.native_language)
-        source_lang = _normalize_lang(original_language) if original_language else None
-        if target_lang != (source_lang or ""):
-            payload["_translation_job"] = {
-                "message_id": message.id,
-                "chat_id": chat_id,
-                "text": text,
-                "target_lang": target_lang,
-                "source_lang": source_lang,
-                "sender_id": user.id,
-                "sender_language": user.native_language,
-                "recipient_id": recipient.id,
-                "recipient_language": recipient.native_language,
-            }
+        jobs = build_translation_jobs(
+            message_id=message.id,
+            chat_id=chat_id,
+            text=text,
+            source_lang=original_language,
+            sender_id=user.id,
+            sender_language=user_preferred_lang(user),
+            recipients=recipients,
+        )
+        if jobs:
+            payload["_translation_jobs"] = jobs
 
     return payload
 
@@ -578,11 +647,8 @@ async def _translate_and_republish(
     source_lang: str | None,
     sender_id: int,
     sender_language: str,
-    recipient_id: int,
-    recipient_language: str,
+    recipient_ids: list[int],
     chat_id: int,
-    reply_payload: dict | None,
-    reply_payload_recipient: dict | None,
     timeout: float,
 ) -> None:
     translated = text
@@ -635,34 +701,43 @@ async def _translate_and_republish(
     ]
     message.translations = others + [tr]
 
-    if status != "done" or translated == text:
+    if status != "done":
+        return
+    # Bir xil matn (emoji/ism) — UI allaqachon originalni ko'rsatgan; qayta publish shart emas.
+    if (translated or "").strip() == (text or "").strip():
         return
 
     hub = get_hub()
     sender_map = await _load_sender_public_map(db, {sender_id})
     s_name, s_avatar = sender_map.get(sender_id, (None, None))
-    sender_payload = _serialize_message(
-        message,
-        viewer_id=sender_id,
-        viewer_language=sender_language,
-        reply_to=reply_payload,
-        sender_name=s_name,
-        sender_avatar_url=s_avatar,
-    )
-    recipient_payload = _serialize_message(
-        message,
-        viewer_id=recipient_id,
-        viewer_language=recipient_language,
-        reply_to=reply_payload_recipient,
-        sender_name=s_name,
-        sender_avatar_url=s_avatar,
-    )
+
+    # Recipient tillari — bitta target_lang bo'yicha barcha peerlarga yangilangan matn.
+    peer_ids = [rid for rid in recipient_ids if rid != sender_id]
+    if not peer_ids:
+        return
+
+    peers_result = await db.execute(select(User).where(User.id.in_(peer_ids)))
+    peers = list(peers_result.scalars().all())
     event_data = {"chat_id": chat_id}
     try:
-        await hub.publish(sender_id, "new_message", {**event_data, "message": sender_payload})
-        await hub.publish(
-            recipient_id, "new_message", {**event_data, "message": recipient_payload}
-        )
+        for peer in peers:
+            peer_reply_map = await _load_reply_to_payloads(
+                db, [message], viewer_language=user_preferred_lang(peer)
+            )
+            peer_reply = (
+                peer_reply_map.get(message.reply_to_id) if message.reply_to_id else None
+            )
+            peer_payload = _serialize_message(
+                message,
+                viewer_id=peer.id,
+                viewer_language=user_preferred_lang(peer),
+                reply_to=peer_reply,
+                sender_name=s_name,
+                sender_avatar_url=s_avatar,
+            )
+            await hub.publish(
+                peer.id, "new_message", {**event_data, "message": peer_payload}
+            )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Realtime republish after translation failed for chat %s: %s", chat_id, exc)
 
@@ -676,10 +751,16 @@ async def finish_message_translation_job(
     source_lang: str | None,
     sender_id: int,
     sender_language: str,
-    recipient_id: int,
-    recipient_language: str,
+    recipient_ids: list[int] | None = None,
+    recipient_id: int | None = None,
+    recipient_language: str | None = None,
 ) -> None:
     """HTTP javobidan keyin ishlaydigan tarjima (BackgroundTasks)."""
+    del recipient_language  # legacy API field; language comes from User rows
+    peers = list(recipient_ids or [])
+    if recipient_id is not None and recipient_id not in peers:
+        peers.append(recipient_id)
+
     factory = get_session_factory()
     async with factory() as db:
         try:
@@ -697,10 +778,14 @@ async def finish_message_translation_job(
                 if _normalize_lang(t.language) == target_lang
                 and t.status == "done"
                 and (t.text or "").strip()
-                and t.text != text
             ]
             if existing_ok:
                 return
+
+            if not peers:
+                # Fallback: chatdagi senderdan boshqa barcha a'zolar.
+                member_ids = await list_chat_member_ids(db, chat_id)
+                peers = [uid for uid in member_ids if uid != sender_id]
 
             await _translate_and_republish(
                 db,
@@ -710,11 +795,8 @@ async def finish_message_translation_job(
                 source_lang=source_lang,
                 sender_id=sender_id,
                 sender_language=sender_language,
-                recipient_id=recipient_id,
-                recipient_language=recipient_language,
+                recipient_ids=peers,
                 chat_id=chat_id,
-                reply_payload=None,
-                reply_payload_recipient=None,
                 timeout=_translation_timeout_seconds(),
             )
             await db.commit()

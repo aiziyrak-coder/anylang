@@ -84,7 +84,10 @@ class RealtimeSyncService extends GetxService {
     if (chat.chatId.value != chatId) return;
     final mapped = mapChatMessageFromApi(msgMap, me: SessionStore.userId(), peerName: chat.peerName.value);
     final idx = chat.messages.indexWhere((m) => m.id == mapped.id);
-    if (idx >= 0) chat.messages[idx] = mapped;
+    if (idx >= 0) {
+      final prevShowing = chat.messages[idx].showingOriginal;
+      chat.messages[idx] = mapped.withShowingOriginal(prevShowing);
+    }
   }
 
   void _onMessageReaction(Map<String, dynamic> data) {
@@ -169,7 +172,8 @@ class RealtimeSyncService extends GetxService {
                   m.id == clientId),
         );
         if (idx >= 0) {
-          chat.messages[idx] = mapped;
+          final prevShowing = chat.messages[idx].showingOriginal;
+          chat.messages[idx] = mapped.withShowingOriginal(prevShowing);
         } else {
           chat.messages.add(mapped);
         }

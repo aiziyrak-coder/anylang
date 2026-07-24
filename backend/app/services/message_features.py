@@ -11,14 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError
+from app.integrations.translation import _normalize_lang, user_preferred_lang
 from app.models.chat import Chat, ChatParticipant, Message, MessageHide, MessagePin, MessageReaction
 from app.models.user import User
-from app.services.chats import _get_chat_for_user, _get_participant, _is_group
+from app.services.chats import _get_chat_for_user, _get_participant, _is_group, list_chat_member_ids
 from app.services.messages import (
     _load_reply_to_payloads,
     _load_sender_public_map,
     _serialize_message,
     _sender_public_fields,
+    build_translation_jobs,
 )
 from app.ws.hub import get_hub
 
@@ -60,6 +62,56 @@ async def _publish_to_chat(db: AsyncSession, chat_id: int, event: str, payload: 
             pass
 
 
+async def _publish_message_personalized(
+    db: AsyncSession,
+    *,
+    chat_id: int,
+    event: str,
+    message: Message,
+    sender: User | None,
+) -> None:
+    """Har bir a'zoga o'z ona tilidagi serialize qilingan xabarni yuboradi."""
+    member_ids = await list_chat_member_ids(db, chat_id)
+    if not member_ids:
+        return
+    users_result = await db.execute(select(User).where(User.id.in_(member_ids)))
+    users = list(users_result.scalars().all())
+    s_name, s_avatar = _sender_public_fields(sender) if sender is not None else (None, None)
+    if sender is None:
+        sender_map = await _load_sender_public_map(db, {message.sender_id})
+        s_name, s_avatar = sender_map.get(message.sender_id, (None, None))
+    hub = get_hub()
+    for peer in users:
+        reply_map = await _load_reply_to_payloads(
+            db, [message], viewer_language=user_preferred_lang(peer)
+        )
+        payload = _serialize_message(
+            message,
+            viewer_id=peer.id,
+            viewer_language=user_preferred_lang(peer),
+            reply_to=reply_map.get(message.reply_to_id) if message.reply_to_id else None,
+            sender_name=s_name,
+            sender_avatar_url=s_avatar,
+        )
+        try:
+            await hub.publish(peer.id, event, {"chat_id": chat_id, "message": payload})
+        except Exception:
+            pass
+
+
+async def _load_peers_except_sender(
+    db: AsyncSession, chat_id: int, sender_id: int
+) -> list[User]:
+    member_ids = await list_chat_member_ids(db, chat_id)
+    other_ids = [uid for uid in member_ids if uid != sender_id]
+    if not other_ids:
+        return []
+    result = await db.execute(
+        select(User).where(User.id.in_(other_ids), User.is_active.is_(True))
+    )
+    return list(result.scalars().all())
+
+
 async def edit_message(
     db: AsyncSession,
     redis: Redis,
@@ -85,18 +137,39 @@ async def edit_message(
     if not cleaned:
         raise AppError(message="Matn bo'sh", error_code="VALIDATION_ERROR", status_code=400)
     message.text_original = cleaned
+    message.original_language = user_preferred_lang(user)
     message.edited_at = datetime.now(UTC)
     message.translations = []
     await db.flush()
+
+    await _publish_message_personalized(
+        db,
+        chat_id=message.chat_id,
+        event="message_edited",
+        message=message,
+        sender=user,
+    )
+
     s_name, s_avatar = _sender_public_fields(user)
     payload = _serialize_message(
         message,
         viewer_id=user.id,
-        viewer_language=user.native_language,
+        viewer_language=user_preferred_lang(user),
         sender_name=s_name,
         sender_avatar_url=s_avatar,
     )
-    await _publish_to_chat(db, message.chat_id, "message_edited", {"chat_id": message.chat_id, "message": payload})
+    peers = await _load_peers_except_sender(db, message.chat_id, user.id)
+    jobs = build_translation_jobs(
+        message_id=message.id,
+        chat_id=message.chat_id,
+        text=cleaned,
+        source_lang=message.original_language,
+        sender_id=user.id,
+        sender_language=user_preferred_lang(user),
+        recipients=peers,
+    )
+    if jobs:
+        payload["_translation_jobs"] = jobs
     return payload
 
 
@@ -135,6 +208,7 @@ async def forward_message(
             },
         }
     created: list[dict] = []
+    all_jobs: list[dict] = []
     for cid in chat_ids:
         await _get_chat_for_user(db, cid, user.id)
         msg = Message(
@@ -143,7 +217,8 @@ async def forward_message(
             client_message_id=f"fwd_{uuid4().hex[:16]}",
             type=source.type,
             text_original=source.text_original,
-            original_language=source.original_language,
+            original_language=source.original_language
+            or user_preferred_lang(user),
             meta=forward_meta,
             status="sent",
             delivered_at=datetime.now(UTC),
@@ -156,18 +231,43 @@ async def forward_message(
             chat.last_message_id = msg.id
             chat.last_message_at = msg.created_at
             chat.has_messages = True
+
+        await _publish_message_personalized(
+            db,
+            chat_id=cid,
+            event="new_message",
+            message=msg,
+            sender=user,
+        )
+
         s_name, s_avatar = _sender_public_fields(user)
         payload = _serialize_message(
             msg,
             viewer_id=user.id,
-            viewer_language=user.native_language,
+            viewer_language=user_preferred_lang(user),
             sender_name=s_name,
             sender_avatar_url=s_avatar,
         )
-        await _publish_to_chat(db, cid, "new_message", {"chat_id": cid, "message": payload})
         created.append(payload)
+
+        if msg.type == "text" and (msg.text_original or "").strip():
+            peers = await _load_peers_except_sender(db, cid, user.id)
+            all_jobs.extend(
+                build_translation_jobs(
+                    message_id=msg.id,
+                    chat_id=cid,
+                    text=msg.text_original or "",
+                    source_lang=msg.original_language,
+                    sender_id=user.id,
+                    sender_language=user_preferred_lang(user),
+                    recipients=peers,
+                )
+            )
     await db.flush()
-    return {"items": created, "count": len(created)}
+    out: dict = {"items": created, "count": len(created)}
+    if all_jobs:
+        out["_translation_jobs"] = all_jobs
+    return out
 
 
 async def pin_message(
@@ -243,7 +343,7 @@ async def list_pinned(db: AsyncSession, *, user: User, chat_id: int) -> dict:
     rows = list(result.all())
     sender_map = await _load_sender_public_map(db, {m.sender_id for _, m in rows})
     reply_map = await _load_reply_to_payloads(
-        db, [m for _, m in rows], viewer_language=user.native_language
+        db, [m for _, m in rows], viewer_language=user_preferred_lang(user)
     )
     items = []
     for pin, msg in rows:
@@ -251,7 +351,7 @@ async def list_pinned(db: AsyncSession, *, user: User, chat_id: int) -> dict:
         payload = _serialize_message(
             msg,
             viewer_id=user.id,
-            viewer_language=user.native_language,
+            viewer_language=user_preferred_lang(user),
             reply_to=reply_map.get(msg.reply_to_id) if msg.reply_to_id else None,
             sender_name=s_name,
             sender_avatar_url=s_avatar,

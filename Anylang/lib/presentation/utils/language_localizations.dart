@@ -491,7 +491,7 @@ class LanguageLocalizations extends Translations {
       'settings_title': 'Sozlamalar',
       'settings_general': 'Umumiy',
       'settings_app_language': 'Ilova tili',
-      'settings_app_language_desc': 'Bu til ilova interfeysida ishlatiladi',
+      'settings_app_language_desc': 'Ilova tili — barcha chat xabarlari shu tilga avtomatik tarjima qilinadi',
       'settings_appearance': 'Ko‘rinish',
       'settings_theme': 'Tema',
       'settings_notifications': 'Bildirishnomalar',
@@ -1112,7 +1112,7 @@ class LanguageLocalizations extends Translations {
       'settings_title': 'Настройки',
       'settings_general': 'Общее',
       'settings_app_language': 'Язык приложения',
-      'settings_app_language_desc': 'Этот язык будет использоваться в интерфейсе приложения',
+      'settings_app_language_desc': 'Язык приложения — все сообщения чата автоматически переводятся на него',
       'settings_appearance': 'Оформление',
       'settings_theme': 'Тема',
       'settings_notifications': 'Уведомления',
@@ -1733,7 +1733,7 @@ class LanguageLocalizations extends Translations {
       'settings_title': 'Settings',
       'settings_general': 'General',
       'settings_app_language': 'App language',
-      'settings_app_language_desc': 'This language will be used across the app interface',
+      'settings_app_language_desc': 'App language — all chat messages are auto-translated into this language',
       'settings_appearance': 'Appearance',
       'settings_theme': 'Theme',
       'settings_notifications': 'Notifications',
@@ -1911,6 +1911,10 @@ class LanguageLocalizations extends Translations {
     Get.updateLocale(locale);
     var box = Hive.box("user");
     box.put("language", langCode);
+    // Tizim tili = tarjima tili.
+    final iso = langCode.split('_').first.split('-').first.toLowerCase();
+    const aliases = {'us': 'en', 'gb': 'en', 'eng': 'en'};
+    box.put("native_language", aliases[iso] ?? iso);
   }
 
 }

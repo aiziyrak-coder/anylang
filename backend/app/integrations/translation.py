@@ -1,4 +1,5 @@
 import logging
+import re
 
 import httpx
 
@@ -12,7 +13,7 @@ DEEPL_PRO_URL = "https://api.deepl.com/v2/translate"
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 _LANG_NAMES = {
-    "uz": "Uzbek",
+    "uz": "Uzbek (Latin script)",
     "ru": "Russian",
     "en": "English",
     "tr": "Turkish",
@@ -27,6 +28,7 @@ _LANG_NAMES = {
     "kk": "Kazakh",
     "ky": "Kyrgyz",
     "tg": "Tajik",
+    "uk": "Ukrainian",
 }
 
 # UI / locale leftovers → ISO 639-1 used by translation + DB matching.
@@ -37,12 +39,49 @@ _LANG_ALIASES = {
     "ua": "uk",
 }
 
+_LANG_QUALITY = {
+    "uz": (
+        "Uzbek: use modern Latin orthography (o‘, g‘, sh, ch, ng). "
+        "Correct case endings and verb agreement. No Russian word-order calques. "
+        "Natural spoken Uzbek for chat; never leave misspellings."
+    ),
+    "ru": (
+        "Russian: perfect cases, gender/number agreement, verb aspect, and punctuation. "
+        "Natural chat Russian; no literal calques from other languages."
+    ),
+    "en": (
+        "English: correct articles (a/an/the), verb tense/agreement, prepositions, "
+        "and spelling (US or consistent). Natural chat English; no broken syntax."
+    ),
+    "tr": (
+        "Turkish: correct agglutination and vowel harmony; natural chat Turkish."
+    ),
+}
+
 
 def _normalize_lang(code: str | None) -> str:
     raw = (code or "").strip().split("_")[0].split("-")[0].lower()
     if not raw:
         return "uz"
     return _LANG_ALIASES.get(raw, raw)
+
+
+def user_preferred_lang(user) -> str:
+    """Tarjima maqsad tili: tizim (app) tili = ona tili (bir xil)."""
+    app = getattr(user, "app_language", None)
+    native = getattr(user, "native_language", None)
+    # App language — sozlamalardan keladi; native fallback.
+    return _normalize_lang(app or native or "uz")
+
+
+def app_locale_for_iso(iso: str) -> str:
+    """ISO 639-1 → app_language locale (uz_UZ / ru_RU / us_US)."""
+    code = _normalize_lang(iso)
+    return {
+        "uz": "uz_UZ",
+        "ru": "ru_RU",
+        "en": "us_US",
+    }.get(code, f"{code}_{code.upper()}")
 
 
 def _lang_name(code: str | None) -> str:
@@ -56,40 +95,59 @@ def _deepl_lang(code: str) -> str:
     return _normalize_lang(code).upper()
 
 
-async def _translate_openai(text: str, target: str, source: str | None) -> str:
-    settings = get_settings()
-    src_name = _lang_name(source)
-    tgt_name = _lang_name(target)
-    system = (
-        "You are a precise translation engine for a messaging/chat app. "
-        "Translate the user message into the target language. "
-        "Rules: "
-        "1) Return ONLY the translated text — no quotes, labels, markdown, or commentary. "
-        "2) Preserve personal names, usernames, @mentions, hashtags, URLs, and emails exactly. "
-        "3) Keep all emojis and their positions; do not add or remove emojis. "
-        "4) Keep the translation concise and natural for chat — match the source length when possible. "
-        "5) Never invent, expand, summarize, or omit content that is not in the source. "
-        "6) If the text is already in the target language (or is only names/emojis/symbols), return it unchanged. "
-        "7) Preserve line breaks and basic punctuation intent."
-    )
-    user = (
-        f"Source language: {src_name}\n"
-        f"Target language: {tgt_name}\n\n"
-        f"Text to translate:\n{text}"
-    )
+def _translation_model(settings) -> str:
+    dedicated = (getattr(settings, "openai_translation_model", None) or "").strip()
+    if dedicated:
+        return dedicated
+    return (settings.openai_model or "gpt-4o-mini").strip()
+
+
+def _strip_model_wrappers(text: str) -> str:
+    out = (text or "").strip()
+    if not out:
+        return out
+    # Remove accidental labels / code fences.
+    out = re.sub(r"^```(?:\w+)?\s*", "", out)
+    out = re.sub(r"\s*```$", "", out)
+    out = out.strip()
+    # Strip wrapping quotes only when the whole string is quoted once.
+    if len(out) >= 2 and out[0] == out[-1] and out[0] in {'"', "'", "“", "”", "«", "»"}:
+        out = out[1:-1].strip()
+    for prefix in (
+        "Translation:",
+        "Translated:",
+        "Corrected:",
+        "Output:",
+        "Tarjima:",
+        "Перевод:",
+    ):
+        if out.lower().startswith(prefix.lower()):
+            out = out[len(prefix) :].strip()
+    return out.strip()
+
+
+async def _openai_chat(
+    *,
+    api_key: str,
+    model: str,
+    system: str,
+    user: str,
+    temperature: float = 0.0,
+    timeout: float = 35.0,
+) -> str:
     headers = {
-        "Authorization": f"Bearer {settings.openai_api_key}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": settings.openai_model,
-        "temperature": 0.2,
+        "model": model,
+        "temperature": temperature,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
         response.raise_for_status()
         data = response.json()
@@ -102,7 +160,90 @@ async def _translate_openai(text: str, target: str, source: str | None) -> str:
                 error_code="TRANSLATION_FAILED",
                 status_code=502,
             )
-        return content
+        return _strip_model_wrappers(content)
+
+
+def _translate_system(tgt: str) -> str:
+    quality = _LANG_QUALITY.get(tgt, "Use perfect native grammar, spelling, and syntax.")
+    return (
+        "You are a senior professional translator for AnyLang, a messaging app. "
+        "Recipients must read every chat message in their native language with "
+        "ZERO spelling, grammar, or syntax mistakes — native-speaker quality only.\n\n"
+        "Hard rules:\n"
+        "1) Output ONLY the translated message text. No quotes, labels, markdown, notes.\n"
+        "2) Meaning must stay exact: do not invent, expand, summarize, or omit.\n"
+        "3) Preserve names, @mentions, #hashtags, URLs, emails, phones, codes exactly.\n"
+        "4) Keep emojis and relative positions; do not add/remove emojis.\n"
+        "5) Match chat tone (casual/formal) and preserve line breaks.\n"
+        "6) If already in the target language, or only names/emojis/symbols/numbers — return unchanged.\n"
+        "7) Never produce broken word order, missing words, or misspellings.\n"
+        "8) Prefer natural idiomatic phrasing over word-for-word calques.\n\n"
+        f"Target-language quality bar:\n{quality}"
+    )
+
+
+def _proofread_system(tgt: str) -> str:
+    quality = _LANG_QUALITY.get(tgt, "Fix every grammar, spelling, and syntax error.")
+    return (
+        "You are a native-speaker copy editor for chat translations in AnyLang. "
+        "Your ONLY job is to eliminate spelling, grammar, syntax, and punctuation errors "
+        "while keeping the meaning identical.\n\n"
+        "Hard rules:\n"
+        "1) Output ONLY the corrected text — no quotes, labels, or commentary.\n"
+        "2) Fix: spelling, diacritics, grammar, agreement, word order, punctuation.\n"
+        "3) Do NOT change meaning, add content, remove content, or rephrase style unless "
+        "needed to fix an error.\n"
+        "4) Preserve names, @mentions, #hashtags, URLs, emails, phones, codes, emojis exactly.\n"
+        "5) Preserve line breaks.\n"
+        "6) If the text is already perfect, return it unchanged.\n\n"
+        f"Language focus:\n{quality}"
+    )
+
+
+async def _translate_openai(text: str, target: str, source: str | None) -> str:
+    settings = get_settings()
+    src_name = _lang_name(source)
+    tgt_name = _lang_name(target)
+    model = _translation_model(settings)
+    tgt = _normalize_lang(target)
+
+    draft = await _openai_chat(
+        api_key=settings.openai_api_key,
+        model=model,
+        system=_translate_system(tgt),
+        user=(
+            f"Source language: {src_name}\n"
+            f"Target language: {tgt_name}\n\n"
+            f"Text to translate:\n{text}"
+        ),
+        temperature=0.0,
+        timeout=35.0,
+    )
+
+    # Short / emoji-only: skip second pass.
+    meaningful = re.sub(r"[\W_]+", "", draft, flags=re.UNICODE)
+    if len(meaningful) < 3:
+        return draft
+
+    try:
+        polished = await _openai_chat(
+            api_key=settings.openai_api_key,
+            model=model,
+            system=_proofread_system(tgt),
+            user=(
+                f"Language: {tgt_name}\n"
+                f"Original source ({src_name}):\n{text}\n\n"
+                f"Draft translation to proofread:\n{draft}"
+            ),
+            temperature=0.0,
+            timeout=35.0,
+        )
+        if (polished or "").strip():
+            return polished
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Translation proofread skipped (%s); using draft", exc)
+
+    return draft
 
 
 async def _translate_deepl(text: str, target: str, source: str | None) -> str:

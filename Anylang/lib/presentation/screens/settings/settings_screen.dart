@@ -4,13 +4,16 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/auth_repository.dart';
+import '../../../data/network/chat_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/socket_service.dart';
 import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/language_localizations.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../chat/chat_state.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
 import '../forgot_password/forgot_password_screen.dart';
 import '../login/login_screen.dart';
@@ -80,8 +83,66 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         Get.find<ThemeController>().setMode(a.mode);
       case SelectAppLanguage a:
         state.currentLanguageKey.value = a.language.key;
-        if (a.language.localeCode != null) {
-          LanguageLocalizations.changeLocale(a.language.localeCode!);
+        final localeCode = a.language.localeCode;
+        if (localeCode != null) {
+          LanguageLocalizations.changeLocale(localeCode);
+          await SessionStore.applyAppLanguage(
+            localeCode: localeCode,
+            isoCode: a.language.langCode,
+          );
+        } else {
+          // UI tarjimasi yo'q tillar — faqat chat tarjima tilini yangilaydi.
+          await SessionStore.applyAppLanguage(
+            localeCode: SessionStore.appLanguage(),
+            isoCode: a.language.langCode,
+          );
+        }
+        try {
+          final result = await Get.find<ProfileRepository>().updateMe({
+            'app_language': SessionStore.appLanguage(),
+            'native_language': SessionStore.preferredLanguage(),
+          });
+          final map = asMap(result.dataOrNull);
+          if (map != null) {
+            await SessionStore.saveUser(map);
+          }
+        } catch (_) {
+          // Lokal til saqlangan; keyingi so'rovda sync bo'ladi.
+        }
+        // Ochiq chat tarixini yangi til bilan qayta yuklash.
+        if (Get.isRegistered<ChatState>()) {
+          final chat = Get.find<ChatState>();
+          final cid = chat.chatId.value;
+          if (cid > 0 && Get.isRegistered<ChatRepository>()) {
+            Future<void> reload() async {
+              final page =
+                  await Get.find<ChatRepository>().listMessages(cid, limit: 50);
+              page.when(
+                success: (data) {
+                  final me = SessionStore.userId();
+                  final raw = asList(data)
+                      .whereType<Map>()
+                      .map((e) => Map<String, dynamic>.from(e))
+                      .toList();
+                  final mapped = raw
+                      .map(
+                        (e) => mapChatMessageFromApi(
+                          e,
+                          me: me,
+                          peerName: chat.peerName.value,
+                        ),
+                      )
+                      .toList();
+                  chat.messages.assignAll(mapped);
+                },
+                failure: (_) {},
+              );
+            }
+
+            await reload();
+            // Background tarjima tugashi uchun qayta yuklash.
+            Future<void>.delayed(const Duration(seconds: 4), reload);
+          }
         }
       case SettingsLogoutRequested _:
         final logout = await Get.find<AuthRepository>().logout();

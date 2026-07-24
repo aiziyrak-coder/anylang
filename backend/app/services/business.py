@@ -174,8 +174,18 @@ async def update_user_profile(
         user.country = code
     if app_language is not None:
         user.app_language = app_language
+        # Tizim tili = tarjima (ona) tili — bir xil saqlanadi.
+        from app.integrations.translation import _normalize_lang
+
+        user.native_language = _normalize_lang(app_language)
     if native_language is not None:
-        user.native_language = native_language
+        from app.integrations.translation import _normalize_lang, app_locale_for_iso
+
+        iso = _normalize_lang(native_language)
+        user.native_language = iso
+        # App tilini ham sync (faqat UI bor tillar).
+        if iso in {"uz", "ru", "en"}:
+            user.app_language = app_locale_for_iso(iso)
 
     await db.flush()
     loaded = await load_user_for_response(db, user.id)

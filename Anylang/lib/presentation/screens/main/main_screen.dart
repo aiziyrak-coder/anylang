@@ -5,6 +5,7 @@ import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../../data/permissions/app_permissions.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -28,6 +29,25 @@ class MainScreen extends Screen<MainState, void> {
     if (!AppPermissions.alreadyRequested) {
       Future.microtask(() => AppPermissions.requestAllRequired());
     }
+    // Tizim tili = tarjima tili — server bilan sync.
+    Future.microtask(_syncLanguageToServer);
+  }
+
+  Future<void> _syncLanguageToServer() async {
+    if (!SessionStore.hasSession) return;
+    if (!Get.isRegistered<ProfileRepository>()) return;
+    final app = SessionStore.appLanguage();
+    final iso = SessionStore.preferredLanguage();
+    try {
+      final result = await Get.find<ProfileRepository>().updateMe({
+        'app_language': app,
+        'native_language': iso,
+      });
+      final map = asMap(result.dataOrNull);
+      if (map != null) {
+        await SessionStore.saveUser(map);
+      }
+    } catch (_) {}
   }
 
   @override

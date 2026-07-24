@@ -38,6 +38,25 @@ from app.services import messages as messages_service
 from app.services.business import _upload_image
 
 router = APIRouter()
+
+
+def _schedule_translation_jobs(background_tasks: BackgroundTasks, jobs: list[dict] | None) -> None:
+    if not jobs:
+        return
+    for job in jobs:
+        background_tasks.add_task(
+            messages_service.finish_message_translation_job,
+            message_id=job["message_id"],
+            chat_id=job["chat_id"],
+            text=job["text"],
+            target_lang=job["target_lang"],
+            source_lang=job.get("source_lang"),
+            sender_id=job["sender_id"],
+            sender_language=job["sender_language"],
+            recipient_ids=job.get("recipient_ids"),
+            recipient_id=job.get("recipient_id"),
+            recipient_language=job.get("recipient_language"),
+        )
 messages_router = APIRouter()
 
 
@@ -481,6 +500,7 @@ async def unpin_message(
 @router.get("/{chat_id}/messages", response_model=MessageListOut)
 async def list_chat_messages(
     chat_id: int,
+    background_tasks: BackgroundTasks,
     db: DbSession,
     current_user: CurrentUser,
     limit: int | None = Query(default=None, ge=1, le=100),
@@ -495,9 +515,12 @@ async def list_chat_messages(
         before_id=before_id,
         after_id=after_id,
     )
+    jobs = data.pop("_translation_jobs", None)
     data = await message_features_service.enrich_messages(
         db, data, viewer_id=current_user.id, chat_id=chat_id
     )
+    await db.commit()
+    _schedule_translation_jobs(background_tasks, jobs)
     return MessageListOut.model_validate(data)
 
 
@@ -522,21 +545,12 @@ async def send_message(
         reply_to_id=body.reply_to_id,
         media_id=body.media_id,
     )
-    job = data.pop("_translation_job", None)
+    jobs = data.pop("_translation_jobs", None)
+    legacy = data.pop("_translation_job", None)
+    if not jobs and legacy is not None:
+        jobs = [legacy]
     await db.commit()
-    if job:
-        background_tasks.add_task(
-            messages_service.finish_message_translation_job,
-            message_id=job["message_id"],
-            chat_id=job["chat_id"],
-            text=job["text"],
-            target_lang=job["target_lang"],
-            source_lang=job["source_lang"],
-            sender_id=job["sender_id"],
-            sender_language=job["sender_language"],
-            recipient_id=job["recipient_id"],
-            recipient_language=job["recipient_language"],
-        )
+    _schedule_translation_jobs(background_tasks, jobs)
     return MessageOut.model_validate(data)
 
 
@@ -562,6 +576,7 @@ async def mark_chat_read(
 async def edit_message(
     message_id: int,
     body: MessageEditIn,
+    background_tasks: BackgroundTasks,
     db: DbSession,
     redis: RedisClient,
     current_user: CurrentUser,
@@ -569,7 +584,9 @@ async def edit_message(
     data = await message_features_service.edit_message(
         db, redis, user=current_user, message_id=message_id, text=body.text
     )
+    jobs = data.pop("_translation_jobs", None)
     await db.commit()
+    _schedule_translation_jobs(background_tasks, jobs)
     return MessageOut.model_validate(data)
 
 
@@ -577,6 +594,7 @@ async def edit_message(
 async def forward_message(
     message_id: int,
     body: MessageForwardIn,
+    background_tasks: BackgroundTasks,
     db: DbSession,
     redis: RedisClient,
     current_user: CurrentUser,
@@ -589,7 +607,9 @@ async def forward_message(
         chat_ids=body.chat_ids,
         hide_sender=body.hide_sender,
     )
+    jobs = data.pop("_translation_jobs", None)
     await db.commit()
+    _schedule_translation_jobs(background_tasks, jobs)
     return data
 
 

@@ -197,6 +197,9 @@ class ChatMessage {
   ChatMessage withToggleOriginal() =>
       _copy(showingOriginal: !showingOriginal);
 
+  ChatMessage withShowingOriginal(bool value) =>
+      _copy(showingOriginal: value);
+
   ChatMessage withStatus(ChatStatus status) => _copy(status: status);
 
   ChatMessage withSenderMeta({

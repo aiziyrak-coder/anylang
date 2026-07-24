@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     deepl_api_key: str = ""
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    # Chat auto-translate: stronger model for grammar/spelling (falls back to openai_model).
+    openai_translation_model: str = "gpt-4o"
     deepgram_api_key: str = ""
     elevenlabs_api_key: str = ""
     translation_provider: str = "mock"  # mock | deepl | openai

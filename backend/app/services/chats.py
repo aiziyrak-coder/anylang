@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError
 from app.core.pagination import normalize_page
-from app.integrations.translation import _normalize_lang
+from app.integrations.translation import _normalize_lang, user_preferred_lang
 from app.models.chat import Chat, ChatParticipant, Message, MessageHide, MessageRead
 from app.models.user import User
 from app.ws.hub import get_hub
@@ -95,10 +95,13 @@ def _preview_text(message: Message, *, viewer_id: int, viewer_language: str) -> 
         return message.text_original
     lang = _normalize_lang(viewer_language)
     for translation in message.translations or []:
-        if _normalize_lang(translation.language) == lang:
-            if (translation.text or "").strip():
-                return translation.text
+        if _normalize_lang(translation.language) != lang:
+            continue
+        if (translation.status or "done") != "done":
             break
+        if (translation.text or "").strip():
+            return translation.text
+        break
     return message.text_original
 
 
@@ -123,7 +126,7 @@ async def _serialize_last_message(
     return {
         "id": message.id,
         "type": message.type,
-        "text": _preview_text(message, viewer_id=viewer.id, viewer_language=viewer.native_language),
+        "text": _preview_text(message, viewer_id=viewer.id, viewer_language=user_preferred_lang(viewer)),
         "meta": message.meta,
         "sender_id": message.sender_id,
         "created_at": message.created_at,
