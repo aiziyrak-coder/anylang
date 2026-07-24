@@ -24,6 +24,7 @@ import '../chat/chat_screen.dart';
 import '../create_group/create_group_screen.dart';
 import '../group_settings/group_settings_payload.dart';
 import '../group_settings/group_settings_screen.dart';
+import '../support_chat/support_chat_screen.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
 import 'conversation.dart';
@@ -239,6 +240,8 @@ class MessagesScreen extends Screen<MessagesState, void> {
         await _load();
       case RefreshConversations _:
         await _load();
+      case OpenSupportChat _:
+        await navigate(SupportChatScreen());
       case OpenUserChat a:
         await _openUserChat(a.user);
       case ChangeMessagesFilter a:

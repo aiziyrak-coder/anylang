@@ -9,6 +9,7 @@ import '../../ui/items/conversation_item.dart';
 import '../../ui/items/friend_result_item.dart';
 import '../../ui/search_field.dart';
 import '../../ui/theme/colors.dart';
+import '../../ui/theme/gradients.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -245,62 +246,86 @@ class MessagesContent extends ScreenContent<MessagesState> {
               if (searching) {
                 return _searchResults(c, state, sendAction);
               }
-              final items = state.conversations.toList();
-              if (items.isEmpty) {
-                return AppEmptyState(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: 'messages_empty'.tr,
-                  subtitle: 'messages_empty_hint'.tr,
-                );
-              }
-              return RefreshIndicator(
-                onRefresh: () async => sendAction(RefreshConversations()),
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
-                  itemCount: items.length,
-                  itemBuilder: (_, i) {
-                    final conv = items[i];
-                    return ConversationItem(
-                      initial: conv.initial,
-                      avatarGradient: conv.avatarGradient,
-                      initialColor: conv.initialColor,
-                      name: conv.name,
-                      lastMessage: conv.lastMessage,
-                      time: conv.time,
-                      online: conv.online,
-                      unread: conv.unread,
-                      highlighted: conv.highlighted,
-                      muted: conv.muted || SessionStore.isChatMuted(conv.id),
-                      pinned: conv.pinned,
-                      isGroup: conv.isGroup,
-                      avatarUrl: conv.avatarUrl,
-                      selected: state.selecting.value &&
-                          state.selectedIds.contains(conv.id),
-                      onTap: () {
-                        if (state.selecting.value) {
-                          sendAction(ToggleListSelect(conv));
-                        } else {
-                          sendAction(OpenConversation(conv));
+                  final items = state.conversations.toList();
+                  // Support doim tepada; bo'sh ro'yxatda ham ko'rinadi.
+                  return RefreshIndicator(
+                    onRefresh: () async => sendAction(RefreshConversations()),
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
+                      itemCount: items.isEmpty ? 2 : items.length + 1,
+                      itemBuilder: (_, i) {
+                        if (i == 0) {
+                          return ConversationItem(
+                            initial: 'S',
+                            avatarGradient: avatarGreenGradient,
+                            initialColor: kLime,
+                            name: 'support_agent_name'.tr,
+                            lastMessage: 'support_list_preview'.tr,
+                            time: '',
+                            online: true,
+                            unread: 0,
+                            highlighted: true,
+                            muted: false,
+                            pinned: true,
+                            isGroup: false,
+                            avatarUrl: null,
+                            selected: false,
+                            onTap: () => sendAction(OpenSupportChat()),
+                            onLongPress: (_) {},
+                          );
                         }
-                      },
-                      onLongPress: (rect) {
-                        if (state.selecting.value) {
-                          sendAction(ToggleListSelect(conv));
-                        } else {
-                          sendAction(LongPressConversation(conv, rect));
+                        if (items.isEmpty) {
+                          return Padding(
+                            padding: EdgeInsets.only(top: 24.dp),
+                            child: AppEmptyState(
+                              icon: Icons.chat_bubble_outline_rounded,
+                              title: 'messages_empty'.tr,
+                              subtitle: 'messages_empty_hint'.tr,
+                            ),
+                          );
                         }
+                        final conv = items[i - 1];
+                        return ConversationItem(
+                          initial: conv.initial,
+                          avatarGradient: conv.avatarGradient,
+                          initialColor: conv.initialColor,
+                          name: conv.name,
+                          lastMessage: conv.lastMessage,
+                          time: conv.time,
+                          online: conv.online,
+                          unread: conv.unread,
+                          highlighted: conv.highlighted,
+                          muted: conv.muted || SessionStore.isChatMuted(conv.id),
+                          pinned: conv.pinned,
+                          isGroup: conv.isGroup,
+                          avatarUrl: conv.avatarUrl,
+                          selected: state.selecting.value &&
+                              state.selectedIds.contains(conv.id),
+                          onTap: () {
+                            if (state.selecting.value) {
+                              sendAction(ToggleListSelect(conv));
+                            } else {
+                              sendAction(OpenConversation(conv));
+                            }
+                          },
+                          onLongPress: (rect) {
+                            if (state.selecting.value) {
+                              sendAction(ToggleListSelect(conv));
+                            } else {
+                              sendAction(LongPressConversation(conv, rect));
+                            }
+                          },
+                        );
                       },
-                    );
-                  },
-                ),
-              );
-            }),
+                    ),
+                  );
+                }),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        );
+      }
 
   Widget _searchResults(
     AppColors c,

@@ -113,6 +113,18 @@ def main() -> int:
         f"chmod 644 {REMOTE_DIR}/* && "
         f"ls -lh {REMOTE_DIR}",
     )
+    # Keep landing meta in sync if site root exists
+    landing_meta = ROOT / "landing" / "download-meta.json"
+    if landing_meta.exists():
+        tmp_landing = "/tmp/anylang-landing-meta.json"
+        sftp2 = c.open_sftp()
+        sftp2.put(str(landing_meta), tmp_landing)
+        sftp2.close()
+        sudo(
+            c,
+            f"cp {tmp_landing} /var/www/anylang/download-meta.json 2>/dev/null || true; "
+            f"cp {tmp_json} /var/www/anylang/download-meta.json 2>/dev/null || true",
+        )
     sudo(
         c,
         "curl -sS -o /dev/null -w 'apk:%{http_code} size:%{size_download}\\n' "

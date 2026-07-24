@@ -19,6 +19,9 @@ class ThemeSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    if (!Get.isRegistered<ThemeController>()) {
+      return const SizedBox.shrink();
+    }
     final controller = Get.find<ThemeController>();
 
     return Obx(() {

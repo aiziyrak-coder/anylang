@@ -168,3 +168,13 @@ class JoinGroupInvite extends ChatAction {
   final String token;
   JoinGroupInvite(this.token);
 }
+
+class OpenSharedContactChat extends ChatAction {
+  final ChatMessage message;
+  OpenSharedContactChat(this.message);
+}
+
+class AddSharedContact extends ChatAction {
+  final ChatMessage message;
+  AddSharedContact(this.message);
+}

@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/assets/landing.css" />
+  <link rel="stylesheet" href="/assets/landing.css?v=40" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23B8F25A'/%3E%3Cstop offset='1' stop-color='%2300C4B8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='%230B1A14'/%3E%3Cpath d='M16 38c7-14 25-14 32 0' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='22' r='6' fill='%23B8F25A'/%3E%3C/svg%3E" />
 </head>
 <body>
@@ -28,6 +28,7 @@
     <nav class="nav-links" aria-label="Asosiy">
       <a href="#essence">Nima bu?</a>
       <a href="#flow">Qanday</a>
+      <a href="#support">Yordam</a>
       <a href="#get">Yuklash</a>
     </nav>
     <a class="nav-cta" href="#get">APK</a>
@@ -42,8 +43,8 @@
         <p class="hero-sub">Ona tilingizda yozing yoki gapiring — suhbatdosh o‘z tilida o‘qiydi. Chegarasiz suhbat, bitta ilova.</p>
         <div class="hero-actions" id="get">
           <a
-            class="btn btn-primary"
             id="apk-download"
+            class="btn btn-primary apk-link"
             href="/download/anylang-latest.apk"
             download="AnyLang.apk"
           >
@@ -56,34 +57,32 @@
         </div>
       </div>
 
-      <div class="hero-device" aria-hidden="true">
-        <div class="device-glow"></div>
-        <div class="device">
+      <div class="hero-device" id="support">
+        <div class="device-glow" aria-hidden="true"></div>
+        <div class="device" role="region" aria-label="Sofiya qo'llab-quvvatlash chati">
           <div class="device-bar">
-            <span class="device-avatar">S</span>
+            <span class="device-avatar" aria-hidden="true">S</span>
             <div>
               <strong>Sofiya</strong>
-              <small>DE · tarjima yoqilgan</small>
+              <small>AnyLang · qo‘llab-quvvatlash</small>
+            </div>
+            <span class="device-online" title="Onlayn" aria-hidden="true"></span>
+          </div>
+          <div class="device-thread" id="support-thread">
+            <div class="msg in">
+              <span class="msg-dst">Salom! Men Sofiya — AnyLang yordamchisiman. APK, o‘rnatish yoki ilova haqida so‘rang.</span>
             </div>
           </div>
-          <div class="device-thread">
-            <div class="msg in anim-1">
-              <span class="msg-src">Hallo! Wie geht’s dir?</span>
-              <span class="msg-dst">Salom! Qalaysiz?</span>
-            </div>
-            <div class="msg out anim-2">
-              <span class="msg-src">Yaxshi — AnyLang orqali gaplashyapmiz.</span>
-              <span class="msg-dst">Gut — wir sprechen über AnyLang.</span>
-            </div>
-            <div class="msg in anim-3">
-              <span class="msg-src">Echtzeit-Übersetzung?</span>
-              <span class="msg-dst">Jonli tarjimami?</span>
-            </div>
-          </div>
-          <div class="device-input">
-            <span>Xabar yozing…</span>
-            <span class="send">↑</span>
-          </div>
+          <form class="device-input" id="support-form" autocomplete="off">
+            <input
+              id="support-input"
+              type="text"
+              maxlength="2000"
+              placeholder="Xabar yozing…"
+              aria-label="Qo'llab-quvvatlash xabari"
+            />
+            <button type="submit" class="send" id="support-send" aria-label="Yuborish">↑</button>
+          </form>
         </div>
       </div>
     </section>
@@ -129,7 +128,7 @@
             <span>Yozing yoki gapiring. Dunyo javob beradi.</span>
           </li>
         </ol>
-        <a class="btn btn-primary btn-sm" href="/download/anylang-latest.apk" download="AnyLang.apk">Hozir yuklash</a>
+        <a class="btn btn-primary btn-sm apk-link" href="/download/anylang-latest.apk" download="AnyLang.apk">Hozir yuklash</a>
       </div>
       <div class="flow-visual" aria-hidden="true">
         <div class="orb orb-a"></div>
@@ -146,7 +145,7 @@
     <section class="close">
       <h2>Bir suhbat. Barcha tillar.</h2>
       <p>Play Market chiqquncha release APK shu yerdan. Yangilang — yangi imkoniyatlar bilan.</p>
-      <a class="btn btn-primary" href="/download/anylang-latest.apk" download="AnyLang.apk">AnyLang yuklab olish</a>
+      <a class="btn btn-primary apk-link" href="/download/anylang-latest.apk" download="AnyLang.apk">AnyLang yuklab olish</a>
       <p class="soon">Google Play va App Store — tez orada</p>
     </section>
   </main>
@@ -159,6 +158,6 @@
     <p>© <span id="y"></span> AnyLang. Har til. Bitta suhbat.</p>
   </footer>
 
-  <script src="/assets/landing.js" defer></script>
+  <script src="/assets/landing.js?v=40" defer></script>
 </body>
 </html>

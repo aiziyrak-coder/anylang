@@ -513,6 +513,16 @@ class ChatContent extends ScreenContent<ChatState> {
               onJoinGroupInvite: selecting
                   ? null
                   : (token) => sendAction(JoinGroupInvite(token)),
+              onContactMessage: selecting
+                  ? null
+                  : (msg.type == ChatMsgType.contact
+                      ? () => sendAction(OpenSharedContactChat(msg))
+                      : null),
+              onContactAdd: selecting
+                  ? null
+                  : (msg.type == ChatMsgType.contact
+                      ? () => sendAction(AddSharedContact(msg))
+                      : null),
             ),
           );
         },

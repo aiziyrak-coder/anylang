@@ -79,6 +79,9 @@ class ChatMessage {
   final String? contactName;
   final String? contactPhone;
   final String? contactInitial;
+  final int? contactUserId;
+  final String? contactAvatarUrl;
+  final String? contactNumber;
 
   /// Tahrirlangan vaqt (API edited_at).
   final DateTime? editedAt;
@@ -121,6 +124,9 @@ class ChatMessage {
     this.contactName,
     this.contactPhone,
     this.contactInitial,
+    this.contactUserId,
+    this.contactAvatarUrl,
+    this.contactNumber,
     this.editedAt,
     this.reactions = const [],
     this.pinned = false,
@@ -189,6 +195,9 @@ class ChatMessage {
         contactName: contactName,
         contactPhone: contactPhone,
         contactInitial: contactInitial,
+        contactUserId: contactUserId,
+        contactAvatarUrl: contactAvatarUrl,
+        contactNumber: contactNumber,
         editedAt: editedAt ?? this.editedAt,
         reactions: reactions ?? this.reactions,
         pinned: pinned ?? this.pinned,
@@ -433,6 +442,9 @@ class ChatMessage {
     int? senderId,
     String? senderName,
     String? senderAvatarUrl,
+    int? userId,
+    String? avatarUrl,
+    String? number,
   }) =>
       ChatMessage(
         id: id,
@@ -447,6 +459,9 @@ class ChatMessage {
         contactName: name,
         contactPhone: phone,
         contactInitial: initial,
+        contactUserId: userId,
+        contactAvatarUrl: avatarUrl,
+        contactNumber: number,
       );
 
   /// Javob (reply) sitatasi va "Nusxa olish" uchun qisqa matn ko'rinishi.

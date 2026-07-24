@@ -23,6 +23,7 @@ import '../presentation/screens/forgot_password/forgot_password_screen.dart';
 import '../presentation/screens/restore_account/restore_account_screen.dart';
 import '../presentation/screens/group_settings/group_settings_state.dart';
 import '../presentation/screens/verify/verify_state.dart';
+import '../presentation/screens/support_chat/support_chat_state.dart';
 
 class StatesModule {
 
@@ -51,5 +52,6 @@ class StatesModule {
     Get.lazyPut<SubscriptionState>(() => SubscriptionState(), fenix: true);
     Get.lazyPut<EditBusinessInfoState>(() => EditBusinessInfoState(), fenix: true);
     Get.lazyPut<AddProductState>(() => AddProductState(), fenix: true);
+    Get.lazyPut<SupportChatState>(() => SupportChatState(), fenix: true);
   }
 }

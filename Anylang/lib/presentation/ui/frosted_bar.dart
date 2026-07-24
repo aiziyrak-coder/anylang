@@ -17,27 +17,47 @@ class FrostedBar extends StatelessWidget {
     required this.child,
     this.padding,
     this.border,
-    this.blurSigma = 28,
+    this.blurSigma = 32,
     this.alignment = Alignment.center,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final tint =
-        c.isDark ? const Color(0xEE101C2C) : const Color(0xF2F7F9FC);
 
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: Container(
-          alignment: alignment,
-          padding: padding,
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: tint,
-            border: border,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: c.isDark
+                  ? const [
+                      Color(0xC8243B55),
+                      Color(0xE6121E2E),
+                    ]
+                  : const [
+                      Color(0xF0FFFFFF),
+                      Color(0xE6F1F5FA),
+                    ],
+            ),
+            border: border ??
+                Border(
+                  top: BorderSide(
+                    color: c.isDark
+                        ? const Color(0x33FFFFFF)
+                        : const Color(0x22FFFFFF),
+                    width: 0.7,
+                  ),
+                ),
           ),
-          child: child,
+          child: Container(
+            alignment: alignment,
+            padding: padding,
+            child: child,
+          ),
         ),
       ),
     );

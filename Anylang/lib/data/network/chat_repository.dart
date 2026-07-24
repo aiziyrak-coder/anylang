@@ -330,6 +330,10 @@ class ChatRepository {
     );
   }
 
+  Future<BaseResult> previewInvite(String token) {
+    return _client.get(api: 'api/v1/chats/invite/$token');
+  }
+
   Future<BaseResult> uploadGroupAvatar(int chatId, String filePath) async {
     final name = filePath.split(RegExp(r'[\\/]')).last;
     final mime = lookupMimeType(filePath) ?? 'image/jpeg';

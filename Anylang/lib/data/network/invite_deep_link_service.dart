@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import '../core/mappers.dart';
 import '../local/session_store.dart';
 import 'chat_repository.dart';
+import '../../presentation/modal/group_invite_bottom_sheet.dart';
 import '../../presentation/screens/chat/chat_payload.dart';
 import '../../presentation/screens/chat/chat_screen.dart';
 import '../../presentation/utils/app_snackbar.dart';
@@ -23,7 +24,7 @@ class InviteDeepLinkService extends GetxService {
 
   static String? tokenFromText(String? text) {
     if (text == null || text.trim().isEmpty) return null;
-    final m = inviteTokenInText.firstMatch(text.trim());
+    final m = inviteTokenInText.firstMatch(text);
     return m?.group(1);
   }
 
@@ -55,12 +56,40 @@ class InviteDeepLinkService extends GetxService {
   Future<void> _handle(Uri uri) async {
     final token = tokenFromUri(uri);
     if (token == null || token.isEmpty) return;
-    await joinAndOpen(token);
+    await openInvite(token);
   }
 
-  Future<bool> joinAndOpen(String token) async {
+  /// Telegram uslubi: preview sheet (Join pastida) yoki a'zo bo'lsa chat.
+  Future<void> openInvite(String token, {BuildContext? context}) async {
+    if ((SessionStore.accessToken ?? '').isEmpty) return;
+    final ctx = context ?? Get.key.currentContext;
+    if (ctx == null) {
+      await joinAndOpen(token);
+      return;
+    }
+    await showGroupInviteBottomSheet(ctx, token: token);
+  }
+
+  Future<bool> joinAndOpen(
+    String token, {
+    int? alreadyMemberChatId,
+    String? titleHint,
+    String? avatarHint,
+    bool? isSuperHint,
+  }) async {
     if ((SessionStore.accessToken ?? '').isEmpty) return false;
     if (!Get.isRegistered<ChatRepository>()) return false;
+
+    if (alreadyMemberChatId != null && alreadyMemberChatId > 0) {
+      _pushChat(
+        chatId: alreadyMemberChatId,
+        title: titleHint ?? 'Guruh',
+        avatarUrl: avatarHint,
+        isSuper: isSuperHint ?? false,
+      );
+      return true;
+    }
+
     final result = await Get.find<ChatRepository>().joinByToken(token);
     var ok = false;
     result.when(
@@ -69,31 +98,49 @@ class InviteDeepLinkService extends GetxService {
         final map = asMap(data) ?? {};
         final chatId = (map['id'] as num?)?.toInt() ?? 0;
         if (chatId <= 0) return;
-        final title = map['title']?.toString() ?? 'Guruh';
-        final ctx = Get.key.currentContext;
-        if (ctx == null) return;
-        Navigator.of(ctx).push(
-          MaterialPageRoute(
-            builder: (_) => (ChatScreen()
-                  ..payload = ChatPayload(
-                    chatId: chatId,
-                    peerId: 0,
-                    name: title,
-                    initial: title.isNotEmpty ? title[0].toUpperCase() : 'G',
-                    avatarGradient: avatarGradientFor(chatId),
-                    avatarUrl: map['avatar_url']?.toString(),
-                    isGroup: true,
-                    myRole: map['my_role']?.toString(),
-                    isSuper: map['is_super'] == true,
-                    inviteLink: map['invite_link']?.toString(),
-                  ))
-                .build(),
-          ),
+        _pushChat(
+          chatId: chatId,
+          title: map['title']?.toString() ?? titleHint ?? 'Guruh',
+          avatarUrl: map['avatar_url']?.toString() ?? avatarHint,
+          isSuper: map['is_super'] == true || (isSuperHint ?? false),
+          myRole: map['my_role']?.toString(),
+          inviteLink: map['invite_link']?.toString(),
         );
       },
       failure: showAppError,
     );
     return ok;
+  }
+
+  void _pushChat({
+    required int chatId,
+    required String title,
+    String? avatarUrl,
+    bool isSuper = false,
+    String? myRole,
+    String? inviteLink,
+  }) {
+    final ctx = Get.key.currentContext;
+    if (ctx == null) return;
+    final name = title.trim().isEmpty ? 'Guruh' : title.trim();
+    Navigator.of(ctx).push(
+      MaterialPageRoute(
+        builder: (_) => (ChatScreen()
+              ..payload = ChatPayload(
+                chatId: chatId,
+                peerId: 0,
+                name: name,
+                initial: name.isNotEmpty ? name[0].toUpperCase() : 'G',
+                avatarGradient: avatarGradientFor(chatId),
+                avatarUrl: avatarUrl,
+                isGroup: true,
+                myRole: myRole,
+                isSuper: isSuper,
+                inviteLink: inviteLink,
+              ))
+            .build(),
+      ),
+    );
   }
 
   @override

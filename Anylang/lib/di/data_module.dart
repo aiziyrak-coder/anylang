@@ -23,6 +23,7 @@ import '../data/network/realtime_sync_service.dart';
 import '../data/network/socket_service.dart';
 import '../data/network/invite_deep_link_service.dart';
 import '../data/network/forward_pending_store.dart';
+import '../data/network/support_repository.dart';
 
 class DataModule {
   Future<void> initModule() async {
@@ -71,6 +72,10 @@ class DataModule {
     );
     Get.put<LanguagesRepository>(
       LanguagesRepository(client: Get.find()),
+      permanent: true,
+    );
+    Get.put<SupportRepository>(
+      SupportRepository(client: Get.find()),
       permanent: true,
     );
     Get.put<CountriesService>(

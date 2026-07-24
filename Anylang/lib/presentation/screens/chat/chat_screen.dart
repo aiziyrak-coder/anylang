@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/audio/voice_player_service.dart';
 import '../../../data/audio/voice_recorder_service.dart';
@@ -27,6 +28,7 @@ import '../../modal/chat_overflow_dialog.dart';
 import '../../modal/chat_overflow_sheet.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/message_actions_dialog.dart';
+import '../../modal/share_contact_bottom_sheet.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
@@ -455,8 +457,16 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         await _openUserProfile(a.userId);
 
       case JoinGroupInvite a:
-        final ok = await Get.find<InviteDeepLinkService>().joinAndOpen(a.token);
-        if (ok) showAppMessage('group_join_ok'.tr);
+        await Get.find<InviteDeepLinkService>().openInvite(
+          a.token,
+          context: context,
+        );
+
+      case OpenSharedContactChat a:
+        await _openSharedContactChat(a.message);
+
+      case AddSharedContact a:
+        await _addSharedContact(a.message);
 
       case OpenGroupSettings _:
         await navigate(
@@ -1347,10 +1357,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _attachContact() async {
-    final contact = await _pickContact();
+    final contact = await showShareContactBottomSheet(context);
     if (contact == null) return;
-    final name = contact.$1;
-    final phone = contact.$2;
+    final name = contact.name.trim();
+    if (name.isEmpty) return;
+    final phone = contact.phone.trim();
+    final number = contact.number?.trim();
     final optimistic = ChatMessage.contact(
       id: _nextId(),
       dir: ChatDir.outgoing,
@@ -1360,15 +1372,83 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       phone: phone,
       initial: initialsOf(name),
       status: ChatStatus.sent,
+      userId: contact.userId,
+      avatarUrl: contact.avatarUrl,
+      number: number,
     );
     await _sendMetaMessage(
       type: 'contact',
       meta: {
         'contact_name': name,
-        'contact_phone': phone,
+        if (phone.isNotEmpty) 'contact_phone': phone,
+        if (contact.userId != null) 'contact_user_id': contact.userId,
+        if ((contact.avatarUrl ?? '').isNotEmpty)
+          'contact_avatar_url': contact.avatarUrl,
+        if ((number ?? '').isNotEmpty) 'contact_number': number,
       },
       optimistic: optimistic,
     );
+  }
+
+  Future<void> _openSharedContactChat(ChatMessage msg) async {
+    final userId = msg.contactUserId;
+    if (userId != null && userId > 0) {
+      if (userId == SessionStore.userId()) {
+        showAppMessage('chat_contact_self'.tr);
+        return;
+      }
+      final chat = await Get.find<ChatRepository>().createChat(userId);
+      final map = asMap(chat.dataOrNull);
+      if (map == null) {
+        if (chat.errorOrNull != null) showAppError(chat.errorOrNull);
+        return;
+      }
+      final chatId = (map['id'] as num?)?.toInt() ?? 0;
+      if (chatId <= 0) return;
+      final name = msg.contactName ?? 'User';
+      await navigate(
+        ChatScreen(),
+        payload: ChatPayload(
+          chatId: chatId,
+          peerId: userId,
+          name: name,
+          initial: initialsOf(name),
+          avatarGradient: avatarGradientFor(userId),
+          avatarUrl: msg.contactAvatarUrl,
+        ),
+      );
+      return;
+    }
+    final phone = (msg.contactPhone ?? '').trim();
+    if (phone.isEmpty) {
+      showAppMessage('chat_contact_no_phone'.tr);
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: phone);
+    await launchUrl(uri);
+  }
+
+  Future<void> _addSharedContact(ChatMessage msg) async {
+    final userId = msg.contactUserId;
+    if (userId != null && userId > 0) {
+      if (userId == SessionStore.userId()) {
+        showAppMessage('chat_contact_self'.tr);
+        return;
+      }
+      final result = await Get.find<FriendsRepository>().sendRequest(userId);
+      result.when(
+        success: (_) => showAppMessage('chat_contact_added'.tr),
+        failure: showAppError,
+      );
+      return;
+    }
+    final phone = (msg.contactPhone ?? '').trim();
+    if (phone.isEmpty) {
+      showAppMessage('chat_contact_no_phone'.tr);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: phone));
+    showAppMessage('chat_contact_phone_copied'.tr);
   }
 
   Future<void> _uploadAndSendMedia({
@@ -1614,68 +1694,6 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         );
       },
     );
-  }
-
-  Future<(String, String)?> _pickContact() async {
-    final user = SessionStore.user();
-    final nameCtrl = TextEditingController(
-      text: user?['full_name']?.toString() ?? '',
-    );
-    final phoneCtrl = TextEditingController(
-      text: user?['phone']?.toString() ?? '',
-    );
-    if (!context.mounted) return null;
-    final c = context.appColors;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: c.isDark ? const Color(0xFF0C2136) : Colors.white,
-        title: Text(
-          'chat_attach_contact'.tr,
-          style: TextStyle(color: c.textPrimary),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'full_name'.tr,
-
-                labelStyle: TextStyle(color: c.textSecondary),
-              ),
-              style: TextStyle(color: c.textPrimary),
-            ),
-            SizedBox(height: 12.dp),
-            TextField(
-              controller: phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'profile_phone'.tr,
-                labelStyle: TextStyle(color: c.textSecondary),
-              ),
-              style: TextStyle(color: c.textPrimary),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('common_cancel'.tr),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('chat_contact_send'.tr),
-          ),
-        ],
-      ),
-    );
-    final name = nameCtrl.text.trim();
-    final phone = phoneCtrl.text.trim();
-    nameCtrl.dispose();
-    phoneCtrl.dispose();
-    if (ok != true || name.isEmpty) return null;
-    return (name, phone);
   }
 
   Future<void> _openChatProduct(ChatMessage msg) async {

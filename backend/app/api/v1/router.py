@@ -14,6 +14,7 @@ from app.api.v1 import (
     payments,
     products,
     subscription,
+    support,
     users,
 )
 
@@ -30,6 +31,7 @@ api_router.include_router(products.router, prefix="/products", tags=["products"]
 api_router.include_router(products.users_router, tags=["products"])
 api_router.include_router(friends.router, prefix="/friends", tags=["friends"])
 api_router.include_router(live.router, prefix="/live", tags=["live"])
+api_router.include_router(support.router, prefix="/support", tags=["support"])
 api_router.include_router(chats.router, prefix="/chats", tags=["chats"])
 api_router.include_router(chats.messages_router, tags=["messages"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])

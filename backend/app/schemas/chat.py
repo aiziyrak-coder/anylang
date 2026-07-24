@@ -110,6 +110,17 @@ class InviteOut(BaseModel):
     enabled: bool = True
 
 
+class InvitePreviewOut(BaseModel):
+    token: str
+    title: str
+    avatar_url: str | None = None
+    member_count: int = 0
+    is_member: bool = False
+    is_super: bool = False
+    chat_id: int | None = None
+    invite_link: str | None = None
+
+
 class ChatSearchItemOut(BaseModel):
     id: int
     type: Literal["direct", "group"] = "direct"

@@ -507,6 +507,9 @@ ChatMessage mapChatMessageFromApi(
             phone: meta['contact_phone']?.toString() ?? '',
             initial: initialsOf(name),
             status: status,
+            userId: (meta['contact_user_id'] as num?)?.toInt(),
+            avatarUrl: meta['contact_avatar_url']?.toString(),
+            number: meta['contact_number']?.toString(),
           );
         }(),
       _ => ChatMessage.text(

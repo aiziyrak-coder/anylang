@@ -354,6 +354,14 @@ class ProfileContent extends ScreenContent<ProfileState> {
           subtitle: 'settings_app_desc'.tr,
           onTap: () => sendAction(OpenAppSettings()),
         ),
+        SizedBox(height: 10.dp),
+        _settingsTile(
+          c,
+          icon: Icons.support_agent_rounded,
+          title: 'support_open'.tr,
+          subtitle: 'support_open_desc'.tr,
+          onTap: () => sendAction(OpenSupportFromProfile()),
+        ),
       ],
     );
   }

@@ -152,13 +152,15 @@ class AppColors extends ThemeExtension<AppColors> {
 /// Light: yorug' fon + to'q matn/ikon/akssent.
 const AppColors lightAppColors = AppColors(
   brightness: Brightness.light,
-  background: Color(0xFFF0F3F8),
+  background: Color(0xFFF0F4F9),
   backgroundGradient: LinearGradient(
     colors: [
-      Color(0xFFF7F9FC),
-      Color(0xFFE8EEF5),
-      Color(0xFFDCE5F0),
+      Color(0xFFF8FBFF),
+      Color(0xFFE8F0F8),
+      Color(0xFFD5E3F2),
+      Color(0xFFE4EDF0),
     ],
+    stops: [0.0, 0.32, 0.68, 1.0],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   ),
@@ -184,10 +186,12 @@ const AppColors darkAppColors = AppColors(
   background: Color(0xFF06111F),
   backgroundGradient: LinearGradient(
     colors: [
-      Color(0xFF040D18),
-      Color(0xFF0A1A2E),
-      Color(0xFF102438),
+      Color(0xFF030B14),
+      Color(0xFF0A1C30),
+      Color(0xFF123048),
+      Color(0xFF0C2236),
     ],
+    stops: [0.0, 0.32, 0.68, 1.0],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   ),

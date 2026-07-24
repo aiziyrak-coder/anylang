@@ -13,6 +13,8 @@ class OpenNumbers extends ProfileAction {}
 /// "Tizim sozlamalari" — til, tema, bildirishnomalar.
 class OpenAppSettings extends ProfileAction {}
 
+class OpenSupportFromProfile extends ProfileAction {}
+
 /// "Akkaunt sozlamalari" — maxfiylik, parol, chiqish.
 class OpenAccountSettings extends ProfileAction {}
 

@@ -12,11 +12,12 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
 import 'settings_action.dart';
-import 'settings_payload.dart';
 import 'settings_state.dart';
 
 /// Yagona sozlamalar: til, ko‘rinish, bildirishnomalar, maxfiylik, hisob.
 class SettingsContent extends ScreenContent<SettingsState> {
+  SettingsContent() : super(color: Colors.transparent);
+
   String _visibilityLabel(String key) => 'settings_visibility_$key'.tr;
 
   @override
@@ -35,11 +36,9 @@ class SettingsContent extends ScreenContent<SettingsState> {
               ),
             ),
             Expanded(
-              child: Obx(
-                () => SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(16.dp, 16.dp, 16.dp, 24.dp),
-                  child: _body(context, c, state, sendAction),
-                ),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(16.dp, 16.dp, 16.dp, 24.dp),
+                child: _body(context, c, state, sendAction),
               ),
             ),
           ],
@@ -67,6 +66,13 @@ class SettingsContent extends ScreenContent<SettingsState> {
                 showChevron: true,
                 onTap: () => _openAppLanguage(context, state, sendAction),
               )),
+          InfoRow(
+            icon: Icons.support_agent_rounded,
+            label: 'support_open'.tr,
+            value: 'support_agent_name'.tr,
+            showChevron: true,
+            onTap: () => sendAction(OpenSupportFromSettings()),
+          ),
         ], padHorizontal: false),
         SizedBox(height: 20.dp),
         _sectionLabel(c, 'settings_appearance'.tr),

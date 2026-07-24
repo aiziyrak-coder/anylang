@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -41,6 +42,9 @@ class ChatMessageItem extends StatelessWidget {
   final bool selected;
   /// Guruh invite linki ostidagi "Qo'shilish" tugmasi.
   final ValueChanged<String>? onJoinGroupInvite;
+  /// Kontakt kartasi: Xabar / Qo‘shish.
+  final VoidCallback? onContactMessage;
+  final VoidCallback? onContactAdd;
 
   const ChatMessageItem({
     super.key,
@@ -56,6 +60,8 @@ class ChatMessageItem extends StatelessWidget {
     this.selecting = false,
     this.selected = false,
     this.onJoinGroupInvite,
+    this.onContactMessage,
+    this.onContactAdd,
   });
 
   bool get _out => message.isOutgoing;
@@ -203,7 +209,7 @@ class ChatMessageItem extends StatelessWidget {
   Widget _body(BuildContext context, AppColors c) {
     switch (message.type) {
       case ChatMsgType.text:
-        return _text(c);
+        return _text(context, c);
       case ChatMsgType.image:
         return _image(context, c);
       case ChatMsgType.voice:
@@ -418,14 +424,14 @@ class ChatMessageItem extends StatelessWidget {
   // Turlar
   // ---------------------------------------------------------------------------
 
-  Widget _text(AppColors c) {
-    final inviteToken = InviteDeepLinkService.tokenFromText(
-      '${message.displayText}\n${message.textOriginal ?? ''}',
-    );
-    final showJoin = !_out &&
-        inviteToken != null &&
+  Widget _text(BuildContext context, AppColors c) {
+    final rawForToken =
+        '${message.displayText}\n${message.textOriginal ?? ''}';
+    final inviteToken = InviteDeepLinkService.tokenFromText(rawForToken);
+    final showJoin = inviteToken != null &&
         inviteToken.isNotEmpty &&
         onJoinGroupInvite != null;
+    final bodyText = message.displayText.isEmpty ? '—' : message.displayText;
 
     // IntrinsicWidth: qisqa matn bubble'ni kontentga qisqartiradi;
     // tashqi ConstrainedBox maxWidth (~76%) chegara sifatida qoladi.
@@ -437,14 +443,16 @@ class ChatMessageItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (message.reply != null) _replyQuote(c, message.reply!),
-            Text(
-              message.displayText.isEmpty ? '—' : message.displayText,
-              style: TextStyle(
+            _InviteAwareText(
+              text: bodyText,
+              baseStyle: TextStyle(
                 color: _primaryText(c),
                 fontSize: 15.sp,
                 fontWeight: _out ? FontWeight.w600 : FontWeight.w400,
                 height: 1.3,
               ),
+              linkColor: _out ? c.onAccent : c.accentText,
+              onInviteTap: onJoinGroupInvite,
             ),
             if (showJoin) ...[
               SizedBox(height: 10.dp),
@@ -1050,61 +1058,63 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Widget _contact(AppColors c) {
-    return GestureDetector(
-      onTap: () async {
-        final phone = message.contactPhone?.trim() ?? '';
-        if (phone.isEmpty) return;
-        HapticFeedback.selectionClick();
-        final uri = Uri(scheme: 'tel', path: phone);
-        await launchUrl(uri);
-      },
-      child: _bubble(
-        c,
-        Column(
+    final name = (message.contactName ?? '').trim().isEmpty
+        ? 'chat_contact_fallback'.tr
+        : message.contactName!.trim();
+    final phone = (message.contactPhone ?? '').trim();
+    final number = (message.contactNumber ?? '').trim();
+    final subtitle = phone.isNotEmpty
+        ? phone
+        : (number.isNotEmpty ? '#$number' : 'chat_contact_fallback'.tr);
+    final titleColor = _primaryText(c);
+    final subColor = _metaColor(c);
+    final actionColor = _out ? c.onAccent : c.accentText;
+    final lineColor = _out
+        ? c.onAccent.withValues(alpha: 0.28)
+        : c.outline.withValues(alpha: 0.7);
+
+    return _bubble(
+      c,
+      ConstrainedBox(
+        constraints: BoxConstraints(minWidth: 210.dp),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Container(
-                  width: 44.dp,
-                  height: 44.dp,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: c.accentSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    message.contactInitial ?? '',
-                    style: TextStyle(
-                      color: c.accentText,
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                ProfileAvatar(
+                  initial: (message.contactInitial ?? initialsOf(name)),
+                  gradient: avatarGradientFor(message.contactUserId ?? name.hashCode),
+                  imageUrl: message.contactAvatarUrl,
+                  size: 48,
+                  shape: ProfileAvatarShape.circle,
                 ),
                 SizedBox(width: 12.dp),
-                Flexible(
+                Expanded(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        message.contactName ?? '',
+                        name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
+                          color: titleColor,
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       SizedBox(height: 3.dp),
                       Text(
-                        message.contactPhone ?? '',
-                        style: TextStyle(color: c.textFaint, fontSize: 12.sp),
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: subColor,
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -1112,19 +1122,57 @@ class ChatMessageItem extends StatelessWidget {
               ],
             ),
             SizedBox(height: 10.dp),
-            Divider(height: 1.dp, thickness: 1, color: c.outline),
-            SizedBox(height: 8.dp),
-            Center(
-              child: Text(
-                'chat_contact_send'.tr,
-                style: TextStyle(
-                  color: c.accentText,
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
+            Divider(height: 1.dp, thickness: 1, color: lineColor),
+            SizedBox(height: 2.dp),
+            Row(
+              children: [
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onContactMessage,
+                      borderRadius: BorderRadius.circular(8.dp),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10.dp),
+                        child: Text(
+                          'chat_contact_message'.tr,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: actionColor,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                Container(width: 1.dp, height: 28.dp, color: lineColor),
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onContactAdd,
+                      borderRadius: BorderRadius.circular(8.dp),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10.dp),
+                        child: Text(
+                          'chat_contact_add'.tr,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: actionColor,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 6.dp),
             Align(alignment: Alignment.centerRight, child: _meta(c)),
           ],
         ),
@@ -1298,5 +1346,87 @@ class _PinStemPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PinStemPainter oldDelegate) =>
       oldDelegate.color != color;
+}
+
+/// Xabar matnidagi AnyLang guruh linklarini bosiladigan qiladi.
+class _InviteAwareText extends StatefulWidget {
+  final String text;
+  final TextStyle baseStyle;
+  final Color linkColor;
+  final ValueChanged<String>? onInviteTap;
+
+  const _InviteAwareText({
+    required this.text,
+    required this.baseStyle,
+    required this.linkColor,
+    this.onInviteTap,
+  });
+
+  @override
+  State<_InviteAwareText> createState() => _InviteAwareTextState();
+}
+
+class _InviteAwareTextState extends State<_InviteAwareText> {
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+
+    final text = widget.text;
+    final matches = InviteDeepLinkService.inviteTokenInText.allMatches(text).toList();
+    if (matches.isEmpty || widget.onInviteTap == null) {
+      return Text(text, style: widget.baseStyle);
+    }
+
+    final spans = <InlineSpan>[];
+    var start = 0;
+    for (final m in matches) {
+      if (m.start > start) {
+        spans.add(TextSpan(
+          text: text.substring(start, m.start),
+          style: widget.baseStyle,
+        ));
+      }
+      final url = m.group(0)!;
+      final token = m.group(1)!;
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () => widget.onInviteTap?.call(token);
+      _recognizers.add(recognizer);
+      spans.add(
+        TextSpan(
+          text: url,
+          style: widget.baseStyle.copyWith(
+            color: widget.linkColor,
+            decoration: TextDecoration.underline,
+            decorationColor: widget.linkColor,
+            fontWeight: FontWeight.w700,
+          ),
+          recognizer: recognizer,
+        ),
+      );
+      start = m.end;
+    }
+    if (start < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(start),
+        style: widget.baseStyle,
+      ));
+    }
+
+    return Text.rich(TextSpan(children: spans));
+  }
 }
 

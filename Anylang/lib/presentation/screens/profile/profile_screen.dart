@@ -22,6 +22,7 @@ import '../settings/settings_payload.dart';
 import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../numbers/numbers_screen.dart';
+import '../support_chat/support_chat_screen.dart';
 import 'profile_account.dart';
 import 'profile_action.dart';
 import 'profile_content.dart';
@@ -113,6 +114,8 @@ class ProfileScreen extends Screen<ProfileState, void> {
           payload: const SettingsPayload(focus: SettingsFocus.app),
         );
         await _load();
+      case OpenSupportFromProfile _:
+        await navigate(SupportChatScreen());
       case OpenAccountSettings _:
         // Akkaunt sozlamalari olib tashlandi — tizim sozlamalariga yo'naltiriladi.
         await navigate(

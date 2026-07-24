@@ -42,6 +42,8 @@ class ChangeMessagesFilter extends MessagesAction {
   ChangeMessagesFilter(this.filter);
 }
 
+class OpenSupportChat extends MessagesAction {}
+
 /// Suhbatdosh item long-press — kontekst oynachasi.
 class LongPressConversation extends MessagesAction {
   final Conversation conversation;

@@ -23,6 +23,7 @@ class OpenChangePassword extends SettingsAction {}
 class OpenEditProfileFromSettings extends SettingsAction {}
 class OpenSubscriptionFromSettings extends SettingsAction {}
 class OpenNumbersFromSettings extends SettingsAction {}
+class OpenSupportFromSettings extends SettingsAction {}
 class SettingsLogoutRequested extends SettingsAction {}
 
 class SettingsDeleteAccountRequested extends SettingsAction {}

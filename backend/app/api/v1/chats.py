@@ -18,6 +18,7 @@ from app.schemas.chat import (
     GroupMembersAddIn,
     GroupUpdateIn,
     InviteOut,
+    InvitePreviewOut,
     MembersOut,
     MessageCreateIn,
     MessageDeletedOut,
@@ -157,6 +158,18 @@ async def join_group_by_token(
     )
     await db.commit()
     return ChatOut.model_validate(data)
+
+
+@router.get("/invite/{token}", response_model=InvitePreviewOut)
+async def preview_group_invite(
+    token: str,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> InvitePreviewOut:
+    data = await group_admin_service.preview_by_token(
+        db, user=current_user, token=token
+    )
+    return InvitePreviewOut.model_validate(data)
 
 
 @router.get("/search", response_model=ChatSearchOut)

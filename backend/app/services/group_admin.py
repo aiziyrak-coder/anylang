@@ -297,6 +297,33 @@ async def disable_invite(db: AsyncSession, *, user: User, chat_id: int) -> dict:
     return {"ok": True, "enabled": False}
 
 
+async def preview_by_token(
+    db: AsyncSession, *, user: User, token: str
+) -> dict:
+    result = await db.execute(
+        select(Chat).where(Chat.invite_token == token, Chat.type == "group")
+    )
+    chat = result.scalar_one_or_none()
+    if chat is None or not chat.invite_enabled:
+        raise AppError(
+            message="Invite yaroqsiz",
+            error_code="INVITE_INVALID",
+            status_code=404,
+        )
+    existing = await _get_participant(db, chat.id, user.id)
+    title = (chat.title or "").strip() or "Guruh"
+    return {
+        "token": token,
+        "title": title,
+        "avatar_url": chat.avatar_url,
+        "member_count": await _count_members(db, chat.id),
+        "is_member": existing is not None,
+        "is_super": bool(chat.is_super),
+        "chat_id": chat.id if existing is not None else None,
+        "invite_link": _invite_link(chat.invite_token),
+    }
+
+
 async def join_by_token(
     db: AsyncSession, *, user: User, token: str, redis: Redis | None = None
 ) -> dict:

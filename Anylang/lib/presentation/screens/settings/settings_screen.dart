@@ -21,6 +21,7 @@ import '../profile_edit/profile_edit_screen.dart';
 import '../select_language/select_language_option.dart';
 import '../subscription/subscription_screen.dart';
 import '../numbers/numbers_screen.dart';
+import '../support_chat/support_chat_screen.dart';
 import '../../modal/simple_list_picker_bottom_sheet.dart';
 import 'blocked_users_bottom_sheet.dart';
 import 'settings_action.dart';
@@ -44,28 +45,32 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
 
   @override
   void initState(SettingsPayload? payload) {
-    state.focus.value = payload?.focus ?? SettingsFocus.app;
-    final native = SessionStore.nativeLanguage();
-    final byNative = languageOptions.where((o) => o.langCode == native);
-    if (byNative.isNotEmpty) {
-      state.currentLanguageKey.value = byNative.first.key;
-    } else {
-      final locale = Get.locale;
-      if (locale != null) {
-        final code = '${locale.languageCode}_${locale.countryCode}';
-        final match = languageOptions.firstWhere(
-          (o) => o.localeCode == code,
-          orElse: () => languageOptions.first,
-        );
-        state.currentLanguageKey.value = match.key;
+    try {
+      state.focus.value = payload?.focus ?? SettingsFocus.app;
+      final native = SessionStore.nativeLanguage();
+      final byNative = languageOptions.where((o) => o.langCode == native);
+      if (byNative.isNotEmpty) {
+        state.currentLanguageKey.value = byNative.first.key;
+      } else {
+        final locale = Get.locale;
+        if (locale != null) {
+          final code = '${locale.languageCode}_${locale.countryCode}';
+          final match = languageOptions.firstWhere(
+            (o) => o.localeCode == code,
+            orElse: () => languageOptions.first,
+          );
+          state.currentLanguageKey.value = match.key;
+        }
       }
+      state.newMessagesEnabled.value =
+          SessionStore.newMessagesNotificationsEnabled();
+      state.friendRequestsEnabled.value =
+          SessionStore.friendRequestsNotificationsEnabled();
+      state.marketingEnabled.value = SessionStore.marketingNotificationsEnabled();
+      state.profileVisibilityKey.value = SessionStore.profileVisibility();
+    } catch (e, st) {
+      debugPrint('SettingsScreen.initState: $e\n$st');
     }
-    state.newMessagesEnabled.value =
-        SessionStore.newMessagesNotificationsEnabled();
-    state.friendRequestsEnabled.value =
-        SessionStore.friendRequestsNotificationsEnabled();
-    state.marketingEnabled.value = SessionStore.marketingNotificationsEnabled();
-    state.profileVisibilityKey.value = SessionStore.profileVisibility();
   }
 
   @override
@@ -220,6 +225,8 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         await navigate(SubscriptionScreen());
       case OpenNumbersFromSettings _:
         await navigate(NumbersScreen());
+      case OpenSupportFromSettings _:
+        await navigate(SupportChatScreen());
     }
   }
 }
