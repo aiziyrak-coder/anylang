@@ -1,13 +1,13 @@
 {
-  "version": "1.0.53",
-  "build": 54,
-  "version_full": "1.0.53+54",
+  "version": "1.0.54",
+  "build": 55,
+  "version_full": "1.0.54+55",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.53+54.apk",
-  "size_bytes": 90808361,
-  "size_mb": 86.6,
-  "updated_at": "2026-07-25T10:54:03.657841+00:00",
+  "versioned_filename": "anylang-1.0.54+55.apk",
+  "size_bytes": 90857573,
+  "size_mb": 86.65,
+  "updated_at": "2026-07-25T11:10:31.854412+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.53 — offline chat, voice STT, nearby"
+  "notes": "Release 1.0.54 — business add product, login form keep"
 }
