@@ -6,7 +6,7 @@ import '../../ui/app_loading.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/items/friend_result_item.dart';
-import '../../ui/items/user_search_item.dart';
+import '../../ui/items/user_card_item.dart';
 import '../../ui/search_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -115,48 +115,54 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
       itemCount: items.length,
       itemBuilder: (_, i) {
         final r = items[i];
-        if (isFriendsMode) {
-          return KeyedSubtree(
-            key: ValueKey('friend-${r.id}-${r.action.name}-${r.requestId}'),
-            child: _friendItem(r, sendAction),
-          );
-        }
-        return UserSearchItem(
-          initial: r.initial,
-          avatarGradient: r.avatarGradient,
-          avatarUrl: r.avatarUrl,
-          name: r.name,
-          subtitle: r.subtitle,
-          online: r.online,
-          onTap: () => sendAction(OpenUserChat(r)),
+        return KeyedSubtree(
+          key: ValueKey('friend-${r.id}-${r.action.name}-${r.requestId}'),
+          child: _userCard(r, isFriendsMode, sendAction),
         );
       },
     );
   }
 
-  Widget _friendItem(AddFriendResult r, void Function(MyAction) sendAction) {
+  Widget _userCard(
+    AddFriendResult r,
+    bool isFriendsMode,
+    void Function(MyAction) sendAction,
+  ) {
     final isFriend = r.action == FriendActionState.message;
     final isRequested = r.action == FriendActionState.requested;
-    final label = isFriend
-        ? 'add_friend_message'.tr
-        : (isRequested
-            ? 'add_friend_requested'.tr
-            : 'add_friend_add'.tr);
+    void openChat() {
+      if (isFriendsMode) {
+        sendAction(MessageResult(r));
+      } else {
+        sendAction(OpenUserChat(r));
+      }
+    }
 
-    return FriendResultItem(
+    return UserCardItem(
       initial: r.initial,
       avatarGradient: r.avatarGradient,
       avatarUrl: r.avatarUrl,
       name: r.name,
-      subtitle: r.subtitle,
       online: r.online,
-      action: r.action,
-      actionLabel: label,
-      onAction: () {
-        if (isFriend) {
-          sendAction(MessageResult(r));
-        } else if (isRequested) {
-          // Status: "So'rov yuborildi" — bekor qilish uchun qayta bosish.
+      country: r.country,
+      businessRole: r.businessRole,
+      keywords: r.keywords,
+      isBusiness: r.isBusiness,
+      rating: r.rating,
+      verified: r.verified,
+      languages: r.languages,
+      productsCount: r.productsCount,
+      countriesCount: r.countriesCount,
+      showMessage: true,
+      showAdd: !isFriend,
+      addEnabled: !isRequested,
+      addLabel: isRequested
+          ? 'add_friend_requested'.tr
+          : 'user_card_add'.tr,
+      onTap: openChat,
+      onMessage: openChat,
+      onAdd: () {
+        if (isRequested) {
           sendAction(CancelFriendRequest(r));
         } else {
           sendAction(SendFriendRequest(r));

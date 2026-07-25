@@ -21,6 +21,7 @@ router = APIRouter()
 @router.get("", response_model=FriendListOut)
 async def list_friends(
     db: DbSession,
+    redis: RedisClient,
     current_user: CurrentUser,
     search: str | None = None,
     page: int | None = Query(default=None, ge=1),
@@ -32,6 +33,7 @@ async def list_friends(
         search=search,
         page=page,
         limit=limit,
+        redis=redis,
     )
     return FriendListOut.model_validate(data)
 

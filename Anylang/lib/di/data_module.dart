@@ -24,6 +24,16 @@ import '../data/network/socket_service.dart';
 import '../data/network/invite_deep_link_service.dart';
 import '../data/network/forward_pending_store.dart';
 import '../data/network/support_repository.dart';
+import '../data/network/trade_assistant_repository.dart';
+import '../data/network/ai_matching_repository.dart';
+import '../data/network/market_analytics_repository.dart';
+import '../data/network/marketplace_groups_repository.dart';
+import '../data/network/business_card_deep_link_service.dart';
+import '../data/network/feed_repository.dart';
+import '../data/network/nearby_repository.dart';
+import '../data/network/connectivity_service.dart';
+import '../data/network/offline_outbox_service.dart';
+import '../data/local/offline_chat_store.dart';
 
 class DataModule {
   Future<void> initModule() async {
@@ -54,6 +64,10 @@ class DataModule {
       FriendsRepository(client: Get.find()),
       permanent: true,
     );
+    Get.put<NearbyRepository>(
+      NearbyRepository(client: Get.find()),
+      permanent: true,
+    );
     Get.put<ProductsRepository>(
       ProductsRepository(client: Get.find()),
       permanent: true,
@@ -78,6 +92,26 @@ class DataModule {
       SupportRepository(client: Get.find()),
       permanent: true,
     );
+    Get.put<TradeAssistantRepository>(
+      TradeAssistantRepository(client: Get.find()),
+      permanent: true,
+    );
+    Get.put<FeedRepository>(
+      FeedRepository(client: Get.find()),
+      permanent: true,
+    );
+    Get.put<AiMatchingRepository>(
+      AiMatchingRepository(client: Get.find()),
+      permanent: true,
+    );
+    Get.put<MarketAnalyticsRepository>(
+      MarketAnalyticsRepository(client: Get.find()),
+      permanent: true,
+    );
+    Get.put<MarketplaceGroupsRepository>(
+      MarketplaceGroupsRepository(client: Get.find()),
+      permanent: true,
+    );
     Get.put<CountriesService>(
       await CountriesService(repo: Get.find()).init(),
       permanent: true,
@@ -96,8 +130,21 @@ class DataModule {
     Get.put<ForwardPendingStore>(ForwardPendingStore(), permanent: true);
     Get.put<VoiceRecorderService>(VoiceRecorderService(), permanent: true);
     Get.put<VoicePlayerService>(VoicePlayerService(), permanent: true);
+    await OfflineChatStore.open();
+    await Get.putAsync<ConnectivityService>(
+      () => ConnectivityService().init(),
+      permanent: true,
+    );
+    await Get.putAsync<OfflineOutboxService>(
+      () => OfflineOutboxService().init(),
+      permanent: true,
+    );
     await Get.putAsync<InviteDeepLinkService>(
       () => InviteDeepLinkService().init(),
+      permanent: true,
+    );
+    await Get.putAsync<BusinessCardDeepLinkService>(
+      () => BusinessCardDeepLinkService().init(),
       permanent: true,
     );
   }

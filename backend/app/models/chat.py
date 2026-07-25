@@ -44,6 +44,14 @@ class Chat(Base, TimestampMixin):
     is_super: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     member_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     super_payment_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Public industry rooms (Textile Group, …)
+    marketplace_slug: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, unique=True, index=True
+    )
+    marketplace_emoji: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    marketplace_blurb: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    # Verified Group: faqat tasdiqlangan bizneslar qo'shiladi
+    verified_only: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     messages: Mapped[list[Message]] = relationship(back_populates="chat", cascade="all, delete-orphan")
     participants: Mapped[list[ChatParticipant]] = relationship(
@@ -102,7 +110,7 @@ class MessageReaction(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     message_id: Mapped[int] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    emoji: Mapped[str] = mapped_column(String(8), nullable=False)
+    emoji: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     message: Mapped[Message] = relationship(back_populates="reactions")
@@ -155,6 +163,25 @@ class MessageHide(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
     message: Mapped[Message] = relationship(back_populates="hidden_for")
+
+
+class ChatFaq(Base, TimestampMixin):
+    """Per-chat FAQ cluster — repeated questions → AI auto-answer."""
+
+    __tablename__ = "chat_faqs"
+    __table_args__ = (
+        UniqueConstraint("chat_id", "fingerprint", name="uq_chat_faq_fp"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"), index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    question_sample: Mapped[str] = mapped_column(String(400), nullable=False)
+    answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ask_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_question_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_answer_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ChatMedia(Base, TimestampMixin):
@@ -214,3 +241,27 @@ class LiveTurn(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(16), default="done", nullable=False)
 
     session: Mapped[LiveSession] = relationship(back_populates="turns")
+
+
+class ChatDeal(Base, TimestampMixin):
+    """Deal Mode — bitta chatdagi jamlangan bitim shartlari."""
+
+    __tablename__ = "chat_deals"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(
+        ForeignKey("chats.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    created_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    product: Mapped[str] = mapped_column(String(240), default="", nullable=False)
+    price: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), default="USD", nullable=False)
+    quantity: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    unit: Mapped[str] = mapped_column(String(32), default="", nullable=False)
+    delivery: Mapped[str] = mapped_column(String(240), default="", nullable=False)
+    payment: Mapped[str] = mapped_column(String(240), default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="open", nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    documents: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    accepted_by: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)

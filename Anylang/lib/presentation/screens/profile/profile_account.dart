@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../ui/trust_score.dart';
+import '../../ui/factory_verification.dart';
+import '../../ui/scam_risk.dart';
+import 'profile_insights.dart';
 
 class OwnListing {
   final int id;
@@ -24,6 +28,21 @@ class OwnListing {
   });
 }
 
+class FactoryMediaItem {
+  final int id;
+  final String url;
+
+  const FactoryMediaItem({required this.id, required this.url});
+
+  bool get isVideo {
+    final u = url.toLowerCase();
+    return u.contains('.mp4') ||
+        u.contains('.mov') ||
+        u.contains('.webm') ||
+        u.contains('.m3u8');
+  }
+}
+
 String businessRoleLabel(String? apiRole) {
   final key = (apiRole ?? '').trim().toLowerCase();
   if (key.isEmpty) return '';
@@ -42,7 +61,12 @@ class ProfileAccount {
   final String countryCode;
   /// Ko'rinadigan nom (Oʻzbekiston).
   final String country;
+  /// Formatlangan AnyLang ID (123 45 67).
   final String? username;
+  /// Xom 7 xonali raqam.
+  final String anylangNumber;
+  /// `@1234567` ko'rinishi.
+  final String handle;
   final String? nativeLanguage;
   final String? memberSince;
   final String? subscriptionPlan;
@@ -56,9 +80,28 @@ class ProfileAccount {
   final int? listingsCount;
   final String? viewsCount;
   final double? rating;
+  final int reviewsCount;
+  final int countriesCount;
+  final List<String> exportCountryCodes;
+  final int? foundedYear;
+  final int? exportYears;
+  final String? moq;
+  final String? productionCapacity;
+  final String? leadTime;
+  final List<String> incoterms;
+  final List<String> paymentMethods;
+  final List<String> certificates;
+  final List<FactoryMediaItem> factoryMedia;
   final List<OwnListing> listings;
   final String? avatarUrl;
   final String? email;
+  final TrustScore? trustScore;
+  final FactoryVerification factoryVerification;
+  final ScamRisk? scamRisk;
+  final int networkingConnections;
+  final int networkingCountries;
+  final int? networkingTrust;
+  final ProfileInsights insights;
 
   const ProfileAccount({
     required this.isBusiness,
@@ -71,6 +114,8 @@ class ProfileAccount {
     this.id = 0,
     this.verified = false,
     this.username,
+    this.anylangNumber = '',
+    this.handle = '',
     this.nativeLanguage,
     this.memberSince,
     this.subscriptionPlan,
@@ -83,9 +128,28 @@ class ProfileAccount {
     this.listingsCount,
     this.viewsCount,
     this.rating,
+    this.reviewsCount = 0,
+    this.countriesCount = 0,
+    this.exportCountryCodes = const [],
+    this.foundedYear,
+    this.exportYears,
+    this.moq,
+    this.productionCapacity,
+    this.leadTime,
+    this.incoterms = const [],
+    this.paymentMethods = const [],
+    this.certificates = const [],
+    this.factoryMedia = const [],
     this.listings = const [],
     this.avatarUrl,
     this.email,
+    this.trustScore,
+    this.factoryVerification = const FactoryVerification(),
+    this.scamRisk,
+    this.networkingConnections = 0,
+    this.networkingCountries = 0,
+    this.networkingTrust,
+    this.insights = const ProfileInsights(),
   });
 
   String get roleLabel {
@@ -113,6 +177,55 @@ class ProfileAccount {
     final displayName = isBusiness && company != null && company.isNotEmpty
         ? company
         : personalName;
+    final stats = biz?['stats'] is Map
+        ? Map<String, dynamic>.from(biz!['stats'] as Map)
+        : <String, dynamic>{};
+
+    final exportCodes = <String>[];
+    final rawCountries = biz?['export_countries'] ?? stats['export_countries'];
+    if (rawCountries is List) {
+      for (final e in rawCountries) {
+        final code = e.toString().trim().toUpperCase();
+        if (code.length == 2) exportCodes.add(code);
+      }
+    }
+
+    final factory = <FactoryMediaItem>[];
+    final factoryRaw = biz?['factory_images'];
+    if (factoryRaw is List) {
+      for (final e in factoryRaw) {
+        if (e is! Map) continue;
+        final fid = (e['id'] as num?)?.toInt() ?? 0;
+        final url = e['url']?.toString() ?? '';
+        if (url.isNotEmpty) {
+          factory.add(FactoryMediaItem(id: fid, url: url));
+        }
+      }
+    }
+
+    final founded = (biz?['founded_year'] as num?)?.toInt() ??
+        (stats['founded_year'] as num?)?.toInt();
+    final exportYears = (stats['export_years'] as num?)?.toInt() ??
+        (founded != null ? (DateTime.now().year - founded).clamp(0, 200) : null);
+
+    final net = json['networking'];
+    final netMap = net is Map ? Map<String, dynamic>.from(net) : null;
+    final trustFromBiz = biz?['trust_score'] != null
+        ? TrustScore.fromApi(biz!['trust_score'])
+        : null;
+
+    final insightsRaw = json['profile_insights'];
+    final insights = ProfileInsights.fromApi(
+      insightsRaw is Map ? Map<String, dynamic>.from(insightsRaw) : null,
+    );
+
+    final formattedId = number.isEmpty ? null : formatNumber(number);
+    final viewsFromStats = (stats['total_views'] as num?)?.toInt();
+    final viewsTotal = viewsFromStats ?? insights.totalViews;
+    final ratingValue =
+        (stats['rating'] as num?)?.toDouble() ?? insights.rating;
+    final listings =
+        (stats['listings_count'] as num?)?.toInt() ?? insights.listingsCount;
 
     return ProfileAccount(
       id: id,
@@ -124,8 +237,10 @@ class ProfileAccount {
       flagAsset: flagAssetForCountry(countryCode),
       countryCode: countryCode.toUpperCase(),
       country: formatCountryName(countryCode),
-      username: number.isEmpty ? null : formatNumber(number),
-      nativeLanguage: formatLanguageName(json['native_language'] as String?),
+      username: formattedId,
+      anylangNumber: number,
+      handle: number.isEmpty ? '' : '@$number',
+      nativeLanguage: formatLanguagesBadge(languageCodesFromApi(json)),
       memberSince: formatMonthYear(created),
       subscriptionPlan: formatSubscriptionPlan(plan),
       subscriptionPeriod: formatSubscriptionPeriod(
@@ -143,15 +258,28 @@ class ProfileAccount {
       subscriptionActive: isActive,
       showPremiumBadge: showPremium,
       role: biz?['business_role']?.toString(),
-      listingsCount: (biz?['stats'] is Map)
-          ? ((biz!['stats'] as Map)['listings_count'] as num?)?.toInt()
-          : null,
-      viewsCount: (biz?['stats'] is Map)
-          ? formatViews(((biz!['stats'] as Map)['total_views'] as num?)?.toInt() ?? 0)
-          : null,
-      rating: (biz?['stats'] is Map)
-          ? ((biz!['stats'] as Map)['rating'] as num?)?.toDouble()
-          : null,
+      listingsCount: listings,
+      viewsCount: formatViews(viewsTotal),
+      rating: ratingValue,
+      reviewsCount: (stats['reviews_count'] as num?)?.toInt() ?? 0,
+      countriesCount: (stats['countries_count'] as num?)?.toInt() ??
+          exportCodes.length,
+      exportCountryCodes: exportCodes,
+      foundedYear: founded,
+      exportYears: exportYears,
+      moq: (biz?['moq'] as String?)?.trim(),
+      productionCapacity: (biz?['production_capacity'] as String?)?.trim(),
+      leadTime: (biz?['lead_time'] as String?)?.trim(),
+      incoterms: (biz?['incoterms'] is List)
+          ? (biz!['incoterms'] as List).map((e) => e.toString()).toList()
+          : const [],
+      paymentMethods: (biz?['payment_methods'] is List)
+          ? (biz!['payment_methods'] as List).map((e) => e.toString()).toList()
+          : const [],
+      certificates: (biz?['certificates'] is List)
+          ? (biz!['certificates'] as List).map((e) => e.toString()).toList()
+          : const [],
+      factoryMedia: factory,
       avatarUrl: (() {
         final top = (json['avatar_url'] as String?)?.trim();
         final logo = (biz == null ? null : biz['logo_url'] as String?)?.trim();
@@ -163,6 +291,19 @@ class ProfileAccount {
         return (top != null && top.isNotEmpty) ? top : null;
       })(),
       email: json['email'] as String?,
+      trustScore: trustFromBiz,
+      factoryVerification: FactoryVerification.fromBusiness(
+        biz is Map ? Map<String, dynamic>.from(biz) : null,
+      ),
+      scamRisk: biz?['scam_risk'] != null
+          ? ScamRisk.fromApi(biz!['scam_risk'])
+          : null,
+      networkingConnections: (netMap?['connections'] as num?)?.toInt() ?? 0,
+      networkingCountries: (netMap?['countries'] as num?)?.toInt() ?? 0,
+      networkingTrust: (netMap?['trust'] as num?)?.toInt() ??
+          trustFromBiz?.score ??
+          insights.trustPercent,
+      insights: insights,
     );
   }
 
@@ -185,6 +326,8 @@ class ProfileAccount {
       countryCode: countryCode,
       country: country,
       username: username,
+      anylangNumber: anylangNumber,
+      handle: handle,
       nativeLanguage: nativeLanguage,
       memberSince: memberSince,
       subscriptionPlan: subscriptionPlan,
@@ -197,9 +340,28 @@ class ProfileAccount {
       listingsCount: listingsCount ?? this.listingsCount,
       viewsCount: viewsCount,
       rating: rating,
+      reviewsCount: reviewsCount,
+      countriesCount: countriesCount,
+      exportCountryCodes: exportCountryCodes,
+      foundedYear: foundedYear,
+      exportYears: exportYears,
+      moq: moq,
+      productionCapacity: productionCapacity,
+      leadTime: leadTime,
+      incoterms: incoterms,
+      paymentMethods: paymentMethods,
+      certificates: certificates,
+      factoryMedia: factoryMedia,
       listings: listings ?? this.listings,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       email: email ?? this.email,
+      trustScore: trustScore,
+      factoryVerification: factoryVerification,
+      scamRisk: scamRisk,
+      networkingConnections: networkingConnections,
+      networkingCountries: networkingCountries,
+      networkingTrust: networkingTrust,
+      insights: insights,
     );
   }
 }

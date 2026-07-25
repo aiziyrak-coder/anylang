@@ -20,6 +20,9 @@ type UserRow = {
   is_active: boolean;
   is_verified: boolean;
   verified_badge: boolean;
+  factory_verified?: boolean;
+  inspection_passed?: boolean;
+  audit_report_url?: string | null;
   deleted_at: string | null;
   plan?: string;
   created_at: string;
@@ -292,6 +295,25 @@ export default function UsersPage() {
               <div className="flex justify-between">
                 <dt className="text-zinc-500">{t("users.badge")}</dt>
                 <dd>{detail.verified_badge ? t("app.yes") : t("app.no")}</dd>
+                <dt className="text-zinc-500">{t("users.factoryVerified")}</dt>
+                <dd>{detail.factory_verified ? t("app.yes") : t("app.no")}</dd>
+                <dt className="text-zinc-500">{t("users.inspectionPassed")}</dt>
+                <dd>{detail.inspection_passed ? t("app.yes") : t("app.no")}</dd>
+                {detail.audit_report_url ? (
+                  <>
+                    <dt className="text-zinc-500">{t("users.auditReport")}</dt>
+                    <dd className="break-all text-xs">
+                      <a
+                        href={detail.audit_report_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        {t("users.openAudit")}
+                      </a>
+                    </dd>
+                  </>
+                ) : null}
               </div>
               {detail.deleted_at ? (
                 <div className="flex justify-between">
@@ -339,6 +361,34 @@ export default function UsersPage() {
                   className="rounded-lg border px-3 py-2 text-sm"
                 >
                   {detail.verified_badge ? t("users.removeBadge") : t("users.grantBadge")}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    patchUser(detail.id, {
+                      factory_verified: !detail.factory_verified,
+                    })
+                  }
+                  className="rounded-lg border px-3 py-2 text-sm"
+                >
+                  {detail.factory_verified
+                    ? t("users.removeFactoryVerified")
+                    : t("users.grantFactoryVerified")}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    patchUser(detail.id, {
+                      inspection_passed: !detail.inspection_passed,
+                    })
+                  }
+                  className="rounded-lg border px-3 py-2 text-sm"
+                >
+                  {detail.inspection_passed
+                    ? t("users.removeInspection")
+                    : t("users.grantInspection")}
                 </button>
                 <select
                   defaultValue={detail.plan ?? "basic"}

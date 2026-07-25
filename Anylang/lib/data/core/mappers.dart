@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../domain/models/country_option.dart';
-import '../../presentation/screens/select_language/select_language_option.dart'
-    show flagUrlForCountry;
+import '../../presentation/screens/select_language/select_language_option.dart';
 import '../../presentation/ui/theme/colors.dart';
 import '../../presentation/ui/theme/gradients.dart';
 import '../local/countries_service.dart';
+import '../local/languages_service.dart';
 import 'country_names.dart';
 
 export 'country_names.dart' show resolveCountryName;
@@ -130,9 +130,84 @@ String formatCountryName(String? codeOrName) {
 String formatLanguageName(String? code) {
   if (code == null || code.trim().isEmpty) return '';
   final normalized = code.trim().toLowerCase().split(RegExp(r'[_-]')).first;
+  final opt = resolveLanguageOption(normalized);
+  if (opt != null && opt.nativeName.trim().isNotEmpty) {
+    return opt.nativeName.trim();
+  }
   final key = 'lang_name_$normalized';
   final translated = key.tr;
   return translated == key ? normalized.toUpperCase() : translated;
+}
+
+String normalizeLangIso(String? code) {
+  if (code == null || code.trim().isEmpty) return '';
+  return code.trim().toLowerCase().split(RegExp(r'[_-]')).first;
+}
+
+LanguageOption? resolveLanguageOption(String? code) {
+  final c = normalizeLangIso(code);
+  if (c.isEmpty) return null;
+  try {
+    if (Get.isRegistered<LanguagesService>()) {
+      final found = Get.find<LanguagesService>().findByCode(c);
+      if (found != null) return found;
+    }
+  } catch (_) {}
+  return languageOptionByCode(c);
+}
+
+List<String> normalizeLanguageCodes(Iterable<dynamic>? raw) {
+  final out = <String>[];
+  final seen = <String>{};
+  if (raw == null) return out;
+  for (final e in raw) {
+    final c = normalizeLangIso(e?.toString());
+    if (c.isEmpty || seen.contains(c)) continue;
+    seen.add(c);
+    out.add(c);
+  }
+  return out;
+}
+
+/// API map'dan tillar: `spoken_languages` yoki native + app.
+List<String> languageCodesFromApi(Map<dynamic, dynamic>? json) {
+  if (json == null) return const [];
+  final spoken = normalizeLanguageCodes(json['spoken_languages'] as List?);
+  if (spoken.isNotEmpty) return spoken;
+  final codes = <String>[];
+  final native = normalizeLangIso(json['native_language']?.toString());
+  if (native.isNotEmpty) codes.add(native);
+  final app = normalizeLangIso(json['app_language']?.toString());
+  if (app.isNotEmpty && !codes.contains(app)) codes.add(app);
+  return codes;
+}
+
+/// Bitta til: 🇺🇿 O'zbek
+String formatLanguageBadge(String? code) {
+  final opt = resolveLanguageOption(code);
+  if (opt == null) {
+    final c = normalizeLangIso(code);
+    return c.isEmpty ? '' : c.toUpperCase();
+  }
+  return '${opt.flagEmoji} ${opt.nativeName}';
+}
+
+/// Bitta: 🇺🇿 O'zbek · Bir nechta: 🇺🇿 🇷🇺 🇬🇧
+String formatLanguagesBadge(Iterable<String>? codes) {
+  final opts = <LanguageOption>[];
+  final seen = <String>{};
+  for (final code in codes ?? const <String>[]) {
+    final opt = resolveLanguageOption(code);
+    if (opt == null) continue;
+    if (seen.contains(opt.langCode)) continue;
+    seen.add(opt.langCode);
+    opts.add(opt);
+  }
+  if (opts.isEmpty) return '';
+  if (opts.length == 1) {
+    return '${opts.first.flagEmoji} ${opts.first.nativeName}';
+  }
+  return opts.map((o) => o.flagEmoji).join(' ');
 }
 
 /// `2024-03-15` → "Mart 2024" (UI tili bo'yicha).

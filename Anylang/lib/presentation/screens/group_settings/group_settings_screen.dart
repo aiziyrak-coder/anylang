@@ -16,6 +16,10 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
 import '../friends/friend.dart';
+import '../group_catalog/group_catalog_payload.dart';
+import '../group_catalog/group_catalog_screen.dart';
+import '../group_stats/group_stats_payload.dart';
+import '../group_stats/group_stats_screen.dart';
 import 'group_settings_action.dart';
 import 'group_settings_content.dart';
 import 'group_settings_payload.dart';
@@ -51,6 +55,24 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
     switch (action) {
       case Back _:
         popBackNavigate();
+
+      case OpenGroupCatalogFromSettings _:
+        await navigate(
+          GroupCatalogScreen(),
+          payload: GroupCatalogPayload(
+            chatId: state.chatId,
+            title: state.title.value,
+          ),
+        );
+
+      case OpenGroupStatsFromSettings _:
+        await navigate(
+          GroupStatsScreen(),
+          payload: GroupStatsPayload(
+            chatId: state.chatId,
+            title: state.title.value,
+          ),
+        );
 
       case ReloadMembers _:
         state.loading.value = true;

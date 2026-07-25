@@ -63,8 +63,8 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
 
   Future<void> _search(String q) async {
     final query = q.trim();
-    // Backend: kamida 3 raqam (NUMBER_QUERY_TOO_SHORT)
-    if (query.length < 3) {
+    // Backend: ism ≥2 belgi yoki raqam ≥3.
+    if (query.length < 2) {
       state.searching.value = false;
       state.results.clear();
       return;
@@ -79,7 +79,10 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
             .toList();
         state.results.assignAll(items);
       },
-      failure: showAppError,
+      failure: (_) {
+        // Bo‘sh natija — snackbar spam qilinmaydi.
+        state.results.clear();
+      },
     );
     state.searching.value = false;
   }

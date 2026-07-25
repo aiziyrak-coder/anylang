@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/offline_chat_store.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
+import '../../../data/network/connectivity_service.dart';
+import '../../../data/network/offline_outbox_service.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/session_bootstrap.dart';
@@ -45,8 +48,10 @@ class MessagesScreen extends Screen<MessagesState, void> {
 
   Future<void> _load() async {
     await connectRealtimeIfNeeded();
+    if (Get.isRegistered<OfflineOutboxService>()) {
+      unawaited(Get.find<OfflineOutboxService>().flush());
+    }
     state.loading.value = true;
-    state.conversations.clear();
     final filter = state.listFilter.value;
     final result = await Get.find<ChatRepository>().listChats(
       sort: filter == MessagesListFilter.unread ? 'unread' : 'activity',
@@ -58,13 +63,25 @@ class MessagesScreen extends Screen<MessagesState, void> {
     );
     result.when(
       success: (data) {
-        final items = asList(data)
+        final raw = asList(data)
             .whereType<Map>()
-            .map((e) => Conversation.fromApi(Map<String, dynamic>.from(e)))
+            .map((e) => Map<String, dynamic>.from(e))
             .toList();
+        unawaited(OfflineChatStore.saveConversations(raw));
+        final items = raw.map(Conversation.fromApi).toList();
         state.conversations.assignAll(_filterConversations(items, filter));
       },
-      failure: showAppError,
+      failure: (err) {
+        final cached = OfflineChatStore.loadConversations();
+        if (cached.isNotEmpty) {
+          final items = cached.map(Conversation.fromApi).toList();
+          state.conversations.assignAll(_filterConversations(items, filter));
+          return;
+        }
+        if (!isNetworkFailure(err)) {
+          showAppError(err);
+        }
+      },
     );
     state.loading.value = false;
   }
@@ -90,6 +107,16 @@ class MessagesScreen extends Screen<MessagesState, void> {
     }
   }
 
+  List<Conversation> _localChatMatches(String q) {
+    final needle = q.toLowerCase();
+    return state.conversations
+        .where((c) {
+          if (!c.isGroup && SessionStore.isUserBlocked(c.peerId)) return false;
+          return c.name.toLowerCase().contains(needle);
+        })
+        .toList();
+  }
+
   Future<void> _search(String raw) async {
     final q = raw.trim();
     if (q.isEmpty) {
@@ -99,9 +126,12 @@ class MessagesScreen extends Screen<MessagesState, void> {
       return;
     }
     final seq = ++_searchSeq;
+    // Darhol mahalliy natija — API kutmasdan.
+    state.searchResults.assignAll(_localChatMatches(q));
     state.searching.value = true;
+    // Backend: ism ≥2 belgi yoki raqam ≥3.
     final chatFuture = Get.find<ChatRepository>().search(q);
-    final userFuture = q.length >= 3
+    final userFuture = q.length >= 2
         ? Get.find<ProfileRepository>().searchUsers(q)
         : null;
     final chatResult = await chatFuture;
@@ -117,9 +147,8 @@ class MessagesScreen extends Screen<MessagesState, void> {
               .toList();
           state.userResults.assignAll(items);
         },
-        failure: (err) {
+        failure: (_) {
           state.userResults.clear();
-          showAppError(err);
         },
       );
     } else {
@@ -128,14 +157,23 @@ class MessagesScreen extends Screen<MessagesState, void> {
     if (seq != _searchSeq) return;
     chatResult.when(
       success: (data) {
-        final items = asList(data)
+        final remote = asList(data)
             .whereType<Map>()
             .map((e) => Conversation.fromApi(Map<String, dynamic>.from(e)))
             .where((c) => c.isGroup || !SessionStore.isUserBlocked(c.peerId))
             .toList();
-        state.searchResults.assignAll(items);
+        // Remote ustuvor; yo‘qolgan lokal hitlarni qo‘shamiz.
+        final byId = <int, Conversation>{
+          for (final c in remote) c.id: c,
+        };
+        for (final local in _localChatMatches(q)) {
+          byId.putIfAbsent(local.id, () => local);
+        }
+        state.searchResults.assignAll(byId.values.toList());
       },
-      failure: showAppError,
+      failure: (_) {
+        state.searchResults.assignAll(_localChatMatches(q));
+      },
     );
     if (seq == _searchSeq) {
       state.searching.value = false;
@@ -227,6 +265,8 @@ class MessagesScreen extends Screen<MessagesState, void> {
             myRole: conv.myRole,
             isSuper: conv.isSuper,
             inviteLink: conv.inviteLink,
+            isMarketplace: conv.isMarketplace,
+            marketplaceSlug: conv.marketplaceSlug,
           ),
         );
         if (Get.isRegistered<RealtimeSyncService>()) {
@@ -441,6 +481,10 @@ class MessagesScreen extends Screen<MessagesState, void> {
         await repo.hideChat(conv.id);
         state.conversations.removeWhere((c) => c.id == conv.id);
       case ChatOverflowAction.search:
+      case ChatOverflowAction.groupCatalog:
+      case ChatOverflowAction.groupStats:
+      case ChatOverflowAction.dealMode:
+      case ChatOverflowAction.aiSummary:
         break;
     }
   }

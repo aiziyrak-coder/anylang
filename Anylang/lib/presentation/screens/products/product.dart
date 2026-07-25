@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/core/mappers.dart';
+import '../../ui/product_capabilities.dart';
+import '../../ui/product_trust_badges.dart';
 
 /// Bitta mahsulot (Bozor).
 class Product {
@@ -17,6 +19,16 @@ class Product {
   final bool isTop;
   final String status;
   final String? topRequestStatus;
+  final String? videoUrl;
+  final String? factoryVideoUrl;
+  final String? processVideoUrl;
+  final String? moq;
+  final String? shippingInfo;
+  final List<String> shippingCountries;
+  final double? rating;
+  final int reviewsCount;
+  final ProductTrustBadges trustBadges;
+  final List<String> capabilities;
 
   const Product({
     required this.id,
@@ -33,6 +45,16 @@ class Product {
     this.isTop = false,
     this.status = 'published',
     this.topRequestStatus,
+    this.videoUrl,
+    this.factoryVideoUrl,
+    this.processVideoUrl,
+    this.moq,
+    this.shippingInfo,
+    this.shippingCountries = const [],
+    this.rating,
+    this.reviewsCount = 0,
+    this.trustBadges = const ProductTrustBadges(),
+    this.capabilities = const [],
   });
 
   factory Product.fromApi(Map<String, dynamic> json) {
@@ -60,6 +82,33 @@ class Product {
     if (topReq is Map) {
       topStatus = topReq['status']?.toString();
     }
+    final countriesRaw = json['shipping_countries'];
+    final countries = <String>[];
+    if (countriesRaw is List) {
+      for (final c in countriesRaw) {
+        final code = c.toString().trim().toUpperCase();
+        if (code.isNotEmpty) countries.add(code);
+      }
+    }
+    final seller = json['seller'];
+    double? rating = (json['rating'] as num?)?.toDouble();
+    var reviewsCount = (json['reviews_count'] as num?)?.toInt() ?? 0;
+    if (seller is Map) {
+      rating ??= (seller['rating'] as num?)?.toDouble();
+      if (reviewsCount <= 0) {
+        reviewsCount = (seller['reviews_count'] as num?)?.toInt() ?? 0;
+      }
+    }
+    String? moq = (json['moq'] as String?)?.trim();
+    if (moq == null || moq.isEmpty) {
+      if (seller is Map) {
+        moq = (seller['moq'] as String?)?.trim();
+      }
+    }
+    var trust = ProductTrustBadges.fromApi(json['trust_badges']);
+    if (!trust.hasAny && seller is Map) {
+      trust = ProductTrustBadges.fromApi(seller['trust_badges']);
+    }
     return Product(
       id: id,
       iconAsset: 'assets/icons/ic_prod_image.svg',
@@ -75,7 +124,23 @@ class Product {
       isTop: json['is_top'] == true,
       status: (json['status'] as String?) ?? 'published',
       topRequestStatus: topStatus,
+      videoUrl: _optUrl(json['video_url']),
+      factoryVideoUrl: _optUrl(json['factory_video_url']),
+      processVideoUrl: _optUrl(json['process_video_url']),
+      moq: (moq != null && moq.isNotEmpty) ? moq : null,
+      shippingInfo: _optUrl(json['shipping_info']),
+      shippingCountries: countries,
+      rating: rating,
+      reviewsCount: reviewsCount,
+      trustBadges: trust,
+      capabilities: parseProductCapabilities(json['capabilities']),
     );
+  }
+
+  static String? _optUrl(dynamic v) {
+    final s = v?.toString().trim();
+    if (s == null || s.isEmpty) return null;
+    return s;
   }
 
   Product copyWith({
@@ -83,6 +148,8 @@ class Product {
     bool? isTop,
     String? status,
     String? topRequestStatus,
+    ProductTrustBadges? trustBadges,
+    List<String>? capabilities,
   }) {
     return Product(
       id: id,
@@ -99,6 +166,16 @@ class Product {
       isTop: isTop ?? this.isTop,
       status: status ?? this.status,
       topRequestStatus: topRequestStatus ?? this.topRequestStatus,
+      videoUrl: videoUrl,
+      factoryVideoUrl: factoryVideoUrl,
+      processVideoUrl: processVideoUrl,
+      moq: moq,
+      shippingInfo: shippingInfo,
+      shippingCountries: shippingCountries,
+      rating: rating,
+      reviewsCount: reviewsCount,
+      trustBadges: trustBadges ?? this.trustBadges,
+      capabilities: capabilities ?? this.capabilities,
     );
   }
 }

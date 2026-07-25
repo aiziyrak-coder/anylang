@@ -40,6 +40,13 @@ class LiveSessionOut(BaseModel):
     other_language: str
     started_at: datetime
     ended_at: datetime | None = None
+    turn_count: int = 0
+    preview: str | None = None
+
+
+class LiveSessionListOut(BaseModel):
+    items: list[LiveSessionOut]
+    has_more: bool = False
 
 
 class LiveTurnOut(BaseModel):
@@ -62,3 +69,15 @@ class LiveTurnOut(BaseModel):
 class LiveTurnListOut(BaseModel):
     items: list[LiveTurnOut]
     has_more: bool
+
+
+class LiveOcrTranslateOut(BaseModel):
+    text_original: str
+    text_translated: str
+    source_language: str | None = None
+    target_language: str
+    audio_tts_url: str | None = None
+    session_id: int | None = None
+    turn_id: int | None = None
+    client_turn_id: str | None = None
+    created_at: datetime | None = None

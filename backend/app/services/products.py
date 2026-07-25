@@ -6,7 +6,7 @@ from io import BytesIO
 from uuid import uuid4
 
 from PIL import Image
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import String, and_, case, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,12 +14,15 @@ from app.core.errors import AppError
 from app.core.pagination import normalize_page
 from app.integrations.storage import get_storage
 from app.models.product import Product, ProductFavorite, ProductImage, ProductTopRequest, ProductView
-from app.models.user import Subscription, User
+from app.models.user import BusinessProfile, Subscription, User
 from app.schemas.product import ProductCreateIn, ProductUpdateIn
+from app.services.factory_verification import build_factory_verification, build_product_trust_badges
 
 MAX_IMAGES_PER_PRODUCT = 10
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_VIDEO_BYTES = 25 * 1024 * 1024
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/x-m4v"}
 MAX_PENDING_TOP_REQUESTS = 3
 
 PRODUCT_CATEGORIES: dict[str, dict[str, str]] = {
@@ -35,6 +38,43 @@ PRODUCT_CATEGORIES: dict[str, dict[str, str]] = {
 }
 
 SUPPORTED_CURRENCIES = {"USD", "EUR", "RUB", "UZS"}
+
+# Xaridorga tushunarli imkoniyatlar (tavsif emas).
+PRODUCT_CAPABILITIES: frozenset[str] = frozenset(
+    {
+        "breathable",
+        "export_quality",
+        "oem_available",
+        "odm_available",
+        "private_label",
+        "custom_logo",
+        "sample_available",
+        "ready_stock",
+        "fast_delivery",
+        "waterproof",
+        "eco_friendly",
+        "bulk_discount",
+        "durable",
+        "lightweight",
+    }
+)
+MAX_CAPABILITIES = 8
+
+
+def _normalize_capabilities(raw: list | None) -> list[str]:
+    if not raw:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        code = str(item).strip().lower().replace(" ", "_").replace("-", "_")
+        if not code or code in seen or code not in PRODUCT_CAPABILITIES:
+            continue
+        seen.add(code)
+        out.append(code)
+        if len(out) >= MAX_CAPABILITIES:
+            break
+    return out
 
 
 def _has_active_business(subscription: Subscription | None) -> bool:
@@ -329,6 +369,24 @@ def _primary_url(product: Product) -> str | None:
 
 def _serialize_seller(user: User) -> dict:
     business = user.business
+    rating = None
+    reviews_count = 0
+    moq = None
+    export_countries: list[str] = []
+    lead_time = None
+    incoterms: list[str] = []
+    if business is not None:
+        if business.rating is not None:
+            rating = float(business.rating)
+        reviews_count = int(business.reviews_count or 0)
+        moq = (business.moq or "").strip() or None
+        export_countries = [
+            str(c).strip().upper()
+            for c in (business.export_countries or [])
+            if str(c).strip()
+        ]
+        lead_time = (business.lead_time or "").strip() or None
+        incoterms = [str(c).strip() for c in (business.incoterms or []) if str(c).strip()]
     return {
         "id": user.id,
         "company_name": business.company_name if business else "",
@@ -336,6 +394,79 @@ def _serialize_seller(user: User) -> dict:
         "verified_badge": user.verified_badge,
         "country": business.country if business else user.country,
         "business_role": business.business_role if business else None,
+        "rating": rating,
+        "reviews_count": reviews_count,
+        "moq": moq,
+        "export_countries": export_countries,
+        "lead_time": lead_time,
+        "incoterms": incoterms,
+        "factory_verification": build_factory_verification(business, user=user),
+        "trust_badges": build_product_trust_badges(business, user=user),
+    }
+
+
+def _clean_optional_str(value: str | None, *, max_len: int) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    return cleaned[:max_len]
+
+
+def _normalize_country_list(raw: list | None) -> list[str]:
+    if not raw:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        code = str(item).strip().upper()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        out.append(code[:8])
+        if len(out) >= 50:
+            break
+    return out
+
+
+def _effective_marketplace_fields(product: Product, seller: User) -> dict:
+    business = seller.business
+    seller_moq = (business.moq or "").strip() if business else ""
+    seller_countries = (
+        [str(c).strip().upper() for c in (business.export_countries or []) if str(c).strip()]
+        if business
+        else []
+    )
+    product_moq = (product.moq or "").strip()
+    product_countries = _normalize_country_list(product.shipping_countries)
+    shipping_info = (product.shipping_info or "").strip()
+    if not shipping_info and business is not None:
+        parts: list[str] = []
+        lead = (business.lead_time or "").strip()
+        if lead:
+            parts.append(lead)
+        terms = [str(c).strip() for c in (business.incoterms or []) if str(c).strip()]
+        if terms:
+            parts.append(" · ".join(terms))
+        shipping_info = " · ".join(parts)
+
+    rating = None
+    reviews_count = 0
+    if business is not None:
+        if business.rating is not None:
+            rating = float(business.rating)
+        reviews_count = int(business.reviews_count or 0)
+
+    return {
+        "video_url": (product.video_url or "").strip() or None,
+        "factory_video_url": (product.factory_video_url or "").strip() or None,
+        "process_video_url": (product.process_video_url or "").strip() or None,
+        "moq": product_moq or seller_moq or None,
+        "shipping_info": shipping_info or None,
+        "shipping_countries": product_countries or seller_countries,
+        "rating": rating,
+        "reviews_count": reviews_count,
     }
 
 
@@ -348,6 +479,11 @@ async def _serialize_product(
 ) -> dict:
     is_top = force_top if force_top is not None else (
         product.is_top_pinned or (top_ids is not None and product.id in top_ids)
+    )
+    seller = getattr(product, "seller", None)
+    trust = build_product_trust_badges(
+        seller.business if seller is not None else None,
+        user=seller,
     )
     return {
         "id": product.id,
@@ -362,6 +498,8 @@ async def _serialize_product(
         "status": product.status,
         "seller_id": product.seller_id,
         "created_at": product.created_at,
+        "trust_badges": trust,
+        "capabilities": _normalize_capabilities(product.capabilities),
     }
 
 
@@ -374,6 +512,7 @@ async def _serialize_detail(
     viewer: User | None = None,
 ) -> dict:
     base = await _serialize_product(product, favorite_ids=favorite_ids, top_ids=top_ids)
+    marketplace = _effective_marketplace_fields(product, product.seller)
     base.update(
         {
             "description": product.description,
@@ -388,8 +527,10 @@ async def _serialize_detail(
                 for img in sorted(product.images, key=lambda x: x.position)
             ],
             "attributes": list(product.attributes or []),
+            "capabilities": _normalize_capabilities(product.capabilities),
             "seller": _serialize_seller(product.seller),
             "top_request": None,
+            **marketplace,
         }
     )
     if viewer is not None and viewer.id == product.seller_id:
@@ -451,23 +592,24 @@ async def _load_products_query(
     return query
 
 
-async def list_products(
-    db: AsyncSession,
+def _apply_marketplace_filters(
+    query,
     *,
-    viewer: User,
     search: str | None,
     category: str | None,
     min_price: Decimal | None,
     max_price: Decimal | None,
     currency: str | None,
     seller_id: int | None,
-    sort: str,
-    page: int | None,
-    limit: int | None,
-) -> dict:
-    params = normalize_page(page, limit, default_size=20, max_size=50)
-    query = await _load_products_query(published_only=True)
-
+    country: str | None,
+    business_role: str | None,
+    verified_only: bool,
+    ready_stock: bool = False,
+    free_shipping: bool = False,
+    premium_seller: bool = False,
+    new_only: bool = False,
+):
+    """Seller/country/role filterlari — BusinessProfile outerjoin talab qiladi."""
     if search:
         pattern = f"%{search.strip()}%"
         query = query.where(
@@ -486,14 +628,238 @@ async def list_products(
         query = query.where(Product.currency == currency)
     if seller_id is not None:
         query = query.where(Product.seller_id == seller_id)
+    if country:
+        code = country.strip().upper()
+        if len(code) == 2:
+            query = query.where(
+                or_(
+                    BusinessProfile.country == code,
+                    and_(BusinessProfile.country.is_(None), User.country == code),
+                )
+            )
+    if business_role:
+        role = business_role.strip().lower()
+        if role:
+            query = query.where(BusinessProfile.business_role == role)
+    if verified_only:
+        query = query.where(User.verified_badge.is_(True))
+    if ready_stock:
+        attrs_text = cast(Product.attributes, String)
+        query = query.where(
+            or_(
+                Product.moq.is_(None),
+                Product.moq == "",
+                Product.moq.ilike("1%"),
+                Product.shipping_info.ilike("%ready%"),
+                Product.shipping_info.ilike("%stock%"),
+                Product.shipping_info.ilike("%ombor%"),
+                Product.shipping_info.ilike("%mavjud%"),
+                Product.shipping_info.ilike("%in stock%"),
+                attrs_text.ilike("%ready_stock%"),
+                attrs_text.ilike("%in_stock%"),
+                attrs_text.ilike("%ready%"),
+            )
+        )
+    if free_shipping:
+        attrs_text = cast(Product.attributes, String)
+        query = query.where(
+            or_(
+                Product.shipping_info.ilike("%free%"),
+                Product.shipping_info.ilike("%bepul%"),
+                Product.shipping_info.ilike("%бесплат%"),
+                Product.shipping_info.ilike("%free shipping%"),
+                attrs_text.ilike("%free_shipping%"),
+                attrs_text.ilike("%free shipping%"),
+            )
+        )
+    if premium_seller:
+        query = query.where(
+            Subscription.is_active.is_(True),
+            Subscription.plan.in_(("premium", "business")),
+        )
+    if new_only:
+        cutoff = datetime.now(UTC) - timedelta(days=30)
+        query = query.where(Product.created_at >= cutoff)
+    return query
 
-    sort_map = {
-        "newest": Product.created_at.desc(),
-        "price_asc": Product.price.asc(),
-        "price_desc": Product.price.desc(),
-        "most_viewed": Product.views_count.desc(),
+
+def _recommended_score(viewer: User):
+    """AI-tavsiya skori: verified + top + ko‘rishlar + viewer davlati."""
+    score = (
+        case((User.verified_badge.is_(True), 100), else_=0)
+        + case((Product.is_top_pinned.is_(True), 80), else_=0)
+        + func.least(Product.views_count, 400)
+    )
+    viewer_country = (viewer.country or "").strip().upper()
+    if len(viewer_country) == 2:
+        score = score + case(
+            (
+                or_(
+                    BusinessProfile.country == viewer_country,
+                    and_(
+                        BusinessProfile.country.is_(None),
+                        User.country == viewer_country,
+                    ),
+                ),
+                45,
+            ),
+            else_=0,
+        )
+    return score
+
+
+async def list_for_you(
+    db: AsyncSession,
+    *,
+    viewer: User,
+    limit: int = 12,
+) -> dict:
+    """Ko‘rilgan mahsulotlar kategoriyasi asosida shaxsiy tavsiyalar."""
+    safe_limit = min(max(int(limit or 12), 1), 30)
+
+    viewed_result = await db.execute(
+        select(Product)
+        .join(ProductView, ProductView.product_id == Product.id)
+        .where(
+            ProductView.user_id == viewer.id,
+            Product.status == "published",
+        )
+        .order_by(ProductView.day_bucket.desc(), ProductView.id.desc())
+        .limit(40)
+    )
+    viewed = list(viewed_result.scalars().unique().all())
+    viewed_ids = {int(p.id) for p in viewed}
+    cat_counts: dict[str, int] = {}
+    for p in viewed:
+        cat = (p.category or "").strip().lower()
+        if not cat:
+            continue
+        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+    top_categories = [
+        c
+        for c, _ in sorted(cat_counts.items(), key=lambda x: x[1], reverse=True)[:6]
+    ]
+    based_on_views = bool(top_categories)
+
+    query = await _load_products_query(published_only=True)
+    query = query.outerjoin(BusinessProfile, BusinessProfile.user_id == User.id)
+    if top_categories:
+        query = query.where(
+            func.lower(Product.category).in_(top_categories),
+            Product.id.notin_(list(viewed_ids)) if viewed_ids else True,
+        )
+        query = query.order_by(
+            _recommended_score(viewer).desc(),
+            Product.views_count.desc(),
+            Product.created_at.desc(),
+        )
+    else:
+        query = query.order_by(
+            _recommended_score(viewer).desc(),
+            Product.created_at.desc(),
+        )
+
+    result = await db.execute(query.limit(safe_limit))
+    products = list(result.scalars().unique().all())
+
+    # Yetarli bo‘lmasa — umumiy recommended bilan to‘ldirish
+    if len(products) < max(4, safe_limit // 2):
+        fallback = await list_products(
+            db,
+            viewer=viewer,
+            search=None,
+            category=None,
+            min_price=None,
+            max_price=None,
+            currency=None,
+            seller_id=None,
+            sort="recommended",
+            page=1,
+            limit=safe_limit,
+        )
+        return {
+            "items": fallback.get("items") or [],
+            "based_on_views": based_on_views,
+        }
+
+    top_ids = set(await _top_product_ids(db))
+    fav_ids = await _favorite_ids(db, viewer.id, [p.id for p in products])
+    items = [
+        await _serialize_product(p, favorite_ids=fav_ids, top_ids=top_ids)
+        for p in products
+    ]
+    return {
+        "items": items,
+        "based_on_views": based_on_views,
     }
-    query = query.order_by(sort_map.get(sort, Product.created_at.desc()))
+
+
+async def list_products(
+    db: AsyncSession,
+    *,
+    viewer: User,
+    search: str | None,
+    category: str | None,
+    min_price: Decimal | None,
+    max_price: Decimal | None,
+    currency: str | None,
+    seller_id: int | None,
+    country: str | None = None,
+    business_role: str | None = None,
+    verified_only: bool = False,
+    ready_stock: bool = False,
+    free_shipping: bool = False,
+    premium_seller: bool = False,
+    new_only: bool = False,
+    sort: str,
+    page: int | None,
+    limit: int | None,
+    smart_search: str | None = None,
+) -> dict:
+    params = normalize_page(page, limit, default_size=20, max_size=50)
+    query = await _load_products_query(published_only=True)
+    query = query.outerjoin(BusinessProfile, BusinessProfile.user_id == User.id)
+    query = _apply_marketplace_filters(
+        query,
+        search=search if not smart_search else None,
+        category=category,
+        min_price=min_price,
+        max_price=max_price,
+        currency=currency,
+        seller_id=seller_id,
+        country=country,
+        business_role=business_role,
+        verified_only=verified_only,
+        ready_stock=ready_stock,
+        free_shipping=free_shipping,
+        premium_seller=premium_seller,
+        new_only=new_only,
+    )
+    if smart_search:
+        from app.services.smart_search import apply_smart_keyword_filter
+
+        query = apply_smart_keyword_filter(query, smart_search)
+
+    sort_key = (sort or "newest").strip().lower()
+    if sort_key == "recommended":
+        query = query.order_by(
+            _recommended_score(viewer).desc(),
+            Product.created_at.desc(),
+        )
+    elif sort_key == "top":
+        query = query.order_by(
+            Product.is_top_pinned.desc(),
+            Product.views_count.desc(),
+            Product.created_at.desc(),
+        )
+    else:
+        sort_map = {
+            "newest": Product.created_at.desc(),
+            "price_asc": Product.price.asc(),
+            "price_desc": Product.price.desc(),
+            "most_viewed": Product.views_count.desc(),
+        }
+        query = query.order_by(sort_map.get(sort_key, Product.created_at.desc()))
 
     count_query = select(func.count()).select_from(query.subquery())
     total = int((await db.execute(count_query)).scalar() or 0)
@@ -540,6 +906,87 @@ async def list_top_products(db: AsyncSession, *, viewer: User, limit: int = 10) 
         for p in ordered
     ]
     return {"items": items}
+
+
+async def list_manufacturers_map(db: AsyncSession, *, viewer: User) -> dict:
+    """Published mahsulotli manufacturer'larni davlat bo‘yicha guruhlash (xarita)."""
+    _ = viewer
+    country_expr = func.upper(func.coalesce(BusinessProfile.country, User.country))
+    company_expr = func.coalesce(
+        func.nullif(BusinessProfile.company_name, ""),
+        func.nullif(User.full_name, ""),
+        "Company",
+    )
+
+    result = await db.execute(
+        select(
+            country_expr.label("country"),
+            User.id.label("seller_id"),
+            company_expr.label("company_name"),
+            User.verified_badge.label("verified"),
+            func.coalesce(BusinessProfile.factory_verified, False).label(
+                "factory_verified"
+            ),
+            func.count(Product.id).label("product_count"),
+        )
+        .select_from(Product)
+        .join(User, User.id == Product.seller_id)
+        .outerjoin(Subscription, Subscription.user_id == User.id)
+        .outerjoin(BusinessProfile, BusinessProfile.user_id == User.id)
+        .where(
+            Product.status == "published",
+            _seller_filter(),
+            BusinessProfile.business_role == "manufacturer",
+            country_expr.isnot(None),
+            func.length(country_expr) == 2,
+        )
+        .group_by(
+            country_expr,
+            User.id,
+            company_expr,
+            User.verified_badge,
+            BusinessProfile.factory_verified,
+        )
+        .order_by(func.count(Product.id).desc())
+    )
+
+    by_country: dict[str, dict] = {}
+    for row in result.all():
+        code = (row.country or "").strip().upper()
+        if len(code) != 2:
+            continue
+        bucket = by_country.setdefault(
+            code,
+            {
+                "country": code,
+                "manufacturer_count": 0,
+                "product_count": 0,
+                "companies": [],
+            },
+        )
+        product_count = int(row.product_count or 0)
+        bucket["manufacturer_count"] += 1
+        bucket["product_count"] += product_count
+        if len(bucket["companies"]) < 8:
+            bucket["companies"].append(
+                {
+                    "id": int(row.seller_id),
+                    "company_name": (row.company_name or "Company").strip() or "Company",
+                    "verified": bool(row.verified),
+                    "factory_verified": bool(row.factory_verified),
+                    "product_count": product_count,
+                }
+            )
+
+    items = sorted(
+        by_country.values(),
+        key=lambda x: (-int(x["manufacturer_count"]), x["country"]),
+    )
+    return {
+        "items": items,
+        "total_manufacturers": sum(int(i["manufacturer_count"]) for i in items),
+        "total_countries": len(items),
+    }
 
 
 def list_categories(language: str) -> list[dict]:
@@ -636,6 +1083,65 @@ async def upload_product_image(
     return {"id": image.id, "url": image.url}
 
 
+def _sniff_video_content_type(data: bytes, declared: str | None, filename: str) -> str:
+    raw = (declared or "").split(";")[0].strip().lower()
+    if raw in ALLOWED_VIDEO_TYPES:
+        return raw
+    name = (filename or "").lower()
+    if name.endswith(".mp4") or name.endswith(".m4v"):
+        return "video/mp4"
+    if name.endswith(".mov"):
+        return "video/quicktime"
+    if name.endswith(".webm"):
+        return "video/webm"
+    # ISO BMFF / MP4 signature
+    if len(data) >= 12 and data[4:8] == b"ftyp":
+        return "video/mp4"
+    return raw or "application/octet-stream"
+
+
+async def upload_product_video(
+    db: AsyncSession,
+    *,
+    user: User,
+    filename: str,
+    content_type: str,
+    data: bytes,
+) -> dict:
+    """Qisqa mahsulot videosi (≈15s) — URL qaytaradi, product.video_url ga yoziladi."""
+    await _require_business_account(user)
+
+    content_type = _sniff_video_content_type(data, content_type, filename)
+    if content_type not in ALLOWED_VIDEO_TYPES:
+        raise AppError(
+            message="Faqat MP4, MOV yoki WebM video ruxsat etilgan",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+    if len(data) > MAX_VIDEO_BYTES:
+        raise AppError(
+            message="Video hajmi 25 MB dan oshmasligi kerak",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+    if len(data) < 64:
+        raise AppError(
+            message="Video fayli noto'g'ri",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+
+    ext = {
+        "video/mp4": "mp4",
+        "video/x-m4v": "m4v",
+        "video/quicktime": "mov",
+        "video/webm": "webm",
+    }.get(content_type, "mp4")
+    key = f"products/videos/{user.id}/{uuid4().hex}.{ext}"
+    url = await get_storage().upload_bytes(key, data, content_type)
+    return {"url": url}
+
+
 async def delete_product_image(db: AsyncSession, *, user: User, image_id: int) -> None:
     result = await db.execute(select(ProductImage).where(ProductImage.id == image_id))
     image = result.scalar_one_or_none()
@@ -693,6 +1199,13 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
         category=payload.category,
         status=payload.status,
         attributes=[a.model_dump() for a in payload.attributes],
+        capabilities=_normalize_capabilities(payload.capabilities),
+        video_url=_clean_optional_str(payload.video_url, max_len=512),
+        factory_video_url=_clean_optional_str(payload.factory_video_url, max_len=512),
+        process_video_url=_clean_optional_str(payload.process_video_url, max_len=512),
+        moq=_clean_optional_str(payload.moq, max_len=120),
+        shipping_info=_clean_optional_str(payload.shipping_info, max_len=255),
+        shipping_countries=_normalize_country_list(payload.shipping_countries),
     )
     db.add(product)
     await db.flush()
@@ -715,6 +1228,23 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
         )
     )
     product = result.scalar_one()
+
+    if product.status == "published":
+        from app.services.feed import create_system_post
+
+        primary = next(
+            (img.url for img in (product.images or []) if img.is_primary),
+            (product.images[0].url if product.images else None),
+        )
+        await create_system_post(
+            db,
+            user=user,
+            post_type="new_product",
+            title=product.name,
+            body=(product.short_description or product.description or "")[:400],
+            image_url=primary,
+            meta={"product_id": product.id},
+        )
 
     fav_ids = await _favorite_ids(db, user.id, [product.id])
     top_ids = set(await _top_product_ids(db))
@@ -742,17 +1272,40 @@ async def update_product(
             status_code=403,
         )
 
+    was_published = product.status == "published"
     data = payload.model_dump(exclude_unset=True)
     attributes = data.pop("attributes", None)
+    capabilities = data.pop("capabilities", None)
     image_ids = data.pop("image_ids", None)
     primary_image_id = data.pop("primary_image_id", None)
     new_status = data.pop("status", None)
 
     for field, value in data.items():
-        if field in {"name", "short_description", "description"} and isinstance(value, str):
+        if field in {
+            "name",
+            "short_description",
+            "description",
+            "video_url",
+            "factory_video_url",
+            "process_video_url",
+            "moq",
+            "shipping_info",
+        } and isinstance(value, str):
             value = value.strip()
+            if field in {
+                "video_url",
+                "factory_video_url",
+                "process_video_url",
+                "moq",
+                "shipping_info",
+            } and not value:
+                value = None
+        if field == "shipping_countries" and value is not None:
+            value = _normalize_country_list(value)
         setattr(product, field, value)
 
+    if capabilities is not None:
+        product.capabilities = _normalize_capabilities(capabilities)
     if attributes is not None:
         product.attributes = [a.model_dump() if hasattr(a, "model_dump") else a for a in attributes]
 
@@ -794,6 +1347,22 @@ async def update_product(
         )
 
     await db.refresh(product, attribute_names=["images", "seller"])
+    if not was_published and product.status == "published":
+        from app.services.feed import create_system_post
+
+        primary = next(
+            (img.url for img in (product.images or []) if img.is_primary),
+            (product.images[0].url if product.images else None),
+        )
+        await create_system_post(
+            db,
+            user=user,
+            post_type="new_product",
+            title=product.name,
+            body=(product.short_description or product.description or "")[:400],
+            image_url=primary,
+            meta={"product_id": product.id},
+        )
     fav_ids = await _favorite_ids(db, user.id, [product.id])
     top_ids = set(await _top_product_ids(db))
     return await _serialize_detail(

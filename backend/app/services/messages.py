@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from PIL import Image
 from redis.asyncio import Redis
-from sqlalchemy import inspect as sa_inspect, select
+from sqlalchemy import func, inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,9 +16,17 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.session import get_session_factory
 from app.integrations.storage import get_storage
-from app.integrations.translation import _normalize_lang, translate, user_preferred_lang
+from app.integrations.translation import (
+    _normalize_lang,
+    resolve_translation_domain,
+    suggest_chat_reply,
+    summarize_chat_thread,
+    translate,
+    user_preferred_lang,
+)
 from app.models.chat import Chat, ChatMedia, Message, MessageHide, MessageRead, MessageTranslation
 from app.models.user import User
+from app.services import moderator_ai as moderator_ai_service
 from app.services.chats import (
     _get_chat_for_user,
     _get_participant,
@@ -127,6 +135,12 @@ def build_translation_jobs(
             "sender_id": sender_id,
             "sender_language": sender_language,
             "recipient_ids": [p.id for p in peers],
+            "domain": resolve_translation_domain(
+                text,
+                peers_preferred=[
+                    getattr(p, "translation_domain", None) for p in peers
+                ],
+            ),
         }
         for lang, peers in by_lang.items()
     ]
@@ -166,6 +180,22 @@ def _reply_preview_text(message: Message, viewer_language: str) -> str | None:
         if caption and caption.strip():
             return caption.strip()
         return None
+    if message.type == "offer":
+        meta = message.meta if isinstance(message.meta, dict) else {}
+        product = str(meta.get("product") or meta.get("product_name") or "").strip()
+        price = str(meta.get("price") or "").strip()
+        currency = str(meta.get("currency") or "").strip()
+        price_bit = f"{price} {currency}".strip()
+        bits = [b for b in (product, price_bit) if b]
+        return " · ".join(bits) if bits else "Offer"
+    if message.type == "rfq":
+        meta = message.meta if isinstance(message.meta, dict) else {}
+        product = str(meta.get("product") or meta.get("product_name") or "").strip()
+        qty = str(meta.get("quantity") or "").strip()
+        unit = str(meta.get("unit") or "").strip()
+        qty_bit = f"{qty} {unit}".strip()
+        bits = [b for b in (product, qty_bit) if b]
+        return " · ".join(bits) if bits else "RFQ"
     if message.type != "text":
         return None
     translated = _pick_translation_text(message, viewer_language)
@@ -388,21 +418,30 @@ async def list_messages(
     sender_map = await _load_sender_public_map(
         db, {m.sender_id for m in visible}
     )
+    from app.services.auto_business_card import build_auto_business_cards
+
+    auto_cards = await build_auto_business_cards(
+        db,
+        viewer_id=user.id,
+        sender_ids={m.sender_id for m in visible},
+    )
 
     items = []
     for m in visible:
         s_name, s_avatar = sender_map.get(m.sender_id, (None, None))
-        items.append(
-            _serialize_message(
-                m,
-                viewer_id=user.id,
-                viewer_language=user_preferred_lang(user),
-                read_message_ids=read_ids if m.sender_id == user.id else None,
-                reply_to=reply_map.get(m.reply_to_id) if m.reply_to_id else None,
-                sender_name=s_name,
-                sender_avatar_url=s_avatar,
-            )
+        payload = _serialize_message(
+            m,
+            viewer_id=user.id,
+            viewer_language=user_preferred_lang(user),
+            read_message_ids=read_ids if m.sender_id == user.id else None,
+            reply_to=reply_map.get(m.reply_to_id) if m.reply_to_id else None,
+            sender_name=s_name,
+            sender_avatar_url=s_avatar,
         )
+        card = auto_cards.get(m.sender_id)
+        if card is not None and m.sender_id != user.id:
+            payload["auto_business_card"] = card
+        items.append(payload)
 
     # Tarix ochilganda yetishmayotgan tarjimalarni backgroundda to'ldirish.
     missing_jobs: list[dict] = []
@@ -431,6 +470,10 @@ async def list_messages(
                 "sender_id": m.sender_id,
                 "sender_language": m.original_language or source or viewer_lang,
                 "recipient_ids": [user.id],
+                "domain": resolve_translation_domain(
+                    src_text,
+                    preferred=getattr(user, "translation_domain", None),
+                ),
             }
         )
 
@@ -484,7 +527,16 @@ async def create_message(
         text = text.strip()
         original_language = user_preferred_lang(user)
         meta_payload = meta
-    elif msg_type in {"product", "location", "contact"}:
+    elif msg_type in {
+        "product",
+        "location",
+        "contact",
+        "invoice",
+        "catalog",
+        "business_card",
+        "offer",
+        "rfq",
+    }:
         if not meta or not isinstance(meta, dict):
             raise AppError(
                 message="Meta majburiy",
@@ -533,6 +585,32 @@ async def create_message(
         reply = await db.get(Message, reply_to_id)
         if reply is None or reply.chat_id != chat_id:
             raise AppError(message="Javob xabari topilmadi", error_code="MESSAGE_NOT_FOUND", status_code=404)
+
+    # Moderator AI — spam / haqorat / reklama (matnli xabarlar)
+    if text and msg_type == "text":
+        await moderator_ai_service.moderate_text(
+            text=text,
+            locale=user_preferred_lang(user),
+            redis=redis,
+            user_id=user.id,
+            context="chat",
+        )
+    elif text and msg_type in {
+        "offer",
+        "rfq",
+        "invoice",
+        "product",
+        "catalog",
+        "business_card",
+        "contact",
+    }:
+        await moderator_ai_service.moderate_text(
+            text=text,
+            locale=user_preferred_lang(user),
+            redis=redis,
+            user_id=user.id,
+            context="chat",
+        )
 
     existing = await db.execute(
         select(Message)
@@ -588,6 +666,8 @@ async def create_message(
     hub = get_hub()
 
     async def _publish(msg: Message) -> dict:
+        from app.services.auto_business_card import build_auto_business_cards
+
         s_name, s_avatar = _sender_public_fields(user)
         sender_payload = _serialize_message(
             msg,
@@ -618,6 +698,12 @@ async def create_message(
                     sender_name=s_name,
                     sender_avatar_url=s_avatar,
                 )
+                cards = await build_auto_business_cards(
+                    db, viewer_id=peer.id, sender_ids={user.id}
+                )
+                card = cards.get(user.id)
+                if card is not None:
+                    peer_payload["auto_business_card"] = card
                 await hub.publish(
                     peer.id, "new_message", {**event_data, "message": peer_payload}
                 )
@@ -641,6 +727,17 @@ async def create_message(
         )
         if jobs:
             payload["_translation_jobs"] = jobs
+        # AI FAQ — takroriy savollarga avto-javob (background)
+        meta_check = meta_payload if isinstance(meta_payload, dict) else {}
+        if not meta_check.get("ai_faq"):
+            payload["_faq_jobs"] = [
+                {
+                    "chat_id": chat_id,
+                    "message_id": message.id,
+                    "text": text,
+                    "asker_id": user.id,
+                }
+            ]
     elif msg_type == "voice":
         audio_url = (meta_payload or {}).get("url")
         if audio_url:
@@ -677,12 +774,13 @@ async def _translate_and_republish(
     recipient_ids: list[int],
     chat_id: int,
     timeout: float,
+    domain: str | None = None,
 ) -> None:
     translated = text
     status = "done"
     try:
         translated = await asyncio.wait_for(
-            translate(text, target_lang, source_lang=source_lang),
+            translate(text, target_lang, source_lang=source_lang, domain=domain),
             timeout=timeout,
         )
     except TimeoutError:
@@ -781,6 +879,7 @@ async def finish_message_translation_job(
     recipient_ids: list[int] | None = None,
     recipient_id: int | None = None,
     recipient_language: str | None = None,
+    domain: str | None = None,
 ) -> None:
     """HTTP javobidan keyin ishlaydigan tarjima (BackgroundTasks)."""
     del recipient_language  # legacy API field; language comes from User rows
@@ -814,6 +913,17 @@ async def finish_message_translation_job(
                 member_ids = await list_chat_member_ids(db, chat_id)
                 peers = [uid for uid in member_ids if uid != sender_id]
 
+            resolved_domain = domain
+            if not resolved_domain and peers:
+                users_result = await db.execute(select(User).where(User.id.in_(peers)))
+                peer_users = list(users_result.scalars().all())
+                resolved_domain = resolve_translation_domain(
+                    text,
+                    peers_preferred=[
+                        getattr(u, "translation_domain", None) for u in peer_users
+                    ],
+                )
+
             await _translate_and_republish(
                 db,
                 message=message,
@@ -825,6 +935,7 @@ async def finish_message_translation_job(
                 recipient_ids=peers,
                 chat_id=chat_id,
                 timeout=_translation_timeout_seconds(),
+                domain=resolved_domain,
             )
             await db.commit()
         except Exception as exc:  # noqa: BLE001
@@ -915,6 +1026,18 @@ async def finish_voice_transcription_job(
                     logger.warning(
                         "Voice download failed for message %s: %s", message_id, exc
                     )
+                    meta = dict(message.meta or {})
+                    meta["transcription_status"] = "failed"
+                    message.meta = meta
+                    await db.flush()
+                    await _republish_message_to_members(
+                        db,
+                        message=message,
+                        chat_id=chat_id,
+                        sender_id=sender_id,
+                        member_ids=[sender_id, *(recipient_ids or [])],
+                    )
+                    await db.commit()
                     return
                 try:
                     transcript = await transcribe_audio(
@@ -930,16 +1053,100 @@ async def finish_voice_transcription_job(
                         exc.error_code,
                         exc.message,
                     )
+                    meta = dict(message.meta or {})
+                    meta["transcription_status"] = "failed"
+                    message.meta = meta
+                    await db.flush()
+                    await _republish_message_to_members(
+                        db,
+                        message=message,
+                        chat_id=chat_id,
+                        sender_id=sender_id,
+                        member_ids=[sender_id, *(recipient_ids or [])],
+                    )
+                    await db.commit()
                     return
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Voice STT failed for message %s: %s", message_id, exc)
+                    meta = dict(message.meta or {})
+                    meta["transcription_status"] = "failed"
+                    message.meta = meta
+                    await db.flush()
+                    await _republish_message_to_members(
+                        db,
+                        message=message,
+                        chat_id=chat_id,
+                        sender_id=sender_id,
+                        member_ids=[sender_id, *(recipient_ids or [])],
+                    )
+                    await db.commit()
                     return
 
                 transcript = (transcript or "").strip()
                 if not transcript:
+                    meta = dict(message.meta or {})
+                    meta["transcription_status"] = "failed"
+                    message.meta = meta
+                    await db.flush()
+                    await _republish_message_to_members(
+                        db,
+                        message=message,
+                        chat_id=chat_id,
+                        sender_id=sender_id,
+                        member_ids=[sender_id, *(recipient_ids or [])],
+                    )
+                    await db.commit()
                     return
+
+                # Moderator AI — ovoz transkripti
+                from app.db.redis import get_redis
+
+                redis_client = None
+                try:
+                    redis_client = await get_redis()
+                except Exception:
+                    redis_client = None
+                verdict = await moderator_ai_service.evaluate_text(
+                    text=transcript,
+                    locale=sender_language,
+                    redis=redis_client,
+                    user_id=sender_id,
+                    context="chat",
+                )
+                if not verdict.allowed:
+                    message.deleted_for_everyone = True
+                    message.is_deleted = True
+                    message.text_original = None
+                    await db.flush()
+                    await db.commit()
+                    try:
+                        hub = get_hub()
+                        member_ids = await list_chat_member_ids(db, chat_id)
+                        for uid in member_ids:
+                            await hub.publish(
+                                uid,
+                                "message_deleted",
+                                {
+                                    "chat_id": chat_id,
+                                    "message_id": message_id,
+                                    "deleted_for_everyone": True,
+                                    "moderator": True,
+                                    "category": verdict.category,
+                                },
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Moderator voice delete publish failed %s: %s",
+                            message_id,
+                            exc,
+                        )
+                    return
+
                 message.text_original = transcript
                 message.original_language = source_lang or sender_language
+                meta = dict(message.meta or {})
+                meta["transcription_status"] = "done"
+                message.meta = meta
                 await db.flush()
 
             peers = list(recipient_ids or [])
@@ -1000,6 +1207,7 @@ async def finish_voice_transcription_job(
                     sender_id=job["sender_id"],
                     sender_language=job["sender_language"],
                     recipient_ids=job.get("recipient_ids"),
+                    domain=job.get("domain"),
                 )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
@@ -1226,3 +1434,251 @@ async def upload_chat_media(
     await db.flush()
     await db.refresh(media)
     return {"id": media.id, "url": media.url, "type": media.type}
+
+async def suggest_reply_for_chat(
+    db: AsyncSession,
+    *,
+    user: User,
+    chat_id: int,
+    message_id: int | None = None,
+    tone: str = "professional",
+) -> dict:
+    await _get_chat_for_user(db, chat_id, user.id)
+    viewer_lang = user_preferred_lang(user)
+
+    peer_message: Message | None = None
+    if message_id is not None:
+        result = await db.execute(
+            select(Message)
+            .where(Message.id == message_id, Message.chat_id == chat_id)
+            .options(selectinload(Message.translations))
+        )
+        peer_message = result.scalar_one_or_none()
+        if peer_message is None:
+            raise AppError(
+                message="Xabar topilmadi",
+                error_code="MESSAGE_NOT_FOUND",
+                status_code=404,
+            )
+        if peer_message.sender_id == user.id:
+            raise AppError(
+                message="Oz xabaringizga AI javob yozilmaydi",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+    else:
+        result = await db.execute(
+            select(Message)
+            .where(
+                Message.chat_id == chat_id,
+                Message.sender_id != user.id,
+                Message.deleted_for_everyone.is_(False),
+                Message.type.in_(("text", "voice")),
+            )
+            .order_by(Message.id.desc())
+            .limit(1)
+            .options(selectinload(Message.translations))
+        )
+        peer_message = result.scalar_one_or_none()
+        if peer_message is None:
+            raise AppError(
+                message="Javob yozish uchun suhbatdosh xabari yoq",
+                error_code="NO_PEER_MESSAGE",
+                status_code=400,
+            )
+
+    peer_text = _pick_translation_text(peer_message, viewer_lang) or peer_message.text_original or ""
+    peer_text = (peer_text or "").strip()
+    if not peer_text:
+        raise AppError(
+            message="Bu xabarda matn yoq",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+
+    recent = await db.execute(
+        select(Message)
+        .where(
+            Message.chat_id == chat_id,
+            Message.deleted_for_everyone.is_(False),
+            Message.type == "text",
+            Message.id < peer_message.id,
+        )
+        .order_by(Message.id.desc())
+        .limit(6)
+        .options(selectinload(Message.translations))
+    )
+    context: list[str] = []
+    for m in reversed(list(recent.scalars().all())):
+        body = _pick_translation_text(m, viewer_lang) or m.text_original or ""
+        body = (body or "").strip()
+        if body:
+            who = "me" if m.sender_id == user.id else "peer"
+            context.append(f"{who}: {body[:240]}")
+
+    text_out = await suggest_chat_reply(
+        peer_message=peer_text,
+        reply_language=viewer_lang,
+        recent_context=context,
+        tone=tone,
+    )
+    return {"text": text_out}
+
+
+def _offer_line(meta: dict | None) -> str:
+    if not isinstance(meta, dict):
+        return ""
+    product = str(meta.get("product") or meta.get("product_name") or "").strip()
+    price = str(meta.get("price") or "").strip()
+    currency = str(meta.get("currency") or "").strip()
+    delivery = str(meta.get("delivery") or meta.get("lead_time") or "").strip()
+    moq = str(meta.get("moq") or "").strip()
+    payment = str(meta.get("payment") or meta.get("payment_terms") or "").strip()
+    status = str(meta.get("status") or "offered").strip()
+    bits = [
+        b
+        for b in (
+            product,
+            f"{price} {currency}".strip(),
+            delivery,
+            f"MOQ {moq}" if moq else "",
+            payment,
+            status if status != "offered" else "",
+        )
+        if b
+    ]
+    return " | ".join(bits)
+
+
+def _rfq_line(meta: dict | None) -> str:
+    if not isinstance(meta, dict):
+        return ""
+    product = str(meta.get("product") or meta.get("product_name") or "").strip()
+    qty = str(meta.get("quantity") or "").strip()
+    unit = str(meta.get("unit") or "").strip()
+    specs = str(meta.get("specs") or meta.get("details") or "").strip()
+    deadline = str(meta.get("deadline") or "").strip()
+    bits = [
+        b
+        for b in (
+            product,
+            f"{qty} {unit}".strip(),
+            specs,
+            deadline,
+        )
+        if b
+    ]
+    return " | ".join(bits)
+
+
+async def summarize_chat_for_user(
+    db: AsyncSession,
+    *,
+    user: User,
+    chat_id: int,
+) -> dict:
+    await _get_chat_for_user(db, chat_id, user.id)
+    viewer_lang = user_preferred_lang(user)
+
+    total_result = await db.execute(
+        select(func.count())
+        .select_from(Message)
+        .where(
+            Message.chat_id == chat_id,
+            Message.deleted_for_everyone.is_(False),
+        )
+    )
+    message_count = int(total_result.scalar_one() or 0)
+    if message_count == 0:
+        raise AppError(
+            message="Suhbatda xabar yoq",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+
+    # Newest first — then reverse for chronological transcript
+    result = await db.execute(
+        select(Message)
+        .where(
+            Message.chat_id == chat_id,
+            Message.deleted_for_everyone.is_(False),
+            Message.type.in_(
+                ("text", "voice", "offer", "rfq", "invoice", "product", "catalog")
+            ),
+        )
+        .order_by(Message.id.desc())
+        .limit(120)
+        .options(selectinload(Message.translations))
+    )
+    rows = list(reversed(list(result.scalars().all())))
+    if not rows:
+        raise AppError(
+            message="Xulosa uchun matnli xabarlar yoq",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+
+    lines: list[str] = []
+    for m in rows:
+        who = "me" if m.sender_id == user.id else "peer"
+        if m.type == "offer":
+            body = _offer_line(m.meta if isinstance(m.meta, dict) else None)
+            if body:
+                lines.append(f"{who} [offer]: {body[:280]}")
+            continue
+        if m.type == "rfq":
+            body = _rfq_line(m.meta if isinstance(m.meta, dict) else None)
+            if body:
+                lines.append(f"{who} [rfq]: {body[:280]}")
+            continue
+        if m.type == "invoice":
+            meta = m.meta if isinstance(m.meta, dict) else {}
+            title = str(meta.get("title") or "invoice").strip()
+            amount = str(meta.get("amount") or "").strip()
+            currency = str(meta.get("currency") or "").strip()
+            body = f"{title} {amount} {currency}".strip()
+            if body:
+                lines.append(f"{who} [invoice]: {body[:240]}")
+            continue
+        if m.type == "product":
+            meta = m.meta if isinstance(m.meta, dict) else {}
+            name = str(meta.get("name") or meta.get("product_name") or "product").strip()
+            price = str(meta.get("price") or "").strip()
+            body = f"{name} {price}".strip()
+            lines.append(f"{who} [product]: {body[:240]}")
+            continue
+        if m.type == "catalog":
+            meta = m.meta if isinstance(m.meta, dict) else {}
+            title = str(meta.get("title") or "catalog").strip()
+            lines.append(f"{who} [catalog]: {title[:200]}")
+            continue
+        body = _pick_translation_text(m, viewer_lang) or m.text_original or ""
+        body = (body or "").strip()
+        if body:
+            lines.append(f"{who}: {body[:280]}")
+
+    if not lines:
+        raise AppError(
+            message="Xulosa uchun matn topilmadi",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+
+    # If very long history, keep oldest sample + newest dense block
+    if len(lines) > 90:
+        head = lines[:15]
+        tail = lines[-75:]
+        lines = head + ["…"] + tail
+
+    summary = await summarize_chat_thread(
+        lines=lines,
+        summary_language=viewer_lang,
+        message_count=message_count,
+    )
+    return {
+        "title": summary.get("title") or "Qisqacha",
+        "bullets": list(summary.get("bullets") or []),
+        "message_count": message_count,
+        "covered_count": len(rows),
+    }
+

@@ -8,9 +8,13 @@ import '../utils/size_controller.dart';
 enum ChatOverflowAction {
   profile,
   groupSettings,
+  groupCatalog,
+  groupStats,
+  dealMode,
   search,
   mute,
   pin,
+  aiSummary,
   clearHistory,
   deleteChat,
   block,
@@ -84,6 +88,36 @@ Future<ChatOverflowAction?> showChatOverflowSheet(
                   'chat_overflow_group_settings'.tr,
                   ChatOverflowAction.groupSettings,
                 ),
+              if (isGroup)
+                _item(
+                  ctx,
+                  c,
+                  Icons.folder_special_outlined,
+                  'chat_overflow_group_catalog'.tr,
+                  ChatOverflowAction.groupCatalog,
+                ),
+              if (isGroup)
+                _item(
+                  ctx,
+                  c,
+                  Icons.insights_outlined,
+                  'chat_overflow_group_stats'.tr,
+                  ChatOverflowAction.groupStats,
+                ),
+              _item(
+                ctx,
+                c,
+                Icons.handshake_outlined,
+                'chat_overflow_deal_mode'.tr,
+                ChatOverflowAction.dealMode,
+              ),
+              _item(
+                ctx,
+                c,
+                Icons.auto_awesome_rounded,
+                'chat_overflow_ai_summary'.tr,
+                ChatOverflowAction.aiSummary,
+              ),
               Divider(height: 16.dp, color: c.outline),
               _item(
                 ctx,

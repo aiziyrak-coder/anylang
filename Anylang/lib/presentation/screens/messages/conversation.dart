@@ -23,6 +23,8 @@ class Conversation {
   final bool isSuper;
   final String? inviteLink;
   final int? memberLimit;
+  final bool isMarketplace;
+  final String? marketplaceSlug;
 
   const Conversation({
     required this.id,
@@ -45,6 +47,8 @@ class Conversation {
     this.isSuper = false,
     this.inviteLink,
     this.memberLimit,
+    this.isMarketplace = false,
+    this.marketplaceSlug,
   });
 
   factory Conversation.fromApi(Map<String, dynamic> json) {
@@ -94,6 +98,9 @@ class Conversation {
       isSuper: json['is_super'] == true,
       inviteLink: json['invite_link']?.toString(),
       memberLimit: (json['member_limit'] as num?)?.toInt(),
+      isMarketplace: json['is_marketplace'] == true ||
+          (json['marketplace_slug']?.toString().isNotEmpty == true),
+      marketplaceSlug: json['marketplace_slug']?.toString(),
     );
   }
 
@@ -127,6 +134,8 @@ class Conversation {
       isSuper: isSuper,
       inviteLink: inviteLink,
       memberLimit: memberLimit,
+      isMarketplace: isMarketplace,
+      marketplaceSlug: marketplaceSlug,
     );
   }
 }

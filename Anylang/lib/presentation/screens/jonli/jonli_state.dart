@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
+
 import '../select_language/select_language_option.dart';
+import 'jonli_transcript_entry.dart';
 
 /// Jonli muloqot o'rta body holati.
 enum JonliMode {
@@ -17,6 +19,19 @@ class JonliState extends GetxController {
   final RxString lastOriginal = ''.obs;
   final RxString lastTranslated = ''.obs;
   final RxBool busy = false.obs;
+
+  /// Conversation Mode — navbat bilan avtomatik mikrofon.
+  final RxBool conversationActive = false.obs;
+  /// Keyingi (yoki joriy) navbat — sizmi.
+  final RxBool nextIsMe = true.obs;
+
+  /// AI ovoz: female | male
+  final RxString ttsVoice = 'female'.obs;
+  /// AI ovoz tezligi 0.5–2.0
+  final RxDouble ttsSpeed = 1.0.obs;
+
+  /// Sessiya gaplari — har biri vaqt + asl + tarjima.
+  final RxList<JonliTranscriptEntry> turns = <JonliTranscriptEntry>[].obs;
 
   /// Server Live API tillari (langCode).
   final RxSet<String> liveLangCodes = <String>{

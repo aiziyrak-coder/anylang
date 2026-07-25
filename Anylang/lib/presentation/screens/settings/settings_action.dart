@@ -17,6 +17,11 @@ class SelectAppLanguage extends SettingsAction {
   SelectAppLanguage(this.language);
 }
 
+class SelectTranslationDomain extends SettingsAction {
+  final String domain;
+  SelectTranslationDomain(this.domain);
+}
+
 class OpenProfileVisibility extends SettingsAction {}
 class OpenBlockedUsers extends SettingsAction {}
 class OpenChangePassword extends SettingsAction {}

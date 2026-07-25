@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.schemas.user import NetworkingScoreOut
+
 
 class FriendOut(BaseModel):
     id: int
@@ -16,7 +18,16 @@ class FriendOut(BaseModel):
     country: str | None = None
     is_business: bool = False
     verified_badge: bool = False
+    company_name: str | None = None
+    business_role: str | None = None
+    rating: float | None = None
     friends_since: datetime | None = None
+    keywords: list[str] = Field(default_factory=list)
+    product_categories: list[str] = Field(default_factory=list)
+    app_language: str | None = None
+    spoken_languages: list[str] = Field(default_factory=list)
+    products_count: int = Field(default=0, ge=0)
+    countries_count: int = Field(default=0, ge=0)
 
 
 class FriendListOut(BaseModel):
@@ -27,6 +38,7 @@ class FriendListOut(BaseModel):
     has_more: bool
     online_count: int = Field(ge=0)
     pending_incoming_count: int = Field(ge=0)
+    networking: NetworkingScoreOut | None = None
 
 
 class FriendRequestCreateIn(BaseModel):

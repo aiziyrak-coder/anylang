@@ -184,10 +184,12 @@ main,
 
 .hero-line {
   margin: 1.1rem 0 0;
+  max-width: 38rem;
   font-family: var(--font-display);
-  font-size: clamp(1.35rem, 3vw, 1.85rem);
+  font-size: clamp(1.2rem, 2.8vw, 1.7rem);
   font-weight: 700;
   letter-spacing: -0.03em;
+  line-height: 1.25;
   color: var(--ink-soft);
   animation: rise 0.9s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

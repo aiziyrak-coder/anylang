@@ -5,7 +5,9 @@ import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
 import '../../../data/network/products_repository.dart';
+import '../../modal/country_picker_bottom_sheet.dart';
 import '../../modal/image_picker.dart';
+import '../../modal/video_picker.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -38,6 +40,10 @@ class AddProductScreen extends Screen<AddProductState, void> {
   @override
   void initState(void payload) {
     state.images.clear();
+    state.shippingCountries.clear();
+    state.capabilities.clear();
+    state.productVideoUrl.value = null;
+    state.videoUploading.value = false;
     state.category.value = kProductCategoryKeys.first;
   }
 
@@ -74,6 +80,46 @@ class AddProductScreen extends Screen<AddProductState, void> {
         state.currency.value = a.currency;
       case SelectCategory a:
         state.category.value = a.category;
+      case AddShippingCountryRequested _:
+        final picked = await showCountryPickerBottomSheet(
+          context,
+          title: 'product_shipping_countries'.tr,
+          desc: 'business_add_export_country'.tr,
+        );
+        if (picked == null) return;
+        final code = picked.code.toUpperCase();
+        if (!state.shippingCountries.contains(code)) {
+          state.shippingCountries.add(code);
+        }
+      case RemoveShippingCountry a:
+        state.shippingCountries.remove(a.code);
+      case PickProductVideoRequested _:
+        if (state.videoUploading.value) return;
+        final file = await pickProductVideo(context);
+        if (file == null) return;
+        state.videoUploading.value = true;
+        try {
+          final up =
+              await Get.find<ProductsRepository>().uploadVideo(file.path);
+          final map = asMap(up.dataOrNull);
+          final url = (map?['url'] as String?)?.trim();
+          if (url == null || url.isEmpty) {
+            showAppError(up.errorOrNull ?? 'product_video_upload_failed'.tr);
+            return;
+          }
+          state.productVideoUrl.value = url;
+          showAppMessage('product_video_uploaded'.tr);
+        } finally {
+          state.videoUploading.value = false;
+        }
+      case ClearProductVideoRequested _:
+        state.productVideoUrl.value = null;
+      case ToggleProductCapability a:
+        if (state.capabilities.contains(a.code)) {
+          state.capabilities.remove(a.code);
+        } else if (state.capabilities.length < 8) {
+          state.capabilities.add(a.code);
+        }
       case SaveDraftRequested a:
         await _submit(
           state,
@@ -81,6 +127,11 @@ class AddProductScreen extends Screen<AddProductState, void> {
           price: a.price,
           shortDescription: a.shortDescription,
           detailedDescription: a.detailedDescription,
+          moq: a.moq,
+          shippingInfo: a.shippingInfo,
+          videoUrl: (state.productVideoUrl.value ?? a.videoUrl).trim(),
+          factoryVideoUrl: a.factoryVideoUrl,
+          processVideoUrl: a.processVideoUrl,
           status: 'draft',
         );
       case PublishProductRequested a:
@@ -90,6 +141,11 @@ class AddProductScreen extends Screen<AddProductState, void> {
           price: a.price,
           shortDescription: a.shortDescription,
           detailedDescription: a.detailedDescription,
+          moq: a.moq,
+          shippingInfo: a.shippingInfo,
+          videoUrl: (state.productVideoUrl.value ?? a.videoUrl).trim(),
+          factoryVideoUrl: a.factoryVideoUrl,
+          processVideoUrl: a.processVideoUrl,
           status: 'published',
         );
     }
@@ -101,12 +157,22 @@ class AddProductScreen extends Screen<AddProductState, void> {
     required String price,
     required String shortDescription,
     required String detailedDescription,
+    required String moq,
+    required String shippingInfo,
+    required String videoUrl,
+    required String factoryVideoUrl,
+    required String processVideoUrl,
     required String status,
   }) async {
     name = name.trim();
     price = price.trim().replaceAll(',', '.');
     shortDescription = shortDescription.trim();
     detailedDescription = detailedDescription.trim();
+    moq = moq.trim();
+    shippingInfo = shippingInfo.trim();
+    videoUrl = videoUrl.trim();
+    factoryVideoUrl = factoryVideoUrl.trim();
+    processVideoUrl = processVideoUrl.trim();
 
     if (name.length < 2) {
       showAppError('add_product_name_required'.tr);
@@ -144,7 +210,7 @@ class AddProductScreen extends Screen<AddProductState, void> {
       final short = shortDescription.isNotEmpty ? shortDescription : name;
       final detailed =
           detailedDescription.isEmpty ? short : detailedDescription;
-      final result = await repo.create({
+      final body = <String, dynamic>{
         'name': name,
         'short_description': short,
         'description': detailed,
@@ -154,7 +220,15 @@ class AddProductScreen extends Screen<AddProductState, void> {
         'image_ids': imageIds,
         'primary_image_id': imageIds.first,
         'status': status,
-      });
+        'shipping_countries': state.shippingCountries.toList(),
+        'capabilities': state.capabilities.toList(),
+      };
+      if (moq.isNotEmpty) body['moq'] = moq;
+      if (shippingInfo.isNotEmpty) body['shipping_info'] = shippingInfo;
+      if (videoUrl.isNotEmpty) body['video_url'] = videoUrl;
+      if (factoryVideoUrl.isNotEmpty) body['factory_video_url'] = factoryVideoUrl;
+      if (processVideoUrl.isNotEmpty) body['process_video_url'] = processVideoUrl;
+      final result = await repo.create(body);
       if (result.dataOrNull != null) {
         showAppMessage('action_done'.tr);
         popBackNavigate();

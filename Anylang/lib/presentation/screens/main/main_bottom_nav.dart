@@ -214,51 +214,47 @@ class _ProductsFab extends StatelessWidget {
 
     return Tooltip(
       message: label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            onTap();
-          },
-          customBorder: const CircleBorder(),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: c.accentButtonGradient,
-              border: Border.all(
-                color: c.isDark
-                    ? const Color(0x66FFFFFF)
-                    : const Color(0xCCFFFFFF),
-                width: 2.4,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          onTap();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: c.accentButtonGradient,
+            border: Border.all(
+              color: c.isDark
+                  ? const Color(0x66FFFFFF)
+                  : const Color(0xCCFFFFFF),
+              width: 2.4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: c.accent.withValues(alpha: selected ? 0.6 : 0.4),
+                blurRadius: selected ? 24 : 16,
+                offset: const Offset(0, 8),
+                spreadRadius: -2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: c.accent.withValues(alpha: selected ? 0.6 : 0.4),
-                  blurRadius: selected ? 24 : 16,
-                  offset: const Offset(0, 8),
-                  spreadRadius: -2,
-                ),
-                BoxShadow(
-                  color: c.isDark
-                      ? const Color(0x66000000)
-                      : const Color(0x22071526),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: SvgPicture.asset(
-              kMainNavTabs[kMainProductsTabIndex].iconAsset,
-              width: selected ? 30.dp : 27.dp,
-              height: selected ? 30.dp : 27.dp,
-              colorFilter: ColorFilter.mode(c.onAccent, BlendMode.srcIn),
-            ),
+              BoxShadow(
+                color: c.isDark
+                    ? const Color(0x66000000)
+                    : const Color(0x22071526),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: SvgPicture.asset(
+            kMainNavTabs[kMainProductsTabIndex].iconAsset,
+            width: selected ? 30.dp : 27.dp,
+            height: selected ? 30.dp : 27.dp,
+            colorFilter: ColorFilter.mode(c.onAccent, BlendMode.srcIn),
           ),
         ),
       ),

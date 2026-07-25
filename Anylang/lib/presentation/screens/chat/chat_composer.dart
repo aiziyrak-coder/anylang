@@ -30,6 +30,8 @@ class ChatComposer extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onMic;
   final VoidCallback onAttach;
+  final VoidCallback? onAiSuggest;
+  final bool aiLoading;
   final VoidCallback onCancelReply;
   final VoidCallback onCancelRecording;
   final VoidCallback onSendVoice;
@@ -48,6 +50,8 @@ class ChatComposer extends StatelessWidget {
     required this.onCancelReply,
     required this.onCancelRecording,
     required this.onSendVoice,
+    this.onAiSuggest,
+    this.aiLoading = false,
     this.peerName = '',
     this.recordElapsed = '0:00',
     this.recordSamples = const [],
@@ -242,6 +246,21 @@ class ChatComposer extends StatelessWidget {
           borderRadius: 22.dp,
           padding: EdgeInsets.all(10.dp),
         ),
+        if (onAiSuggest != null) ...[
+          SizedBox(width: 6.dp),
+          MyIconButton(
+            onClick: aiLoading ? () {} : onAiSuggest!,
+            icon: aiLoading
+                ? Icons.hourglass_top_rounded
+                : Icons.auto_awesome_rounded,
+            iconColor: c.accentText,
+            iconSize: 20.dp,
+            backgroundColor: c.accentSoft,
+            border: Border.all(color: c.accent.withValues(alpha: 0.35), width: 0.7),
+            borderRadius: 22.dp,
+            padding: EdgeInsets.all(10.dp),
+          ),
+        ],
         SizedBox(width: 8.dp),
         Expanded(
           child: Container(

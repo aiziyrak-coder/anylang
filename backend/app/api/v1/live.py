@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, File, Form, Query, UploadFile, status
+from fastapi.responses import Response
 
 from app.api.deps_auth import CurrentUser
 from app.core.deps import DbSession
 from app.core.uploads import read_upload_limited
 from app.schemas.live import (
     LiveLanguagesOut,
+    LiveOcrTranslateOut,
     LiveSessionCreateIn,
+    LiveSessionListOut,
     LiveSessionOut,
     LiveSessionUpdateIn,
     LiveTurnListOut,
@@ -21,6 +24,70 @@ router = APIRouter()
 @router.get("/languages", response_model=LiveLanguagesOut)
 async def list_languages() -> LiveLanguagesOut:
     return LiveLanguagesOut.model_validate(live_service.list_languages())
+
+
+@router.post("/ocr-translate", response_model=LiveOcrTranslateOut)
+async def ocr_translate(
+    db: DbSession,
+    current_user: CurrentUser,
+    image: UploadFile = File(...),
+    target_language: str = Form(...),
+    source_language: str | None = Form(default=None),
+    session_id: int | None = Form(default=None),
+    client_turn_id: str | None = Form(default=None),
+    tts_voice: str | None = Form(default="female"),
+    tts_speed: float | None = Form(default=1.0),
+) -> LiveOcrTranslateOut:
+    content = await read_upload_limited(image, max_bytes=8 * 1024 * 1024)
+    data = await live_service.ocr_translate(
+        db,
+        user=current_user,
+        data=content,
+        filename=image.filename or "photo.jpg",
+        content_type=image.content_type or "image/jpeg",
+        target_language=target_language,
+        source_language=source_language,
+        session_id=session_id,
+        client_turn_id=client_turn_id,
+        tts_voice=tts_voice,
+        tts_speed=tts_speed,
+    )
+    return LiveOcrTranslateOut.model_validate(data)
+
+
+@router.get("/sessions", response_model=LiveSessionListOut)
+async def list_sessions(
+    db: DbSession,
+    current_user: CurrentUser,
+    today: bool = Query(default=True),
+    q: str | None = Query(default=None, max_length=120),
+    limit: int = Query(default=40, ge=1, le=100),
+) -> LiveSessionListOut:
+    data = await live_service.list_sessions(
+        db,
+        user=current_user,
+        today_only=today,
+        q=q,
+        limit=limit,
+    )
+    return LiveSessionListOut.model_validate(data)
+
+
+@router.get("/sessions/export")
+async def export_sessions(
+    db: DbSession,
+    current_user: CurrentUser,
+    format: str = Query(default="txt", pattern="^(txt|pdf)$"),
+    today: bool = Query(default=True),
+    session_id: int | None = Query(default=None, ge=1),
+) -> Response:
+    return await live_service.export_history(
+        db,
+        user=current_user,
+        fmt=format,
+        session_id=session_id,
+        today_only=today,
+    )
 
 
 @router.post("/sessions", response_model=LiveSessionOut, status_code=status.HTTP_201_CREATED)
@@ -77,6 +144,8 @@ async def create_turn(
     audio: UploadFile = File(...),
     speaker: str = Form(...),
     client_turn_id: str = Form(...),
+    tts_voice: str | None = Form(default="female"),
+    tts_speed: float | None = Form(default=1.0),
 ) -> LiveTurnOut:
     content = await read_upload_limited(audio, max_bytes=10 * 1024 * 1024)
     data = await live_service.create_turn(
@@ -88,6 +157,8 @@ async def create_turn(
         filename=audio.filename or "audio.m4a",
         content_type=audio.content_type or "application/octet-stream",
         data=content,
+        tts_voice=tts_voice,
+        tts_speed=tts_speed,
     )
     return LiveTurnOut.model_validate(data)
 

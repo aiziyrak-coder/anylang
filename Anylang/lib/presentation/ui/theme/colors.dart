@@ -24,6 +24,7 @@ const Color kLimeBright = Color(0xFFD4F04A);
 const Color kNavy = Color(0xFF071526);
 
 const Color kOnline = Color(0xFF34C759);
+const Color kTrustFair = Color(0xFFF59E0B);
 const Color kAvatarFg = Color(0xFFF2F7FC);
 const Color kSpeakBlue = Color(0xFF64D2FF);
 const Color kListenRed = Color(0xFFFF453A);
@@ -73,6 +74,12 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Accent ustidagi matn — light'da oq/navy, dark'da navy.
   Color get accentText => isDark ? kLimeBright : const Color(0xFF2E4A08);
 
+  /// Scam / xavf ogohlantirish.
+  Color get danger => isDark ? const Color(0xFFFF6B6B) : const Color(0xFFDC2626);
+
+  Color get dangerSoft =>
+      isDark ? const Color(0x33FF6B6B) : const Color(0x22DC2626);
+
   LinearGradient get accentButtonGradient => LinearGradient(
         colors: isDark
             ? const [Color(0xFFD6F24E), Color(0xFFBCDD3E)]
@@ -84,11 +91,11 @@ class AppColors extends ThemeExtension<AppColors> {
   List<BoxShadow> get glassShadow => [
         BoxShadow(
           color: isDark
-              ? const Color(0x88000000)
-              : const Color(0x1A071526),
-          blurRadius: isDark ? 20 : 24,
-          offset: const Offset(0, 8),
-          spreadRadius: -4,
+              ? const Color(0x66000000)
+              : const Color(0x0F071526),
+          blurRadius: isDark ? 12 : 10,
+          offset: const Offset(0, 4),
+          spreadRadius: 0,
         ),
       ];
 
@@ -96,8 +103,8 @@ class AppColors extends ThemeExtension<AppColors> {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          accent.withValues(alpha: isDark ? 0.14 : 0.12),
-          isDark ? const Color(0xFF0C2136) : const Color(0xFFE8EEF6),
+          accent.withValues(alpha: isDark ? 0.08 : 0.06),
+          isDark ? const Color(0xFF0A1624) : const Color(0xFFF3F5F7),
         ],
       );
 
@@ -149,30 +156,27 @@ class AppColors extends ThemeExtension<AppColors> {
   }
 }
 
-/// Light: yorug' fon + to'q matn/ikon/akssent.
+/// Light: tinch, neytral fon — B2B ishonch; lime akssent.
 const AppColors lightAppColors = AppColors(
   brightness: Brightness.light,
-  background: Color(0xFFF0F4F9),
+  background: Color(0xFFF5F6F8),
   backgroundGradient: LinearGradient(
     colors: [
-      Color(0xFFF8FBFF),
-      Color(0xFFE8F0F8),
-      Color(0xFFD5E3F2),
-      Color(0xFFE4EDF0),
+      Color(0xFFF7F8FA),
+      Color(0xFFF2F3F5),
     ],
-    stops: [0.0, 0.32, 0.68, 1.0],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
   ),
   surface: Color(0xFFFFFFFF),
-  surfaceBorder: Color(0x22071526),
+  surfaceBorder: Color(0x1A071526),
   textPrimary: Color(0xFF071526),
   textSecondary: Color(0xFF3A4D63),
   textFaint: Color(0xFF5C7088),
   accent: kLime,
   onAccent: Color(0xFF071526),
   accentSoft: Color(0x338BC21A),
-  outline: Color(0x1A071526),
+  outline: Color(0x14071526),
   logoTileBg: kNavy,
   toggleTrackOff: Color(0x33071526),
   toggleThumbOn: Colors.white,
@@ -180,30 +184,27 @@ const AppColors lightAppColors = AppColors(
   segmentTrackBg: Color(0x1A071526),
 );
 
-/// Dark: qorong'u fon + yorqin matn/ikon/akssent.
+/// Dark: tinch navy fon — ortiqcha glow/bloom yo‘q.
 const AppColors darkAppColors = AppColors(
   brightness: Brightness.dark,
-  background: Color(0xFF06111F),
+  background: Color(0xFF0A121C),
   backgroundGradient: LinearGradient(
     colors: [
-      Color(0xFF030B14),
-      Color(0xFF0A1C30),
-      Color(0xFF123048),
-      Color(0xFF0C2236),
+      Color(0xFF0A121C),
+      Color(0xFF0D1520),
     ],
-    stops: [0.0, 0.32, 0.68, 1.0],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
   ),
-  surface: Color(0xFF1A3148),
-  surfaceBorder: Color(0x33FFFFFF),
+  surface: Color(0xFF152433),
+  surfaceBorder: Color(0x28FFFFFF),
   textPrimary: Color(0xFFFFFFFF),
   textSecondary: Color(0xFFD0DCE8),
   textFaint: Color(0xFFA8B8C9),
   accent: kLimeBright,
   onAccent: Color(0xFF071526),
-  accentSoft: Color(0x44D4F04A),
-  outline: Color(0x28FFFFFF),
+  accentSoft: Color(0x33D4F04A),
+  outline: Color(0x22FFFFFF),
   logoTileBg: Color(0xFF122A44),
   toggleTrackOff: Color(0x44FFFFFF),
   toggleThumbOn: kNavy,

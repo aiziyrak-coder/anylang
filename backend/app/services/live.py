@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import select
+from fastapi.responses import Response
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError
+from app.integrations.live_export import build_export_pdf, build_export_text
+from app.integrations.ocr import extract_text_from_image
 from app.integrations.storage import get_storage
 from app.integrations.stt import transcribe_audio
+from app.integrations.tts import synthesize_speech
 from app.integrations.translation import translate
 from app.models.chat import LiveSession, LiveTurn
 from app.models.user import User
@@ -108,13 +112,20 @@ async def _get_owned_session(
     return session
 
 
-def _serialize_session(session: LiveSession) -> dict:
+def _serialize_session(
+    session: LiveSession,
+    *,
+    turn_count: int = 0,
+    preview: str | None = None,
+) -> dict:
     return {
         "id": session.id,
         "my_language": session.my_language,
         "other_language": session.other_language,
         "started_at": session.started_at,
         "ended_at": session.ended_at,
+        "turn_count": turn_count,
+        "preview": preview,
     }
 
 
@@ -211,6 +222,25 @@ def _validate_audio(filename: str, content_type: str, data: bytes) -> str:
     return ext or ".m4a"
 
 
+def _normalize_tts_voice(voice: str | None, *, available: list[str] | None) -> str:
+    v = (voice or "female").strip().lower()
+    if v not in {"female", "male"}:
+        v = "female"
+    opts = list(available or [])
+    if opts and v not in opts:
+        v = opts[0]
+    return v
+
+
+def _normalize_tts_speed(speed: float | None) -> float:
+    if speed is None:
+        return 1.0
+    try:
+        return max(0.5, min(2.0, float(speed)))
+    except (TypeError, ValueError):
+        return 1.0
+
+
 async def create_turn(
     db: AsyncSession,
     *,
@@ -221,6 +251,8 @@ async def create_turn(
     filename: str,
     content_type: str,
     data: bytes,
+    tts_voice: str | None = None,
+    tts_speed: float | None = None,
 ) -> dict:
     _require_live_access(user)
 
@@ -269,6 +301,7 @@ async def create_turn(
         text_original,
         target_lang=target_language,
         source_lang=source_language,
+        domain=getattr(user, "translation_domain", None),
     )
 
     storage = get_storage()
@@ -281,8 +314,33 @@ async def create_turn(
 
     target_meta = LANGUAGE_BY_CODE.get(target_language, {})
     audio_tts_url: str | None = None
-    if target_meta.get("tts"):
-        audio_tts_url = None
+    tts_duration_seconds: int | None = None
+    if target_meta.get("tts") and (text_translated or "").strip():
+        voice = _normalize_tts_voice(
+            tts_voice,
+            available=list(target_meta.get("tts_voices") or []),
+        )
+        speed = _normalize_tts_speed(tts_speed)
+        try:
+            synthesized = await synthesize_speech(
+                text_translated,
+                language=target_language,
+                voice=voice,
+                speed=speed,
+            )
+            if synthesized is not None:
+                tts_bytes, tts_ctype, tts_dur = synthesized
+                tts_key = f"live/{session.id}/{uuid4().hex}.mp3"
+                audio_tts_url = await storage.upload_bytes(
+                    tts_key,
+                    tts_bytes,
+                    tts_ctype or "audio/mpeg",
+                )
+                tts_duration_seconds = max(1, int(round(tts_dur)))
+        except Exception:
+            # Partial success: keep STT + translation even if TTS fails.
+            audio_tts_url = None
+            tts_duration_seconds = None
 
     turn = LiveTurn(
         session_id=session.id,
@@ -295,7 +353,7 @@ async def create_turn(
         audio_original_url=audio_original_url,
         audio_tts_url=audio_tts_url,
         audio_duration_seconds=min(MAX_AUDIO_SECONDS, max(1, len(data) // 8000)),
-        tts_duration_seconds=None,
+        tts_duration_seconds=tts_duration_seconds,
         status="done",
     )
     db.add(turn)
@@ -327,4 +385,311 @@ async def list_turns(
     return {
         "items": [_serialize_turn(turn) for turn in items],
         "has_more": has_more,
+    }
+
+
+def _day_bounds_utc(now: datetime | None = None) -> tuple[datetime, datetime]:
+    n = now or datetime.now(UTC)
+    if n.tzinfo is None:
+        n = n.replace(tzinfo=UTC)
+    start = datetime(n.year, n.month, n.day, tzinfo=UTC)
+    end = start + timedelta(days=1)
+    return start, end
+
+
+async def list_sessions(
+    db: AsyncSession,
+    *,
+    user: User,
+    today_only: bool = True,
+    q: str | None = None,
+    limit: int = 40,
+) -> dict:
+    _require_live_access(user)
+    safe_limit = min(max(limit, 1), 100)
+    query = select(LiveSession).where(LiveSession.user_id == user.id)
+    if today_only:
+        start, end = _day_bounds_utc()
+        query = query.where(
+            LiveSession.started_at >= start,
+            LiveSession.started_at < end,
+        )
+
+    search = (q or "").strip()
+    if search:
+        pattern = f"%{search}%"
+        turn_match = (
+            select(LiveTurn.session_id)
+            .where(
+                or_(
+                    LiveTurn.text_original.ilike(pattern),
+                    LiveTurn.text_translated.ilike(pattern),
+                )
+            )
+            .distinct()
+        )
+        query = query.where(
+            or_(
+                LiveSession.my_language.ilike(pattern),
+                LiveSession.other_language.ilike(pattern),
+                LiveSession.id.in_(turn_match),
+            )
+        )
+
+    result = await db.execute(
+        query.order_by(LiveSession.started_at.desc()).limit(safe_limit + 1)
+    )
+    sessions = list(result.scalars().all())
+    has_more = len(sessions) > safe_limit
+    sessions = sessions[:safe_limit]
+
+    items: list[dict] = []
+    for session in sessions:
+        count_row = await db.execute(
+            select(func.count())
+            .select_from(LiveTurn)
+            .where(LiveTurn.session_id == session.id)
+        )
+        turn_count = int(count_row.scalar_one() or 0)
+        preview_row = await db.execute(
+            select(LiveTurn)
+            .where(
+                LiveTurn.session_id == session.id,
+                LiveTurn.text_original.is_not(None),
+            )
+            .order_by(LiveTurn.id.desc())
+            .limit(1)
+        )
+        last_turn = preview_row.scalar_one_or_none()
+        preview = None
+        if last_turn is not None:
+            preview = (last_turn.text_original or last_turn.text_translated or "").strip()
+            if len(preview) > 120:
+                preview = preview[:117] + "…"
+        items.append(
+            _serialize_session(session, turn_count=turn_count, preview=preview)
+        )
+
+    return {"items": items, "has_more": has_more}
+
+
+async def _session_bundle(
+    db: AsyncSession,
+    *,
+    user: User,
+    session_id: int,
+) -> dict:
+    session = await _get_owned_session(
+        db, session_id=session_id, user=user, allow_ended=True
+    )
+    turns_result = await db.execute(
+        select(LiveTurn)
+        .where(LiveTurn.session_id == session.id)
+        .order_by(LiveTurn.id.asc())
+    )
+    turns = list(turns_result.scalars().all())
+    return {
+        **_serialize_session(session, turn_count=len(turns)),
+        "turns": [_serialize_turn(t) for t in turns],
+    }
+
+
+async def export_history(
+    db: AsyncSession,
+    *,
+    user: User,
+    fmt: str = "txt",
+    session_id: int | None = None,
+    today_only: bool = True,
+) -> Response:
+    _require_live_access(user)
+    fmt_n = (fmt or "txt").strip().lower()
+    if fmt_n not in {"txt", "pdf"}:
+        raise AppError(
+            message="format txt yoki pdf bo'lishi kerak",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+
+    bundles: list[dict] = []
+    if session_id is not None:
+        bundles.append(await _session_bundle(db, user=user, session_id=session_id))
+    else:
+        listed = await list_sessions(
+            db, user=user, today_only=today_only, q=None, limit=100
+        )
+        for item in listed["items"]:
+            bundles.append(await _session_bundle(db, user=user, session_id=item["id"]))
+
+    title = "AnyLang · Jonli suhbatlar"
+    if today_only and session_id is None:
+        title = "AnyLang · Bugungi jonli suhbatlar"
+    elif session_id is not None:
+        title = f"AnyLang · Jonli sessiya #{session_id}"
+
+    stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M")
+    if fmt_n == "pdf":
+        data = build_export_pdf(title=title, sessions=bundles)
+        filename = f"anylang_jonli_{stamp}.pdf"
+        media = "application/pdf"
+    else:
+        text = build_export_text(title=title, sessions=bundles)
+        data = text.encode("utf-8")
+        filename = f"anylang_jonli_{stamp}.txt"
+        media = "text/plain; charset=utf-8"
+
+    return Response(
+        content=data,
+        media_type=media,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+ALLOWED_IMAGE_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "application/octet-stream",
+}
+
+
+async def ocr_translate(
+    db: AsyncSession,
+    *,
+    user: User,
+    data: bytes,
+    filename: str,
+    content_type: str,
+    target_language: str,
+    source_language: str | None = None,
+    session_id: int | None = None,
+    client_turn_id: str | None = None,
+    tts_voice: str | None = "female",
+    tts_speed: float | None = 1.0,
+) -> dict:
+    """Kamera/rasm → OCR → tarjima (+ ixtiyoriy TTS / sessiya turn)."""
+    _require_live_access(user)
+
+    mime = (content_type or "").split(";")[0].strip().lower()
+    ext = Path(filename or "").suffix.lower()
+    if mime not in ALLOWED_IMAGE_CONTENT_TYPES and ext not in {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".gif",
+    }:
+        raise AppError(
+            message="Rasm formati qo'llab-quvvatlanmaydi",
+            error_code="UNSUPPORTED_IMAGE_FORMAT",
+            status_code=400,
+        )
+
+    target = _normalize_lang(target_language)
+    if target not in LANGUAGE_BY_CODE:
+        raise AppError(
+            message="Tanlangan til qo'llab-quvvatlanmaydi",
+            error_code="LANGUAGE_NOT_SUPPORTED",
+            status_code=400,
+        )
+
+    source_hint = _normalize_lang(source_language) if source_language else None
+    ocr = await extract_text_from_image(
+        data,
+        content_type=content_type,
+        filename=filename,
+        hint_lang=source_hint,
+    )
+    text_original = (ocr.get("text") or "").strip()
+    if not text_original:
+        raise AppError(
+            message="Rasmdan matn topilmadi",
+            error_code="NO_TEXT_DETECTED",
+            status_code=400,
+        )
+
+    detected = ocr.get("detected_language")
+    source = source_hint or (str(detected).strip().lower() if detected else None)
+    if source == target:
+        text_translated = text_original
+    else:
+        text_translated = await translate(
+            text_original,
+            target_lang=target,
+            source_lang=source,
+            domain=getattr(user, "translation_domain", None),
+        )
+
+    audio_tts_url: str | None = None
+    target_meta = LANGUAGE_BY_CODE.get(target, {})
+    if target_meta.get("tts") and text_translated.strip():
+        voice = _normalize_tts_voice(
+            tts_voice,
+            available=list(target_meta.get("tts_voices") or []),
+        )
+        speed = _normalize_tts_speed(tts_speed)
+        try:
+            synthesized = await synthesize_speech(
+                text_translated,
+                language=target,
+                voice=voice,
+                speed=speed,
+            )
+            if synthesized is not None:
+                tts_bytes, tts_ctype, _ = synthesized
+                storage = get_storage()
+                tts_key = f"live/ocr/{user.id}/{uuid4().hex}.mp3"
+                audio_tts_url = await storage.upload_bytes(
+                    tts_key,
+                    tts_bytes,
+                    tts_ctype or "audio/mpeg",
+                )
+        except Exception:
+            audio_tts_url = None
+
+    turn_id: int | None = None
+    created_at: datetime | None = None
+    resolved_client_id = (client_turn_id or "").strip() or f"ocr_{uuid4().hex[:16]}"
+    resolved_session_id = session_id
+
+    if session_id is not None:
+        session = await _get_owned_session(
+            db, session_id=session_id, user=user, allow_ended=False
+        )
+        # Kamera: tashqi matn → foydalanuvchi tiliga (my_language ga yaqin).
+        turn = LiveTurn(
+            session_id=session.id,
+            client_turn_id=resolved_client_id,
+            speaker="me",
+            source_language=source or session.other_language,
+            target_language=target,
+            text_original=text_original,
+            text_translated=text_translated,
+            audio_original_url=None,
+            audio_tts_url=audio_tts_url,
+            audio_duration_seconds=None,
+            tts_duration_seconds=None,
+            status="done",
+        )
+        db.add(turn)
+        await db.flush()
+        await db.refresh(turn)
+        turn_id = turn.id
+        created_at = turn.created_at
+        resolved_session_id = session.id
+
+    return {
+        "text_original": text_original,
+        "text_translated": text_translated,
+        "source_language": source,
+        "target_language": target,
+        "audio_tts_url": audio_tts_url,
+        "session_id": resolved_session_id,
+        "turn_id": turn_id,
+        "client_turn_id": resolved_client_id,
+        "created_at": created_at or datetime.now(UTC),
     }

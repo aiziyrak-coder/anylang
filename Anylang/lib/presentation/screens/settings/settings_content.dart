@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/local/session_store.dart';
 import '../../modal/language_bottom_sheet.dart';
+import '../../modal/simple_list_picker_bottom_sheet.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/danger_button.dart';
 import '../../ui/gradient_background.dart';
@@ -65,6 +67,13 @@ class SettingsContent extends ScreenContent<SettingsState> {
                 value: state.currentLanguageKey.value.tr,
                 showChevron: true,
                 onTap: () => _openAppLanguage(context, state, sendAction),
+              )),
+          Obx(() => InfoRow(
+                icon: Icons.auto_awesome_rounded,
+                label: 'settings_smart_translation'.tr,
+                value: 'translation_domain_${state.translationDomain.value}'.tr,
+                showChevron: true,
+                onTap: () => _openTranslationDomain(context, state, sendAction),
               )),
           InfoRow(
             icon: Icons.support_agent_rounded,
@@ -182,6 +191,26 @@ class SettingsContent extends ScreenContent<SettingsState> {
       selectedKey: state.currentLanguageKey.value,
     );
     if (picked != null) sendAction(SelectAppLanguage(picked));
+  }
+
+  Future<void> _openTranslationDomain(
+    BuildContext context,
+    SettingsState state,
+    void Function(MyAction) sendAction,
+  ) async {
+    final codes = SessionStore.translationDomains;
+    final labels = codes.map((c) => 'translation_domain_$c'.tr).toList();
+    final selected = 'translation_domain_${state.translationDomain.value}'.tr;
+    final picked = await showSimpleListPickerBottomSheet(
+      context,
+      title: 'settings_smart_translation'.tr,
+      items: labels,
+      selected: selected,
+    );
+    if (picked == null) return;
+    final idx = labels.indexOf(picked);
+    if (idx < 0) return;
+    sendAction(SelectTranslationDomain(codes[idx]));
   }
 
   Widget _sectionLabel(AppColors c, String text) {

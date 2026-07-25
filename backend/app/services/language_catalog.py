@@ -8,17 +8,17 @@ LANGUAGE_ROWS: list[tuple[str, str, str, str, bool, bool, list[str]]] = [
     # Central Asia / core
     ("uz", "O‘zbek", "uz", "🇺🇿", True, True, ["female", "male"]),
     ("en", "English", "gb", "🇬🇧", True, True, ["female", "male"]),
-    ("ru", "Русский", "ru", "🇷🇺", True, True, ["female"]),
-    ("tr", "Türkçe", "tr", "🇹🇷", True, True, ["female"]),
+    ("ru", "Русский", "ru", "🇷🇺", True, True, ["female", "male"]),
+    ("tr", "Türkçe", "tr", "🇹🇷", True, True, ["female", "male"]),
     ("kk", "Қазақша", "kz", "🇰🇿", True, False, []),
     ("ky", "Кыргызча", "kg", "🇰🇬", True, False, []),
     ("tg", "Тоҷикӣ", "tj", "🇹🇯", True, False, []),
     ("az", "Azərbaycan", "az", "🇦🇿", True, False, []),
     ("tk", "Türkmen", "tm", "🇹🇲", True, False, []),
     # Europe
-    ("de", "Deutsch", "de", "🇩🇪", True, True, ["female"]),
-    ("fr", "Français", "fr", "🇫🇷", True, True, ["female"]),
-    ("es", "Español", "es", "🇪🇸", True, True, ["female"]),
+    ("de", "Deutsch", "de", "🇩🇪", True, True, ["female", "male"]),
+    ("fr", "Français", "fr", "🇫🇷", True, True, ["female", "male"]),
+    ("es", "Español", "es", "🇪🇸", True, True, ["female", "male"]),
     ("pt", "Português", "pt", "🇵🇹", True, False, []),
     ("it", "Italiano", "it", "🇮🇹", True, False, []),
     ("pl", "Polski", "pl", "🇵🇱", True, False, []),
@@ -44,7 +44,7 @@ LANGUAGE_ROWS: list[tuple[str, str, str, str, bool, bool, list[str]]] = [
     ("ka", "ქართული", "ge", "🇬🇪", True, False, []),
     ("hy", "Հայերեն", "am", "🇦🇲", True, False, []),
     # Asia
-    ("zh", "中文", "cn", "🇨🇳", True, True, ["female"]),
+    ("zh", "中文", "cn", "🇨🇳", True, True, ["female", "male"]),
     ("ja", "日本語", "jp", "🇯🇵", True, False, []),
     ("ko", "한국어", "kr", "🇰🇷", True, False, []),
     ("hi", "हिन्दी", "in", "🇮🇳", True, False, []),
@@ -73,7 +73,7 @@ LANGUAGE_ROWS: list[tuple[str, str, str, str, bool, bool, list[str]]] = [
     ("yo", "Yorùbá", "ng", "🇳🇬", True, False, []),
 ]
 
-LANGUAGES_VERSION = "2026-07-24.1"
+LANGUAGES_VERSION = "2026-07-25.1"
 FLAGS_BASE_URL = "https://anylang.uz/flags"
 
 

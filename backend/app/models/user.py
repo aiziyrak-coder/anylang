@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -39,6 +40,17 @@ class User(Base, TimestampMixin):
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     app_language: Mapped[str] = mapped_column(String(10), nullable=False, default="uz_UZ")
     native_language: Mapped[str] = mapped_column(String(8), nullable=False, default="uz")
+    # Smart Translation soha: general|medical|legal|textile|it|construction
+    translation_domain: Mapped[str] = mapped_column(String(32), default="general", nullable=False)
+    # Nearby (GPS) — faqat sharing yoqilganda ko‘rinadi
+    location_lat: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
+    location_lng: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
+    location_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    location_sharing_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verified_badge: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -120,8 +132,25 @@ class BusinessProfile(Base, TimestampMixin):
     business_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     website: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seo_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    keywords: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    description_i18n: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     founded_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     certificates: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    export_countries: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    rating: Mapped[float | None] = mapped_column(Numeric(3, 2), nullable=True)
+    reviews_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    successful_deals: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    complaints_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    documents_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    factory_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    inspection_passed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    audit_report_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    moq: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    production_capacity: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    lead_time: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    incoterms: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    payment_methods: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="business")
     factory_images: Mapped[list[FactoryImage]] = relationship(
@@ -210,3 +239,23 @@ class AccountRestoreRequest(Base, TimestampMixin):
     )
     decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+class ProfileView(Base, TimestampMixin):
+    """Who viewed a profile — unique viewer per profile; last_viewed_at updates."""
+
+    __tablename__ = "profile_views"
+    __table_args__ = (
+        UniqueConstraint("profile_user_id", "viewer_user_id", name="uq_profile_viewer"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    profile_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    viewer_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    view_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    last_viewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )

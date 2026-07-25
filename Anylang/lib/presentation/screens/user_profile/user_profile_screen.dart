@@ -14,6 +14,8 @@ import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
 import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
+import '../trade_assistant/trade_assistant_payload.dart';
+import '../trade_assistant/trade_assistant_screen.dart';
 import 'user_profile_action.dart';
 import 'user_profile_content.dart';
 import 'user_profile_payload.dart';
@@ -103,6 +105,16 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
             );
           },
           failure: showAppError,
+        );
+      case OpenCompanyTradeAssistant _:
+        final data = state.data;
+        if (data == null || !data.business || data.id <= 0) return;
+        await navigate(
+          TradeAssistantScreen(),
+          payload: TradeAssistantPayload(
+            sellerId: data.id,
+            companyName: data.name,
+          ),
         );
       case AddFriendFromProfile _:
         await _sendFriendRequest(state);

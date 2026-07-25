@@ -1,13 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
+import '../../../data/network/ai_matching_repository.dart';
+import '../../../data/network/market_analytics_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../modal/ai_matching_bottom_sheet.dart';
+import '../../modal/business_card_qr_bottom_sheet.dart';
 import '../../modal/full_screen_image_dialog.dart';
+import '../../modal/image_picker.dart';
+import '../../modal/market_analytics_bottom_sheet.dart';
+import '../../modal/sofiya_ai_bottom_sheet.dart';
+import '../../ui/ai_matching.dart';
+import '../../ui/business_card_links.dart';
+import '../../ui/market_analytics.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -23,6 +35,8 @@ import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../numbers/numbers_screen.dart';
 import '../support_chat/support_chat_screen.dart';
+import '../user_profile/user_profile_payload.dart';
+import '../user_profile/user_profile_screen.dart';
 import 'profile_account.dart';
 import 'profile_action.dart';
 import 'profile_content.dart';
@@ -59,6 +73,57 @@ class ProfileScreen extends Screen<ProfileState, void> {
     );
     state.loading.value = false;
     await _loadListings();
+    await _loadAiMatching();
+    await _loadMarketAnalytics();
+  }
+
+  String _matchingLocale() {
+    final code = (Get.locale?.languageCode ?? SessionStore.appLanguage()).toLowerCase();
+    if (code.startsWith('ru')) return 'ru';
+    if (code.startsWith('en') || code.startsWith('us')) return 'en';
+    return 'uz';
+  }
+
+  Future<void> _loadAiMatching() async {
+    final acc = state.account.value;
+    if (acc == null || !acc.isBusiness) {
+      state.aiMatching.value = null;
+      return;
+    }
+    state.aiMatchingLoading.value = true;
+    final result = await Get.find<AiMatchingRepository>().matches(
+      locale: _matchingLocale(),
+    );
+    state.aiMatchingLoading.value = false;
+    result.when(
+      success: (data) {
+        state.aiMatching.value = AiMatchingResult.fromApi(data);
+      },
+      failure: (_) {
+        state.aiMatching.value = const AiMatchingResult();
+      },
+    );
+  }
+
+  Future<void> _loadMarketAnalytics() async {
+    final acc = state.account.value;
+    if (acc == null || !acc.isBusiness) {
+      state.marketAnalytics.value = null;
+      return;
+    }
+    state.marketAnalyticsLoading.value = true;
+    final result = await Get.find<MarketAnalyticsRepository>().insights(
+      locale: _matchingLocale(),
+    );
+    state.marketAnalyticsLoading.value = false;
+    result.when(
+      success: (data) {
+        state.marketAnalytics.value = MarketAnalyticsResult.fromApi(data);
+      },
+      failure: (_) {
+        state.marketAnalytics.value = const MarketAnalyticsResult();
+      },
+    );
   }
 
   Future<void> _loadListings() async {
@@ -93,36 +158,48 @@ class ProfileScreen extends Screen<ProfileState, void> {
     state.account.value = current.copyWith(listings: items);
   }
 
+  Future<void> _openSettings() async {
+    await navigate(
+      SettingsScreen(),
+      payload: const SettingsPayload(focus: SettingsFocus.app),
+    );
+    await _load();
+  }
+
   @override
   Future<void> actionHandler(ProfileState state, MyAction action) async {
     switch (action) {
       case OpenSubscription _:
+      case OpenWallet _:
+      case OpenBusinessAccount _:
         await navigate(SubscriptionScreen());
         await _load();
       case OpenNumbers _:
         await navigate(NumbersScreen());
         await _load();
       case OpenSettings _:
-        await navigate(
-          SettingsScreen(),
-          payload: const SettingsPayload(focus: SettingsFocus.app),
-        );
-        await _load();
       case OpenAppSettings _:
+      case OpenSettingsLanguage _:
+      case OpenSettingsTheme _:
+      case OpenSettingsNotifications _:
+      case OpenSettingsTranslation _:
+      case OpenSettingsAiAssistant _:
+        await _openSettings();
+      case OpenSettingsPrivacy _:
+      case OpenSettingsSecurity _:
+      case OpenAccountSettings _:
         await navigate(
           SettingsScreen(),
-          payload: const SettingsPayload(focus: SettingsFocus.app),
+          payload: const SettingsPayload(focus: SettingsFocus.account),
         );
         await _load();
       case OpenSupportFromProfile _:
         await navigate(SupportChatScreen());
-      case OpenAccountSettings _:
-        // Akkaunt sozlamalari olib tashlandi — tizim sozlamalariga yo'naltiriladi.
-        await navigate(
-          SettingsScreen(),
-          payload: const SettingsPayload(focus: SettingsFocus.app),
-        );
-        await _load();
+      case OpenSofiyaAi _:
+        if (!context.mounted) return;
+        await showSofiyaAiBottomSheet(context, sendAction: (a) {
+          unawaited(actionHandler(state, a));
+        });
       case EditPersonalProfile _:
         await navigate(ProfileEditScreen(), payload: state.account.value);
         await _load();
@@ -133,11 +210,104 @@ class ProfileScreen extends Screen<ProfileState, void> {
         await navigate(AddProductScreen());
         await _load();
       case RetryProfileLoad _:
+      case RefreshProfile _:
         await _load();
+      case ChangeAvatarQuick _:
+        if (!context.mounted) return;
+        final file = await pickImage(context);
+        if (file == null) return;
+        final acc = state.account.value;
+        final result = acc != null && acc.isBusiness
+            ? await Get.find<ProfileRepository>().uploadBusinessLogo(file.path)
+            : await Get.find<ProfileRepository>().uploadAvatar(file.path);
+        result.when(
+          success: (data) {
+            final map = asMap(data);
+            final url = map?['avatar_url']?.toString() ??
+                map?['logo_url']?.toString();
+            final current = state.account.value;
+            if (current != null && url != null && url.isNotEmpty) {
+              state.account.value = current.copyWith(avatarUrl: url);
+            }
+            showAppMessage('profile_avatar_updated'.tr);
+            unawaited(_load());
+          },
+          failure: showAppError,
+        );
+      case CopyAnyLangId _:
+        final copyAcc = state.account.value;
+        if (copyAcc == null) return;
+        final text = [
+          if (copyAcc.handle.isNotEmpty) copyAcc.handle,
+          if (copyAcc.anylangNumber.isNotEmpty) copyAcc.anylangNumber,
+        ].join(' · ');
+        if (text.isEmpty) return;
+        await Clipboard.setData(ClipboardData(text: text));
+        showAppMessage('profile_id_copied'.tr);
+      case ShareProfile _:
+        final shareAcc = state.account.value;
+        if (shareAcc == null || shareAcc.id <= 0) return;
+        final url = BusinessCardLinks.urlFor(shareAcc.id);
+        final body =
+            '${shareAcc.name}\n${shareAcc.handle}\n${shareAcc.username ?? shareAcc.anylangNumber}\n$url';
+        await Share.share(body, subject: shareAcc.name);
+      case ShowBusinessBenefits _:
+        break;
       case OpenProfileAvatar _:
-        final url = state.account.value?.avatarUrl?.trim();
-        if (url == null || url.isEmpty) return;
-        await showFullScreenImage(context, url: url);
+        final avatarUrl = state.account.value?.avatarUrl?.trim();
+        if (avatarUrl == null || avatarUrl.isEmpty) return;
+        await showFullScreenImage(context, url: avatarUrl);
+      case OpenFactoryMedia a:
+        final mediaUrl = a.url.trim();
+        if (mediaUrl.isEmpty) return;
+        await showFullScreenImage(context, url: mediaUrl);
+      case OpenAiMatching _:
+        final matching = state.aiMatching.value;
+        if (matching == null && !state.aiMatchingLoading.value) {
+          await _loadAiMatching();
+        }
+        final matchingData = state.aiMatching.value ?? const AiMatchingResult();
+        if (!context.mounted) return;
+        await showAiMatchingBottomSheet(
+          context,
+          result: matchingData,
+          onOpenCompany: (company) async {
+            if (company.id <= 0) return;
+            final profile =
+                await Get.find<ProfileRepository>().getPublicUser(company.id);
+            final map = asMap(profile.dataOrNull);
+            if (map == null) {
+              showAppError(profile.errorOrNull ?? 'error'.tr);
+              return;
+            }
+            await navigate(
+              UserProfileScreen(),
+              payload: UserProfilePayload.fromApi(map),
+            );
+          },
+        );
+      case RetryAiMatching _:
+        await _loadAiMatching();
+      case OpenMarketAnalytics _:
+        final analytics = state.marketAnalytics.value;
+        if (analytics == null && !state.marketAnalyticsLoading.value) {
+          await _loadMarketAnalytics();
+        }
+        final analyticsData =
+            state.marketAnalytics.value ?? const MarketAnalyticsResult();
+        if (!context.mounted) return;
+        await showMarketAnalyticsBottomSheet(context, result: analyticsData);
+      case RetryMarketAnalytics _:
+        await _loadMarketAnalytics();
+      case ShowBusinessCardQr _:
+        final qrAcc = state.account.value;
+        if (qrAcc == null || qrAcc.id <= 0) return;
+        if (!context.mounted) return;
+        await showBusinessCardQrBottomSheet(
+          context,
+          userId: qrAcc.id,
+          companyName: qrAcc.name,
+        );
       case SeeAllListings _:
         await _loadListings();
         final items = state.account.value?.listings ?? const [];
@@ -226,19 +396,18 @@ class ProfileScreen extends Screen<ProfileState, void> {
           showAppMessage(a.listing.name);
           return;
         }
-        final result = await Get.find<ProductsRepository>().detail(id);
-        final map = asMap(result.dataOrNull);
-        if (map == null) {
-          showAppError(result.errorOrNull ?? 'product_not_found'.tr);
+        final detailResult = await Get.find<ProductsRepository>().detail(id);
+        final detailMap = asMap(detailResult.dataOrNull);
+        if (detailMap == null) {
+          showAppError(detailResult.errorOrNull ?? 'product_not_found'.tr);
           return;
         }
-        final product = Product.fromApi(map);
+        final product = Product.fromApi(detailMap);
         if (!context.mounted) return;
         await showProductInfoBottomSheet(
           context,
           product,
           onOpenBusiness: () {
-            // O'z mahsuloti — biznes sahifasiga o'tish shart emas.
             Navigator.of(context).maybePop();
           },
         );

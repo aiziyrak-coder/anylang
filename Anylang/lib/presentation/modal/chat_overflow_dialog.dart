@@ -57,8 +57,8 @@ class _ChatOverflowOverlay extends StatelessWidget {
     final screen = MediaQuery.of(context).size;
 
     const menuWidth = 260.0;
-    final rows = isGroup ? 5 : 6;
-    final menuHeight = rows * 48.dp + 20.dp;
+    final rows = isGroup ? 8 : 7;
+    final menuHeight = rows * 48.dp + 28.dp;
     const gap = 8.0;
     const edgeMargin = 14.0;
 
@@ -135,6 +135,36 @@ class _ChatOverflowOverlay extends StatelessWidget {
                         'chat_overflow_group_settings'.tr,
                         ChatOverflowAction.groupSettings,
                       ),
+                    if (isGroup)
+                      _row(
+                        context,
+                        c,
+                        Icons.folder_special_outlined,
+                        'chat_overflow_group_catalog'.tr,
+                        ChatOverflowAction.groupCatalog,
+                      ),
+                    if (isGroup)
+                      _row(
+                        context,
+                        c,
+                        Icons.insights_outlined,
+                        'chat_overflow_group_stats'.tr,
+                        ChatOverflowAction.groupStats,
+                      ),
+                    _row(
+                      context,
+                      c,
+                      Icons.handshake_outlined,
+                      'chat_overflow_deal_mode'.tr,
+                      ChatOverflowAction.dealMode,
+                    ),
+                    _row(
+                      context,
+                      c,
+                      Icons.auto_awesome_rounded,
+                      'chat_overflow_ai_summary'.tr,
+                      ChatOverflowAction.aiSummary,
+                    ),
                     Divider(height: 12.dp, color: c.outline),
                     _row(
                       context,

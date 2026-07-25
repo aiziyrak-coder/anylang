@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../product_video_badge.dart';
+import '../product_trust_badges.dart';
+import '../product_trust_badges_view.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 
@@ -10,7 +13,11 @@ class ProductTopCard extends StatelessWidget {
   final String name;
   final String price;
   final String views;
+  final String? imageUrl;
+  final bool hasVideo;
+  final ProductTrustBadges trustBadges;
   final VoidCallback onTap;
+  final VoidCallback? onVideoTap;
 
   const ProductTopCard({
     super.key,
@@ -20,12 +27,17 @@ class ProductTopCard extends StatelessWidget {
     required this.price,
     required this.views,
     required this.onTap,
+    this.imageUrl,
+    this.hasVideo = false,
+    this.trustBadges = const ProductTrustBadges(),
+    this.onVideoTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
     final radius = BorderRadius.circular(18.dp);
+    final url = imageUrl?.trim();
 
     return SizedBox(
       width: 182.dp,
@@ -39,7 +51,6 @@ class ProductTopCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Rasm (gradient) + TOP badge + placeholder ikon
               SizedBox(
                 height: 120.dp,
                 child: Stack(
@@ -47,7 +58,18 @@ class ProductTopCard extends StatelessWidget {
                     Positioned.fill(
                       child: DecoratedBox(decoration: BoxDecoration(gradient: tileGradient)),
                     ),
-                    Center(child: SvgPicture.asset(iconAsset, width: 34.dp, height: 34.dp)),
+                    if (url != null && url.isNotEmpty)
+                      Positioned.fill(
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Center(
+                            child: SvgPicture.asset(iconAsset, width: 34.dp, height: 34.dp),
+                          ),
+                        ),
+                      )
+                    else
+                      Center(child: SvgPicture.asset(iconAsset, width: 34.dp, height: 34.dp)),
                     Positioned(
                       top: 10.dp,
                       left: 10.dp,
@@ -67,6 +89,25 @@ class ProductTopCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (hasVideo)
+                      Positioned(
+                        left: 10.dp,
+                        bottom: 10.dp,
+                        child: ProductVideoBadge(
+                          compact: true,
+                          onTap: onVideoTap,
+                        ),
+                      ),
+                    if (trustBadges.hasAny)
+                      Positioned(
+                        left: 8.dp,
+                        right: 8.dp,
+                        top: 36.dp,
+                        child: ProductTrustBadgesView(
+                          data: trustBadges,
+                          compact: true,
+                        ),
+                      ),
                   ],
                 ),
               ),

@@ -6,7 +6,7 @@ import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/buttons/my_icon_button.dart';
 import '../../ui/items/conversation_item.dart';
-import '../../ui/items/friend_result_item.dart';
+import '../../ui/items/user_card_item.dart';
 import '../../ui/search_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
@@ -240,10 +240,12 @@ class MessagesContent extends ScreenContent<MessagesState> {
               if (state.loading.value) return const AppLoading();
               final q = state.query.value.trim();
               final searching = q.isNotEmpty;
-              if (searching && state.searching.value) {
-                return const AppLoading();
-              }
               if (searching) {
+                if (state.searching.value &&
+                    state.searchResults.isEmpty &&
+                    state.userResults.isEmpty) {
+                  return const AppLoading();
+                }
                 return _searchResults(c, state, sendAction);
               }
                   final items = state.conversations.toList();
@@ -359,19 +361,25 @@ class MessagesContent extends ScreenContent<MessagesState> {
               ),
             ),
             for (final user in users)
-              Material(
-                color: Colors.transparent,
-                child: FriendResultItem(
-                  initial: user.initial,
-                  avatarGradient: user.avatarGradient,
-                  avatarUrl: user.avatarUrl,
-                  name: user.name,
-                  subtitle: user.subtitle,
-                  online: user.online,
-                  action: FriendActionState.message,
-                  actionLabel: 'add_friend_message'.tr,
-                  onAction: () => sendAction(OpenUserChat(user)),
-                ),
+              UserCardItem(
+                initial: user.initial,
+                avatarGradient: user.avatarGradient,
+                avatarUrl: user.avatarUrl,
+                name: user.name,
+                online: user.online,
+                country: user.country,
+                businessRole: user.businessRole,
+                keywords: user.keywords,
+                isBusiness: user.isBusiness,
+                rating: user.rating,
+                verified: user.verified,
+                languages: user.languages,
+                productsCount: user.productsCount,
+                countriesCount: user.countriesCount,
+                showMessage: true,
+                showAdd: false,
+                onTap: () => sendAction(OpenUserChat(user)),
+                onMessage: () => sendAction(OpenUserChat(user)),
               ),
             if (chats.isNotEmpty) SizedBox(height: 8.dp),
           ],

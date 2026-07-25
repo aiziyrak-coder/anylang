@@ -12,6 +12,9 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.integrations.storage import get_storage
 from app.models.user import BusinessProfile, FactoryImage, User
+from app.services import trust_score as trust_score_service
+from app.services.business_card import business_card_url
+from app.services.factory_verification import build_factory_verification
 from app.services.users import (
     _business_completeness,
     _business_stats,
@@ -22,6 +25,56 @@ from app.services.users import (
 MAX_FACTORY_IMAGES = 10
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+def _clean_str_list(items: list[str] | None, *, max_items: int = 20, max_len: int = 40) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in items or []:
+        value = " ".join(str(raw or "").split()).strip()
+        if not value:
+            continue
+        key = value.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(value[:max_len])
+        if len(cleaned) >= max_items:
+            break
+    return cleaned
+
+
+def _trade_fields(business: BusinessProfile) -> dict:
+    return {
+        "moq": business.moq,
+        "production_capacity": business.production_capacity,
+        "lead_time": business.lead_time,
+        "incoterms": list(business.incoterms or []),
+        "payment_methods": list(business.payment_methods or []),
+    }
+
+
+def _ai_profile_fields(business: BusinessProfile) -> dict:
+    return {
+        "seo_text": business.seo_text,
+        "keywords": list(business.keywords or []),
+        "description_i18n": dict(business.description_i18n or {}),
+    }
+
+
+def _clean_i18n(raw: dict[str, str] | None) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not isinstance(raw, dict):
+        return out
+    for code, text in raw.items():
+        key = str(code or "").strip().lower()[:8]
+        val = str(text or "").strip()
+        if not key or not val:
+            continue
+        out[key] = val[:4000]
+        if len(out) >= 40:
+            break
+    return out
 
 
 def _require_business_account(user: User) -> None:
@@ -142,6 +195,7 @@ async def update_user_profile(
     country: str | None = None,
     app_language: str | None = None,
     native_language: str | None = None,
+    translation_domain: str | None = None,
 ) -> dict:
     if full_name is not None:
         cleaned = full_name.strip()
@@ -186,6 +240,10 @@ async def update_user_profile(
         # App tilini ham sync (faqat UI bor tillar).
         if iso in {"uz", "ru", "en"}:
             user.app_language = app_locale_for_iso(iso)
+    if translation_domain is not None:
+        from app.integrations.translation import normalize_translation_domain
+
+        user.translation_domain = normalize_translation_domain(translation_domain)
 
     await db.flush()
     loaded = await load_user_for_response(db, user.id)
@@ -221,11 +279,23 @@ async def delete_avatar(db: AsyncSession, user: User) -> None:
     await db.flush()
 
 
-async def serialize_business(db: AsyncSession, user: User) -> dict:
+async def serialize_business(db: AsyncSession, user: User, redis=None) -> dict:
     _require_business_account(user)
     business = await _ensure_business_profile(db, user)
-    stats = await _business_stats(db, user.id)
+    stats = await _business_stats(db, user.id, business)
     has_listing = stats["listings_count"] > 0
+    trust = await trust_score_service.compute_trust_score(db, user, business)
+    from app.services import scam_detection as scam_detection_service
+
+    scam = await scam_detection_service.compute_scam_risk(
+        db,
+        user,
+        business,
+        redis=redis,
+        locale=user.app_language or "uz",
+        trust=trust,
+    )
+    factory = build_factory_verification(business, user=user)
     return {
         "company_name": business.company_name,
         "logo_url": business.logo_url,
@@ -235,11 +305,26 @@ async def serialize_business(db: AsyncSession, user: User) -> dict:
         "description": business.description,
         "founded_year": business.founded_year,
         "certificates": list(business.certificates or []),
+        "export_countries": list(stats.get("export_countries") or []),
+        **_trade_fields(business),
+        **_ai_profile_fields(business),
+        "successful_deals": int(business.successful_deals or 0),
+        "complaints_count": int(business.complaints_count or 0),
+        "documents_verified": bool(
+            business.documents_verified or user.verified_badge
+        ),
+        "factory_verified": bool(factory["factory_verified"]),
+        "inspection_passed": bool(factory["inspection_passed"]),
+        "audit_report_url": factory["audit_report_url"],
+        "factory_verification": factory,
+        "trust_score": trust,
+        "scam_risk": scam,
         "factory_images": [
             {"id": img.id, "url": img.url} for img in (business.factory_images or [])
         ],
         "completeness": _business_completeness(business, has_listing=has_listing),
         "stats": stats,
+        "business_card_url": business_card_url(user.id),
     }
 
 
@@ -252,8 +337,17 @@ async def update_business(
     business_role: str | None = None,
     website: str | None = None,
     description: str | None = None,
+    seo_text: str | None = None,
+    keywords: list[str] | None = None,
+    description_i18n: dict[str, str] | None = None,
     founded_year: int | None = None,
     certificates: list[str] | None = None,
+    export_countries: list[str] | None = None,
+    moq: str | None = None,
+    production_capacity: str | None = None,
+    lead_time: str | None = None,
+    incoterms: list[str] | None = None,
+    payment_methods: list[str] | None = None,
 ) -> dict:
     business = await _ensure_business_profile(db, user)
     if company_name is not None:
@@ -266,10 +360,55 @@ async def update_business(
         business.website = website.strip() or None
     if description is not None:
         business.description = description.strip() or None
+    if seo_text is not None:
+        business.seo_text = seo_text.strip() or None
+    if keywords is not None:
+        business.keywords = _clean_str_list(keywords, max_items=20, max_len=48)
+    if description_i18n is not None:
+        business.description_i18n = _clean_i18n(description_i18n)
     if founded_year is not None:
         business.founded_year = founded_year
+    old_certs = set(str(c).strip().lower() for c in (business.certificates or []) if str(c).strip())
     if certificates is not None:
-        business.certificates = certificates
+        business.certificates = _clean_str_list(certificates, max_items=30, max_len=64)
+        new_certs = [
+            c
+            for c in business.certificates
+            if c.strip().lower() not in old_certs
+        ]
+        if new_certs:
+            from app.services.feed import create_system_post
+
+            await create_system_post(
+                db,
+                user=user,
+                post_type="new_certificate",
+                title=new_certs[0],
+                body=", ".join(new_certs[:5]),
+                meta={"certificates": new_certs[:10]},
+            )
+    if export_countries is not None:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw in export_countries:
+            code = str(raw or "").strip().upper()
+            if len(code) != 2 or code in seen:
+                continue
+            seen.add(code)
+            cleaned.append(code)
+            if len(cleaned) >= 40:
+                break
+        business.export_countries = cleaned
+    if moq is not None:
+        business.moq = moq.strip() or None
+    if production_capacity is not None:
+        business.production_capacity = production_capacity.strip() or None
+    if lead_time is not None:
+        business.lead_time = lead_time.strip() or None
+    if incoterms is not None:
+        business.incoterms = _clean_str_list(incoterms, max_items=12, max_len=16)
+    if payment_methods is not None:
+        business.payment_methods = _clean_str_list(payment_methods, max_items=12, max_len=40)
 
     await db.flush()
     return await serialize_business(db, user)
@@ -307,7 +446,48 @@ async def add_factory_image(db: AsyncSession, user: User, file: UploadFile) -> d
     image = FactoryImage(business_id=business.id, url=url)
     db.add(image)
     await db.flush()
+    from app.services.feed import create_system_post
+
+    await create_system_post(
+        db,
+        user=user,
+        post_type="new_factory",
+        title=business.company_name or "Factory",
+        body="",
+        image_url=url,
+        meta={"factory_image_id": image.id},
+    )
     return {"id": image.id, "url": url}
+
+
+async def upload_audit_report(db: AsyncSession, user: User, file: UploadFile) -> dict:
+    business = await _ensure_business_profile(db, user)
+    key = f"audit/{business.id}/{uuid.uuid4().hex}.webp"
+    url = await _upload_image(file, key)
+    if business.audit_report_url:
+        old_key = _key_from_url(business.audit_report_url)
+        if old_key and old_key != key:
+            try:
+                await get_storage().delete_object(old_key)
+            except Exception:
+                pass
+    business.audit_report_url = url
+    await db.flush()
+    return {"audit_report_url": url}
+
+
+async def delete_audit_report(db: AsyncSession, user: User) -> None:
+    business = await _ensure_business_profile(db, user)
+    if not business.audit_report_url:
+        return
+    old_key = _key_from_url(business.audit_report_url)
+    if old_key:
+        try:
+            await get_storage().delete_object(old_key)
+        except Exception:
+            pass
+    business.audit_report_url = None
+    await db.flush()
 
 
 async def delete_factory_image(db: AsyncSession, user: User, image_id: int) -> None:

@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     openai_translation_model: str = "gpt-4o"
     deepgram_api_key: str = ""
     elevenlabs_api_key: str = ""
+    # Optional overrides for Jonli TTS gender voices (ElevenLabs voice IDs).
+    elevenlabs_voice_female: str = ""
+    elevenlabs_voice_male: str = ""
     translation_provider: str = "mock"  # mock | deepl | openai
 
     payment_provider: str = "mock"  # mock | stripe

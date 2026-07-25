@@ -3,6 +3,8 @@
 from app.models.base import TimestampMixin
 from app.models.chat import (
     Chat,
+    ChatDeal,
+    ChatFaq,
     ChatMedia,
     ChatParticipant,
     Friendship,
@@ -15,6 +17,7 @@ from app.models.chat import (
     MessageRead,
     MessageTranslation,
 )
+from app.models.feed import BusinessFeedPost
 from app.models.language import Language
 from app.models.payment import Payment
 from app.models.promo import PromoCode, PromoRedemption
@@ -34,6 +37,7 @@ from app.models.user import (
     NumberAssignment,
     NumberGroup,
     OtpCode,
+    ProfileView,
     RefreshToken,
     Subscription,
     User,
@@ -51,6 +55,7 @@ __all__ = [
     "Subscription",
     "BusinessProfile",
     "FactoryImage",
+    "ProfileView",
     "NumberGroup",
     "NumberAssignment",
     "AdminUser",
@@ -61,7 +66,10 @@ __all__ = [
     "ProductFavorite",
     "ProductView",
     "ProductTopRequest",
+    "BusinessFeedPost",
     "Chat",
+    "ChatDeal",
+    "ChatFaq",
     "ChatParticipant",
     "Message",
     "MessageTranslation",

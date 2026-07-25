@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../screens/chat/chat_message.dart';
 import '../ui/items/chat_message_item.dart';
 import '../ui/theme/colors.dart';
+import '../utils/business_reactions.dart';
 import '../utils/size_controller.dart';
 
 /// Xabar kontekst menyusi natijasi.
@@ -20,28 +21,7 @@ enum MessageMenuAction {
   profile,
 }
 
-const kAllowedReactions = [
-  '👍',
-  '❤️',
-  '😂',
-  '🔥',
-  '😢',
-  '🎉',
-  '🙏',
-  '👏',
-  '😍',
-  '😮',
-  '😡',
-  '🤔',
-  '💯',
-  '👀',
-  '🤝',
-  '💪',
-  '✨',
-  '🥰',
-];
-
-/// Uzoq bosish menyusi: reaksiyalar + amallar.
+/// Uzoq bosish menyusi: biznes reaksiyalar + amallar.
 Future<MessageMenuAction?> showMessageActionsDialog(
   BuildContext context, {
   required ChatMessage message,
@@ -110,13 +90,14 @@ class _MessageActionsOverlay extends StatelessWidget {
 
     final showProfile =
         isGroup && !_out && (message.senderId ?? 0) > 0;
-    const menuWidth = 260.0;
+    const menuWidth = 288.0;
     final rows = 5 +
         (showTranslate ? 1 : 0) +
         (canPin ? 1 : 0) +
         (showProfile ? 1 : 0) +
         (message.type == ChatMsgType.text && _out ? 1 : 0);
-    final menuHeight = rows * 44.dp + 56.dp;
+    // Biznes reaksiya bloki ~108dp
+    final menuHeight = rows * 44.dp + 118.dp;
     const gap = 10.0;
     const chipHeight = 34.0;
     final edgeMargin = 14.0;
@@ -274,33 +255,59 @@ class _MenuCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(6.dp, 4.dp, 6.dp, 8.dp),
-            child: SizedBox(
-              height: 40.dp,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.symmetric(horizontal: 4.dp),
-                itemCount: kAllowedReactions.length,
-                separatorBuilder: (_, __) => SizedBox(width: 2.dp),
-                itemBuilder: (ctx, i) {
-                  final emoji = kAllowedReactions[i];
-                  return InkWell(
-                    onTap: () {
-                      onReact?.call(emoji);
-                      Navigator.pop(ctx, MessageMenuAction.react);
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: SizedBox(
-                      width: 40.dp,
-                      height: 40.dp,
-                      child: Center(
-                        child: Text(emoji, style: TextStyle(fontSize: 24.sp)),
+            padding: EdgeInsets.fromLTRB(10.dp, 8.dp, 10.dp, 10.dp),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'biz_react_title'.tr,
+                  style: TextStyle(
+                    color: c.textSecondary,
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                SizedBox(height: 8.dp),
+                Wrap(
+                  spacing: 6.dp,
+                  runSpacing: 6.dp,
+                  children: [
+                    for (final r in kBusinessReactions)
+                      Material(
+                        color: c.accentSoft,
+                        borderRadius: BorderRadius.circular(16.dp),
+                        child: InkWell(
+                          onTap: () {
+                            onReact?.call(r.emoji);
+                            Navigator.pop(context, MessageMenuAction.react);
+                          },
+                          borderRadius: BorderRadius.circular(16.dp),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.dp,
+                              vertical: 7.dp,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16.dp),
+                              border: Border.all(
+                                color: c.accent.withValues(alpha: 0.28),
+                              ),
+                            ),
+                            child: Text(
+                              r.chipText,
+                              style: TextStyle(
+                                color: c.textPrimary,
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                  ],
+                ),
+              ],
             ),
           ),
           Divider(height: 1, color: c.outline),

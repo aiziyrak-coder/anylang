@@ -57,6 +57,28 @@ class ProfileRepository {
     return _client.patch(api: 'api/v1/users/me/business', data: body);
   }
 
+  Future<BaseResult> generateAiCompanyProfile({
+    required String prompt,
+    String? companyName,
+    String? country,
+    String? businessRole,
+    required String locale,
+  }) {
+    return _client.post(
+      api: 'api/v1/users/me/business/ai-profile',
+      data: {
+        'prompt': prompt,
+        if (companyName != null && companyName.trim().isNotEmpty)
+          'company_name': companyName.trim(),
+        if (country != null && country.length == 2) 'country': country.toUpperCase(),
+        if (businessRole != null && businessRole.isNotEmpty)
+          'business_role': businessRole,
+        'locale': locale,
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
   Future<BaseResult> searchUsers(String q) {
     return _client.get(
       api: 'api/v1/users/search',
@@ -78,6 +100,20 @@ class ProfileRepository {
     );
   }
 
+  Future<BaseResult> uploadAuditReport(String filePath) async {
+    final formData = FormData.fromMap({
+      'file': await _imagePart(filePath),
+    });
+    return _client.post(
+      api: 'api/v1/users/me/business/audit-report',
+      data: formData,
+    );
+  }
+
+  Future<BaseResult> deleteAuditReport() {
+    return _client.delete(api: 'api/v1/users/me/business/audit-report');
+  }
+
   Future<BaseResult> blockUser(int peerId) {
     return _client.post(api: 'api/v1/users/me/blocked/$peerId');
   }
@@ -88,5 +124,12 @@ class ProfileRepository {
 
   Future<BaseResult> listBlocked() {
     return _client.get(api: 'api/v1/users/me/blocked');
+  }
+
+  Future<BaseResult> listProfileViewers({int limit = 20}) {
+    return _client.get(
+      api: 'api/v1/users/me/profile-viewers',
+      queryParameters: {'limit': limit},
+    );
   }
 }

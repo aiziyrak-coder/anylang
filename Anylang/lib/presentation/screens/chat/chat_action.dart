@@ -4,7 +4,19 @@ import '../../utils/screen_options/my_action.dart';
 import 'chat_message.dart';
 
 /// Biriktirish menyusidagi variantlar (3b).
-enum AttachKind { gallery, camera, file, product, location, contact }
+enum AttachKind {
+  gallery,
+  camera,
+  file,
+  product,
+  location,
+  contact,
+  invoice,
+  offer,
+  rfq,
+  catalog,
+  businessCard,
+}
 
 /// Faqat Chat (suhbat) ekraniga xos action'lar.
 class ChatAction extends MyAction {}
@@ -110,6 +122,17 @@ class ToggleForwardShowSender extends ChatAction {}
 /// Guruh sozlamalari.
 class OpenGroupSettings extends ChatAction {}
 
+/// Group Catalog — Products / Documents / Companies.
+class OpenGroupCatalog extends ChatAction {
+  final String section;
+  OpenGroupCatalog({this.section = 'products'});
+}
+
+class OpenGroupStats extends ChatAction {}
+
+class OpenDealMode extends ChatAction {}
+
+
 /// Mikrofon — ovoz yozishni boshlash (composer record holatiga o'tadi).
 class StartRecording extends ChatAction {}
 
@@ -152,6 +175,13 @@ class DeleteChat extends ChatAction {}
 /// Foydalanuvchini bloklash.
 class BlockPeer extends ChatAction {}
 
+/// AI "Javob yozib ber" — [tone]: professional | friendly | sales | negotiation.
+class SuggestAiReply extends ChatAction {
+  final ChatMessage? message;
+  final String tone;
+  SuggestAiReply({this.message, this.tone = 'professional'});
+}
+
 /// Chat xabaridagi mahsulot kartasini ochish.
 class OpenChatProduct extends ChatAction {
   final ChatMessage message;
@@ -177,4 +207,19 @@ class OpenSharedContactChat extends ChatAction {
 class AddSharedContact extends ChatAction {
   final ChatMessage message;
   AddSharedContact(this.message);
+}
+
+class AcceptOffer extends ChatAction {
+  final ChatMessage message;
+  AcceptOffer(this.message);
+}
+
+class CounterOffer extends ChatAction {
+  final ChatMessage message;
+  CounterOffer(this.message);
+}
+
+class ReplyToRfq extends ChatAction {
+  final ChatMessage message;
+  ReplyToRfq(this.message);
 }

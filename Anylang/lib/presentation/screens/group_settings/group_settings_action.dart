@@ -44,3 +44,7 @@ class RegenerateInviteLink extends GroupSettingsAction {}
 class DisableInviteLink extends GroupSettingsAction {}
 
 class UpgradeSuperGroup extends GroupSettingsAction {}
+
+class OpenGroupCatalogFromSettings extends GroupSettingsAction {}
+
+class OpenGroupStatsFromSettings extends GroupSettingsAction {}

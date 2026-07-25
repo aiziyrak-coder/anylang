@@ -6,6 +6,8 @@ from app.core.deps import DbSession, RedisClient
 from app.core.errors import AppError
 from app.core.pagination import normalize_page
 from app.schemas.business import (
+    AiCompanyProfileIn,
+    AiCompanyProfileOut,
     AvatarOut,
     BusinessUpdateIn,
     FactoryImageCreateOut,
@@ -16,9 +18,19 @@ from app.schemas.business import (
 )
 from app.schemas.common import MessageResponse
 from app.schemas.user import BusinessOut, UserOut
+from app.schemas.profile_views import ProfileViewersOut
+from app.schemas.nearby import (
+    LocationOut,
+    LocationSharingIn,
+    LocationUpdateIn,
+    NearbyOut,
+)
 from app.services import admin_console as console
 from app.services import business as business_service
 from app.services import chats as chats_service
+from app.services import company_profile as company_profile_service
+from app.services import nearby as nearby_service
+from app.services import profile_views as profile_views_service
 from app.services.admin_ops import client_ip
 from app.services.users import (
     get_public_profile,
@@ -41,11 +53,81 @@ class PublicRestoreIn(BaseModel):
 
 
 @router.get("/me", response_model=UserOut)
-async def get_me(current_user: CurrentUser, db: DbSession) -> UserOut:
+async def get_me(
+    current_user: CurrentUser,
+    db: DbSession,
+    redis: RedisClient,
+) -> UserOut:
     loaded = await load_user_for_response(db, current_user.id)
     assert loaded is not None
-    data = await serialize_user(loaded, db)
+    data = await serialize_user(loaded, db, redis=redis)
     return UserOut.model_validate(data)
+
+
+@router.put("/me/location", response_model=LocationOut)
+async def put_my_location(
+    body: LocationUpdateIn,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> LocationOut:
+    data = await nearby_service.update_my_location(
+        db,
+        user=current_user,
+        lat=body.latitude,
+        lng=body.longitude,
+        sharing_enabled=body.sharing_enabled,
+    )
+    await db.commit()
+    return LocationOut.model_validate(data)
+
+
+@router.patch("/me/location-sharing", response_model=LocationOut)
+async def patch_location_sharing(
+    body: LocationSharingIn,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> LocationOut:
+    data = await nearby_service.set_location_sharing(
+        db,
+        user=current_user,
+        enabled=body.enabled,
+    )
+    await db.commit()
+    return LocationOut.model_validate(
+        {
+            "location_lat": float(current_user.location_lat)
+            if current_user.location_lat is not None
+            else None,
+            "location_lng": float(current_user.location_lng)
+            if current_user.location_lng is not None
+            else None,
+            "location_updated_at": current_user.location_updated_at,
+            "location_sharing_enabled": data["location_sharing_enabled"],
+        }
+    )
+
+
+@router.get("/nearby", response_model=NearbyOut)
+async def get_nearby(
+    current_user: CurrentUser,
+    db: DbSession,
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius_m: int = Query(default=2000, ge=100, le=20000),
+    language: str | None = Query(default=None, max_length=8),
+    limit: int = Query(default=40, ge=1, le=80),
+) -> NearbyOut:
+    data = await nearby_service.list_nearby(
+        db,
+        viewer=current_user,
+        lat=lat,
+        lng=lng,
+        radius_m=radius_m,
+        language=language,
+        limit=limit,
+    )
+    await db.commit()
+    return NearbyOut.model_validate(data)
 
 
 @router.delete("/me", response_model=MessageResponse)
@@ -114,6 +196,7 @@ async def patch_me(body: UserUpdateIn, current_user: CurrentUser, db: DbSession)
         country=body.country,
         app_language=body.app_language,
         native_language=body.native_language,
+        translation_domain=body.translation_domain,
     )
     await db.commit()
     return UserOut.model_validate(data)
@@ -138,9 +221,30 @@ async def delete_avatar(current_user: CurrentUser, db: DbSession) -> MessageResp
 
 
 @router.get("/me/business", response_model=BusinessOut)
-async def get_my_business(current_user: CurrentUser, db: DbSession) -> BusinessOut:
-    data = await business_service.serialize_business(db, current_user)
+async def get_my_business(
+    current_user: CurrentUser,
+    db: DbSession,
+    redis: RedisClient,
+) -> BusinessOut:
+    data = await business_service.serialize_business(db, current_user, redis=redis)
     return BusinessOut.model_validate(data)
+
+
+@router.get("/me/business-card")
+async def get_my_business_card(current_user: CurrentUser) -> dict:
+    """Ko‘rgazma QR kartochkasi — profil ochiladigan havola."""
+    if not current_user.is_business:
+        raise AppError(
+            message="Business Card faqat Business akkaunt uchun",
+            error_code="NOT_A_BUSINESS",
+            status_code=403,
+        )
+    from app.services.business_card import business_card_url
+
+    return {
+        "user_id": current_user.id,
+        "url": business_card_url(current_user.id),
+    }
 
 
 @router.patch("/me/business", response_model=BusinessOut)
@@ -157,11 +261,41 @@ async def patch_my_business(
         business_role=body.business_role,
         website=body.website,
         description=body.description,
+        seo_text=body.seo_text,
+        keywords=body.keywords,
+        description_i18n=body.description_i18n,
         founded_year=body.founded_year,
         certificates=body.certificates,
+        export_countries=body.export_countries,
+        moq=body.moq,
+        production_capacity=body.production_capacity,
+        lead_time=body.lead_time,
+        incoterms=body.incoterms,
+        payment_methods=body.payment_methods,
     )
     await db.commit()
     return BusinessOut.model_validate(data)
+
+
+@router.post("/me/business/ai-profile", response_model=AiCompanyProfileOut)
+async def generate_ai_company_profile(
+    body: AiCompanyProfileIn,
+    current_user: CurrentUser,
+) -> AiCompanyProfileOut:
+    if not current_user.is_business:
+        raise AppError(
+            message="Biznes tarif talab qilinadi",
+            error_code="NOT_A_BUSINESS_ACCOUNT",
+            status_code=403,
+        )
+    data = await company_profile_service.generate_company_profile(
+        prompt=body.prompt,
+        company_name=body.company_name or "",
+        country=body.country or "",
+        business_role=body.business_role or "",
+        locale=body.locale,
+    )
+    return AiCompanyProfileOut.model_validate(data)
 
 
 @router.post("/me/business/logo", response_model=LogoOut)
@@ -195,6 +329,31 @@ async def delete_factory_image(
     await business_service.delete_factory_image(db, current_user, image_id)
     await db.commit()
     return MessageResponse(message="Rasm o'chirildi")
+
+
+class AuditReportOut(BaseModel):
+    audit_report_url: str
+
+
+@router.post("/me/business/audit-report", response_model=AuditReportOut)
+async def upload_audit_report(
+    current_user: CurrentUser,
+    db: DbSession,
+    file: UploadFile = File(...),
+) -> AuditReportOut:
+    data = await business_service.upload_audit_report(db, current_user, file)
+    await db.commit()
+    return AuditReportOut.model_validate(data)
+
+
+@router.delete("/me/business/audit-report", response_model=MessageResponse)
+async def delete_audit_report(
+    current_user: CurrentUser,
+    db: DbSession,
+) -> MessageResponse:
+    await business_service.delete_audit_report(db, current_user)
+    await db.commit()
+    return MessageResponse(message="Audit report o'chirildi")
 
 
 @router.get("/search", response_model=UserSearchOut)
@@ -237,11 +396,27 @@ async def unblock_peer(
     return await chats_service.unblock_user(redis, user_id=current_user.id, peer_id=peer_id)
 
 
+@router.get("/me/profile-viewers", response_model=ProfileViewersOut)
+async def list_my_profile_viewers(
+    db: DbSession,
+    current_user: CurrentUser,
+    limit: int = Query(default=20, ge=1, le=50),
+) -> ProfileViewersOut:
+    """Premium: kim profilingizni ko‘rdi. Basic — locked + total_count."""
+    data = await profile_views_service.list_profile_viewers(
+        db,
+        user=current_user,
+        limit=limit,
+    )
+    return ProfileViewersOut.model_validate(data)
+
+
 @router.get("/{user_id}", response_model=PublicUserProfileOut)
 async def get_user_profile(
     user_id: int,
     db: DbSession,
     current_user: CurrentUser,
+    redis: RedisClient,
 ) -> PublicUserProfileOut:
-    data = await get_public_profile(db, user_id, viewer=current_user)
+    data = await get_public_profile(db, user_id, viewer=current_user, redis=redis)
     return PublicUserProfileOut.model_validate(data)

@@ -17,6 +17,8 @@ class VoicePlayerService extends GetxService {
 
   final RxnString activeId = RxnString();
   final RxBool isPlaying = false.obs;
+  /// Ijro tezligi (0.5–2.0) — Jonli AI ovoz uchun.
+  final RxDouble playbackRate = 1.0.obs;
 
   final ValueNotifier<double> progress = ValueNotifier<double>(0);
   final ValueNotifier<double> pulse = ValueNotifier<double>(0);
@@ -43,6 +45,14 @@ class VoicePlayerService extends GetxService {
   double restingProgress(String id) {
     if (activeId.value == id) return progress.value;
     return _positions[id] ?? 0;
+  }
+
+  Future<void> setPlaybackRate(double rate) async {
+    final r = rate.clamp(0.5, 2.0);
+    playbackRate.value = r;
+    try {
+      await _player.setPlaybackRate(r);
+    } catch (_) {}
   }
 
   Future<void> toggle({
@@ -145,6 +155,9 @@ class VoicePlayerService extends GetxService {
         ? UrlSource(path)
         : DeviceFileSource(path);
     await _player.play(source, position: startPos);
+    try {
+      await _player.setPlaybackRate(playbackRate.value);
+    } catch (_) {}
   }
 
   void _onRealPosition(Duration pos) {

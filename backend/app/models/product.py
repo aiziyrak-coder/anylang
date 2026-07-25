@@ -36,6 +36,13 @@ class Product(Base, TimestampMixin):
     views_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_top_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     attributes: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    capabilities: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    factory_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    process_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    moq: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    shipping_info: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    shipping_countries: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
 
     images: Mapped[list[ProductImage]] = relationship(
         back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.position"

@@ -68,6 +68,7 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
           SessionStore.friendRequestsNotificationsEnabled();
       state.marketingEnabled.value = SessionStore.marketingNotificationsEnabled();
       state.profileVisibilityKey.value = SessionStore.profileVisibility();
+      state.translationDomain.value = SessionStore.translationDomain();
     } catch (e, st) {
       debugPrint('SettingsScreen.initState: $e\n$st');
     }
@@ -151,6 +152,24 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
             // Background tarjima tugashi uchun qayta yuklash.
             Future<void>.delayed(const Duration(seconds: 4), reload);
           }
+        }
+      case SelectTranslationDomain a:
+        final code = SessionStore.translationDomains.contains(a.domain)
+            ? a.domain
+            : 'general';
+        state.translationDomain.value = code;
+        await SessionStore.applyTranslationDomain(code);
+        try {
+          final result = await Get.find<ProfileRepository>().updateMe({
+            'translation_domain': code,
+          });
+          final map = asMap(result.dataOrNull);
+          if (map != null) {
+            await SessionStore.saveUser(map);
+            showAppMessage('settings_smart_translation_saved'.tr);
+          }
+        } catch (_) {
+          showAppWarning('settings_smart_translation_save_failed'.tr);
         }
       case SettingsLogoutRequested _:
         final logout = await Get.find<AuthRepository>().logout();

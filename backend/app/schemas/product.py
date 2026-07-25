@@ -40,6 +40,10 @@ class ProductImageUploadOut(BaseModel):
     url: str
 
 
+class ProductVideoUploadOut(BaseModel):
+    url: str
+
+
 class ProductSellerOut(BaseModel):
     id: int
     company_name: str
@@ -47,6 +51,21 @@ class ProductSellerOut(BaseModel):
     verified_badge: bool
     country: str | None = None
     business_role: str | None = None
+    rating: float | None = None
+    reviews_count: int = 0
+    moq: str | None = None
+    export_countries: list[str] = Field(default_factory=list)
+    lead_time: str | None = None
+    incoterms: list[str] = Field(default_factory=list)
+    factory_verification: dict | None = None
+
+
+class ProductTrustBadgesOut(BaseModel):
+    factory_verified: bool = False
+    iso: bool = False
+    trade_assurance: bool = False
+    premium: bool = False
+    has_any: bool = False
 
 
 class ProductOut(BaseModel):
@@ -62,6 +81,8 @@ class ProductOut(BaseModel):
     status: ProductStatus
     seller_id: int
     created_at: datetime
+    trust_badges: ProductTrustBadgesOut | None = None
+    capabilities: list[str] = Field(default_factory=list)
 
     @field_serializer("price")
     @classmethod
@@ -89,6 +110,14 @@ class ProductDetailOut(ProductOut):
     attributes: list[ProductAttributeOut]
     seller: ProductSellerOut
     top_request: ProductTopRequestOut | None = None
+    video_url: str | None = None
+    factory_video_url: str | None = None
+    process_video_url: str | None = None
+    moq: str | None = None
+    shipping_info: str | None = None
+    shipping_countries: list[str] = Field(default_factory=list)
+    rating: float | None = None
+    reviews_count: int = 0
 
 
 class ProductListOut(BaseModel):
@@ -97,6 +126,32 @@ class ProductListOut(BaseModel):
     limit: int = Field(ge=1)
     total: int = Field(ge=0)
     has_more: bool
+
+
+class ProductForYouOut(BaseModel):
+    items: list[ProductOut]
+    based_on_views: bool = False
+
+
+class ManufacturerMapCompanyOut(BaseModel):
+    id: int
+    company_name: str
+    verified: bool = False
+    factory_verified: bool = False
+    product_count: int = Field(ge=0)
+
+
+class ManufacturerMapCountryOut(BaseModel):
+    country: str = Field(min_length=2, max_length=2)
+    manufacturer_count: int = Field(ge=0)
+    product_count: int = Field(ge=0)
+    companies: list[ManufacturerMapCompanyOut] = Field(default_factory=list)
+
+
+class ManufacturersMapOut(BaseModel):
+    items: list[ManufacturerMapCountryOut] = Field(default_factory=list)
+    total_manufacturers: int = Field(ge=0, default=0)
+    total_countries: int = Field(ge=0, default=0)
 
 
 class ProductTopOut(BaseModel):
@@ -138,7 +193,14 @@ class ProductCreateIn(BaseModel):
     image_ids: list[int] = Field(default_factory=list)
     primary_image_id: int | None = None
     attributes: list[ProductAttributeIn] = Field(default_factory=list, max_length=10)
+    capabilities: list[str] = Field(default_factory=list, max_length=8)
     status: ProductStatus = "draft"
+    video_url: str | None = Field(default=None, max_length=512)
+    factory_video_url: str | None = Field(default=None, max_length=512)
+    process_video_url: str | None = Field(default=None, max_length=512)
+    moq: str | None = Field(default=None, max_length=120)
+    shipping_info: str | None = Field(default=None, max_length=255)
+    shipping_countries: list[str] = Field(default_factory=list, max_length=50)
 
 
 class ProductUpdateIn(BaseModel):
@@ -153,4 +215,11 @@ class ProductUpdateIn(BaseModel):
     image_ids: list[int] | None = None
     primary_image_id: int | None = None
     attributes: list[ProductAttributeIn] | None = Field(default=None, max_length=10)
+    capabilities: list[str] | None = Field(default=None, max_length=8)
     status: ProductStatus | None = None
+    video_url: str | None = Field(default=None, max_length=512)
+    factory_video_url: str | None = Field(default=None, max_length=512)
+    process_video_url: str | None = Field(default=None, max_length=512)
+    moq: str | None = Field(default=None, max_length=120)
+    shipping_info: str | None = Field(default=None, max_length=255)
+    shipping_countries: list[str] | None = Field(default=None, max_length=50)

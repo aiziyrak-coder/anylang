@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import '../product_video_badge.dart';
+import '../product_capabilities_view.dart';
+import '../product_trust_badges.dart';
+import '../product_trust_badges_view.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 
@@ -13,7 +17,11 @@ class ProductGridCard extends StatelessWidget {
   final String price;
   final String views;
   final String? imageUrl;
+  final bool hasVideo;
+  final ProductTrustBadges trustBadges;
+  final List<String> capabilities;
   final VoidCallback onTap;
+  final VoidCallback? onVideoTap;
 
   const ProductGridCard({
     super.key,
@@ -25,6 +33,10 @@ class ProductGridCard extends StatelessWidget {
     required this.onTap,
     this.subtitle,
     this.imageUrl,
+    this.hasVideo = false,
+    this.trustBadges = const ProductTrustBadges(),
+    this.capabilities = const [],
+    this.onVideoTap,
   });
 
   @override
@@ -64,12 +76,31 @@ class ProductGridCard extends StatelessWidget {
                           ),
                         );
                       },
-                      errorBuilder: (_, __, ___) => Center(
+                      errorBuilder: (_, _, _) => Center(
                         child: SvgPicture.asset(iconAsset, width: 28.dp, height: 28.dp),
                       ),
                     )
                   else
                     Center(child: SvgPicture.asset(iconAsset, width: 28.dp, height: 28.dp)),
+                  if (hasVideo)
+                    Positioned(
+                      left: 8.dp,
+                      bottom: 8.dp,
+                      child: ProductVideoBadge(
+                        compact: true,
+                        onTap: onVideoTap,
+                      ),
+                    ),
+                  if (trustBadges.hasAny)
+                    Positioned(
+                      left: 6.dp,
+                      right: 6.dp,
+                      top: 6.dp,
+                      child: ProductTrustBadgesView(
+                        data: trustBadges,
+                        compact: true,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -89,7 +120,13 @@ class ProductGridCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (subtitle != null) ...[
+                  if (capabilities.isNotEmpty) ...[
+                    SizedBox(height: 6.dp),
+                    ProductCapabilitiesView(
+                      codes: capabilities.take(2).toList(),
+                      compact: true,
+                    ),
+                  ] else if (subtitle != null) ...[
                     SizedBox(height: 2.dp),
                     Text(
                       subtitle!,

@@ -25,6 +25,14 @@ from app.services.messages import (
 from app.ws.hub import get_hub
 
 ALLOWED_REACTIONS = {
+    # Business deal statuses
+    "✔",
+    "✅",  # alias
+    "📦",
+    "🚢",
+    "💵",
+    "🛃",
+    # Classic (legacy + optional)
     "👍",
     "❤️",
     "😂",
@@ -43,6 +51,11 @@ ALLOWED_REACTIONS = {
     "💪",
     "✨",
     "🥰",
+}
+
+# Normalize aliases before save
+_REACTION_ALIASES = {
+    "✅": "✔",
 }
 
 
@@ -270,6 +283,62 @@ async def forward_message(
     return out
 
 
+def _classify_smart_pin(message: Message) -> dict:
+    """Contract / Product / Address / Invoice — pin banner uchun."""
+    msg_type = (message.type or "").strip().lower()
+    meta = message.meta if isinstance(message.meta, dict) else {}
+    text_blob = " ".join(
+        str(x)
+        for x in (
+            message.text_original or "",
+            meta.get("title"),
+            meta.get("name"),
+            meta.get("product"),
+            meta.get("product_name"),
+            meta.get("filename"),
+            meta.get("label"),
+            meta.get("note"),
+        )
+        if x
+    ).lower()
+
+    if msg_type in {"invoice", "offer"}:
+        kind = "invoice"
+    elif msg_type in {"product", "catalog", "rfq"}:
+        kind = "product"
+    elif msg_type == "location":
+        kind = "address"
+    elif msg_type == "file":
+        filename = str(meta.get("filename") or "").lower()
+        if filename.endswith(".pdf") or any(
+            k in filename for k in ("contract", "shartnoma", "dogovor", "agreement")
+        ):
+            kind = "contract"
+        elif any(k in text_blob for k in ("contract", "shartnoma", "договор", "agreement")):
+            kind = "contract"
+        else:
+            kind = "other"
+    elif any(k in text_blob for k in ("invoice", "инвойс", "payment", "to‘lov", "оплат")):
+        kind = "invoice"
+    elif any(k in text_blob for k in ("product", "mahsulot", "товар", "moq", "catalog")):
+        kind = "product"
+    elif any(k in text_blob for k in ("address", "manzil", "адрес", "warehouse", "ombor")):
+        kind = "address"
+    elif any(k in text_blob for k in ("contract", "shartnoma", "договор", "agreement", "nda")):
+        kind = "contract"
+    else:
+        kind = "other"
+
+    emoji = {
+        "contract": "📄",
+        "product": "📦",
+        "address": "📍",
+        "invoice": "💰",
+        "other": "📌",
+    }.get(kind, "📌")
+    return {"kind": kind, "emoji": emoji}
+
+
 async def pin_message(
     db: AsyncSession, redis: Redis, *, user: User, chat_id: int, message_id: int
 ) -> dict:
@@ -358,6 +427,7 @@ async def list_pinned(db: AsyncSession, *, user: User, chat_id: int) -> dict:
         )
         payload["pinned"] = True
         payload["pinned_at"] = pin.pinned_at
+        payload["smart_pin"] = _classify_smart_pin(msg)
         items.append(payload)
     return {"items": items}
 
@@ -365,6 +435,7 @@ async def list_pinned(db: AsyncSession, *, user: User, chat_id: int) -> dict:
 async def set_reaction(
     db: AsyncSession, redis: Redis, *, user: User, message_id: int, emoji: str
 ) -> dict:
+    emoji = _REACTION_ALIASES.get((emoji or "").strip(), (emoji or "").strip())
     if emoji not in ALLOWED_REACTIONS:
         raise AppError(message="Noto'g'ri reaksiya", error_code="VALIDATION_ERROR", status_code=400)
     result = await db.execute(select(Message).where(Message.id == message_id))

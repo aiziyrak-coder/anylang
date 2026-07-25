@@ -4,8 +4,11 @@ import '../screens/chat/chat_action.dart';
 import '../ui/theme/colors.dart';
 import '../utils/size_controller.dart';
 
-/// Biriktirish menyusi (3b) — "+" bosilganda pastdan chiqadi.
-Future<AttachKind?> showAttachmentBottomSheet(BuildContext context) {
+/// Biriktirish menyusi — "+" bosilganda pastdan chiqadi.
+Future<AttachKind?> showAttachmentBottomSheet(
+  BuildContext context, {
+  bool showRfq = false,
+}) {
   final c = context.appColors;
   return showModalBottomSheet<AttachKind>(
     context: context,
@@ -13,13 +16,12 @@ Future<AttachKind?> showAttachmentBottomSheet(BuildContext context) {
     isScrollControlled: true,
     useSafeArea: true,
     builder: (ctx) {
-      // viewPadding — Android gesture/nav bar; SafeArea ba'zan sheet ichida 0 qaytaradi.
       final bottomInset = MediaQuery.viewPaddingOf(ctx).bottom;
       return Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: Container(
           decoration: BoxDecoration(
-            color: c.isDark ? const Color(0xFF0C2136) : Colors.white,
+            color: c.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24.dp)),
           ),
           padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 20.dp),
@@ -58,6 +60,31 @@ Future<AttachKind?> showAttachmentBottomSheet(BuildContext context) {
                       'chat_attach_contact'.tr),
                 ],
               ),
+              SizedBox(height: 18.dp),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _tile(ctx, c, AttachKind.invoice, Icons.receipt_long_rounded,
+                      'chat_attach_invoice'.tr),
+                  _tile(ctx, c, AttachKind.offer, Icons.handshake_outlined,
+                      'chat_attach_offer'.tr),
+                  _tile(ctx, c, AttachKind.catalog, Icons.menu_book_rounded,
+                      'chat_attach_catalog'.tr),
+                ],
+              ),
+              SizedBox(height: 18.dp),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  _tile(ctx, c, AttachKind.businessCard, Icons.badge_outlined,
+                      'chat_attach_business_card'.tr),
+                  if (showRfq) ...[
+                    SizedBox(width: 12.dp),
+                    _tile(ctx, c, AttachKind.rfq, Icons.campaign_outlined,
+                        'chat_attach_rfq'.tr),
+                  ],
+                ],
+              ),
             ],
           ),
         ),
@@ -86,7 +113,7 @@ Widget _tile(
             height: 68.dp,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: c.surface,
+              color: c.isDark ? c.background : c.surface,
               border: Border.all(color: c.surfaceBorder),
               borderRadius: BorderRadius.circular(18.dp),
             ),
@@ -95,9 +122,15 @@ Widget _tile(
         ),
       ),
       SizedBox(height: 8.dp),
-      Text(
-        label,
-        style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+      SizedBox(
+        width: 78.dp,
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: c.textSecondary, fontSize: 11.sp),
+        ),
       ),
     ],
   );

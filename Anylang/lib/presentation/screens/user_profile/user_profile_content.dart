@@ -3,6 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../../../data/local/session_store.dart';
 import '../../modal/full_screen_image_dialog.dart';
+import '../../modal/trust_score_bottom_sheet.dart';
+import '../../modal/scam_risk_bottom_sheet.dart';
+import '../../ui/factory_verification_badges.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/my_icon_button.dart';
@@ -12,6 +15,7 @@ import '../../ui/items/info_row.dart';
 import '../../ui/items/pill_badge.dart';
 import '../../ui/items/product_grid_card.dart';
 import '../../ui/language_flag.dart';
+import '../../ui/networking_score_bar.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
@@ -50,15 +54,75 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
                           _nameRow(c, d),
                           SizedBox(height: 6.dp),
                           _subtitle(c, d),
+                          if (d.networkingConnections > 0 ||
+                              d.networkingCountries > 0 ||
+                              d.networkingTrust != null) ...[
+                            SizedBox(height: 12.dp),
+                            NetworkingScoreBar(
+                              connections: d.networkingConnections,
+                              countries: d.networkingCountries,
+                              trust: d.networkingTrust ?? d.trustScore?.score,
+                            ),
+                          ],
                           if (d.business) ...[
                             SizedBox(height: 12.dp),
-                            _businessBadge(c),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8.dp,
+                              runSpacing: 8.dp,
+                              children: [
+                                _businessBadge(c),
+                                if (!d.factoryVerification.factoryVerified &&
+                                    d.verified)
+                                  PillBadge(
+                                    label: 'profile_verified'.tr,
+                                    icon: Icons.verified_rounded,
+                                    background: c.accent,
+                                    foreground: c.onAccent,
+                                    fontSize: 12,
+                                  ),
+                                if (d.trustScore != null)
+                                  TrustScoreBadge(
+                                    trust: d.trustScore!,
+                                    onTap: () => showTrustScoreBottomSheet(
+                                      context,
+                                      trust: d.trustScore!,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            if (d.factoryVerification.hasAny) ...[
+                              SizedBox(height: 10.dp),
+                              FactoryVerificationBadges(data: d.factoryVerification),
+                            ],
+                            if (d.scamRisk?.hasWarning == true) ...[
+                              SizedBox(height: 12.dp),
+                              ScamRiskBanner(
+                                risk: d.scamRisk!,
+                                onTap: () => showScamRiskBottomSheet(
+                                  context,
+                                  risk: d.scamRisk!,
+                                ),
+                              ),
+                            ],
                           ],
                           SizedBox(height: 18.dp),
                           _actions(c, state, d, sendAction),
                           SizedBox(height: 18.dp),
                           _infoCard(c, d, sendAction),
+                          if (d.business && _hasAbout(d)) ...[
+                            SizedBox(height: 18.dp),
+                            _sectionTitle(c, 'business_about_section'.tr),
+                            SizedBox(height: 10.dp),
+                            _aboutCard(c, d),
+                          ],
                           if (d.business) ...[
+                            if (_hasTrade(d)) ...[
+                              SizedBox(height: 18.dp),
+                              _sectionTitle(c, 'business_trade_section'.tr),
+                              SizedBox(height: 10.dp),
+                              _tradeCard(c, d),
+                            ],
                             SizedBox(height: 20.dp),
                             _completeness(c, d),
                             if (d.certificates.isNotEmpty) ...[
@@ -109,9 +173,12 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
             style: TextStyle(color: c.textPrimary, fontSize: 22.sp, fontWeight: FontWeight.w700),
           ),
         ),
-        if (d.verified) ...[
+        if (d.verified || d.factoryVerification.factoryVerified) ...[
           SizedBox(width: 6.dp),
-          SvgPicture.asset('assets/icons/ic_verified.svg', width: 20.dp, height: 20.dp),
+          if (d.factoryVerification.factoryVerified)
+            Icon(Icons.verified_rounded, size: 20.dp, color: c.accent)
+          else
+            SvgPicture.asset('assets/icons/ic_verified.svg', width: 20.dp, height: 20.dp),
         ],
       ],
     );
@@ -182,6 +249,19 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
         if (showFriend) ...[
           SizedBox(width: 10.dp),
           Obx(() => _friendButton(c, state, sendAction)),
+        ],
+        if (d.business) ...[
+          SizedBox(width: 10.dp),
+          MyIconButton(
+            onClick: () => sendAction(OpenCompanyTradeAssistant()),
+            icon: Icons.auto_awesome_rounded,
+            iconColor: c.accentText,
+            iconSize: 20.dp,
+            backgroundColor: c.accentSoft,
+            borderRadius: 14.dp,
+            padding: EdgeInsets.all(14.dp),
+            border: Border.all(color: c.accent.withValues(alpha: 0.45), width: 0.7),
+          ),
         ],
         if (d.business && (d.website ?? '').trim().isNotEmpty) ...[
           SizedBox(width: 10.dp),
@@ -291,6 +371,170 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
       }
     }
 
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+        borderRadius: BorderRadius.circular(18.dp),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+        boxShadow: c.glassShadow,
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  bool _hasTrade(UserProfilePayload d) {
+    return (d.moq ?? '').isNotEmpty ||
+        (d.productionCapacity ?? '').isNotEmpty ||
+        (d.leadTime ?? '').isNotEmpty ||
+        d.incoterms.isNotEmpty ||
+        d.paymentMethods.isNotEmpty;
+  }
+
+  bool _hasAbout(UserProfilePayload d) {
+    return _localizedDescription(d).isNotEmpty ||
+        (d.seoText ?? '').isNotEmpty ||
+        d.keywords.isNotEmpty;
+  }
+
+  String _localizedDescription(UserProfilePayload d) {
+    final code = (Get.locale?.languageCode ?? 'uz').toLowerCase();
+    final fromI18n = d.descriptionI18n[code]?.trim() ?? '';
+    if (fromI18n.isNotEmpty) return fromI18n;
+    return (d.description ?? '').trim();
+  }
+
+  Widget _aboutCard(AppColors c, UserProfilePayload d) {
+    final about = _localizedDescription(d);
+    final seo = (d.seoText ?? '').trim();
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.dp),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(18.dp),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+        boxShadow: c.glassShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (about.isNotEmpty)
+            Text(
+              about,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 14.sp,
+                height: 1.4,
+              ),
+            ),
+          if (seo.isNotEmpty) ...[
+            if (about.isNotEmpty) SizedBox(height: 12.dp),
+            Text(
+              'business_seo'.tr,
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 4.dp),
+            Text(
+              seo,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 13.sp,
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (d.keywords.isNotEmpty) ...[
+            SizedBox(height: 12.dp),
+            Text(
+              'business_keywords'.tr,
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 8.dp),
+            Wrap(
+              spacing: 6.dp,
+              runSpacing: 6.dp,
+              children: [
+                for (final kw in d.keywords)
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10.dp,
+                      vertical: 6.dp,
+                    ),
+                    decoration: BoxDecoration(
+                      color: c.accentSoft,
+                      borderRadius: BorderRadius.circular(999.dp),
+                    ),
+                    child: Text(
+                      kw,
+                      style: TextStyle(
+                        color: c.accentText,
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (d.descriptionI18n.length > 1) ...[
+            SizedBox(height: 10.dp),
+            Text(
+              'business_ai_translations'.trParams({
+                'n': '${d.descriptionI18n.length}',
+              }),
+              style: TextStyle(
+                color: c.textFaint,
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _tradeCard(AppColors c, UserProfilePayload d) {
+    final rows = <Widget>[
+      if ((d.moq ?? '').isNotEmpty)
+        InfoRow(icon: Icons.shopping_basket_outlined, label: 'business_moq'.tr, value: d.moq!),
+      if ((d.productionCapacity ?? '').isNotEmpty)
+        InfoRow(
+          icon: Icons.precision_manufacturing_outlined,
+          label: 'business_capacity'.tr,
+          value: d.productionCapacity!,
+        ),
+      if ((d.leadTime ?? '').isNotEmpty)
+        InfoRow(icon: Icons.schedule_outlined, label: 'business_lead_time'.tr, value: d.leadTime!),
+      if (d.incoterms.isNotEmpty)
+        InfoRow(
+          icon: Icons.local_shipping_outlined,
+          label: 'business_incoterms'.tr,
+          value: d.incoterms.join(' · '),
+        ),
+      if (d.paymentMethods.isNotEmpty)
+        InfoRow(
+          icon: Icons.payments_outlined,
+          label: 'business_payment_methods'.tr,
+          value: d.paymentMethods.join(' · '),
+        ),
+    ];
+    final children = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      children.add(rows[i]);
+      if (i != rows.length - 1) {
+        children.add(Divider(height: 1.dp, thickness: 0.5, color: c.outline));
+      }
+    }
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(

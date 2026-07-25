@@ -108,6 +108,12 @@ const List<SubscriptionPlan> kMockSubscriptionPlans = [
     },
     features: [
       PlanFeature('Premium’dagi barchasi'),
+      PlanFeature('AI tarjimon'),
+      PlanFeature('AI kotib'),
+      PlanFeature('AI savdo yordamchisi'),
+      PlanFeature('100 GB fayl'),
+      PlanFeature('Priority Support'),
+      PlanFeature('Verified Business Badge'),
       PlanFeature('Biznes profil & e’lonlar'),
       PlanFeature('Sertifikat & ko‘rish statistikasi'),
     ],

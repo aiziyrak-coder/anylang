@@ -17,6 +17,10 @@ class ChatPayload {
   final bool isSuper;
   final String? inviteLink;
 
+  /// Marketplace soha guruhi (Textile Group va h.k.).
+  final bool isMarketplace;
+  final String? marketplaceSlug;
+
   const ChatPayload({
     required this.chatId,
     required this.peerId,
@@ -30,5 +34,7 @@ class ChatPayload {
     this.myRole,
     this.isSuper = false,
     this.inviteLink,
+    this.isMarketplace = false,
+    this.marketplaceSlug,
   });
 }

@@ -38,6 +38,16 @@ class SelectLanguageContent extends ScreenContent<SelectLanguageState> {
                   ),
                 ],
               ),
+              SizedBox(height: 8.dp),
+              Text(
+                'app_slogan'.tr,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w500,
+                  height: 1.35,
+                ),
+              ),
               SizedBox(height: 22.dp),
               Text(
                 'select_language_title'.tr,

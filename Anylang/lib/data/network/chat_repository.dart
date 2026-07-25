@@ -109,6 +109,104 @@ class ChatRepository {
     );
   }
 
+  Future<BaseResult> suggestReply(int chatId, {int? messageId, String tone = 'professional'}) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/suggest-reply',
+      data: {
+        'tone': tone,
+        if (messageId != null) 'message_id': messageId,
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> chatSummary(int chatId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/summary',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> groupCatalog(
+    int chatId, {
+    String section = 'all',
+    int limit = 100,
+  }) {
+    return _client.get(
+      api: 'api/v1/chats/$chatId/catalog',
+      queryParameters: {
+        'section': section,
+        'limit': limit,
+      },
+    );
+  }
+
+  Future<BaseResult> groupStats(int chatId) {
+    return _client.get(api: 'api/v1/chats/$chatId/stats');
+  }
+
+  Future<BaseResult> getDeal(int chatId) {
+    return _client.get(api: 'api/v1/chats/$chatId/deal');
+  }
+
+  Future<BaseResult> startDeal(int chatId) {
+    return _client.post(api: 'api/v1/chats/$chatId/deal', notify: SnackNotify.none);
+  }
+
+  Future<BaseResult> updateDeal(
+    int chatId, {
+    String? product,
+    String? price,
+    String? currency,
+    String? quantity,
+    String? unit,
+    String? delivery,
+    String? payment,
+  }) {
+    return _client.patch(
+      api: 'api/v1/chats/$chatId/deal',
+      data: {
+        if (product != null) 'product': product,
+        if (price != null) 'price': price,
+        if (currency != null) 'currency': currency,
+        if (quantity != null) 'quantity': quantity,
+        if (unit != null) 'unit': unit,
+        if (delivery != null) 'delivery': delivery,
+        if (payment != null) 'payment': payment,
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> acceptDeal(int chatId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/deal/accept',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> attachDealDocument(int chatId, int messageId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/deal/documents',
+      data: {'message_id': messageId},
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> detachDealDocument(int chatId, int messageId) {
+    return _client.delete(
+      api: 'api/v1/chats/$chatId/deal/documents/$messageId',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> closeDeal(int chatId) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/deal/close',
+      notify: SnackNotify.none,
+    );
+  }
+
   Future<BaseResult> markRead(int chatId, List<int> messageIds) {
     return _client.post(
       api: 'api/v1/chats/$chatId/read',

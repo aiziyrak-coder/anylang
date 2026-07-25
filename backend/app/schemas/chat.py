@@ -15,6 +15,11 @@ MessageType = Literal[
     "product",
     "location",
     "contact",
+    "invoice",
+    "catalog",
+    "business_card",
+    "offer",
+    "rfq",
     "system",
 ]
 
@@ -27,6 +32,8 @@ class InterlocutorOut(BaseModel):
     is_online: bool = False
     last_seen_at: datetime | None = None
     native_language: str
+    app_language: str | None = None
+    spoken_languages: list[str] = Field(default_factory=list)
     country: str | None = None
     is_business: bool = False
     verified_badge: bool = False
@@ -58,6 +65,10 @@ class ChatOut(BaseModel):
     created_by: int | None = None
     invite_link: str | None = None
     member_limit: int | None = None
+    marketplace_slug: str | None = None
+    marketplace_emoji: str | None = None
+    is_marketplace: bool = False
+    verified_only: bool = False
 
 
 class ChatListOut(BaseModel):
@@ -119,6 +130,8 @@ class InvitePreviewOut(BaseModel):
     is_super: bool = False
     chat_id: int | None = None
     invite_link: str | None = None
+    verified_only: bool = False
+    can_join: bool = True
 
 
 class ChatSearchItemOut(BaseModel):
@@ -172,6 +185,7 @@ class MessageOut(BaseModel):
     edited_at: datetime | None = None
     reactions: list[dict[str, Any]] = Field(default_factory=list)
     pinned: bool = False
+    auto_business_card: dict[str, Any] | None = None
 
 
 class MessageListOut(BaseModel):
@@ -198,7 +212,7 @@ class MessageForwardIn(BaseModel):
 
 
 class ReactionIn(BaseModel):
-    emoji: str = Field(min_length=1, max_length=8)
+    emoji: str = Field(min_length=1, max_length=32)
 
 
 class ClearHistoryIn(BaseModel):
@@ -218,6 +232,22 @@ class ChatMediaUploadOut(BaseModel):
     id: int
     url: str
     type: str
+
+
+class SuggestReplyIn(BaseModel):
+    message_id: int | None = None
+    tone: str = Field(default="professional", max_length=32)
+
+
+class SuggestReplyOut(BaseModel):
+    text: str
+
+
+class ChatSummaryOut(BaseModel):
+    title: str
+    bullets: list[str] = Field(default_factory=list)
+    message_count: int = 0
+    covered_count: int = 0
 
 
 class MessageDeletedOut(BaseModel):

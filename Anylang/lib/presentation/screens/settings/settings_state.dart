@@ -11,4 +11,5 @@ class SettingsState extends GetxController {
   RxString profileVisibilityKey = 'everyone'.obs;
 
   RxString currentLanguageKey = 'lang_name_uz'.obs;
+  RxString translationDomain = 'general'.obs;
 }

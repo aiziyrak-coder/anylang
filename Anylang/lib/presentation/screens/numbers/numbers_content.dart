@@ -178,6 +178,16 @@ class NumbersContent extends ScreenContent<NumbersState> {
                 letterSpacing: 1.4,
               ),
             ),
+            SizedBox(height: 8.dp),
+            Text(
+              'numbers_id_hint'.tr,
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 13.sp,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             if (groupName != null && groupName.isNotEmpty) ...[
               SizedBox(height: 6.dp),
               Text(

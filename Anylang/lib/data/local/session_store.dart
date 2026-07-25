@@ -157,6 +157,34 @@ class SessionStore {
     await _box.put('user', u);
   }
 
+  static const translationDomains = [
+    'general',
+    'medical',
+    'legal',
+    'textile',
+    'it',
+    'construction',
+  ];
+
+  /// Smart Translation soha (medical/legal/…).
+  static String translationDomain() {
+    final stored = _box.get('translation_domain') as String?;
+    if (stored != null && translationDomains.contains(stored)) return stored;
+    final fromUser = user()?['translation_domain']?.toString();
+    if (fromUser != null && translationDomains.contains(fromUser)) {
+      return fromUser;
+    }
+    return 'general';
+  }
+
+  static Future<void> applyTranslationDomain(String domain) async {
+    final code = translationDomains.contains(domain) ? domain : 'general';
+    await _box.put('translation_domain', code);
+    final u = Map<String, dynamic>.from(user() ?? {});
+    u['translation_domain'] = code;
+    await _box.put('user', u);
+  }
+
   static Map<String, dynamic>? user() {
     final raw = _box.get('user');
     if (raw is Map<String, dynamic>) return raw;
@@ -170,6 +198,10 @@ class SessionStore {
     final native = user['native_language']?.toString();
     if (native != null && native.isNotEmpty) {
       await _box.put('native_language', normalizeLangCode(native));
+    }
+    final domain = user['translation_domain']?.toString();
+    if (domain != null && translationDomains.contains(domain)) {
+      await _box.put('translation_domain', domain);
     }
     final app = user['app_language']?.toString();
     if (app != null && app.isNotEmpty) {
@@ -272,6 +304,34 @@ class SessionStore {
 
   static Future<void> setProfileVisibility(String value) async {
     await _box.put(_kProfileVisibility, value);
+  }
+
+  static const _kJonliTtsVoice = 'jonli_tts_voice';
+  static const _kJonliTtsSpeed = 'jonli_tts_speed';
+
+  /// Jonli AI ovoz: `female` | `male`.
+  static String jonliTtsVoice() {
+    final v = _box.get(_kJonliTtsVoice, defaultValue: 'female')?.toString();
+    return v == 'male' ? 'male' : 'female';
+  }
+
+  static Future<void> setJonliTtsVoice(String value) async {
+    final v = value == 'male' ? 'male' : 'female';
+    await _box.put(_kJonliTtsVoice, v);
+  }
+
+  /// Jonli TTS tezligi 0.5–2.0.
+  static double jonliTtsSpeed() {
+    final raw = _box.get(_kJonliTtsSpeed, defaultValue: 1.0);
+    final n = raw is num ? raw.toDouble() : double.tryParse('$raw') ?? 1.0;
+    if (n < 0.5) return 0.5;
+    if (n > 2.0) return 2.0;
+    return n;
+  }
+
+  static Future<void> setJonliTtsSpeed(double value) async {
+    final n = value.clamp(0.5, 2.0);
+    await _box.put(_kJonliTtsSpeed, n);
   }
 
   static int? _jwtExpMillis(String token) {

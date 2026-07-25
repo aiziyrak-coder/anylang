@@ -113,6 +113,40 @@ class GroupSettingsContent extends ScreenContent<GroupSettingsState> {
                     SizedBox(height: 16.dp),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.folder_special_outlined, color: c.accentText),
+                      title: Text(
+                        'group_catalog_title'.tr,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: c.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'group_catalog_hint'.tr,
+                        style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded, color: c.textFaint),
+                      onTap: () => sendAction(OpenGroupCatalogFromSettings()),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.insights_outlined, color: c.accentText),
+                      title: Text(
+                        'group_stats_title'.tr,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: c.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'group_stats_hint'.tr,
+                        style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded, color: c.textFaint),
+                      onTap: () => sendAction(OpenGroupStatsFromSettings()),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.person_add_alt_1_rounded, color: c.accentText),
                       title: Text(
                         'group_settings_add_members'.tr,

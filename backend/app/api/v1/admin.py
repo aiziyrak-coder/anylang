@@ -13,7 +13,7 @@ from app.core.pagination import normalize_page
 from app.models.chat import Chat, Message
 from app.models.payment import Payment
 from app.models.product import Product
-from app.models.user import NumberGroup, Subscription, User
+from app.models.user import BusinessProfile, NumberGroup, Subscription, User
 from app.services import admin_auth
 from app.services import numbers as numbers_service
 from app.services import products as products_service
@@ -43,6 +43,9 @@ class AdminUserOut(BaseModel):
     is_active: bool
     is_verified: bool
     verified_badge: bool
+    factory_verified: bool = False
+    inspection_passed: bool = False
+    audit_report_url: str | None = None
     created_at: object
 
 
@@ -57,6 +60,9 @@ class AdminUserListOut(BaseModel):
 class AdminUserPatchIn(BaseModel):
     is_active: bool | None = None
     verified_badge: bool | None = None
+    factory_verified: bool | None = None
+    inspection_passed: bool | None = None
+    audit_report_url: str | None = None
 
 
 class AdminNumberGroupOut(BaseModel):
@@ -132,6 +138,7 @@ class AdminPaymentListOut(BaseModel):
 
 
 def _serialize_admin_user(user: User) -> dict:
+    biz = user.business
     return {
         "id": user.id,
         "full_name": user.full_name,
@@ -140,6 +147,9 @@ def _serialize_admin_user(user: User) -> dict:
         "is_active": user.is_active,
         "is_verified": user.is_verified,
         "verified_badge": user.verified_badge,
+        "factory_verified": bool(biz.factory_verified) if biz is not None else False,
+        "inspection_passed": bool(biz.inspection_passed) if biz is not None else False,
+        "audit_report_url": (biz.audit_report_url if biz is not None else None),
         "created_at": user.created_at,
     }
 
@@ -232,8 +242,44 @@ async def admin_patch_user(
             status_code=400,
         )
 
+    factory_verified = data.pop("factory_verified", None)
+    inspection_passed = data.pop("inspection_passed", None)
+    audit_report_url = data.pop("audit_report_url", None)
+
     for field, value in data.items():
         setattr(user, field, value)
+
+    needs_biz = (
+        data.get("verified_badge") is True
+        or factory_verified is not None
+        or inspection_passed is not None
+        or audit_report_url is not None
+    )
+    biz = None
+    if needs_biz:
+        result = await db.execute(
+            select(BusinessProfile).where(BusinessProfile.user_id == user.id)
+        )
+        biz = result.scalar_one_or_none()
+
+    if data.get("verified_badge") is True and biz is not None:
+        biz.documents_verified = True
+
+    if biz is not None:
+        if factory_verified is not None:
+            biz.factory_verified = bool(factory_verified)
+            if factory_verified:
+                biz.documents_verified = True
+                user.verified_badge = True
+        if inspection_passed is not None:
+            biz.inspection_passed = bool(inspection_passed)
+            if inspection_passed:
+                biz.factory_verified = True
+                biz.documents_verified = True
+                user.verified_badge = True
+        if audit_report_url is not None:
+            cleaned = str(audit_report_url or "").strip()
+            biz.audit_report_url = cleaned[:512] or None
 
     await db.flush()
     await write_audit(
@@ -242,10 +288,28 @@ async def admin_patch_user(
         action="user.patch",
         target_type="user",
         target_id=user_id,
-        meta=data,
+        meta={
+            **data,
+            **(
+                {"factory_verified": factory_verified}
+                if factory_verified is not None
+                else {}
+            ),
+            **(
+                {"inspection_passed": inspection_passed}
+                if inspection_passed is not None
+                else {}
+            ),
+            **(
+                {"audit_report_url": audit_report_url}
+                if audit_report_url is not None
+                else {}
+            ),
+        },
         ip=client_ip(request),
     )
-    await db.refresh(user)
+    # Reload business for serialize
+    await db.refresh(user, attribute_names=["business"])
     return AdminUserOut.model_validate(_serialize_admin_user(user))
 
 

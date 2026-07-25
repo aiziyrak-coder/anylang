@@ -3,8 +3,12 @@ import 'package:get/get.dart';
 import '../../../data/audio/voice_recorder_service.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/network/forward_pending_store.dart';
+import '../../modal/ai_reply_styles_bottom_sheet.dart';
+import '../../modal/smart_pins_bottom_sheet.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
+import '../../ui/chat_smart_pins_bar.dart';
+import '../../ui/group_catalog_bar.dart';
 import '../../ui/chat_wallpaper_background.dart';
 import '../../ui/items/chat_message_item.dart';
 import '../../ui/theme/colors.dart';
@@ -224,6 +228,17 @@ class ChatContent extends ScreenContent<ChatState> {
     );
   }
 
+  Future<void> _openSmartPins(BuildContext context, ChatState state) async {
+    final pins = state.pinnedMessages.isNotEmpty
+        ? state.pinnedMessages.toList()
+        : [
+            if (state.pinnedBanner.value != null) state.pinnedBanner.value!,
+          ];
+    if (pins.isEmpty || !context.mounted) return;
+    final id = await showSmartPinsBottomSheet(context, pins: pins);
+    if (id != null) _scrollToMessage(id);
+  }
+
   GlobalKey _keyFor(String id) =>
       _messageKeys.putIfAbsent(id, GlobalKey.new);
 
@@ -301,21 +316,30 @@ class ChatContent extends ScreenContent<ChatState> {
                   child: Column(
                     children: [
                       Obx(() {
-                        final pin = state.pinnedBanner.value;
-                        if (pin == null) return const SizedBox.shrink();
-                        return Material(
-                          color: c.surface.withValues(alpha: 0.92),
-                          child: ListTile(
-                            dense: true,
-                            leading: Icon(Icons.push_pin, size: 18.dp, color: c.accentText),
-                            title: Text(
-                              pin.previewText(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 13.sp, color: c.textPrimary),
-                            ),
-                            onTap: () => _scrollToMessage(pin.id),
+                        if (!state.isGroup.value) {
+                          return const SizedBox.shrink();
+                        }
+                        return GroupCatalogBar(
+                          onOpenSection: (section) => sendAction(
+                            OpenGroupCatalog(section: section),
                           ),
+                        );
+                      }),
+                      Obx(() {
+                        final pins = state.pinnedMessages.toList();
+                        if (pins.isEmpty) {
+                          final pin = state.pinnedBanner.value;
+                          if (pin == null) return const SizedBox.shrink();
+                          return ChatSmartPinsBar(
+                            pins: [pin],
+                            onTapPin: _scrollToMessage,
+                            onOpenAll: () => _openSmartPins(context, state),
+                          );
+                        }
+                        return ChatSmartPinsBar(
+                          pins: pins,
+                          onTapPin: _scrollToMessage,
+                          onOpenAll: () => _openSmartPins(context, state),
                         );
                       }),
                       Expanded(child: _list(c, state, sendAction)),
@@ -391,6 +415,13 @@ class ChatContent extends ScreenContent<ChatState> {
                     onSend: () => sendAction(SendText()),
                     onMic: () => sendAction(StartRecording()),
                     onAttach: () => sendAction(OpenAttachMenu()),
+                    onAiSuggest: () async {
+                      final tone = await showAiReplyStylesBottomSheet(context);
+                      if (tone != null) {
+                        sendAction(SuggestAiReply(tone: tone));
+                      }
+                    },
+                    aiLoading: state.aiSuggesting.value,
                     onCancelReply: () => sendAction(CancelReply()),
                     onCancelRecording: () => sendAction(CancelRecording()),
                     onSendVoice: () => sendAction(SendVoice()),
@@ -445,6 +476,19 @@ class ChatContent extends ScreenContent<ChatState> {
         );
       }
       final items = _buildListItems(messages);
+      String? lastAiTargetId;
+      for (final m in messages.reversed) {
+        if (!m.isOutgoing &&
+            (m.type == ChatMsgType.text || m.type == ChatMsgType.voice) &&
+            m.displayText.trim().isNotEmpty) {
+          lastAiTargetId = m.id;
+          break;
+        }
+      }
+      // Obx tracking for AI chip spinner
+      final aiLoading = state.aiSuggesting.value;
+      final aiTone = state.aiSuggestTone.value;
+      final aiMsgId = state.aiSuggestMessageId.value;
       return ListView.builder(
         controller: _scroll,
         padding: EdgeInsets.fromLTRB(
@@ -474,6 +518,15 @@ class ChatContent extends ScreenContent<ChatState> {
                 prev == null || !_sameIncomingSender(prev, msg);
             showAvatar = next == null || !_sameIncomingSender(msg, next);
           }
+          var showAutoCard = false;
+          if (!msg.isOutgoing && msg.autoBusinessCard != null) {
+            final prev = _prevMessage(items, i);
+            showAutoCard =
+                prev == null || !_sameIncomingSender(prev, msg);
+          }
+          final showAiStyles = !selecting &&
+              !msg.isOutgoing &&
+              lastAiTargetId == msg.id;
           return KeyedSubtree(
             key: key,
             child: ChatMessageItem(
@@ -481,13 +534,13 @@ class ChatContent extends ScreenContent<ChatState> {
               isGroup: isGroup,
               showSenderName: showSenderName,
               showAvatar: showAvatar,
+              showAutoBusinessCard: showAutoCard,
               selecting: selecting,
               selected: selectedIds.contains(msg.id),
               onTap: selecting
                   ? () => sendAction(ToggleSelectMessage(msg))
                   : null,
               onSenderTap: (!selecting &&
-                      isGroup &&
                       !msg.isOutgoing &&
                       (msg.senderId ?? 0) > 0)
                   ? () => sendAction(OpenSenderProfile(msg.senderId!))
@@ -523,6 +576,28 @@ class ChatContent extends ScreenContent<ChatState> {
                   : (msg.type == ChatMsgType.contact
                       ? () => sendAction(AddSharedContact(msg))
                       : null),
+              onAiReplyStyle: showAiStyles
+                  ? (tone) => sendAction(
+                        SuggestAiReply(message: msg, tone: tone),
+                      )
+                  : null,
+              aiReplyLoading: showAiStyles && aiLoading && aiMsgId == msg.id,
+              aiReplyActiveTone: aiTone,
+              onAcceptOffer: (!selecting &&
+                      msg.type == ChatMsgType.offer &&
+                      !msg.isOutgoing)
+                  ? () => sendAction(AcceptOffer(msg))
+                  : null,
+              onCounterOffer: (!selecting &&
+                      msg.type == ChatMsgType.offer &&
+                      !msg.isOutgoing)
+                  ? () => sendAction(CounterOffer(msg))
+                  : null,
+              onReplyToRfq: (!selecting &&
+                      msg.type == ChatMsgType.rfq &&
+                      !msg.isOutgoing)
+                  ? () => sendAction(ReplyToRfq(msg))
+                  : null,
             ),
           );
         },

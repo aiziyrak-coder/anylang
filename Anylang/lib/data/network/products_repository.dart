@@ -10,13 +10,67 @@ class ProductsRepository {
 
   ProductsRepository({required NetworkClient client}) : _client = client;
 
-  Future<BaseResult> list({int page = 1, int limit = 40, String? q}) {
+  Future<BaseResult> list({
+    int page = 1,
+    int limit = 40,
+    String? q,
+    String? category,
+    String? country,
+    String? businessRole,
+    bool verifiedOnly = false,
+    bool readyStock = false,
+    bool freeShipping = false,
+    bool premiumSeller = false,
+    bool newOnly = false,
+    String sort = 'newest',
+  }) {
     return _client.get(
       api: 'api/v1/products',
       queryParameters: {
         'page': page,
         'limit': limit,
+        'sort': sort,
         if (q != null && q.isNotEmpty) 'search': q,
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (country != null && country.isNotEmpty) 'country': country,
+        if (businessRole != null && businessRole.isNotEmpty)
+          'business_role': businessRole,
+        if (verifiedOnly) 'verified_only': true,
+        if (readyStock) 'ready_stock': true,
+        if (freeShipping) 'free_shipping': true,
+        if (premiumSeller) 'premium_seller': true,
+        if (newOnly) 'new_only': true,
+      },
+    );
+  }
+
+  /// Avval ko‘rilgan mahsulotlar asosida shaxsiy tavsiyalar.
+  Future<BaseResult> forYou({int limit = 12}) {
+    return _client.get(
+      api: 'api/v1/products/for-you',
+      queryParameters: {'limit': limit},
+    );
+  }
+
+  /// Xarita: ishlab chiqaruvchilar davlatlar bo‘yicha.
+  Future<BaseResult> manufacturersMap() {
+    return _client.get(api: 'api/v1/products/manufacturers-map');
+  }
+
+  /// Tabiiy til qidiruvi: "Turkey textile factory" → filtrlar + mahsulotlar.
+  Future<BaseResult> smartSearch({
+    required String q,
+    String locale = 'uz',
+    int page = 1,
+    int limit = 40,
+  }) {
+    return _client.get(
+      api: 'api/v1/products/smart-search',
+      queryParameters: {
+        'q': q,
+        'locale': locale,
+        'page': page,
+        'limit': limit,
       },
     );
   }
@@ -39,8 +93,11 @@ class ProductsRepository {
     return _client.get(api: 'api/v1/products/$productId');
   }
 
-  Future<BaseResult> categories() {
-    return _client.get(api: 'api/v1/products/categories');
+  Future<BaseResult> categories({String language = 'uz_UZ'}) {
+    return _client.get(
+      api: 'api/v1/products/categories',
+      queryParameters: {'language': language},
+    );
   }
 
   Future<MultipartFile> _imagePart(String filePath) async {
@@ -66,6 +123,35 @@ class ProductsRepository {
     });
     return _client.post(
       api: 'api/v1/products/images',
+      data: form,
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<MultipartFile> _videoPart(String filePath) async {
+    final name = filePath.split(RegExp(r'[\\/]')).last;
+    final mime = lookupMimeType(filePath) ??
+        lookupMimeType(name) ??
+        'video/mp4';
+    final parts = mime.split('/');
+    final filename = name.contains('.') ? name : '$name.mp4';
+    return MultipartFile.fromFile(
+      filePath,
+      filename: filename,
+      contentType: MediaType(
+        parts.isNotEmpty ? parts[0] : 'video',
+        parts.length > 1 ? parts[1] : 'mp4',
+      ),
+    );
+  }
+
+  /// Qisqa mahsulot videosi (≈15s) yuklash → `{ url }`.
+  Future<BaseResult> uploadVideo(String filePath) async {
+    final form = FormData.fromMap({
+      'file': await _videoPart(filePath),
+    });
+    return _client.post(
+      api: 'api/v1/products/videos',
       data: form,
       notify: SnackNotify.none,
     );

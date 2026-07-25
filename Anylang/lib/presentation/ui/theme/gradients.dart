@@ -58,6 +58,66 @@ const LinearGradient speakingBlueGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
+/// Profil foni — nozik yashil–ko‘k.
+const LinearGradient profilePageGradientLight = LinearGradient(
+  colors: [Color(0xFFE8F7F0), Color(0xFFE8F1FA), Color(0xFFF5F6F8)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const LinearGradient profilePageGradientDark = LinearGradient(
+  colors: [Color(0xFF0A1A18), Color(0xFF0A1520), Color(0xFF0A121C)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+/// Statistika kartalari — yengil gradientlar.
+const LinearGradient profileStatGradientA = LinearGradient(
+  colors: [Color(0x338BC21A), Color(0x225AA8E8)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const LinearGradient profileStatGradientB = LinearGradient(
+  colors: [Color(0x335AA8E8), Color(0x228BC21A)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const LinearGradient profileStatGradientC = LinearGradient(
+  colors: [Color(0x33F5C542), Color(0x228BC21A)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const LinearGradient profileIdCardGradient = LinearGradient(
+  colors: [Color(0xFF1B6B3A), Color(0xFF175CD3)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+/// Bozor promo banner — slayd gradientlari.
+const LinearGradient marketBannerGradientA = LinearGradient(
+  colors: [Color(0xFF1B6B3A), Color(0xFF0F3D24)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+const LinearGradient marketBannerGradientB = LinearGradient(
+  colors: [Color(0xFFB42318), Color(0xFF7A160F)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+const LinearGradient marketBannerGradientC = LinearGradient(
+  colors: [Color(0xFFB54708), Color(0xFF7A2E05)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+const LinearGradient marketBannerGradientD = LinearGradient(
+  colors: [Color(0xFF175CD3), Color(0xFF0B3B8C)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
 // ---------------------------------------------------------------------------
 // Mahsulot kartasi (Bozor) fon tile gradientlari. Rasm o'rniga placeholder
 // sifatida. Temaga bog'liq emas.

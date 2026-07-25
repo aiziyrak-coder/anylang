@@ -23,10 +23,14 @@ class ChatState extends GetxController {
   String? myRole;
   bool isSuper = false;
   String? inviteLink;
+  bool isMarketplace = false;
+  String? marketplaceSlug;
 
   final RxBool selecting = false.obs;
   final RxSet<String> selectedIds = <String>{}.obs;
   final Rxn<ChatMessage> pinnedBanner = Rxn<ChatMessage>();
+  /// Barcha pinlangan xabarlar (Smart Pin paneli).
+  final RxList<ChatMessage> pinnedMessages = <ChatMessage>[].obs;
   final RxBool pinned = false.obs;
   final RxList<ChatMessage> messages = <ChatMessage>[].obs;
   final RxString input = ''.obs;
@@ -34,6 +38,10 @@ class ChatState extends GetxController {
   final RxBool recording = false.obs;
   final RxBool loading = true.obs;
   final RxBool sending = false.obs;
+  final RxBool aiSuggesting = false.obs;
+  /// Hozir yuklanayotgan AI uslubi (chip spinner).
+  final RxnString aiSuggestTone = RxnString();
+  final RxnString aiSuggestMessageId = RxnString();
   final RxBool searching = false.obs;
   final RxString searchQuery = ''.obs;
   final RxBool muted = false.obs;
@@ -69,9 +77,12 @@ class ChatState extends GetxController {
     myRole = p.myRole;
     isSuper = p.isSuper;
     inviteLink = p.inviteLink;
+    isMarketplace = p.isMarketplace;
+    marketplaceSlug = p.marketplaceSlug;
     selecting.value = false;
     selectedIds.clear();
     pinnedBanner.value = null;
+    pinnedMessages.clear();
     peerTyping.value = false;
     peerActivity.value = '';
     typingUserId.value = null;

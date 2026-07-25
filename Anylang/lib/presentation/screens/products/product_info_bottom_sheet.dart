@@ -8,10 +8,19 @@ import '../../../data/network/chat_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/full_screen_image_dialog.dart';
+import '../../modal/product_video_dialog.dart';
 import '../../screens/chat/chat_payload.dart';
 import '../../screens/chat/chat_screen.dart';
 import '../../utils/app_snackbar.dart';
 import '../../ui/buttons/rich_button.dart';
+import '../../ui/factory_verification.dart';
+import '../../ui/factory_verification_badges.dart';
+import '../../ui/items/info_row.dart';
+import '../../ui/items/product_company_card.dart';
+import '../../ui/product_capabilities_view.dart';
+import '../../ui/product_trust_badges.dart';
+import '../../ui/product_trust_badges_view.dart';
+import '../../ui/product_video_badge.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/size_controller.dart';
@@ -59,11 +68,15 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   late Product _product;
   String _description = '';
   List<String> _attributes = const [];
+  List<String> _capabilities = const [];
   String? _sellerName;
-  String? _sellerRole;
   String? _sellerAvatar;
+  bool _sellerVerified = false;
+  double? _sellerRating;
+  int _exportCountriesCount = 0;
   bool _sellerLoading = false;
   bool _detailErrorShown = false;
+  FactoryVerification _factoryVerification = const FactoryVerification();
 
   bool get _isOwner {
     final me = SessionStore.userId();
@@ -88,9 +101,57 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
         _description = (map['description'] as String?)?.trim().isNotEmpty == true
             ? map['description'] as String
             : (_product.subtitle ?? '');
+        _capabilities = _product.capabilities;
         final attrs = map['attributes'];
         if (attrs is List) {
-          _attributes = attrs.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+          _attributes = attrs
+              .map((e) {
+                if (e is Map) {
+                  final n = e['name']?.toString().trim() ?? '';
+                  final v = e['value']?.toString().trim() ?? '';
+                  // Imkoniyat sifatida saqlangan eski formatni o'tkazib yuboramiz.
+                  if (n.toLowerCase() == 'capability') return '';
+                  if (n.isEmpty && v.isEmpty) return '';
+                  if (n.isEmpty) return v;
+                  if (v.isEmpty) return n;
+                  return '$n: $v';
+                }
+                return e.toString();
+              })
+              .where((e) => e.isNotEmpty)
+              .toList();
+        }
+        final seller = map['seller'];
+        if (seller is Map) {
+          final company = seller['company_name']?.toString().trim();
+          if (company != null && company.isNotEmpty) {
+            _sellerName = company;
+          }
+          final logo = seller['logo_url']?.toString().trim();
+          if (logo != null && logo.isNotEmpty) {
+            _sellerAvatar = logo;
+          }
+          _sellerVerified = seller['verified_badge'] == true;
+          _sellerRating = (seller['rating'] as num?)?.toDouble() ??
+              _product.rating;
+          final exports = seller['export_countries'];
+          if (exports is List) {
+            _exportCountriesCount = exports
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .length;
+          }
+          _factoryVerification = FactoryVerification.fromApi(
+            seller['factory_verification'],
+          );
+          final trust = ProductTrustBadges.fromApi(
+                map['trust_badges'],
+              ).hasAny
+              ? ProductTrustBadges.fromApi(map['trust_badges'])
+              : ProductTrustBadges.fromApi(seller['trust_badges']);
+          if (trust.hasAny) {
+            _product = _product.copyWith(trustBadges: trust);
+          }
         }
         _fav = _product.isFavorited;
       });
@@ -107,17 +168,36 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       setState(() {
         _sellerLoading = false;
         if (pmap != null) {
-          _sellerName = (pmap['full_name'] as String?) ??
-              (pmap['name'] as String?) ??
-              'product_seller_unknown'.tr;
-          final biz = pmap['business'] as Map?;
-          _sellerRole = biz?['business_role']?.toString() ??
-              pmap['subtitle_role']?.toString() ??
-              '';
-          _sellerAvatar = pmap['is_business'] == true
+          final biz = pmap['business'] is Map
+              ? Map<String, dynamic>.from(pmap['business'] as Map)
+              : null;
+          final company = biz?['company_name']?.toString().trim();
+          if (company != null && company.isNotEmpty) {
+            _sellerName = company;
+          } else if ((_sellerName == null || _sellerName!.isEmpty)) {
+            _sellerName = (pmap['full_name'] as String?) ??
+                (pmap['name'] as String?) ??
+                'product_seller_unknown'.tr;
+          }
+          final logo = pmap['is_business'] == true
               ? (biz?['logo_url'] as String?)
               : (pmap['avatar_url'] as String?);
-        } else if (profile.errorOrNull != null) {
+          if (logo != null && logo.trim().isNotEmpty) {
+            _sellerAvatar = logo.trim();
+          }
+          _sellerVerified =
+              pmap['verified_badge'] == true || _sellerVerified;
+          final rating = (biz?['rating'] as num?)?.toDouble();
+          if (rating != null) _sellerRating = rating;
+          final exports = biz?['export_countries'];
+          if (exports is List && exports.isNotEmpty) {
+            _exportCountriesCount = exports
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .length;
+          }
+        } else if (profile.errorOrNull != null &&
+            (_sellerName == null || _sellerName!.isEmpty)) {
           _sellerName = 'product_seller_unknown'.tr;
         }
       });
@@ -282,9 +362,67 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                     _thumbnails(c, gallery),
                     SizedBox(height: 18.dp),
                     _titlePrice(c),
-                    if (_attributes.isNotEmpty) ...[
+                    if (_product.rating != null) ...[
+                      SizedBox(height: 8.dp),
+                      _ratingRow(c),
+                    ],
+                    if (_product.trustBadges.hasAny) ...[
+                      SizedBox(height: 12.dp),
+                      Text(
+                        'product_trust_badges_title'.tr,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 8.dp),
+                      ProductTrustBadgesView(data: _product.trustBadges),
+                    ],
+                    if (_capabilities.isNotEmpty) ...[
+                      SizedBox(height: 14.dp),
+                      Text(
+                        'product_capabilities_title'.tr,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 4.dp),
+                      Text(
+                        'product_capabilities_hint'.tr,
+                        style: TextStyle(
+                          color: c.textSecondary,
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                      SizedBox(height: 10.dp),
+                      ProductCapabilitiesView(codes: _capabilities),
+                    ] else if (_attributes.isNotEmpty) ...[
                       SizedBox(height: 12.dp),
                       _chips(c),
+                    ],
+                    if (_hasVideos) ...[
+                      SizedBox(height: 16.dp),
+                      _videosSection(c),
+                    ],
+                    if (_hasTradeInfo) ...[
+                      SizedBox(height: 16.dp),
+                      _tradeSection(c),
+                    ],
+                    if (_factoryVerification.hasAny) ...[
+                      SizedBox(height: 16.dp),
+                      Text(
+                        'factory_verification_title'.tr,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 10.dp),
+                      FactoryVerificationBadges(data: _factoryVerification),
                     ],
                     if (_description.isNotEmpty) ...[
                       SizedBox(height: 14.dp),
@@ -345,6 +483,41 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                     splashColor: Colors.white.withValues(alpha: 0.2),
                     highlightColor: Colors.white.withValues(alpha: 0.08),
                   ),
+                ),
+              ),
+            if ((_product.videoUrl ?? '').isNotEmpty)
+              Center(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _openVideo(_product.videoUrl),
+                    customBorder: const CircleBorder(),
+                    child: Ink(
+                      width: 64.dp,
+                      height: 64.dp,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: c.accent.withValues(alpha: 0.9),
+                          width: 2.dp,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: c.accent,
+                        size: 40.dp,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if ((_product.videoUrl ?? '').isNotEmpty)
+              Positioned(
+                left: 12.dp,
+                bottom: 12.dp,
+                child: ProductVideoBadge(
+                  onTap: () => _openVideo(_product.videoUrl),
                 ),
               ),
             Positioned(
@@ -438,6 +611,16 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
     );
   }
 
+  bool get _hasVideos =>
+      (_product.videoUrl ?? '').isNotEmpty ||
+      (_product.factoryVideoUrl ?? '').isNotEmpty ||
+      (_product.processVideoUrl ?? '').isNotEmpty;
+
+  bool get _hasTradeInfo =>
+      (_product.moq ?? '').isNotEmpty ||
+      (_product.shippingInfo ?? '').isNotEmpty ||
+      _product.shippingCountries.isNotEmpty;
+
   Widget _titlePrice(AppColors c) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,6 +637,152 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
           style: TextStyle(color: c.textPrimary, fontSize: 22.sp, fontWeight: FontWeight.w700),
         ),
       ],
+    );
+  }
+
+  Widget _ratingRow(AppColors c) {
+    final rating = _product.rating!;
+    final reviews = _product.reviewsCount;
+    return Row(
+      children: [
+        Icon(Icons.star_rounded, color: c.accent, size: 20.dp),
+        SizedBox(width: 4.dp),
+        Text(
+          rating.toStringAsFixed(1),
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (reviews > 0) ...[
+          SizedBox(width: 6.dp),
+          Text(
+            'product_reviews_count'.trParams({'n': '$reviews'}),
+            style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _openVideo(String? url) async {
+    final raw = url?.trim() ?? '';
+    if (raw.isEmpty) return;
+    await showProductVideoDialog(context, url: raw);
+  }
+
+  Widget _videosSection(AppColors c) {
+    final items = <({String label, String url, IconData icon})>[
+      if ((_product.videoUrl ?? '').isNotEmpty)
+        (
+          label: 'product_video_15s_title'.tr,
+          url: _product.videoUrl!,
+          icon: Icons.videocam_outlined,
+        ),
+      if ((_product.factoryVideoUrl ?? '').isNotEmpty)
+        (
+          label: 'product_factory_video'.tr,
+          url: _product.factoryVideoUrl!,
+          icon: Icons.precision_manufacturing_outlined,
+        ),
+      if ((_product.processVideoUrl ?? '').isNotEmpty)
+        (
+          label: 'product_process_video'.tr,
+          url: _product.processVideoUrl!,
+          icon: Icons.movie_filter_outlined,
+        ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'product_videos_title'.tr,
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        SizedBox(height: 10.dp),
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) SizedBox(height: 8.dp),
+          Material(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(14.dp),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14.dp),
+              onTap: () => _openVideo(items[i].url),
+              child: Ink(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14.dp),
+                  border: Border.all(color: c.outline),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 14.dp, vertical: 12.dp),
+                child: Row(
+                  children: [
+                    Icon(items[i].icon, color: c.accent, size: 22.dp),
+                    SizedBox(width: 12.dp),
+                    Expanded(
+                      child: Text(
+                        items[i].label,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.play_circle_outline_rounded, color: c.textSecondary, size: 22.dp),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _tradeSection(AppColors c) {
+    final countries = _product.shippingCountries
+        .map(formatCountryName)
+        .where((e) => e.trim().isNotEmpty)
+        .join(', ');
+    final rows = <Widget>[
+      if ((_product.moq ?? '').isNotEmpty)
+        InfoRow(
+          icon: Icons.inventory_2_outlined,
+          label: 'product_moq'.tr,
+          value: _product.moq!,
+        ),
+      if (countries.isNotEmpty)
+        InfoRow(
+          icon: Icons.public_outlined,
+          label: 'product_shipping_countries'.tr,
+          value: countries,
+        ),
+      if ((_product.shippingInfo ?? '').isNotEmpty)
+        InfoRow(
+          icon: Icons.local_shipping_outlined,
+          label: 'product_shipping'.tr,
+          value: _product.shippingInfo!,
+        ),
+    ];
+    final children = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      children.add(rows[i]);
+      if (i != rows.length - 1) {
+        children.add(Divider(height: 1.dp, thickness: 0.5, color: c.outline));
+      }
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16.dp),
+        border: Border.all(color: c.outline),
+      ),
+      child: Column(children: children),
     );
   }
 
@@ -477,84 +806,19 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   }
 
   Widget _businessCard(AppColors c) {
-    final name = _sellerLoading
-        ? '…'
-        : (_sellerName ?? 'product_seller_unknown'.tr);
-    final role = _sellerRole ?? '';
-    final initial = initialsOf(name);
-    final gradient = avatarGradientFor(_product.sellerId);
-    return Material(
-      color: c.surface,
-      borderRadius: BorderRadius.circular(16.dp),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16.dp),
-        onTap: () {
-          Navigator.pop(context);
-          widget.onOpenBusiness();
-        },
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16.dp),
-            border: Border.all(color: c.outline),
-          ),
-          padding: EdgeInsets.all(10.dp),
-          child: Row(
-            children: [
-              Container(
-                width: 44.dp,
-                height: 44.dp,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: gradient,
-                  image: _sellerAvatar != null && _sellerAvatar!.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(_sellerAvatar!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: _sellerAvatar == null || _sellerAvatar!.isEmpty
-                    ? Text(
-                        initial,
-                        style: TextStyle(
-                          color: kLime,
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    : null,
-              ),
-              SizedBox(width: 12.dp),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (role.isNotEmpty)
-                      Text(
-                        role,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
-                      ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: c.textFaint),
-            ],
-          ),
-        ),
-      ),
+    return ProductCompanyCard(
+      companyName: _sellerName ?? 'product_seller_unknown'.tr,
+      rating: _sellerRating ?? _product.rating,
+      verified: _sellerVerified || _factoryVerification.factoryVerified,
+      exportCountriesCount: _exportCountriesCount > 0
+          ? _exportCountriesCount
+          : _product.shippingCountries.length,
+      logoUrl: _sellerAvatar,
+      loading: _sellerLoading && (_sellerName == null || _sellerName!.isEmpty),
+      onTap: () {
+        Navigator.pop(context);
+        widget.onOpenBusiness();
+      },
     );
   }
 

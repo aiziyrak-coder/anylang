@@ -27,7 +27,7 @@ class ShareContactChoice {
   });
 }
 
-/// Do‘stlar (va o‘zingiz) ichidan kontakt tanlash — Telegram uslubi.
+/// Tarmoq (aloqalar) ichidan kontakt tanlash — Telegram uslubi.
 Future<ShareContactChoice?> showShareContactBottomSheet(BuildContext context) {
   return showModalBottomSheet<ShareContactChoice>(
     context: context,

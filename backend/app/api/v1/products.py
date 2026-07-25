@@ -11,19 +11,69 @@ from app.schemas.common import MessageResponse
 from app.schemas.product import (
     CategoryOut,
     FavoriteStatusOut,
+    ManufacturersMapOut,
     ProductCreateIn,
     ProductDetailOut,
+    ProductForYouOut,
     ProductImageUploadOut,
     ProductListOut,
     ProductTopOut,
     ProductTopRequestIn,
     ProductTopRequestOut,
     ProductUpdateIn,
+    ProductVideoUploadOut,
 )
+from app.schemas.smart_search import SmartSearchOut
 from app.services import products as products_service
+from app.services import smart_search as smart_search_service
 
 router = APIRouter()
 users_router = APIRouter()
+
+
+@router.get("/smart-search", response_model=SmartSearchOut)
+async def smart_search_products(
+    db: DbSession,
+    current_user: CurrentUser,
+    q: str = Query(..., min_length=1, max_length=200),
+    locale: str = Query(default="uz", max_length=16),
+    page: int | None = Query(default=None, ge=1),
+    limit: int | None = Query(default=None, ge=1, le=50),
+) -> SmartSearchOut:
+    data = await smart_search_service.smart_search(
+        db,
+        viewer=current_user,
+        query=q,
+        locale=locale,
+        page=page,
+        limit=limit,
+    )
+    return SmartSearchOut.model_validate(data)
+
+
+@router.get("/for-you", response_model=ProductForYouOut)
+async def products_for_you(
+    db: DbSession,
+    current_user: CurrentUser,
+    limit: int = Query(default=12, ge=1, le=30),
+) -> ProductForYouOut:
+    """Avval ko‘rilgan mahsulotlar asosida AI tavsiya."""
+    data = await products_service.list_for_you(
+        db,
+        viewer=current_user,
+        limit=limit,
+    )
+    return ProductForYouOut.model_validate(data)
+
+
+@router.get("/manufacturers-map", response_model=ManufacturersMapOut)
+async def manufacturers_map(
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ManufacturersMapOut:
+    """Xarita: ishlab chiqaruvchilar davlatlar bo‘yicha."""
+    data = await products_service.list_manufacturers_map(db, viewer=current_user)
+    return ManufacturersMapOut.model_validate(data)
 
 
 @router.get("", response_model=ProductListOut)
@@ -37,7 +87,17 @@ async def list_products(
     max_price: Decimal | None = None,
     currency: str | None = None,
     seller_id: int | None = None,
-    sort: str = Query(default="newest"),
+    country: str | None = Query(default=None, min_length=2, max_length=2),
+    business_role: str | None = Query(default=None, max_length=32),
+    verified_only: bool = Query(default=False),
+    ready_stock: bool = Query(default=False),
+    free_shipping: bool = Query(default=False),
+    premium_seller: bool = Query(default=False),
+    new_only: bool = Query(default=False),
+    sort: str = Query(
+        default="newest",
+        description="newest|price_asc|price_desc|most_viewed|top|recommended",
+    ),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=50),
 ) -> ProductListOut:
@@ -50,6 +110,13 @@ async def list_products(
         max_price=max_price,
         currency=currency,
         seller_id=seller_id,
+        country=country,
+        business_role=business_role,
+        verified_only=verified_only,
+        ready_stock=ready_stock,
+        free_shipping=free_shipping,
+        premium_seller=premium_seller,
+        new_only=new_only,
         sort=sort,
         page=page,
         limit=limit,
@@ -104,6 +171,24 @@ async def upload_product_image(
         data=content,
     )
     return ProductImageUploadOut.model_validate(data)
+
+
+@router.post("/videos", response_model=ProductVideoUploadOut, status_code=status.HTTP_201_CREATED)
+async def upload_product_video(
+    db: DbSession,
+    current_user: CurrentUser,
+    file: UploadFile = File(...),
+) -> ProductVideoUploadOut:
+    """Mahsulotning qisqa (≈15s) videosini yuklash."""
+    content = await read_upload_limited(file, max_bytes=25 * 1024 * 1024)
+    data = await products_service.upload_product_video(
+        db,
+        user=current_user,
+        filename=file.filename or "video.mp4",
+        content_type=file.content_type or "application/octet-stream",
+        data=content,
+    )
+    return ProductVideoUploadOut.model_validate(data)
 
 
 @router.delete("/images/{image_id}", response_model=MessageResponse)

@@ -29,11 +29,24 @@ from app.schemas.chat import (
     ReactionIn,
     ReadMessagesIn,
     ReadMessagesOut,
+    SuggestReplyIn,
+    SuggestReplyOut,
+    ChatSummaryOut,
     TransferOwnershipIn,
+)
+from app.schemas.group_catalog import GroupCatalogOut
+from app.schemas.group_stats import GroupStatsOut
+from app.schemas.deal_mode import (
+    DealAttachDocumentIn,
+    DealGetOut,
+    DealUpdateIn,
 )
 from app.models.chat import Chat
 from app.services import chats as chats_service
+from app.services import deal_mode as deal_mode_service
 from app.services import group_admin as group_admin_service
+from app.services import group_catalog as group_catalog_service
+from app.services import group_stats as group_stats_service
 from app.services import message_features as message_features_service
 from app.services import messages as messages_service
 from app.services.business import _upload_image
@@ -57,6 +70,7 @@ def _schedule_translation_jobs(background_tasks: BackgroundTasks, jobs: list[dic
             recipient_ids=job.get("recipient_ids"),
             recipient_id=job.get("recipient_id"),
             recipient_language=job.get("recipient_language"),
+            domain=job.get("domain"),
         )
 
 
@@ -75,6 +89,21 @@ def _schedule_voice_jobs(background_tasks: BackgroundTasks, jobs: list[dict] | N
             sender_id=job["sender_id"],
             sender_language=job["sender_language"],
             recipient_ids=job.get("recipient_ids"),
+        )
+
+
+def _schedule_faq_jobs(background_tasks: BackgroundTasks, jobs: list[dict] | None) -> None:
+    if not jobs:
+        return
+    from app.services import ai_faq as ai_faq_service
+
+    for job in jobs:
+        background_tasks.add_task(
+            ai_faq_service.maybe_auto_faq_reply,
+            chat_id=job["chat_id"],
+            message_id=job["message_id"],
+            text=job["text"],
+            asker_id=job["asker_id"],
         )
 
 
@@ -326,6 +355,130 @@ async def list_members(
         db, user=current_user, chat_id=chat_id, redis=redis
     )
     return MembersOut.model_validate(data)
+
+
+@router.get("/{chat_id}/catalog", response_model=GroupCatalogOut)
+async def get_group_catalog(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+    section: str = Query(default="all", pattern="^(products|documents|companies|all)$"),
+    limit: int = Query(default=100, ge=1, le=200),
+) -> GroupCatalogOut:
+    data = await group_catalog_service.get_group_catalog(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        section=section,
+        limit=limit,
+    )
+    return GroupCatalogOut.model_validate(data)
+
+
+@router.get("/{chat_id}/stats", response_model=GroupStatsOut)
+async def get_group_stats(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> GroupStatsOut:
+    data = await group_stats_service.get_group_stats(
+        db, user=current_user, chat_id=chat_id
+    )
+    return GroupStatsOut.model_validate(data)
+
+
+@router.get("/{chat_id}/deal", response_model=DealGetOut)
+async def get_deal(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DealGetOut:
+    data = await deal_mode_service.get_deal(db, user=current_user, chat_id=chat_id)
+    return DealGetOut.model_validate(data)
+
+
+@router.post("/{chat_id}/deal", response_model=DealGetOut, status_code=status.HTTP_200_OK)
+async def start_deal(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DealGetOut:
+    data = await deal_mode_service.start_deal(db, user=current_user, chat_id=chat_id)
+    await db.commit()
+    return DealGetOut.model_validate(data)
+
+
+@router.patch("/{chat_id}/deal", response_model=DealGetOut)
+async def update_deal(
+    chat_id: int,
+    body: DealUpdateIn,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DealGetOut:
+    data = await deal_mode_service.update_deal(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        data=body.model_dump(exclude_unset=True),
+    )
+    await db.commit()
+    return DealGetOut.model_validate(data)
+
+
+@router.post("/{chat_id}/deal/accept", response_model=DealGetOut)
+async def accept_deal(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DealGetOut:
+    data = await deal_mode_service.accept_deal(db, user=current_user, chat_id=chat_id)
+    await db.commit()
+    return DealGetOut.model_validate(data)
+
+
+@router.post("/{chat_id}/deal/documents", response_model=DealGetOut)
+async def attach_deal_document(
+    chat_id: int,
+    body: DealAttachDocumentIn,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DealGetOut:
+    data = await deal_mode_service.attach_document(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        message_id=body.message_id,
+    )
+    await db.commit()
+    return DealGetOut.model_validate(data)
+
+
+@router.delete("/{chat_id}/deal/documents/{message_id}", response_model=DealGetOut)
+async def detach_deal_document(
+    chat_id: int,
+    message_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DealGetOut:
+    data = await deal_mode_service.detach_document(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        message_id=message_id,
+    )
+    await db.commit()
+    return DealGetOut.model_validate(data)
+
+
+@router.post("/{chat_id}/deal/close", response_model=DealGetOut)
+async def close_deal(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> DealGetOut:
+    data = await deal_mode_service.close_deal(db, user=current_user, chat_id=chat_id)
+    await db.commit()
+    return DealGetOut.model_validate(data)
 
 
 @router.post("/{chat_id}/members", response_model=MembersOut)
@@ -580,13 +733,46 @@ async def send_message(
     )
     jobs = data.pop("_translation_jobs", None)
     voice_jobs = data.pop("_voice_jobs", None)
+    faq_jobs = data.pop("_faq_jobs", None)
     legacy = data.pop("_translation_job", None)
     if not jobs and legacy is not None:
         jobs = [legacy]
     await db.commit()
     _schedule_translation_jobs(background_tasks, jobs)
     _schedule_voice_jobs(background_tasks, voice_jobs)
+    _schedule_faq_jobs(background_tasks, faq_jobs)
     return MessageOut.model_validate(data)
+
+
+@router.post("/{chat_id}/suggest-reply", response_model=SuggestReplyOut)
+async def suggest_reply(
+    chat_id: int,
+    body: SuggestReplyIn,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> SuggestReplyOut:
+    data = await messages_service.suggest_reply_for_chat(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        message_id=body.message_id,
+        tone=body.tone,
+    )
+    return SuggestReplyOut.model_validate(data)
+
+
+@router.post("/{chat_id}/summary", response_model=ChatSummaryOut)
+async def chat_summary(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ChatSummaryOut:
+    data = await messages_service.summarize_chat_for_user(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+    )
+    return ChatSummaryOut.model_validate(data)
 
 
 @router.post("/{chat_id}/read", response_model=ReadMessagesOut)

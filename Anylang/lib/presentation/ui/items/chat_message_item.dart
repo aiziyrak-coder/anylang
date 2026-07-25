@@ -10,9 +10,13 @@ import '../../../data/network/invite_deep_link_service.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../screens/chat/chat_message.dart';
 import '../../utils/size_controller.dart';
+import '../chat_ai_reply_styles.dart';
+import '../chat_auto_business_card.dart';
 import '../profile_avatar.dart';
+import '../../utils/business_reactions.dart';
 import '../theme/colors.dart';
 import '../theme/gradients.dart';
+import '../transcript_shimmer.dart';
 import '../waveform_bars.dart';
 import '../../../data/core/mappers.dart';
 
@@ -45,6 +49,17 @@ class ChatMessageItem extends StatelessWidget {
   /// Kontakt kartasi: Xabar / Qo‘shish.
   final VoidCallback? onContactMessage;
   final VoidCallback? onContactAdd;
+  /// Kiruvchi xabar ostida AI javob uslublari.
+  final ValueChanged<String>? onAiReplyStyle;
+  final bool aiReplyLoading;
+  final String? aiReplyActiveTone;
+  /// Narx taklifi: qabul / qarshi.
+  final VoidCallback? onAcceptOffer;
+  final VoidCallback? onCounterOffer;
+  /// Marketplace RFQ: taklif yuborish.
+  final VoidCallback? onReplyToRfq;
+  /// Auto Business Card — ketma-ketlikning birinchi xabarida.
+  final bool showAutoBusinessCard;
 
   const ChatMessageItem({
     super.key,
@@ -62,6 +77,13 @@ class ChatMessageItem extends StatelessWidget {
     this.onJoinGroupInvite,
     this.onContactMessage,
     this.onContactAdd,
+    this.onAiReplyStyle,
+    this.aiReplyLoading = false,
+    this.aiReplyActiveTone,
+    this.onAcceptOffer,
+    this.onCounterOffer,
+    this.onReplyToRfq,
+    this.showAutoBusinessCard = false,
   });
 
   bool get _out => message.isOutgoing;
@@ -86,7 +108,7 @@ class ChatMessageItem extends StatelessWidget {
               children: [
                 for (final r in message.reactions)
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6.dp, vertical: 2.dp),
+                    padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 3.dp),
                     decoration: BoxDecoration(
                       color: c.surface,
                       borderRadius: BorderRadius.circular(12.dp),
@@ -97,8 +119,15 @@ class ChatMessageItem extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      '${r['emoji'] ?? ''} ${r['count'] ?? ''}'.trim(),
-                      style: TextStyle(fontSize: 12.sp),
+                      reactionDisplayText(
+                        '${r['emoji'] ?? ''}',
+                        count: r['count'],
+                      ),
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w600,
+                        color: c.textPrimary,
+                      ),
                     ),
                   ),
               ],
@@ -173,21 +202,62 @@ class ChatMessageItem extends StatelessWidget {
             child: bubble,
           );
 
-    return Material(
-      color: selected
-          ? c.accent.withValues(alpha: 0.14)
-          : Colors.transparent,
-      child: InkWell(
-        onTap: selecting ? onTap : null,
-        onLongPress: onLongPress,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: selecting ? 10.dp : 0,
-            vertical: 4.dp,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showAutoBusinessCard &&
+            !_out &&
+            message.autoBusinessCard != null) ...[
+          Padding(
+            padding: EdgeInsets.only(
+              left: selecting ? 10.dp : 0,
+              right: selecting ? 10.dp : 0,
+              bottom: 6.dp,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxW + (isGroup ? 40.dp : 0)),
+                child: ChatAutoBusinessCard(
+                  card: message.autoBusinessCard!,
+                  onTap: onSenderTap,
+                ),
+              ),
+            ),
           ),
-          child: aligned,
+        ],
+        Material(
+          color: selected
+              ? c.accent.withValues(alpha: 0.14)
+              : Colors.transparent,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: selecting ? onTap : null,
+            onLongPress: onLongPress,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: selecting ? 10.dp : 0,
+                vertical: 4.dp,
+              ),
+              child: aligned,
+            ),
+          ),
         ),
-      ),
+        if (onAiReplyStyle != null && !selecting) ...[
+          Padding(
+            padding: EdgeInsets.only(
+              left: isGroup && !_out ? 38.dp : 0,
+              top: 2.dp,
+              bottom: 6.dp,
+            ),
+            child: ChatAiReplyStyles(
+              onSelect: onAiReplyStyle!,
+              loading: aiReplyLoading,
+              activeTone: aiReplyActiveTone,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -222,6 +292,14 @@ class ChatMessageItem extends StatelessWidget {
         return _file(c);
       case ChatMsgType.contact:
         return _contact(c);
+      case ChatMsgType.invoice:
+      case ChatMsgType.catalog:
+      case ChatMsgType.businessCard:
+        return _tradeCard(c);
+      case ChatMsgType.offer:
+        return _offerCard(c);
+      case ChatMsgType.rfq:
+        return _rfqCard(c);
     }
   }
 
@@ -326,11 +404,15 @@ class ChatMessageItem extends StatelessWidget {
         if (_out) ...[
           SizedBox(width: 4.dp),
           Icon(
-            message.status == ChatStatus.read
-                ? Icons.done_all_rounded
-                : Icons.done_rounded,
+            switch (message.status) {
+              ChatStatus.pending => Icons.access_time_rounded,
+              ChatStatus.read => Icons.done_all_rounded,
+              ChatStatus.delivered || ChatStatus.sent => Icons.done_rounded,
+            },
             size: 14.dp,
-            color: c.onAccent.withValues(alpha: 0.7),
+            color: message.status == ChatStatus.pending
+                ? c.onAccent.withValues(alpha: 0.55)
+                : c.onAccent.withValues(alpha: 0.7),
           ),
         ],
       ],
@@ -432,6 +514,7 @@ class ChatMessageItem extends StatelessWidget {
         inviteToken.isNotEmpty &&
         onJoinGroupInvite != null;
     final bodyText = message.displayText.isEmpty ? '—' : message.displayText;
+    final original = message.originalAside;
 
     // IntrinsicWidth: qisqa matn bubble'ni kontentga qisqartiradi;
     // tashqi ConstrainedBox maxWidth (~76%) chegara sifatida qoladi.
@@ -443,6 +526,27 @@ class ChatMessageItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (message.reply != null) _replyQuote(c, message.reply!),
+            if (message.isAiFaq) ...[
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 3.dp),
+                margin: EdgeInsets.only(bottom: 6.dp),
+                decoration: BoxDecoration(
+                  color: _out
+                      ? c.onAccent.withValues(alpha: 0.14)
+                      : c.accentSoft,
+                  borderRadius: BorderRadius.circular(8.dp),
+                ),
+                child: Text(
+                  'chat_ai_faq_badge'.tr,
+                  style: TextStyle(
+                    color: _out ? c.onAccent : c.accent,
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ],
             _InviteAwareText(
               text: bodyText,
               baseStyle: TextStyle(
@@ -454,6 +558,46 @@ class ChatMessageItem extends StatelessWidget {
               linkColor: _out ? c.onAccent : c.accentText,
               onInviteTap: onJoinGroupInvite,
             ),
+            if (original != null) ...[
+              SizedBox(height: 8.dp),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.only(top: 8.dp),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: (_out ? c.onAccent : c.outline)
+                          .withValues(alpha: 0.28),
+                    ),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'chat_original_label'.tr,
+                      style: TextStyle(
+                        color: _metaColor(c),
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    SizedBox(height: 3.dp),
+                    Text(
+                      original,
+                      style: TextStyle(
+                        color: _primaryText(c).withValues(alpha: 0.78),
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w400,
+                        height: 1.3,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (showJoin) ...[
               SizedBox(height: 10.dp),
               Material(
@@ -559,8 +703,8 @@ class ChatMessageItem extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () => showFullScreenImage(context, url: url),
-                  splashColor: Colors.white.withValues(alpha: 0.22),
-                  highlightColor: Colors.white.withValues(alpha: 0.08),
+                  splashFactory: NoSplash.splashFactory,
+                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                 ),
               ),
             ),
@@ -733,7 +877,75 @@ class ChatMessageItem extends StatelessWidget {
                 ),
               ],
             ),
-            if (message.displayText.trim().isNotEmpty) ...[
+            if (message.transcriptFailed) ...[
+              SizedBox(height: 8.dp),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: SizeController.screenWidth * 0.62,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.translate_rounded,
+                      size: 16.dp,
+                      color: _metaColor(c),
+                    ),
+                    SizedBox(width: 6.dp),
+                    Expanded(
+                      child: Text(
+                        'voice_transcript_failed'.tr,
+                        style: TextStyle(
+                          color: _metaColor(c),
+                          fontSize: 12.5.sp,
+                          fontStyle: FontStyle.italic,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (message.transcriptPending &&
+                message.displayText.trim().isEmpty) ...[
+              SizedBox(height: 8.dp),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: SizeController.screenWidth * 0.62,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.translate_rounded,
+                          size: 16.dp,
+                          color: _metaColor(c),
+                        ),
+                        SizedBox(width: 6.dp),
+                        Expanded(
+                          child: Text(
+                            'voice_transcribing'.tr,
+                            style: TextStyle(
+                              color: _metaColor(c),
+                              fontSize: 11.5.sp,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 6.dp),
+                    TranscriptShimmer(
+                      color: _out
+                          ? c.onAccent.withValues(alpha: 0.35)
+                          : c.textFaint.withValues(alpha: 0.35),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (message.displayText.trim().isNotEmpty) ...[
               SizedBox(height: 8.dp),
               ConstrainedBox(
                 constraints: BoxConstraints(
@@ -823,6 +1035,346 @@ class ChatMessageItem extends StatelessWidget {
     );
   }
 
+  Widget _tradeCard(AppColors c) {
+    final label = switch (message.type) {
+      ChatMsgType.invoice => 'chat_invoice_label'.tr,
+      ChatMsgType.catalog => 'chat_catalog_label'.tr,
+      _ => 'chat_business_card_label'.tr,
+    };
+    final icon = switch (message.type) {
+      ChatMsgType.invoice => Icons.receipt_long_rounded,
+      ChatMsgType.catalog => Icons.menu_book_rounded,
+      _ => Icons.badge_outlined,
+    };
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: _bubbleRadius,
+        onTap: onProductTap,
+        child: Ink(
+          padding: EdgeInsets.all(12.dp),
+          decoration: BoxDecoration(
+            color: c.accentSoft,
+            border: Border.all(color: c.accent.withValues(alpha: 0.3)),
+            borderRadius: _bubbleRadius,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 16.dp, color: c.accentText),
+                  SizedBox(width: 6.dp),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: c.accentText,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8.dp),
+              Text(
+                message.cardTitle ?? '',
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if ((message.cardSubtitle ?? '').isNotEmpty) ...[
+                SizedBox(height: 4.dp),
+                Text(
+                  message.cardSubtitle!,
+                  style: TextStyle(
+                    color: c.accentText,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              if ((message.cardDetail ?? '').isNotEmpty) ...[
+                SizedBox(height: 4.dp),
+                Text(
+                  message.cardDetail!,
+                  style: TextStyle(
+                    color: c.textSecondary,
+                    fontSize: 12.sp,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+              SizedBox(height: 6.dp),
+              Align(alignment: Alignment.centerRight, child: _meta(c)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _offerCard(AppColors c) {
+    final status = (message.offerStatus ?? 'offered').toLowerCase();
+    final statusLabel = switch (status) {
+      'accepted' => 'chat_offer_status_accepted'.tr,
+      'countered' => 'chat_offer_status_countered'.tr,
+      _ => 'chat_offer_label'.tr,
+    };
+    final statusColor = switch (status) {
+      'accepted' => c.accent,
+      'countered' => c.textSecondary,
+      _ => c.accentText,
+    };
+    final price = [
+      message.offerPrice ?? '',
+      message.offerCurrency ?? '',
+    ].where((e) => e.isNotEmpty).join(' ');
+    final showActions = !_out &&
+        !selecting &&
+        (status == 'offered' || status == 'countered') &&
+        (onAcceptOffer != null || onCounterOffer != null);
+
+    Widget row(String emoji, String label, String value) {
+      if (value.trim().isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: EdgeInsets.only(bottom: 6.dp),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 22.dp,
+              child: Text(emoji, style: TextStyle(fontSize: 13.sp)),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: c.textFaint,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        padding: EdgeInsets.all(12.dp),
+        decoration: BoxDecoration(
+          color: c.accentSoft,
+          border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+          borderRadius: _bubbleRadius,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.handshake_outlined, size: 16.dp, color: statusColor),
+                SizedBox(width: 6.dp),
+                Expanded(
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10.dp),
+            row('📦', 'chat_offer_product'.tr, message.offerProduct ?? ''),
+            row('💵', 'chat_offer_price'.tr, price),
+            row('📅', 'chat_offer_delivery'.tr, message.offerDelivery ?? ''),
+            row('🔢', 'chat_offer_moq'.tr, message.offerMoq ?? ''),
+            row('💳', 'chat_offer_payment'.tr, message.offerPayment ?? ''),
+            if (showActions) ...[
+              SizedBox(height: 4.dp),
+              Row(
+                children: [
+                  if (onAcceptOffer != null)
+                    Expanded(
+                      child: _offerActionBtn(
+                        c,
+                        label: 'chat_offer_accept'.tr,
+                        filled: true,
+                        onTap: onAcceptOffer!,
+                      ),
+                    ),
+                  if (onAcceptOffer != null && onCounterOffer != null)
+                    SizedBox(width: 8.dp),
+                  if (onCounterOffer != null)
+                    Expanded(
+                      child: _offerActionBtn(
+                        c,
+                        label: 'chat_offer_counter'.tr,
+                        filled: false,
+                        onTap: onCounterOffer!,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            SizedBox(height: 6.dp),
+            Align(alignment: Alignment.centerRight, child: _meta(c)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _rfqCard(AppColors c) {
+    final qty = [
+      message.rfqQuantity ?? '',
+      message.rfqUnit ?? '',
+    ].where((e) => e.isNotEmpty).join(' ');
+    final showOffer = !_out && !selecting && onReplyToRfq != null;
+
+    Widget row(String emoji, String label, String value) {
+      if (value.trim().isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: EdgeInsets.only(bottom: 6.dp),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 22.dp,
+              child: Text(emoji, style: TextStyle(fontSize: 13.sp)),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: c.textFaint,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        padding: EdgeInsets.all(12.dp),
+        decoration: BoxDecoration(
+          color: c.surface,
+          border: Border.all(color: c.outline.withValues(alpha: 0.7)),
+          borderRadius: _bubbleRadius,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'chat_rfq_label'.tr,
+              style: TextStyle(
+                color: c.accent,
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
+            ),
+            SizedBox(height: 8.dp),
+            row('📦', 'chat_rfq_product'.tr, message.rfqProduct ?? ''),
+            row('🔢', 'chat_rfq_quantity'.tr, qty),
+            row('📝', 'chat_rfq_specs'.tr, message.rfqSpecs ?? ''),
+            row('⏰', 'chat_rfq_deadline'.tr, message.rfqDeadline ?? ''),
+            if (showOffer) ...[
+              SizedBox(height: 8.dp),
+              _offerActionBtn(
+                c,
+                label: 'chat_rfq_send_offer'.tr,
+                filled: true,
+                onTap: onReplyToRfq!,
+              ),
+            ],
+            SizedBox(height: 6.dp),
+            Align(alignment: Alignment.centerRight, child: _meta(c)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _offerActionBtn(
+    AppColors c, {
+    required String label,
+    required bool filled,
+    required VoidCallback onTap,
+  }) {
+    final radius = BorderRadius.circular(12.dp);
+    return Material(
+      color: filled ? c.accent : c.surface,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Container(
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(vertical: 9.dp),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: filled
+                ? null
+                : Border.all(color: c.outline.withValues(alpha: 0.6)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: filled ? c.onAccent : c.textPrimary,
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _location(AppColors c) {
     final lat = message.latitude;
     final lng = message.longitude;
@@ -845,6 +1397,8 @@ class ChatMessageItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: _bubbleRadius,
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         onTap: () async {
           HapticFeedback.selectionClick();
           final uri = hasCoords
@@ -858,7 +1412,6 @@ class ChatMessageItem extends StatelessWidget {
             Get.snackbar('error'.tr, 'maps_open_failed'.tr);
           }
         },
-        onLongPress: onLongPress,
         child: ClipRRect(
           borderRadius: _bubbleRadius,
           child: SizedBox(
@@ -1429,4 +1982,3 @@ class _InviteAwareTextState extends State<_InviteAwareText> {
     return Text.rich(TextSpan(children: spans));
   }
 }
-

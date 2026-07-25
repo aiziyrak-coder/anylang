@@ -22,6 +22,28 @@ class RemoveCertificate extends EditBusinessInfoAction {
 
 class AddCertificateRequested extends EditBusinessInfoAction {}
 
+class AddExportCountryRequested extends EditBusinessInfoAction {}
+
+class RemoveExportCountry extends EditBusinessInfoAction {
+  final String code;
+  RemoveExportCountry(this.code);
+}
+
+class ToggleIncoterm extends EditBusinessInfoAction {
+  final String code;
+  ToggleIncoterm(this.code);
+}
+
+class TogglePaymentMethod extends EditBusinessInfoAction {
+  final String code;
+  TogglePaymentMethod(this.code);
+}
+
+class ToggleCertificatePreset extends EditBusinessInfoAction {
+  final String code;
+  ToggleCertificatePreset(this.code);
+}
+
 class AddFactoryImageRequested extends EditBusinessInfoAction {}
 
 class OpenFactoryImage extends EditBusinessInfoAction {
@@ -29,9 +51,34 @@ class OpenFactoryImage extends EditBusinessInfoAction {
   OpenFactoryImage(this.url);
 }
 
+class UploadAuditReportRequested extends EditBusinessInfoAction {}
+
+class OpenAuditReport extends EditBusinessInfoAction {}
+
+class RemoveAuditReport extends EditBusinessInfoAction {}
+
 class SaveBusinessInfo extends EditBusinessInfoAction {
   final String companyName;
   final String website;
   final String description;
-  SaveBusinessInfo({required this.companyName, required this.website, required this.description});
+  final String seoText;
+  SaveBusinessInfo({
+    required this.companyName,
+    required this.website,
+    required this.description,
+    required this.seoText,
+  });
+}
+
+class GenerateAiProfile extends EditBusinessInfoAction {
+  final String prompt;
+  final String companyName;
+  GenerateAiProfile(this.prompt, {this.companyName = ''});
+}
+
+class ToggleAiTranslations extends EditBusinessInfoAction {}
+
+class RemoveAiKeyword extends EditBusinessInfoAction {
+  final String keyword;
+  RemoveAiKeyword(this.keyword);
 }

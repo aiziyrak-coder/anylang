@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 
 String formatSecondToMinute(int seconds) {
   final duration = Duration(seconds: seconds);
@@ -160,4 +161,53 @@ String formatIsoDateToHHmm(String? isoTime) {
   final minute = local.minute.toString().padLeft(2, '0');
 
   return '$hour:$minute';
+}
+
+DateTime? parseApiDateTime(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is DateTime) return raw.toLocal();
+  final s = raw.toString().trim();
+  if (s.isEmpty) return null;
+  return DateTime.tryParse(s)?.toLocal();
+}
+
+bool _isSameCalendarDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+bool _isYesterday(DateTime now, DateTime then) {
+  final yesterday = DateTime(now.year, now.month, now.day)
+      .subtract(const Duration(days: 1));
+  return _isSameCalendarDay(yesterday, then);
+}
+
+/// Oxirgi faollik: 🟢 Online · 🕐 3 min oldin · 🌙 Kecha
+String formatLastActivity({
+  required bool online,
+  DateTime? lastSeenAt,
+  DateTime? now,
+}) {
+  if (online) return '🟢 ${'activity_online'.tr}';
+
+  final seen = lastSeenAt?.toLocal();
+  if (seen == null) return 'user_card_offline'.tr;
+
+  final n = (now ?? DateTime.now()).toLocal();
+  final diff = n.difference(seen);
+  if (diff.isNegative || diff.inSeconds < 45) {
+    return '🕐 ${'activity_just_now'.tr}';
+  }
+  if (diff.inMinutes < 60) {
+    return '🕐 ${'activity_minutes_ago'.trParams({'n': '${diff.inMinutes}'})}';
+  }
+  if (diff.inHours < 24 && _isSameCalendarDay(n, seen)) {
+    return '🕐 ${'activity_hours_ago'.trParams({'n': '${diff.inHours}'})}';
+  }
+  if (_isYesterday(n, seen)) {
+    return '🌙 ${'activity_yesterday'.tr}';
+  }
+  if (diff.inDays < 7) {
+    final days = diff.inDays < 1 ? 1 : diff.inDays;
+    return '📅 ${'activity_days_ago'.trParams({'n': '$days'})}';
+  }
+  return '📅 ${formatDateDots(seen)}';
 }

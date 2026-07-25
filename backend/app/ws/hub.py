@@ -76,8 +76,10 @@ class RedisHub:
         raw = await redis.get(last_seen_key(user_id))
         if not raw:
             return None
+        if isinstance(raw, (bytes, bytearray)):
+            raw = raw.decode()
         try:
-            return datetime.fromisoformat(raw)
+            return datetime.fromisoformat(str(raw))
         except ValueError:
             logger.warning("Invalid last_seen value for user %s: %s", user_id, raw)
             return None

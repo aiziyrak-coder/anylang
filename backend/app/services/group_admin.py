@@ -84,6 +84,11 @@ async def enrich_chat_dict(db: AsyncSession, data: dict, *, viewer: User, chat: 
         data["invite_link"] = _invite_link(chat.invite_token)
     else:
         data["invite_link"] = None
+    slug = getattr(chat, "marketplace_slug", None)
+    data["marketplace_slug"] = slug
+    data["marketplace_emoji"] = getattr(chat, "marketplace_emoji", None)
+    data["is_marketplace"] = bool(slug)
+    data["verified_only"] = bool(getattr(chat, "verified_only", False))
     return data
 
 
@@ -140,12 +145,15 @@ async def add_members(
             status_code=400,
             extra={"limit": cap, "current": current, "is_super": chat.is_super},
         )
+    from app.services.marketplace_groups import assert_verified_join_allowed
+
     added = 0
     for uid in unique:
         existing = await _get_participant(db, chat_id, uid)
         if existing is not None:
             continue
-        await _load_user(db, uid)
+        target = await _load_user(db, uid)
+        await assert_verified_join_allowed(db, chat=chat, user=target)
         db.add(ChatParticipant(chat_id=chat_id, user_id=uid, role="member"))
         added += 1
     await db.flush()
@@ -310,8 +318,22 @@ async def preview_by_token(
             error_code="INVITE_INVALID",
             status_code=404,
         )
+    from app.services.marketplace_groups import user_is_verified_business
+
+    viewer = user
+    if getattr(viewer, "business", None) is None:
+        loaded = await db.execute(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.business))
+        )
+        found = loaded.scalar_one_or_none()
+        if found is not None:
+            viewer = found
+
     existing = await _get_participant(db, chat.id, user.id)
     title = (chat.title or "").strip() or "Guruh"
+    verified_only = bool(getattr(chat, "verified_only", False))
     return {
         "token": token,
         "title": title,
@@ -321,6 +343,10 @@ async def preview_by_token(
         "is_super": bool(chat.is_super),
         "chat_id": chat.id if existing is not None else None,
         "invite_link": _invite_link(chat.invite_token),
+        "verified_only": verified_only,
+        "can_join": (not verified_only)
+        or user_is_verified_business(viewer)
+        or existing is not None,
     }
 
 
@@ -339,6 +365,9 @@ async def join_by_token(
             viewer=user,
             chat=chat,
         )
+    from app.services.marketplace_groups import assert_verified_join_allowed
+
+    await assert_verified_join_allowed(db, chat=chat, user=user)
     cap = member_cap(chat)
     current = await _count_members(db, chat.id)
     if cap is not None and current >= cap:

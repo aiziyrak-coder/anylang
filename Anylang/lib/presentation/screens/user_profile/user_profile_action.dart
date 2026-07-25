@@ -24,3 +24,6 @@ class OpenListing extends UserProfileAction {
   final Product product;
   OpenListing(this.product);
 }
+
+/// Kompaniya AI savdo yordamchisi.
+class OpenCompanyTradeAssistant extends UserProfileAction {}

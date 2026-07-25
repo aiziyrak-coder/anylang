@@ -21,3 +21,81 @@ class RefreshProducts extends ProductsAction {}
 
 /// Sevimlilar ro'yxatini ko'rsatish.
 class ShowFavorites extends ProductsAction {}
+
+/// AI savdo yordamchisi (marketplace).
+class OpenTradeAssistant extends ProductsAction {}
+
+class OpenBusinessFeed extends ProductsAction {}
+
+class OpenAiMatching extends ProductsAction {}
+
+class RetryAiMatching extends ProductsAction {}
+
+class OpenMarketAnalytics extends ProductsAction {}
+
+class RetryMarketAnalytics extends ProductsAction {}
+
+class OpenMarketplaceGroups extends ProductsAction {}
+
+/// 🌍 Map View — ishlab chiqaruvchilar xaritasi.
+class OpenMarketMap extends ProductsAction {}
+
+/// Ko‘rgazma: Business Card QR skaner.
+class OpenBusinessCardScan extends ProductsAction {}
+
+/// Kategoriya filtri.
+class ProductsSelectCategory extends ProductsAction {
+  final String? code;
+  ProductsSelectCategory(this.code);
+}
+
+/// Davlat filtri (null = barcha).
+class ProductsSelectCountry extends ProductsAction {
+  final String? code;
+  ProductsSelectCountry(this.code);
+}
+
+/// Yetkazib beruvchi turi.
+class ProductsSelectRole extends ProductsAction {
+  final String? code;
+  ProductsSelectRole(this.code);
+}
+
+/// Faqat verified kompaniyalar.
+class ProductsToggleVerified extends ProductsAction {}
+
+/// 🏭 Factory — manufacturer filtri (bir bosish).
+class ProductsToggleFactory extends ProductsAction {}
+
+/// 🔥 Trend — TOP sort.
+class ProductsToggleTrend extends ProductsAction {}
+
+/// Ready Stock.
+class ProductsToggleReadyStock extends ProductsAction {}
+
+/// New (so‘nggi 30 kun).
+class ProductsToggleNew extends ProductsAction {}
+
+/// Free Shipping.
+class ProductsToggleFreeShipping extends ProductsAction {}
+
+/// Premium Seller.
+class ProductsTogglePremiumSeller extends ProductsAction {}
+
+/// Barcha filtrlarni tozalash.
+class ProductsClearFilters extends ProductsAction {}
+
+/// Davlat tanlash sheet'ini ochish.
+class ProductsPickCountry extends ProductsAction {}
+
+/// Rol tanlash sheet'ini ochish.
+class ProductsPickRole extends ProductsAction {}
+
+/// Mahsulot kategoriyasi tanlash sheet'ini ochish.
+class ProductsPickCategory extends ProductsAction {}
+
+/// Promo banner bosilganda.
+class ProductsBannerTap extends ProductsAction {
+  final String id;
+  ProductsBannerTap(this.id);
+}

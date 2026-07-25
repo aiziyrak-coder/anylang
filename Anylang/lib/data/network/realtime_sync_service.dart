@@ -119,7 +119,16 @@ class RealtimeSyncService extends GetxService {
     if (idx >= 0) {
       final msg = chat.messages[idx].withPinned(pinned);
       chat.messages[idx] = msg;
-      chat.pinnedBanner.value = pinned ? msg : (chat.pinnedBanner.value?.id == messageId ? null : chat.pinnedBanner.value);
+      if (pinned) {
+        chat.pinnedMessages.removeWhere((m) => m.id == messageId);
+        chat.pinnedMessages.add(msg);
+        chat.pinnedBanner.value = msg;
+      } else {
+        chat.pinnedMessages.removeWhere((m) => m.id == messageId);
+        chat.pinnedBanner.value = chat.pinnedMessages.isNotEmpty
+            ? chat.pinnedMessages.last
+            : null;
+      }
     }
   }
 
@@ -132,6 +141,7 @@ class RealtimeSyncService extends GetxService {
     if (data['for_everyone'] == true) {
       chat.messages.clear();
       chat.pinnedBanner.value = null;
+      chat.pinnedMessages.clear();
     }
   }
 
@@ -173,7 +183,37 @@ class RealtimeSyncService extends GetxService {
         );
         if (idx >= 0) {
           final prevShowing = chat.messages[idx].showingOriginal;
-          chat.messages[idx] = mapped.withShowingOriginal(prevShowing);
+          final prev = chat.messages[idx];
+          var next = mapped.withShowingOriginal(prevShowing);
+          // Lokal pending ovoz — server URL kelguncha lokal path/samples saqlansin.
+          if (prev.type == ChatMsgType.voice && mapped.type == ChatMsgType.voice) {
+            next = ChatMessage.voice(
+              id: mapped.id,
+              dir: mapped.dir,
+              time: mapped.time,
+              createdAt: mapped.createdAt,
+              duration: mapped.voiceDuration ?? prev.voiceDuration ?? '0:00',
+              durationMs: mapped.voiceDurationMs ?? prev.voiceDurationMs,
+              path: (mapped.voicePath != null && mapped.voicePath!.isNotEmpty)
+                  ? mapped.voicePath
+                  : prev.voicePath,
+              samples: mapped.voiceSamples.isNotEmpty
+                  ? mapped.voiceSamples
+                  : prev.voiceSamples,
+              downloaded: mapped.voiceDownloaded || prev.voiceDownloaded,
+              status: mapped.status,
+              reply: mapped.reply ?? prev.reply,
+              senderId: mapped.senderId,
+              senderName: mapped.senderName,
+              senderAvatarUrl: mapped.senderAvatarUrl,
+              text: mapped.text,
+              textOriginal: mapped.textOriginal,
+              showingOriginal: prevShowing,
+              transcriptPending: mapped.transcriptPending,
+              transcriptFailed: mapped.transcriptFailed,
+            );
+          }
+          chat.messages[idx] = next;
         } else {
           chat.messages.add(mapped);
         }
@@ -386,6 +426,11 @@ class RealtimeSyncService extends GetxService {
       'product' => '🏷️',
       'location' => '📍',
       'contact' => '👤',
+      'invoice' => '🧾',
+      'catalog' => '📚',
+      'offer' => '🤝',
+      'rfq' => '📣',
+      'business_card' => '🪪',
       _ => '',
     };
   }
@@ -423,6 +468,10 @@ ChatMessage mapChatMessageFromApi(
             .toList() ??
         const <double>[];
     final url = meta['url']?.toString();
+    final hasText = text.trim().isNotEmpty;
+    final sttStatus = meta['transcription_status']?.toString();
+    final transcriptFailed = sttStatus == 'failed';
+    final transcriptPending = !transcriptFailed && !hasText;
     mapped = ChatMessage.voice(
       id: '${json['id']}',
       dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
@@ -439,6 +488,8 @@ ChatMessage mapChatMessageFromApi(
       reply: reply,
       text: textTranslated,
       textOriginal: textOriginal,
+      transcriptPending: transcriptPending,
+      transcriptFailed: transcriptFailed,
     );
   } else {
     final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
@@ -512,6 +563,94 @@ ChatMessage mapChatMessageFromApi(
             number: meta['contact_number']?.toString(),
           );
         }(),
+      'invoice' => ChatMessage.invoice(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          title: meta['title']?.toString() ??
+              meta['name']?.toString() ??
+              'Invoice',
+          amount: [
+            meta['amount']?.toString() ?? '',
+            meta['currency']?.toString() ?? '',
+          ].where((e) => e.isNotEmpty).join(' '),
+          note: meta['note']?.toString() ?? meta['description']?.toString(),
+          status: status,
+        ),
+      'catalog' => ChatMessage.catalog(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          title: meta['title']?.toString() ??
+              meta['company_name']?.toString() ??
+              'Catalog',
+          subtitle: meta['subtitle']?.toString() ??
+              ((meta['count'] != null)
+                  ? '${meta['count']} products'
+                  : ''),
+          detail: meta['preview']?.toString() ??
+              (meta['items'] is List
+                  ? (meta['items'] as List).take(4).join(' · ')
+                  : null),
+          imageUrl: meta['image_url']?.toString(),
+          status: status,
+        ),
+      'business_card' => ChatMessage.businessCard(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          name: meta['name']?.toString() ??
+              meta['company_name']?.toString() ??
+              'Card',
+          company: meta['company_name']?.toString(),
+          role: meta['role']?.toString() ?? meta['business_role']?.toString(),
+          phone: meta['phone']?.toString(),
+          imageUrl: meta['avatar_url']?.toString() ?? meta['logo_url']?.toString(),
+          userId: (meta['user_id'] as num?)?.toInt(),
+          status: status,
+        ),
+      'offer' => ChatMessage.offer(
+          id: id,
+          dir: dir,
+          time: time,
+          createdAt: created,
+          product: meta['product']?.toString() ??
+              meta['product_name']?.toString() ??
+              'Product',
+          price: meta['price']?.toString() ?? '',
+          currency: meta['currency']?.toString(),
+          delivery: meta['delivery']?.toString() ??
+              meta['lead_time']?.toString(),
+          moq: meta['moq']?.toString(),
+          payment: meta['payment']?.toString() ??
+              meta['payment_terms']?.toString(),
+          status: meta['status']?.toString() ?? 'offered',
+          productId: (meta['product_id'] as num?)?.toInt(),
+          chatStatus: status,
+        ),
+      'rfq' => () {
+          final unitRaw = meta['unit']?.toString() ?? 'pcs';
+          final unitKey = 'chat_rfq_unit_$unitRaw';
+          final unitLabel = unitKey.tr == unitKey ? unitRaw : unitKey.tr;
+          return ChatMessage.rfq(
+            id: id,
+            dir: dir,
+            time: time,
+            createdAt: created,
+            product: meta['product']?.toString() ??
+                meta['product_name']?.toString() ??
+                'Product',
+            quantity: meta['quantity']?.toString() ?? '',
+            unit: unitLabel,
+            specs: meta['specs']?.toString() ?? meta['details']?.toString(),
+            deadline: meta['deadline']?.toString(),
+            chatStatus: status,
+            reply: reply,
+          );
+        }(),
       _ => ChatMessage.text(
           id: id,
           dir: dir,
@@ -521,6 +660,7 @@ ChatMessage mapChatMessageFromApi(
           textOriginal: textOriginal,
           status: status,
           reply: reply,
+          isAiFaq: meta['ai_faq'] == true,
         ),
     };
   }
@@ -533,6 +673,11 @@ ChatMessage mapChatMessageFromApi(
           .toList() ??
       const <Map<String, dynamic>>[];
   final pinned = json['pinned'] == true;
+  AutoBusinessCard? autoCard;
+  final cardRaw = json['auto_business_card'];
+  if (cardRaw is Map && !outgoing) {
+    autoCard = AutoBusinessCard.fromApi(Map<String, dynamic>.from(cardRaw));
+  }
   return mapped
       .withSenderMeta(
         senderId: senderId,
@@ -544,6 +689,7 @@ ChatMessage mapChatMessageFromApi(
         editedAt: editedAt,
         reactions: reactions,
         pinned: pinned,
+        autoBusinessCard: autoCard,
       );
 }
 

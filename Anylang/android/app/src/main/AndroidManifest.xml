@@ -44,6 +44,15 @@
                     android:host="anylang.uz"
                     android:pathPrefix="/g/"/>
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="anylang.uz"
+                    android:pathPrefix="/b/"/>
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -51,6 +60,14 @@
                 <data
                     android:scheme="anylang"
                     android:host="g"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="anylang"
+                    android:host="b"/>
             </intent-filter>
         </activity>
         <meta-data

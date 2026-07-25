@@ -36,6 +36,13 @@ def _serialize_user_brief(user: User) -> dict[str, Any]:
     insp = sa_inspect(user)
     if "subscription" not in insp.unloaded and user.subscription is not None:
         plan = user.subscription.plan
+    factory_verified = False
+    inspection_passed = False
+    audit_report_url = None
+    if "business" not in insp.unloaded and user.business is not None:
+        factory_verified = bool(user.business.factory_verified)
+        inspection_passed = bool(user.business.inspection_passed)
+        audit_report_url = user.business.audit_report_url
     return {
         "id": user.id,
         "full_name": user.full_name,
@@ -44,6 +51,9 @@ def _serialize_user_brief(user: User) -> dict[str, Any]:
         "is_active": user.is_active,
         "is_verified": user.is_verified,
         "verified_badge": user.verified_badge,
+        "factory_verified": factory_verified,
+        "inspection_passed": inspection_passed,
+        "audit_report_url": audit_report_url,
         "deleted_at": user.deleted_at,
         "scheduled_purge_at": user.scheduled_purge_at,
         "created_at": user.created_at,
@@ -61,7 +71,10 @@ async def list_users(
     limit: int | None = None,
 ) -> dict[str, Any]:
     params = normalize_page(page, limit, default_size=50, max_size=100)
-    query = select(User).options(selectinload(User.subscription))
+    query = select(User).options(
+        selectinload(User.subscription),
+        selectinload(User.business),
+    )
 
     if status == "deleted":
         query = query.where(User.deleted_at.is_not(None))

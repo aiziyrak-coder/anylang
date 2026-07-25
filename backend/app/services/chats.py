@@ -82,13 +82,45 @@ async def _serialize_interlocutor(
         "is_online": is_online,
         "last_seen_at": last_seen_at,
         "native_language": user.native_language,
+        "app_language": user.app_language,
+        "spoken_languages": [
+            c
+            for c in _spoken_lang_codes(user)
+        ],
         "country": user.business.country if is_business and user.business else user.country,
         "is_business": is_business,
         "verified_badge": user.verified_badge,
     }
 
 
+def _spoken_lang_codes(user: User) -> list[str]:
+    codes: list[str] = []
+    for raw in (user.native_language, user.app_language):
+        if not raw:
+            continue
+        code = str(raw).strip().lower().replace("-", "_").split("_", 1)[0]
+        if len(code) >= 2 and code not in codes:
+            codes.append(code)
+    return codes
+
+
 def _preview_text(message: Message, *, viewer_id: int, viewer_language: str) -> str | None:
+    if message.type == "offer":
+        meta = message.meta if isinstance(message.meta, dict) else {}
+        product = str(meta.get("product") or meta.get("product_name") or "").strip()
+        price = str(meta.get("price") or "").strip()
+        currency = str(meta.get("currency") or "").strip()
+        price_bit = f"{price} {currency}".strip()
+        bits = [b for b in (product, price_bit) if b]
+        return " · ".join(bits) if bits else "Offer"
+    if message.type == "rfq":
+        meta = message.meta if isinstance(message.meta, dict) else {}
+        product = str(meta.get("product") or meta.get("product_name") or "").strip()
+        qty = str(meta.get("quantity") or "").strip()
+        unit = str(meta.get("unit") or "").strip()
+        qty_bit = f"{qty} {unit}".strip()
+        bits = [b for b in (product, qty_bit) if b]
+        return " · ".join(bits) if bits else "RFQ"
     if message.type != "text":
         return None
     if message.sender_id == viewer_id:
@@ -629,11 +661,14 @@ async def block_user(redis: Redis, *, user_id: int, peer_id: int) -> dict:
     if peer_id <= 0 or peer_id == user_id:
         raise AppError(message="Noto'g'ri foydalanuvchi", error_code="VALIDATION_ERROR", status_code=400)
     await redis.sadd(f"blocked:{user_id}", peer_id)
+    # Teskari indeks — scam detection "ko‘p bloklangan" uchun
+    await redis.sadd(f"blocked_by:{peer_id}", user_id)
     return {"user_id": peer_id, "blocked": True}
 
 
 async def unblock_user(redis: Redis, *, user_id: int, peer_id: int) -> dict:
     await redis.srem(f"blocked:{user_id}", peer_id)
+    await redis.srem(f"blocked_by:{peer_id}", user_id)
     return {"user_id": peer_id, "blocked": False}
 
 

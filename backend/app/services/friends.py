@@ -22,26 +22,137 @@ def _pair_ids(user_a: int, user_b: int) -> tuple[int, int]:
     return (min(user_a, user_b), max(user_a, user_b))
 
 
+def _spoken_languages(user: User) -> list[str]:
+    """Ona tili + ilova tili (ISO 639-1), dublikatsiz."""
+    codes: list[str] = []
+
+    def add(raw: str | None) -> None:
+        if not raw:
+            return
+        code = str(raw).strip().lower().replace("-", "_").split("_", 1)[0]
+        if len(code) < 2 or code in codes:
+            return
+        codes.append(code)
+
+    add(user.native_language)
+    add(user.app_language)
+    return codes
+
+
 def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> dict:
     is_business = bool(
         user.subscription and user.subscription.plan == "business" and user.subscription.is_active
     )
+    biz = user.business
     avatar_url = user.avatar_url
-    if is_business and user.business is not None and user.business.logo_url:
-        avatar_url = user.business.logo_url
+    company_name = (user.full_name or "").strip()
+    country = (user.country or None)
+    business_role = None
+    rating = None
+    verified = bool(user.verified_badge)
+    keywords: list[str] = []
+    countries_count = 0
+    if is_business and biz is not None:
+        if biz.logo_url:
+            avatar_url = biz.logo_url
+        if (biz.company_name or "").strip():
+            company_name = biz.company_name.strip()
+        if biz.country:
+            country = str(biz.country).strip().upper() or country
+        if biz.business_role:
+            business_role = str(biz.business_role).strip() or None
+        if biz.rating is not None:
+            rating = float(biz.rating)
+        if biz.documents_verified:
+            verified = True
+        if biz.keywords:
+            keywords = [
+                str(k).strip()
+                for k in biz.keywords
+                if str(k).strip()
+            ][:24]
+        export = {
+            str(c).strip().upper()
+            for c in (biz.export_countries or [])
+            if str(c).strip() and len(str(c).strip()) == 2
+        }
+        if country and len(str(country)) == 2:
+            export.add(str(country).upper())
+        countries_count = len(export)
+    elif country:
+        country = str(country).strip().upper() or None
+        if country and len(country) == 2:
+            countries_count = 1
     return {
         "id": user.id,
-        "full_name": user.full_name,
+        "full_name": company_name or user.full_name,
         "number": user.number,
         "avatar_url": avatar_url,
         "is_online": False,
         "last_seen_at": None,
         "native_language": user.native_language,
-        "country": user.country,
+        "country": country,
         "is_business": is_business,
-        "verified_badge": user.verified_badge,
+        "verified_badge": verified,
+        "company_name": company_name or user.full_name,
+        "business_role": business_role,
+        "rating": rating,
         "friends_since": friends_since,
+        "keywords": keywords,
+        "product_categories": [],
+        "app_language": user.app_language,
+        "spoken_languages": _spoken_languages(user),
+        "products_count": 0,
+        "countries_count": countries_count,
     }
+
+
+async def _product_counts_by_sellers(
+    db: AsyncSession,
+    seller_ids: list[int],
+) -> dict[int, int]:
+    if not seller_ids:
+        return {}
+    from app.models.product import Product
+
+    result = await db.execute(
+        select(Product.seller_id, func.count())
+        .where(
+            Product.seller_id.in_(seller_ids),
+            Product.status == "published",
+        )
+        .group_by(Product.seller_id)
+    )
+    return {int(seller_id): int(count) for seller_id, count in result.all()}
+
+
+async def _product_categories_by_sellers(
+    db: AsyncSession,
+    seller_ids: list[int],
+) -> dict[int, list[str]]:
+    if not seller_ids:
+        return {}
+    from collections import defaultdict
+
+    from app.models.product import Product
+
+    result = await db.execute(
+        select(Product.seller_id, Product.category)
+        .where(
+            Product.seller_id.in_(seller_ids),
+            Product.status == "published",
+        )
+        .distinct()
+    )
+    out: dict[int, list[str]] = defaultdict(list)
+    seen: dict[int, set[str]] = defaultdict(set)
+    for seller_id, category in result.all():
+        cat = (category or "").strip().lower()
+        if not cat or cat in seen[int(seller_id)]:
+            continue
+        seen[int(seller_id)].add(cat)
+        out[int(seller_id)].append(cat)
+    return dict(out)
 
 
 async def _get_friendship(db: AsyncSession, user_a: int, user_b: int) -> Friendship | None:
@@ -122,6 +233,7 @@ async def list_friends(
     search: str | None,
     page: int | None,
     limit: int | None,
+    redis: Redis | None = None,
 ) -> dict:
     params = normalize_page(page, limit, default_size=50, max_size=100)
 
@@ -155,6 +267,7 @@ async def list_friends(
             "has_more": False,
             "online_count": 0,
             "pending_incoming_count": int(pending_result.scalar() or 0),
+            "networking": await _networking(db, user, []),
         }
 
     users_query = (
@@ -196,10 +309,31 @@ async def list_friends(
     )
     pending_incoming_count = int(pending_result.scalar() or 0)
 
-    items = [
-        _serialize_friend(friend_user, friends_since=friendship.accepted_at)
-        for friendship, friend_user in page_rows
-    ]
+    seller_ids = [u.id for _, u in page_rows]
+    categories_map = await _product_categories_by_sellers(db, seller_ids)
+    products_map = await _product_counts_by_sellers(db, seller_ids)
+
+    items = []
+    online_count = 0
+    hub = None
+    if redis is not None:
+        from app.ws.hub import get_hub
+
+        hub = get_hub()
+    for friendship, friend_user in page_rows:
+        data = _serialize_friend(friend_user, friends_since=friendship.accepted_at)
+        data["product_categories"] = categories_map.get(friend_user.id, [])
+        data["products_count"] = int(products_map.get(friend_user.id, 0))
+        if hub is not None and redis is not None:
+            try:
+                data["is_online"] = await hub.is_online(redis, friend_user.id)
+                data["last_seen_at"] = await hub.get_last_seen(redis, friend_user.id)
+            except Exception:
+                data["is_online"] = False
+                data["last_seen_at"] = None
+        if data.get("is_online"):
+            online_count += 1
+        items.append(data)
 
     return {
         "items": items,
@@ -207,9 +341,28 @@ async def list_friends(
         "limit": params.page_size,
         "total": total,
         "has_more": params.offset + len(items) < total,
-        "online_count": 0,
+        "online_count": online_count,
         "pending_incoming_count": pending_incoming_count,
+        "networking": await _networking(
+            db,
+            user,
+            None if (search and search.strip()) else [u for _, u in rows],
+        ),
     }
+
+
+async def _networking(
+    db: AsyncSession,
+    user: User,
+    friend_users: list[User] | None,
+) -> dict:
+    from app.services import networking_score as networking_score_service
+
+    return await networking_score_service.build_networking_score(
+        db,
+        user,
+        friend_users=friend_users,
+    )
 
 
 async def send_friend_request(

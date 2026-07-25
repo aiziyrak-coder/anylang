@@ -47,12 +47,25 @@
 			</array>
 		</dict>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>uz.anylang.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>anylang</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ovozli xabar yozish va jonli tarjima uchun mikrofon kerak</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Chatga surat va video yuborish uchun kamera kerak</string>
+	<string>Chatga surat/video yuborish va Business Card QR skanerlash uchun kamera kerak</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Galereyadan rasm va fayl tanlash uchun ruxsat kerak</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
