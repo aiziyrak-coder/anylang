@@ -317,8 +317,14 @@ async def _attach_images(
             status_code=400,
         )
 
+    # Async: product.images lazy-load qilmaslik (MissingGreenlet).
+    existing_result = await db.execute(
+        select(ProductImage).where(ProductImage.product_id == product.id)
+    )
+    existing = list(existing_result.scalars().all())
+
     if not image_ids:
-        for img in list(product.images):
+        for img in existing:
             img.product_id = None
             img.is_primary = False
             img.position = 0
@@ -340,8 +346,9 @@ async def _attach_images(
             status_code=400,
         )
 
-    for img in list(product.images):
-        if img.id not in image_ids:
+    keep = set(image_ids)
+    for img in existing:
+        if img.id not in keep:
             img.product_id = None
             img.is_primary = False
             img.position = 0

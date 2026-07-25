@@ -57,8 +57,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
                       ),
                     ),
                     Obx(() {
-                      if (!state.isBusiness.value ||
-                          state.showingFavorites.value) {
+                      if (state.showingFavorites.value) {
                         return const SizedBox.shrink();
                       }
                       return IconButton(
@@ -101,6 +100,56 @@ class ProductsContent extends ScreenContent<ProductsState> {
                   ],
                 ),
               ),
+              Obx(() {
+                if (state.showingFavorites.value) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 0),
+                  child: Material(
+                    color: c.accent,
+                    borderRadius: BorderRadius.circular(14.dp),
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        sendAction(OpenAddProduct());
+                      },
+                      borderRadius: BorderRadius.circular(14.dp),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14.dp,
+                          vertical: 12.dp,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.add_box_rounded,
+                              color: c.onAccent,
+                              size: 22.dp,
+                            ),
+                            SizedBox(width: 10.dp),
+                            Expanded(
+                              child: Text(
+                                'add_product_title'.tr,
+                                style: TextStyle(
+                                  color: c.onAccent,
+                                  fontSize: 15.sp,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: c.onAccent,
+                              size: 22.dp,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
           SizedBox(height: 16.dp),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.dp),
@@ -336,7 +385,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
       ),
         ),
         Obx(() {
-          if (!state.isBusiness.value || state.showingFavorites.value) {
+          if (state.showingFavorites.value) {
             return const SizedBox.shrink();
           }
           return Positioned(

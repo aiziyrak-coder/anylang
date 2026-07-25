@@ -32,7 +32,14 @@ def error_body(message: str, error_code: str, **extra: Any) -> dict[str, Any]:
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
-    async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+        logging.getLogger(__name__).warning(
+            "AppError [%s %s] %s: %s",
+            request.method,
+            request.url.path,
+            exc.error_code,
+            exc.message,
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content=error_body(exc.message, exc.error_code, **exc.extra),
@@ -70,9 +77,20 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
-        logging.getLogger(__name__).exception("Unhandled error: %s", exc)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logging.getLogger(__name__).exception(
+            "Unhandled error [%s %s] %s: %s",
+            request.method,
+            request.url.path,
+            type(exc).__name__,
+            exc,
+        )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=error_body("Internal server error", "INTERNAL_ERROR"),
+            content=error_body(
+                f"Internal server error ({type(exc).__name__})",
+                "INTERNAL_ERROR",
+                exception=type(exc).__name__,
+                path=request.url.path,
+            ),
         )

@@ -759,6 +759,10 @@ class LanguageLocalizations extends Translations {
       'add_product_published': 'Mahsulot e’lon qilindi',
       'add_product_business_required':
           'E’lon qilish uchun Business tarif kerak',
+      'add_product_plan_required_title': 'Business tarif kerak',
+      'add_product_plan_required_body':
+          'Mahsulot joylash uchun avval Business tarifini sotib oling',
+      'add_product_go_plans': 'Tariflar',
       'add_product_name_required': 'Mahsulot nomi kerak',
       'add_product_price_invalid': 'Narx noto‘g‘ri',
       'add_product_image_required': 'Kamida 1 ta rasm qo‘shing',
@@ -2089,6 +2093,10 @@ class LanguageLocalizations extends Translations {
       'add_product_published': 'Товар опубликован',
       'add_product_business_required':
           'Для публикации нужен тариф Business',
+      'add_product_plan_required_title': 'Нужен тариф Business',
+      'add_product_plan_required_body':
+          'Чтобы разместить товар, сначала купите тариф Business',
+      'add_product_go_plans': 'Тарифы',
       'add_product_name_required': 'Нужно название товара',
       'add_product_price_invalid': 'Неверная цена',
       'add_product_image_required': 'Добавьте хотя бы 1 фото',
@@ -3419,6 +3427,10 @@ class LanguageLocalizations extends Translations {
       'add_product_published': 'Product published',
       'add_product_business_required':
           'A Business plan is required to publish',
+      'add_product_plan_required_title': 'Business plan required',
+      'add_product_plan_required_body':
+          'To list a product, buy a Business plan first',
+      'add_product_go_plans': 'Plans',
       'add_product_name_required': 'Product name is required',
       'add_product_price_invalid': 'Invalid price',
       'add_product_image_required': 'Add at least 1 image',
