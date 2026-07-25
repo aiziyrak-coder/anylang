@@ -1,13 +1,13 @@
 {
-  "version": "1.0.55",
-  "build": 56,
-  "version_full": "1.0.55+56",
+  "version": "1.0.56",
+  "build": 57,
+  "version_full": "1.0.56+57",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.55+56.apk",
-  "size_bytes": 90857573,
+  "versioned_filename": "anylang-1.0.56+57.apk",
+  "size_bytes": 90857893,
   "size_mb": 86.65,
-  "updated_at": "2026-07-25T11:20:41.479819+00:00",
+  "updated_at": "2026-07-25T11:31:45.860810+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.55 — fix product create MissingGreenlet, market add CTA"
+  "notes": "Release 1.0.56 — market 3-dot menu, remove analytics, scroll fix"
 }
