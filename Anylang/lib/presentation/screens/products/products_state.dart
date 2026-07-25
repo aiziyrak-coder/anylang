@@ -48,6 +48,9 @@ class ProductsState extends GetxController {
   /// Smart Search dan kelgan sort (`price_asc` / `price_desc`).
   final RxnString smartSort = RxnString();
 
+  /// Main tab soft-refresh (IndexedStack).
+  Future<void> Function()? softRefreshHandler;
+
   bool get hasActiveFilters =>
       category.value != null ||
       country.value != null ||

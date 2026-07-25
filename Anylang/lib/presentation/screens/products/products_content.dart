@@ -31,63 +31,76 @@ class ProductsContent extends ScreenContent<ProductsState> {
   ) {
     final c = context.appColors;
 
-    return Padding(
-      padding: EdgeInsets.only(top: 8.dp),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.dp),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Obx(
-                    () => Text(
-                      state.showingFavorites.value
-                          ? 'favorites_title'.tr
-                          : 'products_title'.tr,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 27.sp,
-                        fontWeight: FontWeight.w700,
+    return Stack(
+      children: [
+        Padding(
+          padding: EdgeInsets.only(top: 8.dp),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.dp),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Obx(
+                        () => Text(
+                          state.showingFavorites.value
+                              ? 'favorites_title'.tr
+                              : 'products_title'.tr,
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 27.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                Obx(
-                  () => IconButton(
-                    onPressed: () => sendAction(ShowFavorites()),
-                    icon: Icon(
-                      state.showingFavorites.value
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: c.accent,
+                    Obx(() {
+                      if (!state.isBusiness.value ||
+                          state.showingFavorites.value) {
+                        return const SizedBox.shrink();
+                      }
+                      return IconButton(
+                        onPressed: () => sendAction(OpenAddProduct()),
+                        tooltip: 'add_product_title'.tr,
+                        icon: Icon(Icons.add_box_rounded, color: c.accent),
+                      );
+                    }),
+                    Obx(
+                      () => IconButton(
+                        onPressed: () => sendAction(ShowFavorites()),
+                        icon: Icon(
+                          state.showingFavorites.value
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: c.accent,
+                        ),
+                      ),
                     ),
-                  ),
+                    IconButton(
+                      onPressed: () => sendAction(OpenBusinessCardScan()),
+                      tooltip: 'business_card_scan_title'.tr,
+                      icon: Icon(Icons.qr_code_scanner_rounded, color: c.accent),
+                    ),
+                    IconButton(
+                      onPressed: () => sendAction(OpenBusinessFeed()),
+                      tooltip: 'feed_title'.tr,
+                      icon: Icon(Icons.campaign_outlined, color: c.accent),
+                    ),
+                    IconButton(
+                      onPressed: () => sendAction(OpenMarketplaceGroups()),
+                      tooltip: 'marketplace_groups_title'.tr,
+                      icon: Icon(Icons.storefront_outlined, color: c.accent),
+                    ),
+                    IconButton(
+                      onPressed: () => sendAction(OpenTradeAssistant()),
+                      tooltip: 'trade_ai_title'.tr,
+                      icon: Icon(Icons.auto_awesome_rounded, color: c.accent),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  onPressed: () => sendAction(OpenBusinessCardScan()),
-                  tooltip: 'business_card_scan_title'.tr,
-                  icon: Icon(Icons.qr_code_scanner_rounded, color: c.accent),
-                ),
-                IconButton(
-                  onPressed: () => sendAction(OpenBusinessFeed()),
-                  tooltip: 'feed_title'.tr,
-                  icon: Icon(Icons.campaign_outlined, color: c.accent),
-                ),
-                IconButton(
-                  onPressed: () => sendAction(OpenMarketplaceGroups()),
-                  tooltip: 'marketplace_groups_title'.tr,
-                  icon: Icon(Icons.storefront_outlined, color: c.accent),
-                ),
-                IconButton(
-                  onPressed: () => sendAction(OpenTradeAssistant()),
-                  tooltip: 'trade_ai_title'.tr,
-                  icon: Icon(Icons.auto_awesome_rounded, color: c.accent),
-                ),
-              ],
-            ),
-          ),
+              ),
           SizedBox(height: 16.dp),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.dp),
@@ -321,6 +334,33 @@ class ProductsContent extends ScreenContent<ProductsState> {
           ),
         ],
       ),
+        ),
+        Obx(() {
+          if (!state.isBusiness.value || state.showingFavorites.value) {
+            return const SizedBox.shrink();
+          }
+          return Positioned(
+            right: 20.dp,
+            bottom: 20.dp,
+            child: FloatingActionButton.extended(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                sendAction(OpenAddProduct());
+              },
+              backgroundColor: c.accent,
+              foregroundColor: c.onAccent,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(
+                'add_product_title'.tr,
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 

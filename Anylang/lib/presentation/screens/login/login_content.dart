@@ -25,6 +25,16 @@ class LoginContent extends ScreenContent<LoginState> {
   }
 
   @override
+  void uiBuildFinished(LoginState state) {
+    if (_emailCtrl.text.isEmpty && state.email.isNotEmpty) {
+      _emailCtrl.text = state.email;
+    }
+    if (_passCtrl.text.isEmpty && state.password.isNotEmpty) {
+      _passCtrl.text = state.password;
+    }
+  }
+
+  @override
   void onClose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
@@ -63,6 +73,7 @@ class LoginContent extends ScreenContent<LoginState> {
                 hint: 'email_hint'.tr,
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
+                onChanged: (v) => state.email = v,
               ),
               SizedBox(height: 18.dp),
               AppTextField(
@@ -71,6 +82,7 @@ class LoginContent extends ScreenContent<LoginState> {
                 controller: _passCtrl,
                 isPassword: true,
                 textInputAction: TextInputAction.done,
+                onChanged: (v) => state.password = v,
               ),
               SizedBox(height: 12.dp),
               Align(
@@ -106,9 +118,13 @@ class LoginContent extends ScreenContent<LoginState> {
                     text: 'login'.tr,
                     isLoading: state.isLoading.value,
                     enabled: !state.isGoogleLoading.value,
-                    onTap: () => sendAction(
-                      LoginSubmit(_emailCtrl.text, _passCtrl.text),
-                    ),
+                    onTap: () {
+                      state.email = _emailCtrl.text;
+                      state.password = _passCtrl.text;
+                      sendAction(
+                        LoginSubmit(_emailCtrl.text, _passCtrl.text),
+                      );
+                    },
                   )),
               SizedBox(height: 22.dp),
               LabeledDivider(label: 'or'.tr),

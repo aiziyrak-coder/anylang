@@ -61,6 +61,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _sessionWorker = ever<int>(Get.find<SessionExpiredBus>().tick, (_) async {
       MySnackBar.dismiss();
+      // Login sahifasida / sessiya yo‘q — formani qayta qurib tozalamaslik.
+      if (!SessionStore.hasSession) return;
       await SessionStore.clear();
       Get.offAll(() => LoginScreen().build());
     });

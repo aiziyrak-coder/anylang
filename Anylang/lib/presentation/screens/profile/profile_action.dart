@@ -48,6 +48,9 @@ class RetryProfileLoad extends ProfileAction {}
 /// Pull-to-refresh.
 class RefreshProfile extends ProfileAction {}
 
+/// Tab qayta ochilganda — to‘liq spinner siz soft yangilash.
+class SoftRefreshProfile extends ProfileAction {}
+
 /// Avatar / logo ustiga bosib to'liq ekranda ko'rish.
 class OpenProfileAvatar extends ProfileAction {}
 

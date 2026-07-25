@@ -20,6 +20,7 @@ import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
+import '../add_product/add_product_screen.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
 import '../trade_assistant/trade_assistant_screen.dart';
@@ -27,6 +28,7 @@ import '../business_feed/business_feed_screen.dart';
 import '../business_card_scan/business_card_scan_screen.dart';
 import '../marketplace_groups/marketplace_groups_screen.dart';
 import '../market_map/market_map_screen.dart';
+import '../subscription/subscription_screen.dart';
 import 'product.dart';
 import 'product_info_bottom_sheet.dart';
 import 'products_action.dart';
@@ -43,15 +45,27 @@ class ProductsScreen extends Screen<ProductsState, void> {
 
   @override
   void initState(void payload) {
+    state.softRefreshHandler = _onSoftRefresh;
     _loadCategories();
     _load();
     _loadAiMatchingIfBusiness();
     _loadMarketAnalyticsIfBusiness();
   }
 
+  Future<void> _onSoftRefresh() async {
+    await _refreshBusinessFlag();
+    if (state.isBusiness.value) {
+      await _loadAiMatchingIfBusiness();
+      await _loadMarketAnalyticsIfBusiness();
+    }
+  }
+
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    if (identical(state.softRefreshHandler, _onSoftRefresh)) {
+      state.softRefreshHandler = null;
+    }
     super.dispose();
   }
 
@@ -631,6 +645,28 @@ class ProductsScreen extends Screen<ProductsState, void> {
     await _reloadWithFilters();
   }
 
+  Future<void> _refreshBusinessFlag() async {
+    final cached = SessionStore.user()?['is_business'] == true;
+    if (cached) state.isBusiness.value = true;
+    final me = await Get.find<ProfileRepository>().getMe();
+    final map = asMap(me.dataOrNull);
+    if (map == null) return;
+    await SessionStore.saveUser(Map<String, dynamic>.from(map));
+    state.isBusiness.value = map['is_business'] == true;
+  }
+
+  Future<void> _openAddProduct() async {
+    await _refreshBusinessFlag();
+    if (!state.isBusiness.value) {
+      showAppError('add_product_business_required'.tr);
+      await navigate(SubscriptionScreen());
+      await _refreshBusinessFlag();
+      if (!state.isBusiness.value) return;
+    }
+    await navigate(AddProductScreen());
+    await _load(keepQuery: true);
+  }
+
   @override
   Future<void> actionHandler(ProductsState state, MyAction action) async {
     switch (action) {
@@ -655,6 +691,14 @@ class ProductsScreen extends Screen<ProductsState, void> {
         await _load(keepQuery: true);
         await _loadAiMatchingIfBusiness();
         await _loadMarketAnalyticsIfBusiness();
+      case SoftRefreshProducts _:
+        await _refreshBusinessFlag();
+        if (state.isBusiness.value) {
+          await _loadAiMatchingIfBusiness();
+          await _loadMarketAnalyticsIfBusiness();
+        }
+      case OpenAddProduct _:
+        await _openAddProduct();
       case ShowFavorites _:
         if (state.showingFavorites.value) {
           state.showingFavorites.value = false;

@@ -3,4 +3,8 @@ import 'package:get/get.dart';
 class LoginState extends GetxController {
   RxBool isLoading = false.obs;
   RxBool isGoogleLoading = false.obs;
+
+  /// Xato / soft-rebuild da inputlar yo‘qolmasin.
+  String email = '';
+  String password = '';
 }

@@ -590,11 +590,12 @@ class ProfileContent extends ScreenContent<ProfileState> {
         'profile_plans'.tr,
         () => sendAction(OpenSubscription()),
       ),
-      (
-        Icons.add_box_outlined,
-        'profile_post_listing'.tr,
-        () => sendAction(AddProductRequested()),
-      ),
+      if (d.isBusiness)
+        (
+          Icons.add_box_outlined,
+          'profile_post_listing'.tr,
+          () => sendAction(AddProductRequested()),
+        ),
       (
         Icons.ios_share_rounded,
         'profile_share'.tr,
@@ -1127,6 +1128,20 @@ class ProfileContent extends ScreenContent<ProfileState> {
               ),
             ),
             const Spacer(),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => sendAction(AddProductRequested()),
+                borderRadius: BorderRadius.circular(8.dp),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 6.dp,
+                    vertical: 4.dp,
+                  ),
+                  child: Icon(Icons.add_rounded, size: 20.dp, color: c.accent),
+                ),
+              ),
+            ),
             if (d.listings.isNotEmpty)
               Material(
                 color: Colors.transparent,
@@ -1149,6 +1164,28 @@ class ProfileContent extends ScreenContent<ProfileState> {
                   ),
                 ),
               ),
+            if (d.listings.isEmpty)
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => sendAction(AddProductRequested()),
+                  borderRadius: BorderRadius.circular(8.dp),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 6.dp,
+                      vertical: 4.dp,
+                    ),
+                    child: Text(
+                      'add_product_title'.tr,
+                      style: TextStyle(
+                        color: c.accentText,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         SizedBox(height: 12.dp),
@@ -1157,6 +1194,8 @@ class ProfileContent extends ScreenContent<ProfileState> {
             icon: Icons.inventory_2_outlined,
             title: 'profile_listings_empty'.tr,
             subtitle: 'profile_listings_empty_hint'.tr,
+            actionLabel: 'add_product_title'.tr,
+            onAction: () => sendAction(AddProductRequested()),
           )
         else
           GridView.builder(

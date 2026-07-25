@@ -158,7 +158,11 @@ class ProductsRepository {
   }
 
   Future<BaseResult> create(Map<String, dynamic> body) {
-    return _client.post(api: 'api/v1/products', data: body);
+    return _client.post(
+      api: 'api/v1/products',
+      data: body,
+      notify: SnackNotify.none,
+    );
   }
 
   Future<BaseResult> update(int productId, Map<String, dynamic> body) {

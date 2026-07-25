@@ -32,17 +32,7 @@ class ApiService {
           }
           // Skip auth header for public auth endpoints
           final path = options.path;
-          final skipAuth = path.contains('auth/login') ||
-              path.contains('auth/register') ||
-              path.contains('auth/google') ||
-              path.contains('auth/refresh') ||
-              path.contains('auth/verify-email') ||
-              path.contains('auth/resend') ||
-              path.contains('auth/password') ||
-              path.contains('countries') ||
-              path.contains('languages');
-
-          if (!skipAuth) {
+          if (!_isPublicAuthPath(path)) {
             final token = await this.tokenRefresher.getToken();
             if (token.isNotEmpty && token != 'none') {
               options.headers['Authorization'] = 'Bearer $token';
@@ -56,6 +46,11 @@ class ApiService {
           final isRefresh = path.contains('auth/refresh');
           final alreadyRetried =
               error.requestOptions.extra['auth_retry'] == true;
+
+          // Login/register 401 = noto‘g‘ri parol — sessiyani o‘chirmaslik.
+          if (_isPublicAuthPath(path)) {
+            return handler.next(error);
+          }
 
           if (status == 401 && !isRefresh && !alreadyRetried) {
             final fresh = await this.tokenRefresher.getNewToken();
@@ -98,6 +93,18 @@ class ApiService {
   }
 
   Future<String?> getToken() => tokenRefresher.getToken();
+}
+
+bool _isPublicAuthPath(String path) {
+  return path.contains('auth/login') ||
+      path.contains('auth/register') ||
+      path.contains('auth/google') ||
+      path.contains('auth/refresh') ||
+      path.contains('auth/verify-email') ||
+      path.contains('auth/resend') ||
+      path.contains('auth/password') ||
+      path.contains('countries') ||
+      path.contains('languages');
 }
 
 /// Lightweight bus so screens can route to login on session death.

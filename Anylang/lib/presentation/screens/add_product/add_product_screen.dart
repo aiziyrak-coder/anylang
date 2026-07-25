@@ -230,14 +230,20 @@ class AddProductScreen extends Screen<AddProductState, void> {
       if (processVideoUrl.isNotEmpty) body['process_video_url'] = processVideoUrl;
       final result = await repo.create(body);
       if (result.dataOrNull != null) {
-        showAppMessage('action_done'.tr);
+        showAppMessage(
+          status == 'draft'
+              ? 'add_product_draft_saved'.tr
+              : 'add_product_published'.tr,
+        );
         popBackNavigate();
         return;
       }
       final err = result.errorOrNull?.toString() ?? '';
+      final lower = err.toLowerCase();
       if (err.contains('NOT_A_BUSINESS') ||
-          err.toLowerCase().contains('biznes') ||
-          err.toLowerCase().contains('business')) {
+          lower.contains('biznes') ||
+          lower.contains('business') ||
+          lower.contains('ruxsat yo')) {
         showAppError('add_product_business_required'.tr);
       } else {
         showAppError(result.errorOrNull ?? 'error'.tr);

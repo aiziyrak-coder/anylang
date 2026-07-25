@@ -14,6 +14,8 @@ import '../friends/friend.dart';
 import '../friends/friends_state.dart';
 import '../messages/conversation.dart';
 import '../messages/messages_state.dart';
+import '../products/products_state.dart';
+import '../profile/profile_state.dart';
 import 'main_action.dart';
 import 'main_content.dart';
 import 'main_state.dart';
@@ -61,9 +63,21 @@ class MainScreen extends Screen<MainState, void> {
         // IndexedStack re-init qilmaydi — tab ochilganda soft refresh.
         if (a.index == 0) await _refreshConversations();
         if (a.index == 1) await _refreshFriends();
+        if (a.index == 2) await _softRefreshProducts();
+        if (a.index == 4) await _softRefreshProfile();
       case HandleSystemBack _:
         await _onSystemBack(state);
     }
+  }
+
+  Future<void> _softRefreshProducts() async {
+    if (!Get.isRegistered<ProductsState>()) return;
+    await Get.find<ProductsState>().softRefreshHandler?.call();
+  }
+
+  Future<void> _softRefreshProfile() async {
+    if (!Get.isRegistered<ProfileState>()) return;
+    await Get.find<ProfileState>().softRefreshHandler?.call();
   }
 
   Future<void> _onSystemBack(MainState state) async {

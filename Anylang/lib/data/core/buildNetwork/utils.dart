@@ -77,7 +77,16 @@ Map<String, dynamic>? dioErrorBody(DioException e) {
   return null;
 }
 
-Error<String> dioToError(DioException e) => Error(mapDioError(e));
+Error<String> dioToError(DioException e) {
+  final msg = mapDioError(e);
+  final code = dioErrorCode(e);
+  if (code != null &&
+      code.isNotEmpty &&
+      !msg.contains(code)) {
+    return Error('$msg [$code]');
+  }
+  return Error(msg);
+}
 
 BaseResult successOrCatch(Response response) {
   return Success(response.data);

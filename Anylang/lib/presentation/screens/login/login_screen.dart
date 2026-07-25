@@ -30,6 +30,8 @@ class LoginScreen extends Screen<LoginState, void> {
   Future<void> actionHandler(LoginState state, MyAction action) async {
     switch (action) {
       case LoginSubmit a:
+        state.email = a.email;
+        state.password = a.password;
         if (!_validEmail(a.email)) {
           showAppError('email_invalid'.tr);
           return;
@@ -64,6 +66,7 @@ class LoginScreen extends Screen<LoginState, void> {
 
           outcome.result.when(
             success: (_) async {
+              state.password = '';
               MySnackBar.dismiss();
               await connectRealtimeIfNeeded();
               navigateAndRemoveUntil(MainScreen());

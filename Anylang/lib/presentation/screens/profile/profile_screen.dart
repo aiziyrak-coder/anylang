@@ -29,6 +29,7 @@ import '../add_product/add_product_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
 import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
+import '../products/products_state.dart';
 import '../profile_edit/profile_edit_screen.dart';
 import '../settings/settings_payload.dart';
 import '../settings/settings_screen.dart';
@@ -47,7 +48,16 @@ class ProfileScreen extends Screen<ProfileState, void> {
 
   @override
   void initState(void payload) {
+    state.softRefreshHandler = _softRefresh;
     _load();
+  }
+
+  @override
+  void dispose() {
+    if (identical(state.softRefreshHandler, _softRefresh)) {
+      state.softRefreshHandler = null;
+    }
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -65,6 +75,10 @@ class ProfileScreen extends Screen<ProfileState, void> {
         state.account.value = ProfileAccount.fromApi(map);
         state.error.value = null;
         unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
+        if (Get.isRegistered<ProductsState>()) {
+          Get.find<ProductsState>().isBusiness.value =
+              state.account.value?.isBusiness == true;
+        }
       },
       failure: (err) {
         state.error.value = err.toString();
@@ -158,6 +172,31 @@ class ProfileScreen extends Screen<ProfileState, void> {
     state.account.value = current.copyWith(listings: items);
   }
 
+  /// IndexedStack tab qayta ochilganda — loading flashsiz yangilash.
+  Future<void> _softRefresh() async {
+    final result = await Get.find<ProfileRepository>().getMe();
+    final map = asMap(result.dataOrNull);
+    if (map == null) return;
+    final prevListings = state.account.value?.listings ?? const <OwnListing>[];
+    final account = ProfileAccount.fromApi(map);
+    state.account.value = account.isBusiness
+        ? account.copyWith(listings: prevListings)
+        : account;
+    state.error.value = null;
+    unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
+    if (Get.isRegistered<ProductsState>()) {
+      Get.find<ProductsState>().isBusiness.value = account.isBusiness;
+    }
+    if (account.isBusiness) {
+      await _loadListings();
+      await _loadAiMatching();
+      await _loadMarketAnalytics();
+    } else {
+      state.aiMatching.value = null;
+      state.marketAnalytics.value = null;
+    }
+  }
+
   Future<void> _openSettings() async {
     await navigate(
       SettingsScreen(),
@@ -207,8 +246,17 @@ class ProfileScreen extends Screen<ProfileState, void> {
         await navigate(EditBusinessInfoScreen());
         await _load();
       case AddProductRequested _:
+        final isBiz = state.account.value?.isBusiness == true;
+        if (!isBiz) {
+          showAppError('add_product_business_required'.tr);
+          await navigate(SubscriptionScreen());
+          await _load();
+          if (state.account.value?.isBusiness != true) return;
+        }
         await navigate(AddProductScreen());
         await _load();
+      case SoftRefreshProfile _:
+        await _softRefresh();
       case RetryProfileLoad _:
       case RefreshProfile _:
         await _load();

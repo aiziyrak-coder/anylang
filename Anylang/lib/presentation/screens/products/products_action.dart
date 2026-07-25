@@ -99,3 +99,9 @@ class ProductsBannerTap extends ProductsAction {
   final String id;
   ProductsBannerTap(this.id);
 }
+
+/// Biznes — mahsulot qo‘shish (FAB / header).
+class OpenAddProduct extends ProductsAction {}
+
+/// Tab qayta ochilganda is_business / AI kartalarni soft yangilash.
+class SoftRefreshProducts extends ProductsAction {}
