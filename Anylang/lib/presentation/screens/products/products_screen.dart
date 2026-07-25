@@ -7,14 +7,11 @@ import '../../../data/core/buildNetwork/base_result.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/ai_matching_repository.dart';
-import '../../../data/network/market_analytics_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/ai_matching_bottom_sheet.dart';
 import '../../modal/country_picker_bottom_sheet.dart';
-import '../../modal/market_analytics_bottom_sheet.dart';
 import '../../ui/ai_matching.dart';
-import '../../ui/market_analytics.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -48,16 +45,11 @@ class ProductsScreen extends Screen<ProductsState, void> {
     state.softRefreshHandler = _onSoftRefresh;
     _loadCategories();
     _load();
-    _loadAiMatchingIfBusiness();
-    _loadMarketAnalyticsIfBusiness();
+    unawaited(_refreshBusinessFlag());
   }
 
   Future<void> _onSoftRefresh() async {
     await _refreshBusinessFlag();
-    if (state.isBusiness.value) {
-      await _loadAiMatchingIfBusiness();
-      await _loadMarketAnalyticsIfBusiness();
-    }
   }
 
   @override
@@ -83,7 +75,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
     state.isBusiness.value = isBiz;
     if (!isBiz) {
       state.aiMatching.value = null;
-      state.marketAnalytics.value = null;
       return;
     }
     state.aiMatchingLoading.value = true;
@@ -97,31 +88,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
       },
       failure: (_) {
         state.aiMatching.value = const AiMatchingResult();
-      },
-    );
-  }
-
-  Future<void> _loadMarketAnalyticsIfBusiness() async {
-    if (!state.isBusiness.value) {
-      final me = await Get.find<ProfileRepository>().getMe();
-      final map = asMap(me.dataOrNull);
-      state.isBusiness.value = map?['is_business'] == true;
-    }
-    if (!state.isBusiness.value) {
-      state.marketAnalytics.value = null;
-      return;
-    }
-    state.marketAnalyticsLoading.value = true;
-    final result = await Get.find<MarketAnalyticsRepository>().insights(
-      locale: _matchingLocale(),
-    );
-    state.marketAnalyticsLoading.value = false;
-    result.when(
-      success: (data) {
-        state.marketAnalytics.value = MarketAnalyticsResult.fromApi(data);
-      },
-      failure: (_) {
-        state.marketAnalytics.value = const MarketAnalyticsResult();
       },
     );
   }
@@ -705,14 +671,9 @@ class ProductsScreen extends Screen<ProductsState, void> {
       case RefreshProducts _:
         state.showingFavorites.value = false;
         await _load(keepQuery: true);
-        await _loadAiMatchingIfBusiness();
-        await _loadMarketAnalyticsIfBusiness();
+        await _refreshBusinessFlag();
       case SoftRefreshProducts _:
         await _refreshBusinessFlag();
-        if (state.isBusiness.value) {
-          await _loadAiMatchingIfBusiness();
-          await _loadMarketAnalyticsIfBusiness();
-        }
       case OpenAddProduct _:
         await _openAddProduct();
       case ShowFavorites _:
@@ -759,6 +720,14 @@ class ProductsScreen extends Screen<ProductsState, void> {
       case OpenBusinessCardScan _:
         await navigate(BusinessCardScanScreen());
       case OpenAiMatching _:
+        await _refreshBusinessFlag();
+        if (!state.isBusiness.value) {
+          showAppError('add_product_business_required'.tr);
+          return;
+        }
+        if (state.aiMatching.value == null && !state.aiMatchingLoading.value) {
+          await _loadAiMatchingIfBusiness();
+        }
         final data = state.aiMatching.value ?? const AiMatchingResult();
         await showAiMatchingBottomSheet(
           context,
@@ -780,13 +749,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         );
       case RetryAiMatching _:
         await _loadAiMatchingIfBusiness();
-      case OpenMarketAnalytics _:
-        final data =
-            state.marketAnalytics.value ?? const MarketAnalyticsResult();
-        if (!context.mounted) return;
-        await showMarketAnalyticsBottomSheet(context, result: data);
-      case RetryMarketAnalytics _:
-        await _loadMarketAnalyticsIfBusiness();
       case ProductsSelectCategory a:
         state.category.value = a.code;
         await _reloadWithFilters();

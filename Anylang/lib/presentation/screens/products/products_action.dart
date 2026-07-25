@@ -31,10 +31,6 @@ class OpenAiMatching extends ProductsAction {}
 
 class RetryAiMatching extends ProductsAction {}
 
-class OpenMarketAnalytics extends ProductsAction {}
-
-class RetryMarketAnalytics extends ProductsAction {}
-
 class OpenMarketplaceGroups extends ProductsAction {}
 
 /// 🌍 Map View — ishlab chiqaruvchilar xaritasi.

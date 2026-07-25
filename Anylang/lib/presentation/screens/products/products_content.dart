@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../../ui/ai_matching_card.dart';
-import '../../ui/market_analytics_card.dart';
 import '../../ui/market_promo_banner.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
@@ -18,6 +16,16 @@ import '../../utils/size_controller.dart';
 import 'product.dart';
 import 'products_action.dart';
 import 'products_state.dart';
+
+enum _ProductsMenuAction {
+  addProduct,
+  aiMatching,
+  scan,
+  feed,
+  groups,
+  tradeAi,
+  map,
+}
 
 class ProductsContent extends ScreenContent<ProductsState> {
   // Asosiy ekran body'si ichida ochiladi — fon shaffof, tema gradienti ko'rinadi.
@@ -39,36 +47,30 @@ class ProductsContent extends ScreenContent<ProductsState> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20.dp),
+                padding: EdgeInsets.symmetric(horizontal: 12.dp),
                 child: Row(
                   children: [
                     Expanded(
-                      child: Obx(
-                        () => Text(
-                          state.showingFavorites.value
-                              ? 'favorites_title'.tr
-                              : 'products_title'.tr,
-                          style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 27.sp,
-                            fontWeight: FontWeight.w700,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 8.dp),
+                        child: Obx(
+                          () => Text(
+                            state.showingFavorites.value
+                                ? 'favorites_title'.tr
+                                : 'products_title'.tr,
+                            style: TextStyle(
+                              color: c.textPrimary,
+                              fontSize: 27.sp,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    Obx(() {
-                      if (state.showingFavorites.value) {
-                        return const SizedBox.shrink();
-                      }
-                      return IconButton(
-                        onPressed: () => sendAction(OpenAddProduct()),
-                        tooltip: 'add_product_title'.tr,
-                        icon: Icon(Icons.add_box_rounded, color: c.accent),
-                      );
-                    }),
                     Obx(
                       () => IconButton(
                         onPressed: () => sendAction(ShowFavorites()),
+                        tooltip: 'favorites_title'.tr,
                         icon: Icon(
                           state.showingFavorites.value
                               ? Icons.favorite_rounded
@@ -77,312 +79,315 @@ class ProductsContent extends ScreenContent<ProductsState> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => sendAction(OpenBusinessCardScan()),
-                      tooltip: 'business_card_scan_title'.tr,
-                      icon: Icon(Icons.qr_code_scanner_rounded, color: c.accent),
-                    ),
-                    IconButton(
-                      onPressed: () => sendAction(OpenBusinessFeed()),
-                      tooltip: 'feed_title'.tr,
-                      icon: Icon(Icons.campaign_outlined, color: c.accent),
-                    ),
-                    IconButton(
-                      onPressed: () => sendAction(OpenMarketplaceGroups()),
-                      tooltip: 'marketplace_groups_title'.tr,
-                      icon: Icon(Icons.storefront_outlined, color: c.accent),
-                    ),
-                    IconButton(
-                      onPressed: () => sendAction(OpenTradeAssistant()),
-                      tooltip: 'trade_ai_title'.tr,
-                      icon: Icon(Icons.auto_awesome_rounded, color: c.accent),
+                    PopupMenuButton<_ProductsMenuAction>(
+                      tooltip: 'products_more_menu'.tr,
+                      icon: Icon(Icons.more_vert_rounded, color: c.accent),
+                      position: PopupMenuPosition.under,
+                      onSelected: (action) {
+                        HapticFeedback.selectionClick();
+                        switch (action) {
+                          case _ProductsMenuAction.addProduct:
+                            sendAction(OpenAddProduct());
+                          case _ProductsMenuAction.aiMatching:
+                            sendAction(OpenAiMatching());
+                          case _ProductsMenuAction.scan:
+                            sendAction(OpenBusinessCardScan());
+                          case _ProductsMenuAction.feed:
+                            sendAction(OpenBusinessFeed());
+                          case _ProductsMenuAction.groups:
+                            sendAction(OpenMarketplaceGroups());
+                          case _ProductsMenuAction.tradeAi:
+                            sendAction(OpenTradeAssistant());
+                          case _ProductsMenuAction.map:
+                            sendAction(OpenMarketMap());
+                        }
+                      },
+                      itemBuilder: (ctx) {
+                        final isBiz = state.isBusiness.value;
+                        return [
+                          _menuItem(
+                            c,
+                            value: _ProductsMenuAction.addProduct,
+                            icon: Icons.add_box_rounded,
+                            label: 'add_product_title'.tr,
+                          ),
+                          if (isBiz)
+                            _menuItem(
+                              c,
+                              value: _ProductsMenuAction.aiMatching,
+                              icon: Icons.hub_outlined,
+                              label: 'ai_matching_title'.tr,
+                            ),
+                          _menuItem(
+                            c,
+                            value: _ProductsMenuAction.scan,
+                            icon: Icons.qr_code_scanner_rounded,
+                            label: 'business_card_scan_title'.tr,
+                          ),
+                          _menuItem(
+                            c,
+                            value: _ProductsMenuAction.feed,
+                            icon: Icons.campaign_outlined,
+                            label: 'feed_title'.tr,
+                          ),
+                          _menuItem(
+                            c,
+                            value: _ProductsMenuAction.groups,
+                            icon: Icons.storefront_outlined,
+                            label: 'marketplace_groups_title'.tr,
+                          ),
+                          _menuItem(
+                            c,
+                            value: _ProductsMenuAction.tradeAi,
+                            icon: Icons.auto_awesome_rounded,
+                            label: 'trade_ai_title'.tr,
+                          ),
+                          _menuItem(
+                            c,
+                            value: _ProductsMenuAction.map,
+                            icon: Icons.map_outlined,
+                            label: 'products_map_view'.tr,
+                          ),
+                        ];
+                      },
                     ),
                   ],
                 ),
               ),
+              SizedBox(height: 8.dp),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.dp),
+                child: SearchField(
+                  hint: 'products_smart_search_hint'.tr,
+                  onChanged: (v) => sendAction(ProductsSearchChanged(v)),
+                ),
+              ),
               Obx(() {
-                if (state.showingFavorites.value) {
+                final text = state.smartInterpretation.value;
+                if (text == null ||
+                    text.isEmpty ||
+                    !state.smartSearchActive.value) {
                   return const SizedBox.shrink();
                 }
+                final colors = context.appColors;
                 return Padding(
                   padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 0),
-                  child: Material(
-                    color: c.accent,
-                    borderRadius: BorderRadius.circular(14.dp),
-                    child: InkWell(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        sendAction(OpenAddProduct());
-                      },
-                      borderRadius: BorderRadius.circular(14.dp),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14.dp,
-                          vertical: 12.dp,
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.dp,
+                      vertical: 10.dp,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.accentSoft,
+                      borderRadius: BorderRadius.circular(12.dp),
+                      border: Border.all(color: colors.outline),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          color: colors.accent,
+                          size: 18.dp,
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.add_box_rounded,
-                              color: c.onAccent,
-                              size: 22.dp,
-                            ),
-                            SizedBox(width: 10.dp),
-                            Expanded(
-                              child: Text(
-                                'add_product_title'.tr,
+                        SizedBox(width: 8.dp),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'products_smart_search_understood'.tr,
                                 style: TextStyle(
-                                  color: c.onAccent,
-                                  fontSize: 15.sp,
+                                  color: colors.accentText,
+                                  fontSize: 11.sp,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: c.onAccent,
-                              size: 22.dp,
-                            ),
-                          ],
+                              SizedBox(height: 2.dp),
+                              Text(
+                                text,
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 );
               }),
-          SizedBox(height: 16.dp),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.dp),
-            child: SearchField(
-              hint: 'products_smart_search_hint'.tr,
-              onChanged: (v) => sendAction(ProductsSearchChanged(v)),
-            ),
-          ),
-          Obx(() {
-            final text = state.smartInterpretation.value;
-            if (text == null || text.isEmpty || !state.smartSearchActive.value) {
-              return const SizedBox.shrink();
-            }
-            final colors = context.appColors;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 0),
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
-                decoration: BoxDecoration(
-                  color: colors.accentSoft,
-                  borderRadius: BorderRadius.circular(12.dp),
-                  border: Border.all(color: colors.outline),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Obx(() {
+                if (state.showingFavorites.value) {
+                  return const SizedBox.shrink();
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      color: colors.accent,
-                      size: 18.dp,
+                    SizedBox(height: 12.dp),
+                    MarketPromoBanner(
+                      onTap: (id) => sendAction(ProductsBannerTap(id)),
                     ),
-                    SizedBox(width: 8.dp),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'products_smart_search_understood'.tr,
-                            style: TextStyle(
-                              color: colors.accentText,
-                              fontSize: 11.sp,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(height: 2.dp),
-                          Text(
-                            text,
-                            style: TextStyle(
-                              color: colors.textPrimary,
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w600,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    SizedBox(height: 12.dp),
+                    _quickFilters(c, state, sendAction),
                   ],
-                ),
-              ),
-            );
-          }),
-          Obx(() {
-            if (state.showingFavorites.value) return const SizedBox.shrink();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 12.dp),
-                MarketPromoBanner(
-                  onTap: (id) => sendAction(ProductsBannerTap(id)),
-                ),
-                SizedBox(height: 12.dp),
-                _quickFilters(c, state, sendAction),
-              ],
-            );
-          }),
-          Obx(() {
-            if (!state.isBusiness.value || state.showingFavorites.value) {
-              return const SizedBox.shrink();
-            }
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20.dp, 14.dp, 20.dp, 0),
-              child: Column(
-                children: [
-                  AiMatchingCard(
-                    result: state.aiMatching.value,
-                    loading: state.aiMatchingLoading.value,
-                    onTap: () => sendAction(OpenAiMatching()),
-                    onRetry: () => sendAction(RetryAiMatching()),
-                  ),
-                  SizedBox(height: 10.dp),
-                  MarketAnalyticsCard(
-                    result: state.marketAnalytics.value,
-                    loading: state.marketAnalyticsLoading.value,
-                    onTap: () => sendAction(OpenMarketAnalytics()),
-                    onRetry: () => sendAction(RetryMarketAnalytics()),
-                  ),
-                ],
-              ),
-            );
-          }),
-          SizedBox(height: 14.dp),
-          Expanded(
-            child: Obx(() {
-              if (state.loading.value || state.searching.value) {
-                return const AppLoading();
-              }
-              final q = state.query.value.trim();
-              final searching = q.isNotEmpty;
-              final favorites = state.showingFavorites.value;
-              final showSections =
-                  !searching && !favorites && !state.hasActiveFilters;
-              final all = state.all.toList();
-
-              if (all.isEmpty &&
-                  (!showSections ||
-                      (state.top.isEmpty &&
-                          state.newest.isEmpty &&
-                          state.recommended.isEmpty))) {
-                return AppEmptyState(
-                  icon: searching
-                      ? Icons.search_off_rounded
-                      : Icons.storefront_outlined,
-                  title: searching
-                      ? 'empty_no_results'.tr
-                      : 'products_empty'.tr,
                 );
-              }
+              }),
+              SizedBox(height: 10.dp),
+              Expanded(
+                child: Obx(() {
+                  if (state.loading.value || state.searching.value) {
+                    return const AppLoading();
+                  }
+                  final q = state.query.value.trim();
+                  final searching = q.isNotEmpty;
+                  final favorites = state.showingFavorites.value;
+                  final showSections =
+                      !searching && !favorites && !state.hasActiveFilters;
+                  final all = state.all.toList();
 
-              return RefreshIndicator(
-                onRefresh: () async => sendAction(RefreshProducts()),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (showSections) ...[
-                        if (state.recommended.isNotEmpty) ...[
-                          _forYouBlock(context, c, state, sendAction),
-                          SizedBox(height: 22.dp),
-                        ],
-                        if (state.top.isNotEmpty) ...[
-                          _sectionHeader(
-                            c,
-                            icon: Icons.star_rounded,
-                            title: 'products_top'.tr,
-                          ),
-                          SizedBox(height: 12.dp),
-                          _horizontalProducts(context, state.top, sendAction),
-                          SizedBox(height: 22.dp),
-                        ],
-                        if (state.newest.isNotEmpty) ...[
-                          _sectionHeader(
-                            c,
-                            icon: Icons.fiber_new_rounded,
-                            title: 'products_newest'.tr,
-                          ),
-                          SizedBox(height: 12.dp),
-                          _horizontalProducts(context, state.newest, sendAction),
-                          SizedBox(height: 22.dp),
-                        ],
-                      ],
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.dp),
-                        child: Text(
-                          (searching || favorites
-                                  ? 'products_results'
-                                  : 'products_all')
-                              .tr,
-                          style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 12.dp),
-                      if (all.isEmpty)
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 24.dp),
-                          child: Text(
-                            'products_empty'.tr,
-                            style: TextStyle(
-                              color: c.textSecondary,
-                              fontSize: 14.sp,
+                  if (all.isEmpty &&
+                      (!showSections ||
+                          (state.top.isEmpty &&
+                              state.newest.isEmpty &&
+                              state.recommended.isEmpty))) {
+                    return AppEmptyState(
+                      icon: searching
+                          ? Icons.search_off_rounded
+                          : Icons.storefront_outlined,
+                      title: searching
+                          ? 'empty_no_results'.tr
+                          : 'products_empty'.tr,
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: () async => sendAction(RefreshProducts()),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(bottom: 88.dp),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (showSections) ...[
+                            if (state.recommended.isNotEmpty) ...[
+                              _forYouBlock(context, c, state, sendAction),
+                              SizedBox(height: 22.dp),
+                            ],
+                            if (state.top.isNotEmpty) ...[
+                              _sectionHeader(
+                                c,
+                                icon: Icons.star_rounded,
+                                title: 'products_top'.tr,
+                              ),
+                              SizedBox(height: 12.dp),
+                              _horizontalProducts(
+                                context,
+                                state.top,
+                                sendAction,
+                              ),
+                              SizedBox(height: 22.dp),
+                            ],
+                            if (state.newest.isNotEmpty) ...[
+                              _sectionHeader(
+                                c,
+                                icon: Icons.fiber_new_rounded,
+                                title: 'products_newest'.tr,
+                              ),
+                              SizedBox(height: 12.dp),
+                              _horizontalProducts(
+                                context,
+                                state.newest,
+                                sendAction,
+                              ),
+                              SizedBox(height: 22.dp),
+                            ],
+                          ],
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20.dp),
+                            child: Text(
+                              (searching || favorites
+                                      ? 'products_results'
+                                      : 'products_all')
+                                  .tr,
+                              style: TextStyle(
+                                color: c.textPrimary,
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        )
-                      else
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: EdgeInsets.fromLTRB(16.dp, 0, 16.dp, 16.dp),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12.dp,
-                            mainAxisSpacing: 12.dp,
-                            childAspectRatio: 0.9,
-                          ),
-                          itemCount: all.length,
-                          itemBuilder: (_, i) {
-                            final p = all[i];
-                            return ProductGridCard(
-                              iconAsset: p.iconAsset,
-                              tileGradient: p.tileGradient,
-                              name: p.name,
-                              subtitle: p.subtitle,
-                              price: p.price,
-                              views: p.views,
-                              imageUrl: p.imageUrl,
-                              hasVideo: (p.videoUrl ?? '').isNotEmpty,
-                              trustBadges: p.trustBadges,
-                              capabilities: p.capabilities,
-                              onTap: () => sendAction(OpenProduct(p)),
-                              onVideoTap: (p.videoUrl ?? '').isEmpty
-                                  ? null
-                                  : () => showProductVideoDialog(
-                                        context,
-                                        url: p.videoUrl!,
-                                      ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            }),
+                          SizedBox(height: 12.dp),
+                          if (all.isEmpty)
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                20.dp,
+                                8.dp,
+                                20.dp,
+                                24.dp,
+                              ),
+                              child: Text(
+                                'products_empty'.tr,
+                                style: TextStyle(
+                                  color: c.textSecondary,
+                                  fontSize: 14.sp,
+                                ),
+                              ),
+                            )
+                          else
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding: EdgeInsets.fromLTRB(
+                                16.dp,
+                                0,
+                                16.dp,
+                                16.dp,
+                              ),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 12.dp,
+                                mainAxisSpacing: 12.dp,
+                                childAspectRatio: 0.9,
+                              ),
+                              itemCount: all.length,
+                              itemBuilder: (_, i) {
+                                final p = all[i];
+                                return ProductGridCard(
+                                  iconAsset: p.iconAsset,
+                                  tileGradient: p.tileGradient,
+                                  name: p.name,
+                                  subtitle: p.subtitle,
+                                  price: p.price,
+                                  views: p.views,
+                                  imageUrl: p.imageUrl,
+                                  hasVideo: (p.videoUrl ?? '').isNotEmpty,
+                                  trustBadges: p.trustBadges,
+                                  capabilities: p.capabilities,
+                                  onTap: () => sendAction(OpenProduct(p)),
+                                  onVideoTap: (p.videoUrl ?? '').isEmpty
+                                      ? null
+                                      : () => showProductVideoDialog(
+                                            context,
+                                            url: p.videoUrl!,
+                                          ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
           ),
-        ],
-      ),
         ),
         Obx(() {
           if (state.showingFavorites.value) {
@@ -410,6 +415,33 @@ class ProductsContent extends ScreenContent<ProductsState> {
           );
         }),
       ],
+    );
+  }
+
+  PopupMenuItem<_ProductsMenuAction> _menuItem(
+    AppColors c, {
+    required _ProductsMenuAction value,
+    required IconData icon,
+    required String label,
+  }) {
+    return PopupMenuItem<_ProductsMenuAction>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, color: c.accent, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -443,6 +475,13 @@ class ProductsContent extends ScreenContent<ProductsState> {
               label: 'products_tezkor_factory'.tr,
               selected: state.isFactoryFilter,
               onTap: () => sendAction(ProductsToggleFactory()),
+            ),
+            SizedBox(width: 8.dp),
+            _chip(
+              c,
+              label: 'products_tezkor_trend'.tr,
+              selected: state.trendOnly.value,
+              onTap: () => sendAction(ProductsToggleTrend()),
             ),
             SizedBox(width: 8.dp),
             _chip(
@@ -556,7 +595,8 @@ class ProductsContent extends ScreenContent<ProductsState> {
                     trustBadges: p.trustBadges,
                     onTap: () => sendAction(OpenProduct(p)),
                     onVideoTap: hasVideo
-                        ? () => showProductVideoDialog(context, url: p.videoUrl!)
+                        ? () =>
+                            showProductVideoDialog(context, url: p.videoUrl!)
                         : null,
                   );
                 },

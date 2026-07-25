@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 
 import '../../ui/ai_matching.dart';
-import '../../ui/market_analytics.dart';
 import 'product.dart';
 
 class ProductCategoryOption {
@@ -39,8 +38,6 @@ class ProductsState extends GetxController {
   RxBool isBusiness = false.obs;
   final Rxn<AiMatchingResult> aiMatching = Rxn<AiMatchingResult>();
   final RxBool aiMatchingLoading = false.obs;
-  final Rxn<MarketAnalyticsResult> marketAnalytics = Rxn<MarketAnalyticsResult>();
-  final RxBool marketAnalyticsLoading = false.obs;
 
   /// Smart Search AI tushuntirishi (masalan: Turkiyadagi to‘qimachilik…).
   final RxnString smartInterpretation = RxnString();
