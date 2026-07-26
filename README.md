@@ -42,6 +42,18 @@ cd backend
 python scripts/smoke_test.py
 ```
 
+## Production / ops
+
+| Doc | Purpose |
+|---|---|
+| [`PRODUCTION_RUNBOOK.md`](PRODUCTION_RUNBOOK.md) | Deploy, rollback, backup/restore, incidents |
+| [`deploy/ENV.md`](deploy/ENV.md) | Environment variables reference |
+| [`deploy/env.production.template`](deploy/env.production.template) | Production `.env` template |
+| [`deploy/env.staging.template`](deploy/env.staging.template) | Staging `.env` template |
+| [`scripts/ship_full_release.py`](scripts/ship_full_release.py) | Repeatable ship (SSH) |
+
+Live site: https://anylang.uz — stack is Docker Compose + Nginx + Let’s Encrypt (not Kubernetes yet).
+
 ## Implemented API modules
 
 Auth · Users/Business · Subscription · Numbers · Products · Chats (+ WSS `/ws`) · Friends · Live · Admin

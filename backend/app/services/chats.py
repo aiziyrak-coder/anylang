@@ -568,6 +568,7 @@ async def search_chats(
         .where(ChatParticipant.user_id == user.id)
         .where(or_(Chat.type == "group", Chat.has_messages.is_(True)))
         .order_by(nullslast(Chat.last_message_at.desc()))
+        .limit(200)
     )
     rows = list(result.all())
     hidden_raw = await redis.smembers(f"chat_hidden:{user.id}")
@@ -580,6 +581,8 @@ async def search_chats(
 
     items: list[dict] = []
     for chat, _part in rows:
+        if len(items) >= 50:
+            break
         if chat.id in hidden_ids:
             continue
         if _is_group(chat):

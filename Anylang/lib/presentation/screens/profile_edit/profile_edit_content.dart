@@ -183,7 +183,8 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
                     SizedBox(height: 28.dp),
                     Obx(() => PrimaryButton(
                           text: 'profile_edit_save'.tr,
-                          isLoading: state.isSaving.value,
+                          isLoading:
+                              state.isSaving.value || state.avatarUploading.value,
                           onTap: () => _save(sendAction),
                         )),
                   ],

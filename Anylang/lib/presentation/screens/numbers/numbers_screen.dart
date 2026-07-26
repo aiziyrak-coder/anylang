@@ -14,6 +14,7 @@ import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/secondary_button.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
@@ -60,6 +61,7 @@ class NumbersScreen extends Screen<NumbersState, void> {
   }
 
   Future<void> _loadMine() async {
+    state.myFromCache.value = false;
     final result = await Get.find<NumbersRepository>().myNumber();
     result.when(
       success: (data) {
@@ -68,12 +70,15 @@ class NumbersScreen extends Screen<NumbersState, void> {
         state.my.value = MyNumberInfo.fromApi(map);
       },
       failure: (err) {
-        // Fallback from session
         final n = SessionStore.user()?['number']?.toString() ?? '';
         if (n.isNotEmpty) {
           state.my.value = MyNumberInfo(number: n);
+          state.myFromCache.value = true;
         } else {
-          state.error.value = err.toString();
+          state.error.value = AuthValidators.safeError(
+            err,
+            fallbackKey: 'numbers_load_failed',
+          );
         }
       },
     );
@@ -405,7 +410,7 @@ class NumbersScreen extends Screen<NumbersState, void> {
       if (done || attempts >= 40) {
         _pollTimer?.cancel();
         if (!done && attempts >= 40) {
-          showAppMessage('numbers_payment_check_hint'.tr);
+          showAppWarning('numbers_payment_poll_failed'.tr);
         }
       }
     });

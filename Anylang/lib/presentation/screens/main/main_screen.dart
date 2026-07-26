@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
@@ -50,7 +51,9 @@ class MainScreen extends Screen<MainState, void> {
       if (map != null) {
         await SessionStore.saveUser(map);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('sync language to server failed: $e\n$st');
+    }
   }
 
   @override
@@ -133,7 +136,13 @@ class MainScreen extends Screen<MainState, void> {
       },
     );
     final data = result.dataOrNull;
-    if (data == null) return;
+    if (data == null) {
+      final err = result.errorOrNull;
+      if (err != null) {
+        debugPrint('refresh conversations failed: $err');
+      }
+      return;
+    }
     var items = asList(data)
         .whereType<Map>()
         .map((e) => Conversation.fromApi(Map<String, dynamic>.from(e)))
@@ -155,10 +164,15 @@ class MainScreen extends Screen<MainState, void> {
   Future<void> _refreshFriends() async {
     if (!Get.isRegistered<FriendsState>()) return;
     final fs = Get.find<FriendsState>();
-    if (fs.loading.value) return;
     final result = await Get.find<FriendsRepository>().listFriends();
     final data = result.dataOrNull;
-    if (data == null) return;
+    if (data == null) {
+      final err = result.errorOrNull;
+      if (err != null) {
+        debugPrint('refresh friends failed: $err');
+      }
+      return;
+    }
     final items = asList(data)
         .whereType<Map>()
         .map((e) => Friend.fromApi(Map<String, dynamic>.from(e)))
@@ -178,7 +192,9 @@ class MainScreen extends Screen<MainState, void> {
             .length;
         fs.pendingCount.value = count;
       },
-      failure: (_) {},
+      failure: (err) {
+        debugPrint('pending friends count failed: $err');
+      },
     );
   }
 }

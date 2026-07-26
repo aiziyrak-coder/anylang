@@ -14,6 +14,7 @@ import '../../modal/jonli_history_bottom_sheet.dart';
 import '../../modal/jonli_voice_settings_bottom_sheet.dart';
 import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/formatters/time_formatter.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -57,22 +58,22 @@ class JonliScreen extends Screen<JonliState, void> {
       return;
     }
     _stopSilenceWatch();
-    _conversationGen++;
     state.conversationActive.value = false;
     state.busy.value = false;
     final recorder = Get.find<VoiceRecorderService>();
     if (recorder.isRecording.value) {
       await recorder.cancel();
     }
-    final id = state.sessionId.value;
-    if (id != null) {
-      unawaited(Get.find<LiveRepository>().endSession(id));
-      state.sessionId.value = null;
-    }
   }
 
   Future<void> _loadLiveLanguages() async {
+    state.liveLanguagesLoadFailed.value = false;
     final result = await Get.find<LiveRepository>().languages();
+    if (result.errorOrNull != null) {
+      state.liveLanguagesLoadFailed.value = true;
+      showAppError(result.errorOrNull);
+      return;
+    }
     final data = result.dataOrNull;
     final codes = <String>{};
     if (data is Map) {
@@ -86,6 +87,8 @@ class JonliScreen extends Screen<JonliState, void> {
       }
     }
     if (codes.isEmpty) {
+      state.liveLanguagesLoadFailed.value = true;
+      showAppWarning('jonli_languages_failed'.tr);
       codes.addAll(const ['uz', 'en', 'ru', 'de', 'ja', 'zh', 'tr']);
     }
     state.liveLangCodes.assignAll(codes);
@@ -115,21 +118,31 @@ class JonliScreen extends Screen<JonliState, void> {
     state.conversationActive.value = false;
     final recorder = Get.find<VoiceRecorderService>();
     if (recorder.isRecording.value) {
-      recorder.cancel();
+      unawaited(recorder.cancel());
     }
     final id = state.sessionId.value;
     if (id != null) {
-      Get.find<LiveRepository>().endSession(id);
+      unawaited(
+        Get.find<LiveRepository>().endSession(id).then(
+          (_) {},
+          onError: (Object e, StackTrace st) {
+            debugPrint('JonliScreen.endSession failed: $e\n$st');
+          },
+        ),
+      );
+      state.sessionId.value = null;
     }
+    super.dispose();
   }
 
   bool _isPremiumRequired(Object? err) {
-    final text = err?.toString().toLowerCase() ?? '';
-    return text.contains('premium') ||
-        text.contains('subscription') ||
-        text.contains('jonli muloqot uchun') ||
-        text.contains('подписк') ||
-        text.contains('тариф');
+    final code = AuthValidators.apiErrorCode(err);
+    if (code == 'SUBSCRIPTION_REQUIRED' ||
+        code == 'PREMIUM_REQUIRED' ||
+        code == 'JONLI_PREMIUM_REQUIRED') {
+      return true;
+    }
+    return false;
   }
 
   Future<void> _offerPlans() async {

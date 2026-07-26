@@ -22,6 +22,7 @@ import '../../ui/business_card_links.dart';
 import '../../ui/market_analytics.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/business_plan_dialog.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -82,7 +83,10 @@ class ProfileScreen extends Screen<ProfileState, void> {
         }
       },
       failure: (err) {
-        state.error.value = err.toString();
+        state.error.value = AuthValidators.safeError(
+          err,
+          fallbackKey: 'profile_load_failed',
+        );
         showAppError(err);
       },
     );
@@ -93,7 +97,7 @@ class ProfileScreen extends Screen<ProfileState, void> {
   }
 
   String _matchingLocale() {
-    final code = (Get.locale?.languageCode ?? SessionStore.appLanguage()).toLowerCase();
+    final code = SessionStore.appLanguage().toLowerCase();
     if (code.startsWith('ru')) return 'ru';
     if (code.startsWith('en') || code.startsWith('us')) return 'en';
     return 'uz';
@@ -106,16 +110,19 @@ class ProfileScreen extends Screen<ProfileState, void> {
       return;
     }
     state.aiMatchingLoading.value = true;
+    state.aiMatchingLoadFailed.value = false;
     final result = await Get.find<AiMatchingRepository>().matches(
       locale: _matchingLocale(),
     );
     state.aiMatchingLoading.value = false;
     result.when(
       success: (data) {
+        state.aiMatchingLoadFailed.value = false;
         state.aiMatching.value = AiMatchingResult.fromApi(data);
       },
       failure: (_) {
-        state.aiMatching.value = const AiMatchingResult();
+        state.aiMatchingLoadFailed.value = true;
+        state.aiMatching.value = null;
       },
     );
   }
@@ -127,16 +134,19 @@ class ProfileScreen extends Screen<ProfileState, void> {
       return;
     }
     state.marketAnalyticsLoading.value = true;
+    state.marketAnalyticsLoadFailed.value = false;
     final result = await Get.find<MarketAnalyticsRepository>().insights(
       locale: _matchingLocale(),
     );
     state.marketAnalyticsLoading.value = false;
     result.when(
       success: (data) {
+        state.marketAnalyticsLoadFailed.value = false;
         state.marketAnalytics.value = MarketAnalyticsResult.fromApi(data);
       },
       failure: (_) {
-        state.marketAnalytics.value = const MarketAnalyticsResult();
+        state.marketAnalyticsLoadFailed.value = true;
+        state.marketAnalytics.value = null;
       },
     );
   }
@@ -147,6 +157,10 @@ class ProfileScreen extends Screen<ProfileState, void> {
     final result = await Get.find<ProductsRepository>().listMine(limit: 40);
     if (result.errorOrNull != null) {
       showAppError(result.errorOrNull);
+      final current = state.account.value;
+      if (current != null) {
+        state.account.value = current.copyWith(listings: const []);
+      }
       return;
     }
     final data = result.dataOrNull;
@@ -177,7 +191,12 @@ class ProfileScreen extends Screen<ProfileState, void> {
   Future<void> _softRefresh() async {
     final result = await Get.find<ProfileRepository>().getMe();
     final map = asMap(result.dataOrNull);
-    if (map == null) return;
+    if (map == null) {
+      if (result.errorOrNull != null) {
+        showAppWarning('profile_soft_refresh_failed'.tr);
+      }
+      return;
+    }
     final prevListings = state.account.value?.listings ?? const <OwnListing>[];
     final account = ProfileAccount.fromApi(map);
     state.account.value = account.isBusiness

@@ -8,6 +8,7 @@ import '../../modal/country_picker_bottom_sheet.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../modal/image_picker.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import 'edit_business_info_action.dart';
@@ -18,6 +19,8 @@ const _roleCodes = ['manufacturer', 'distributor', 'retail', 'service'];
 
 class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
   EditBusinessInfoScreen() : super(mobileContent: EditBusinessInfoContent());
+
+  String _baselineSnapshot = '';
 
   @override
   void initState(void payload) {
@@ -45,13 +48,21 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
     _load();
   }
 
+  String _snapshot(EditBusinessInfoState s) =>
+      '${s.companyName.value}|${s.website.value}|${s.description.value}|${s.seoText.value}|${s.country.value}|${s.role.value}';
+
   Future<void> _load() async {
     state.loading.value = true;
-    final result = await Get.find<ProfileRepository>().getBusiness();
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        if (map == null) return;
+    state.loadError.value = null;
+    try {
+      final result = await Get.find<ProfileRepository>().getBusiness();
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          if (map == null) {
+            state.loadError.value = 'business_load_failed'.tr;
+            return;
+          }
         state.companyName.value = (map['company_name'] as String?) ?? '';
         state.country.value = (map['country'] as String?) ?? '';
         final role = (map['business_role'] as String?) ?? 'manufacturer';
@@ -139,10 +150,41 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
               (audit != null && audit.isNotEmpty) ? audit : null;
         }
         state.formEpoch.value++;
+        _baselineSnapshot = _snapshot(state);
       },
-      failure: showAppError,
+      failure: (err) {
+        state.loadError.value = AuthValidators.safeError(
+          err,
+          fallbackKey: 'business_load_failed',
+        );
+      },
     );
-    state.loading.value = false;
+    } finally {
+      state.loading.value = false;
+    }
+  }
+
+  bool _isDirty(EditBusinessInfoState s) =>
+      _baselineSnapshot.isNotEmpty && _snapshot(s) != _baselineSnapshot;
+
+  Future<bool> _confirmDiscard() async {
+    final leave = await Get.dialog<bool>(
+      AlertDialog(
+        title: Text('business_unsaved_title'.tr),
+        content: Text('business_unsaved_back'.tr),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text('cancel'.tr),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: Text('confirm'.tr),
+          ),
+        ],
+      ),
+    );
+    return leave == true;
   }
 
   @override
@@ -152,6 +194,11 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
   ) async {
     switch (action) {
       case Back _:
+        if (state.isSaving.value) return;
+        if (_isDirty(state)) {
+          final ok = await _confirmDiscard();
+          if (!ok) return;
+        }
         popBackNavigate();
       case ChangeLogo _:
         final file = await pickImage(context);
@@ -346,7 +393,11 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
 
   Future<void> _generateAi(EditBusinessInfoState state, String raw) async {
     final prompt = raw.trim();
-    if (prompt.length < 8 || state.aiGenerating.value) return;
+    if (prompt.length < 8) {
+      showAppWarning('business_ai_prompt_min'.tr);
+      return;
+    }
+    if (state.aiGenerating.value) return;
     state.aiGenerating.value = true;
     final locale = SessionStore.preferredLanguage().isNotEmpty
         ? SessionStore.preferredLanguage()

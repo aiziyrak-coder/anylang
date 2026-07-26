@@ -46,4 +46,5 @@ class JonliState extends GetxController {
     'zh',
     'tr',
   }.obs;
+  final RxBool liveLanguagesLoadFailed = false.obs;
 }

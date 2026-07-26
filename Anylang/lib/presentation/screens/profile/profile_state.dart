@@ -12,6 +12,8 @@ class ProfileState extends GetxController {
   final RxBool aiMatchingLoading = false.obs;
   final Rxn<MarketAnalyticsResult> marketAnalytics = Rxn<MarketAnalyticsResult>();
   final RxBool marketAnalyticsLoading = false.obs;
+  final RxBool aiMatchingLoadFailed = false.obs;
+  final RxBool marketAnalyticsLoadFailed = false.obs;
 
   /// Main tab soft-refresh (IndexedStack).
   Future<void> Function()? softRefreshHandler;

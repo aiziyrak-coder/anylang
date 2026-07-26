@@ -7,6 +7,7 @@ import '../../../data/network/chat_repository.dart';
 import '../../../data/network/nearby_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../chat/chat_payload.dart';
@@ -28,15 +29,20 @@ class NearbyScreen extends Screen<NearbyState, void> {
   }
 
   Future<Position?> _currentPosition() async {
+    state.permissionDenied.value = false;
+    state.locationServiceOff.value = false;
+    state.gpsFailed.value = false;
+
     final status = await Permission.locationWhenInUse.request();
     if (!status.isGranted) {
       state.permissionDenied.value = true;
+      state.error.value = 'nearby_permission_title'.tr;
       return null;
     }
-    state.permissionDenied.value = false;
     final serviceOn = await Geolocator.isLocationServiceEnabled();
     if (!serviceOn) {
-      state.permissionDenied.value = true;
+      state.locationServiceOff.value = true;
+      state.error.value = 'nearby_gps_off'.tr;
       showAppWarning('nearby_gps_off'.tr);
       return null;
     }
@@ -48,7 +54,8 @@ class NearbyScreen extends Screen<NearbyState, void> {
         ),
       );
     } catch (_) {
-      state.permissionDenied.value = true;
+      state.gpsFailed.value = true;
+      state.error.value = 'nearby_gps_failed'.tr;
       showAppWarning('nearby_gps_failed'.tr);
       return null;
     }
@@ -69,11 +76,21 @@ class NearbyScreen extends Screen<NearbyState, void> {
       return;
     }
 
-    await Get.find<NearbyRepository>().updateLocation(
+    final locUpdate = await Get.find<NearbyRepository>().updateLocation(
       latitude: pos.latitude,
       longitude: pos.longitude,
       sharingEnabled: true,
     );
+    if (locUpdate.errorOrNull != null) {
+      state.error.value = AuthValidators.safeError(
+        locUpdate.errorOrNull,
+        fallbackKey: 'nearby_location_update_failed',
+      );
+      showAppError(locUpdate.errorOrNull);
+      state.loading.value = false;
+      state.refreshing.value = false;
+      return;
+    }
 
     final lang = state.languageFilter.value;
     final result = await Get.find<NearbyRepository>().listNearby(
@@ -104,7 +121,10 @@ class NearbyScreen extends Screen<NearbyState, void> {
         state.error.value = null;
       },
       failure: (err) {
-        state.error.value = err.toString();
+        state.error.value = AuthValidators.safeError(
+          err,
+          fallbackKey: 'nearby_load_failed',
+        );
         showAppError(err);
       },
     );

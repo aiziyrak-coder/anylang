@@ -576,9 +576,16 @@ async def get_public_profile(
                 profile_user_id=user.id,
                 viewer_user_id=viewer.id,
             )
-        except Exception:
+        except Exception as exc:
             # Profil ochilishi view yozilishiga bog'liq emas.
-            pass
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "record_profile_view failed profile=%s viewer=%s: %s",
+                user.id,
+                viewer.id,
+                exc,
+            )
     try:
         from app.services import networking_score as networking_score_service
 

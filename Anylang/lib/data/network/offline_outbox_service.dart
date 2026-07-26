@@ -13,6 +13,7 @@ import '../../presentation/screens/messages/messages_state.dart';
 import 'chat_repository.dart';
 import 'connectivity_service.dart';
 import 'realtime_sync_service.dart';
+import '../../presentation/utils/app_snackbar.dart';
 
 /// Offline outbox — ulanish tiklanganda yuborilmagan xabarlarni flush qiladi.
 class OfflineOutboxService extends GetxService {
@@ -175,6 +176,7 @@ class OfflineOutboxService extends GetxService {
       if (permanentFail) {
         await OfflineChatStore.removeOutbox(clientId);
         _dropLocalPending(chatId, clientId);
+        showAppError('outbox_send_failed'.tr);
         continue;
       }
 

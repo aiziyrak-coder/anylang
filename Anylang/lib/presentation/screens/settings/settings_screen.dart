@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -10,6 +12,7 @@ import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/socket_service.dart';
 import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/language_localizations.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -17,6 +20,7 @@ import '../chat/chat_state.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
 import '../forgot_password/forgot_password_screen.dart';
 import '../login/login_screen.dart';
+import '../profile/profile_account.dart';
 import '../profile_edit/profile_edit_screen.dart';
 import '../select_language/select_language_option.dart';
 import '../subscription/subscription_screen.dart';
@@ -33,6 +37,7 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
   SettingsScreen() : super(mobileContent: SettingsContent());
 
   static const _visibilityKeys = ['everyone', 'friends', 'nobody'];
+  Timer? _chatLangReloadTimer;
 
   String _visibilityLabel(String key) => 'settings_visibility_$key'.tr;
 
@@ -72,6 +77,12 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
     } catch (e, st) {
       debugPrint('SettingsScreen.initState: $e\n$st');
     }
+  }
+
+  @override
+  void dispose() {
+    _chatLangReloadTimer?.cancel();
+    _chatLangReloadTimer = null;
   }
 
   @override
@@ -124,10 +135,18 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
           final cid = chat.chatId.value;
           if (cid > 0 && Get.isRegistered<ChatRepository>()) {
             Future<void> reload() async {
+              if (!Get.isRegistered<ChatState>()) return;
+              final live = Get.find<ChatState>();
+              if (live.chatId.value != cid) return;
               final page =
                   await Get.find<ChatRepository>().listMessages(cid, limit: 50);
+              if (!Get.isRegistered<ChatState>()) return;
+              if (Get.find<ChatState>().chatId.value != cid) return;
               page.when(
                 success: (data) {
+                  if (!Get.isRegistered<ChatState>()) return;
+                  final liveChat = Get.find<ChatState>();
+                  if (liveChat.chatId.value != cid) return;
                   final me = SessionStore.userId();
                   final raw = asList(data)
                       .whereType<Map>()
@@ -138,19 +157,24 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
                         (e) => mapChatMessageFromApi(
                           e,
                           me: me,
-                          peerName: chat.peerName.value,
+                          peerName: liveChat.peerName.value,
                         ),
                       )
                       .toList();
-                  chat.messages.assignAll(mapped);
+                  liveChat.messages.assignAll(mapped);
                 },
-                failure: (_) {},
+                failure: (_) {
+                  showAppWarning('settings_chat_reload_failed'.tr);
+                },
               );
             }
 
             await reload();
             // Background tarjima tugashi uchun qayta yuklash.
-            Future<void>.delayed(const Duration(seconds: 4), reload);
+            _chatLangReloadTimer?.cancel();
+            _chatLangReloadTimer = Timer(const Duration(seconds: 4), () {
+              unawaited(reload());
+            });
           }
         }
       case SelectTranslationDomain a:
@@ -175,6 +199,8 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         final logout = await Get.find<AuthRepository>().logout();
         if (logout.errorOrNull != null) {
           showAppWarning('logout_failed'.tr);
+        } else {
+          showAppMessage('settings_logout_success'.tr);
         }
         _clearLocalSession();
         navigateAndRemoveUntil(LoginScreen());
@@ -209,7 +235,7 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
             failure: showAppError,
           );
         } catch (e) {
-          showAppError(e.toString());
+          showAppError(AuthValidators.safeError(e));
         }
       case OpenProfileVisibility _:
         final labels = _visibilityKeys.map(_visibilityLabel).toList();
@@ -225,6 +251,17 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         final key = _visibilityKeys[idx];
         state.profileVisibilityKey.value = key;
         await SessionStore.setProfileVisibility(key);
+        // Backend hozircha profile_visibility maydonini qo'llab-quvvatlamaydi — faqat lokal.
+        try {
+          final sync = await Get.find<ProfileRepository>().updateMe({
+            'profile_visibility': key,
+          });
+          if (sync.errorOrNull != null) {
+            showAppWarning('settings_visibility_local_only'.tr);
+          }
+        } catch (_) {
+          showAppWarning('settings_visibility_local_only'.tr);
+        }
       case OpenBlockedUsers _:
         await showBlockedUsersBottomSheet(context);
       case OpenChangePassword _:
@@ -234,11 +271,16 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
       case OpenEditProfileFromSettings _:
         final me = await Get.find<ProfileRepository>().getMe();
         final map = asMap(me.dataOrNull);
-        final isBusiness = map?['is_business'] == true;
+        if (map == null) {
+          showAppError(me.errorOrNull ?? 'profile_load_failed'.tr);
+          return;
+        }
+        final account = ProfileAccount.fromApi(map);
+        final isBusiness = map['is_business'] == true;
         if (isBusiness) {
           await navigate(EditBusinessInfoScreen());
         } else {
-          await navigate(ProfileEditScreen());
+          await navigate(ProfileEditScreen(), payload: account);
         }
       case OpenSubscriptionFromSettings _:
         await navigate(SubscriptionScreen());

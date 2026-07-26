@@ -85,12 +85,14 @@ def register_exception_handlers(app: FastAPI) -> None:
             type(exc).__name__,
             exc,
         )
+        from app.core.config import get_settings
+
+        settings = get_settings()
+        body = error_body("Internal server error", "INTERNAL_ERROR")
+        if settings.debug:
+            body["exception"] = type(exc).__name__
+            body["path"] = request.url.path
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=error_body(
-                f"Internal server error ({type(exc).__name__})",
-                "INTERNAL_ERROR",
-                exception=type(exc).__name__,
-                path=request.url.path,
-            ),
+            content=body,
         )

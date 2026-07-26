@@ -9,6 +9,7 @@ import '../../../data/network/friends_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../ui/items/friend_result_item.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../chat/chat_payload.dart';
@@ -44,32 +45,43 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
 
   Future<void> _loadSentRequests() async {
     state.loadingSent.value = true;
-    final result = await Get.find<FriendsRepository>().listRequests(
-      type: 'outgoing',
-      includeDeclined: true,
-    );
-    result.when(
-      success: (data) {
-        final items = asList(data)
-            .whereType<Map>()
-            .map((e) => AddFriendResult.fromRequestApi(Map<String, dynamic>.from(e)))
-            .toList();
-        state.sentRequests.assignAll(items);
-      },
-      failure: showAppError,
-    );
-    state.loadingSent.value = false;
+    state.sentLoadError.value = null;
+    try {
+      final result = await Get.find<FriendsRepository>().listRequests(
+        type: 'outgoing',
+        includeDeclined: true,
+      );
+      result.when(
+        success: (data) {
+          final items = asList(data)
+              .whereType<Map>()
+              .map((e) => AddFriendResult.fromRequestApi(Map<String, dynamic>.from(e)))
+              .toList();
+          state.sentRequests.assignAll(items);
+        },
+        failure: (err) {
+          state.sentLoadError.value = AuthValidators.safeError(
+            err,
+            fallbackKey: 'add_friend_sent_load_failed',
+          );
+        },
+      );
+    } finally {
+      state.loadingSent.value = false;
+    }
   }
 
   Future<void> _search(String q) async {
     final query = q.trim();
-    // Backend: ism ≥2 belgi yoki raqam ≥3.
     if (query.length < 2) {
       state.searching.value = false;
+      state.searchError.value =
+          query.isNotEmpty ? 'add_friend_search_min_hint'.tr : null;
       state.results.clear();
       return;
     }
     state.searching.value = true;
+    state.searchError.value = null;
     final result = await Get.find<ProfileRepository>().searchUsers(query);
     result.when(
       success: (data) {
@@ -79,9 +91,12 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
             .toList();
         state.results.assignAll(items);
       },
-      failure: (_) {
-        // Bo‘sh natija — snackbar spam qilinmaydi.
+      failure: (err) {
         state.results.clear();
+        state.searchError.value = AuthValidators.safeError(
+          err,
+          fallbackKey: 'add_friend_search_failed',
+        );
       },
     );
     state.searching.value = false;
@@ -97,6 +112,10 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
       success: (data) {
         final map = asMap(data);
         final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+        if (chatId <= 0) {
+          showAppError('chat_open_failed'.tr);
+          return;
+        }
         navigate(
           ChatScreen(),
           payload: ChatPayload(
@@ -175,11 +194,11 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
         if (_sendingRequest) return;
         if (a.result.action == FriendActionState.requested) return;
         _sendingRequest = true;
-        // Optimistic: tugma darhol "So'rov yuborildi".
-        _markRequested(a.result);
-        final result =
-            await Get.find<FriendsRepository>().sendRequest(a.result.id);
-        result.when(
+        try {
+          _markRequested(a.result);
+          final result =
+              await Get.find<FriendsRepository>().sendRequest(a.result.id);
+          result.when(
           success: (data) {
             final map = asMap(data);
             final requestId = (map?['id'] as num?)?.toInt();
@@ -205,26 +224,30 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
             showAppError(err);
           },
         );
-        _sendingRequest = false;
+        } finally {
+          _sendingRequest = false;
+        }
       case CancelFriendRequest a:
         if (_sendingRequest) return;
         final requestId = a.result.requestId;
         if (requestId == null) {
-          // requestId yo'q bo'lsa ham UI ni qaytarib, so'rovlarni yangilaymiz.
           _markCancelled(a.result);
           await _loadSentRequests();
           return;
         }
         _sendingRequest = true;
-        final result =
-            await Get.find<FriendsRepository>().cancelRequest(requestId);
-        result.when(
-          success: (_) => _markCancelled(a.result),
-          failure: (err) {
-            showAppError(err);
-          },
-        );
-        _sendingRequest = false;
+        try {
+          final result =
+              await Get.find<FriendsRepository>().cancelRequest(requestId);
+          result.when(
+            success: (_) => _markCancelled(a.result),
+            failure: (err) {
+              showAppError(err);
+            },
+          );
+        } finally {
+          _sendingRequest = false;
+        }
     }
   }
 }

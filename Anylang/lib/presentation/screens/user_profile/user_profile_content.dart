@@ -675,6 +675,14 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         );
       }
+      final listErr = state.listingsError.value;
+      if (listErr != null && listErr.isNotEmpty) {
+        return AppEmptyState(
+          icon: Icons.error_outline_rounded,
+          title: 'profile_listings_load_failed'.tr,
+          subtitle: listErr,
+        );
+      }
       if (items.isEmpty) {
         return AppEmptyState(
           icon: Icons.inventory_2_outlined,

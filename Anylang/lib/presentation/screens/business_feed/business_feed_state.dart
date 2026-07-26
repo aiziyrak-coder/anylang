@@ -11,4 +11,5 @@ class BusinessFeedState extends GetxController {
   /// null = barcha turlar
   final RxnString filterType = RxnString();
   RxBool isBusiness = false.obs;
+  final RxnString loadError = RxnString();
 }

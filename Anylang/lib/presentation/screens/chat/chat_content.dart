@@ -455,6 +455,13 @@ class ChatContent extends ScreenContent<ChatState> {
       FutureOr<void> Function(MyAction action) sendAction) {
     return Obx(() {
       if (state.loading.value) return const AppLoading();
+      if (state.loadError.value && state.messages.isEmpty) {
+        return AppEmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'chat_load_failed'.tr,
+          subtitle: 'common_retry'.tr,
+        );
+      }
       final selecting = state.selecting.value;
       final selectedIds = state.selectedIds.toSet();
       final q = state.searchQuery.value.trim().toLowerCase();

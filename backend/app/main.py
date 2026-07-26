@@ -60,6 +60,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    import logging
+
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
 
     docs_url = None if settings.is_production else "/docs"
     redoc_url = None if settings.is_production else "/redoc"
@@ -128,22 +134,76 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "service": settings.app_name, "env": settings.app_env}
 
     @app.get("/ready")
     async def ready() -> JSONResponse:
+        checks: dict[str, str] = {}
         try:
             redis = await get_redis()
             await redis.ping()
+            checks["redis"] = "ok"
+        except Exception:
+            checks["redis"] = "fail"
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "status": "not_ready",
+                    "error_code": "DEPENDENCY_UNAVAILABLE",
+                    "checks": checks,
+                },
+            )
+        try:
             factory = get_session_factory()
             async with factory() as db:
                 await db.execute(text("SELECT 1"))
+            checks["postgres"] = "ok"
         except Exception:
+            checks["postgres"] = "fail"
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={"status": "not_ready", "error_code": "DEPENDENCY_UNAVAILABLE"},
+                content={
+                    "status": "not_ready",
+                    "error_code": "DEPENDENCY_UNAVAILABLE",
+                    "checks": checks,
+                },
             )
-        return JSONResponse(content={"status": "ready"})
+        return JSONResponse(
+            content={"status": "ready", "checks": checks, "env": settings.app_env}
+        )
+
+    @app.get("/metrics/basic")
+    async def basic_metrics() -> JSONResponse:
+        """Lightweight ops snapshot (no Prometheus required)."""
+        import time
+
+        started = time.perf_counter()
+        redis_ok = False
+        pg_ok = False
+        try:
+            redis = await get_redis()
+            await redis.ping()
+            redis_ok = True
+        except Exception:
+            pass
+        try:
+            factory = get_session_factory()
+            async with factory() as db:
+                await db.execute(text("SELECT 1"))
+            pg_ok = True
+        except Exception:
+            pass
+        latency_ms = round((time.perf_counter() - started) * 1000, 2)
+        code = status.HTTP_200_OK if redis_ok and pg_ok else status.HTTP_503_SERVICE_UNAVAILABLE
+        return JSONResponse(
+            status_code=code,
+            content={
+                "postgres": pg_ok,
+                "redis": redis_ok,
+                "check_latency_ms": latency_ms,
+                "env": settings.app_env,
+            },
+        )
 
     return app
 

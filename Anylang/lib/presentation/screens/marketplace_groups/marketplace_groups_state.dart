@@ -7,4 +7,5 @@ class MarketplaceGroupsState extends GetxController {
   final RxBool loading = true.obs;
   final RxBool joining = false.obs;
   final RxBool viewerVerified = false.obs;
+  final RxnString loadError = RxnString();
 }

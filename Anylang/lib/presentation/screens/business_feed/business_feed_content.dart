@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../ui/buttons/secondary_button.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/app_top_bar.dart';
@@ -76,6 +77,29 @@ class BusinessFeedContent extends ScreenContent<BusinessFeedState> {
               child: Obx(() {
                 if (state.loading.value) {
                   return const Center(child: AppLoading());
+                }
+                final loadErr = state.loadError.value;
+                if (loadErr != null && loadErr.isNotEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24.dp),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppEmptyState(
+                            icon: Icons.wifi_off_rounded,
+                            title: 'feed_load_failed'.tr,
+                            subtitle: loadErr,
+                          ),
+                          SizedBox(height: 16.dp),
+                          SecondaryButton(
+                            text: 'common_retry'.tr,
+                            onTap: () => sendAction(FeedRefreshRequested()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 }
                 if (state.posts.isEmpty) {
                   return AppEmptyState(

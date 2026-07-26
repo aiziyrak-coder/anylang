@@ -80,6 +80,8 @@ class MessagesScreen extends Screen<MessagesState, void> {
         }
         if (!isNetworkFailure(err)) {
           showAppError(err);
+        } else {
+          showAppMessage('conversations_load_failed'.tr);
         }
       },
     );
@@ -173,6 +175,9 @@ class MessagesScreen extends Screen<MessagesState, void> {
       },
       failure: (_) {
         state.searchResults.assignAll(_localChatMatches(q));
+        if (state.searchResults.isEmpty) {
+          showAppMessage('messages_search_failed'.tr);
+        }
       },
     );
     if (seq == _searchSeq) {
@@ -243,13 +248,6 @@ class MessagesScreen extends Screen<MessagesState, void> {
           showAppWarning('chat_blocked'.tr);
           return;
         }
-        final idx = state.conversations.indexWhere((c) => c.id == conv.id);
-        if (idx >= 0 && state.conversations[idx].unread > 0) {
-          state.conversations[idx] = state.conversations[idx].copyWith(
-            unread: 0,
-            highlighted: false,
-          );
-        }
         await navigate(
           ChatScreen(),
           payload: ChatPayload(
@@ -271,6 +269,13 @@ class MessagesScreen extends Screen<MessagesState, void> {
         );
         if (Get.isRegistered<RealtimeSyncService>()) {
           Get.find<RealtimeSyncService>().setActiveChat(null);
+        }
+        final idx = state.conversations.indexWhere((c) => c.id == conv.id);
+        if (idx >= 0 && state.conversations[idx].unread > 0) {
+          state.conversations[idx] = state.conversations[idx].copyWith(
+            unread: 0,
+            highlighted: false,
+          );
         }
         await _load();
       case NewConversation a:
@@ -327,11 +332,16 @@ class MessagesScreen extends Screen<MessagesState, void> {
         );
         if (ok != true) return;
         final repo = Get.find<ChatRepository>();
+        var failed = 0;
         for (final id in state.selectedIds.toList()) {
-          await repo.muteChat(id);
+          final r = await repo.muteChat(id);
+          if (r.errorOrNull != null) failed++;
         }
         state.selecting.value = false;
         state.selectedIds.clear();
+        if (failed > 0) {
+          showAppError('messages_bulk_partial_failed'.tr);
+        }
         await _load();
       case BulkHideSelected _:
         final okHide = await Get.dialog<bool>(
@@ -352,11 +362,16 @@ class MessagesScreen extends Screen<MessagesState, void> {
         );
         if (okHide != true) return;
         final hideRepo = Get.find<ChatRepository>();
+        var hideFailed = 0;
         for (final id in state.selectedIds.toList()) {
-          await hideRepo.hideChat(id);
+          final r = await hideRepo.hideChat(id);
+          if (r.errorOrNull != null) hideFailed++;
         }
         state.selecting.value = false;
         state.selectedIds.clear();
+        if (hideFailed > 0) {
+          showAppError('messages_bulk_partial_failed'.tr);
+        }
         await _load();
       case BulkDeleteSelected _:
         final okDel = await Get.dialog<bool>(
@@ -380,12 +395,21 @@ class MessagesScreen extends Screen<MessagesState, void> {
         );
         if (okDel != true) return;
         final delRepo = Get.find<ChatRepository>();
+        var delFailed = 0;
         for (final id in state.selectedIds.toList()) {
-          await delRepo.clearHistory(id);
-          await delRepo.hideChat(id);
+          final clearR = await delRepo.clearHistory(id);
+          if (clearR.errorOrNull != null) {
+            delFailed++;
+            continue;
+          }
+          final hideR = await delRepo.hideChat(id);
+          if (hideR.errorOrNull != null) delFailed++;
         }
         state.selecting.value = false;
         state.selectedIds.clear();
+        if (delFailed > 0) {
+          showAppError('messages_bulk_partial_failed'.tr);
+        }
         await _load();
     }
   }
@@ -532,10 +556,20 @@ class MessagesScreen extends Screen<MessagesState, void> {
           ],
         );
         if (blockChoice != 'block') return;
-        await SessionStore.setUserBlocked(conv.peerId, true);
-        await Get.find<ProfileRepository>().blockUser(conv.peerId);
-        await repo.hideChat(conv.id);
-        state.conversations.removeWhere((c) => c.id == conv.id);
+        final blockResult =
+            await Get.find<ProfileRepository>().blockUser(conv.peerId);
+        if (blockResult.errorOrNull != null) {
+          showAppError(blockResult.errorOrNull);
+          return;
+        }
+        final hideResult = await repo.hideChat(conv.id);
+        hideResult.when(
+          success: (_) async {
+            await SessionStore.setUserBlocked(conv.peerId, true);
+            state.conversations.removeWhere((c) => c.id == conv.id);
+          },
+          failure: showAppError,
+        );
       case ChatOverflowAction.search:
       case ChatOverflowAction.groupCatalog:
       case ChatOverflowAction.groupStats:

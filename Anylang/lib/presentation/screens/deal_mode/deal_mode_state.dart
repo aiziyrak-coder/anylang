@@ -8,6 +8,7 @@ class DealModeState extends GetxController {
   final RxString title = ''.obs;
   final RxBool loading = true.obs;
   final RxBool saving = false.obs;
+  final RxnString loadError = RxnString();
   final Rxn<DealData> deal = Rxn<DealData>();
   final RxList<DealDocumentCandidate> candidates = <DealDocumentCandidate>[].obs;
 

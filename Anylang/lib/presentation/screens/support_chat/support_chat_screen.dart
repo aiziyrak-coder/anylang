@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/support_repository.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import 'support_chat_action.dart';
@@ -13,12 +14,15 @@ import 'support_message.dart';
 class SupportChatScreen extends Screen<SupportChatState, void> {
   SupportChatScreen() : super(mobileContent: SupportChatContent());
 
+  static bool _welcomeAdded = false;
+
   @override
   void initState(void payload) {
     state.error.value = '';
     state.sending.value = false;
     state.showSend.value = false;
-    if (state.messages.isEmpty) {
+    if (!_welcomeAdded && state.messages.every((m) => m.id != 'welcome')) {
+      _welcomeAdded = true;
       state.messages.add(
         SupportMessage(
           id: 'welcome',
@@ -39,6 +43,17 @@ class SupportChatScreen extends Screen<SupportChatState, void> {
         state.showSend.value = a.text.trim().isNotEmpty;
       case SupportSend a:
         await _send(state, a.text);
+    }
+  }
+
+  String _locale() {
+    try {
+      final app = SessionStore.appLanguage().toLowerCase();
+      if (app.startsWith('ru')) return 'ru';
+      if (app.startsWith('en') || app.startsWith('us')) return 'en';
+      return 'uz';
+    } catch (_) {
+      return Get.locale?.languageCode ?? 'uz';
     }
   }
 
@@ -77,14 +92,10 @@ class SupportChatScreen extends Screen<SupportChatState, void> {
       ),
     );
 
-    final locale = SessionStore.preferredLanguage().isNotEmpty
-        ? SessionStore.preferredLanguage()
-        : (Get.locale?.languageCode ?? 'uz');
-
     final result = await Get.find<SupportRepository>().send(
       message: text,
       history: history,
-      locale: locale,
+      locale: _locale(),
     );
 
     final idx = state.messages.indexWhere((m) => m.id == pendingId);
@@ -102,12 +113,12 @@ class SupportChatScreen extends Screen<SupportChatState, void> {
         }
       },
       failure: (err) {
-        final msg = '$err'.trim();
+        final msg = AuthValidators.safeError(err, fallbackKey: 'support_send_failed');
         state.error.value = msg;
         if (idx >= 0) {
           state.messages[idx] = SupportMessage(
             id: pendingId,
-            text: msg.isNotEmpty ? msg : 'support_send_failed'.tr,
+            text: msg,
             isOutgoing: false,
             at: DateTime.now(),
             failed: true,

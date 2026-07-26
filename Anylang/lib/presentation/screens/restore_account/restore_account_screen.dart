@@ -8,6 +8,7 @@ import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/screen_options/screen_content.dart';
@@ -33,13 +34,19 @@ class RestoreAccountContent extends ScreenContent<RestoreAccountState> {
   late final TextEditingController emailCtrl;
   late final TextEditingController numberCtrl;
   late final TextEditingController reasonCtrl;
-  bool _prefilled = false;
 
   @override
   void initContent() {
     emailCtrl = TextEditingController();
     numberCtrl = TextEditingController();
     reasonCtrl = TextEditingController();
+  }
+
+  @override
+  void uiBuildFinished(RestoreAccountState state) {
+    if (emailCtrl.text.isEmpty && state.prefillEmail.value.isNotEmpty) {
+      emailCtrl.text = state.prefillEmail.value;
+    }
   }
 
   @override
@@ -56,14 +63,6 @@ class RestoreAccountContent extends ScreenContent<RestoreAccountState> {
     void Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
-    if (!_prefilled && state.prefillEmail.value.isNotEmpty) {
-      _prefilled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (emailCtrl.text.isEmpty) {
-          emailCtrl.text = state.prefillEmail.value;
-        }
-      });
-    }
     return GradientBackground(
       child: SafeArea(
         child: KeyboardAwareScrollView(
@@ -74,6 +73,7 @@ class RestoreAccountContent extends ScreenContent<RestoreAccountState> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
+                  tooltip: 'nav_back'.tr,
                   onPressed: () => sendAction(RestoreBack()),
                   icon: Icon(Icons.arrow_back_ios_new, color: c.textPrimary),
                 ),
@@ -111,6 +111,9 @@ class RestoreAccountContent extends ScreenContent<RestoreAccountState> {
                 label: 'restore_reason'.tr,
                 hint: 'restore_reason_hint'.tr,
                 controller: reasonCtrl,
+                maxLength: 500,
+                maxLines: 4,
+                minLines: 3,
               ),
               SizedBox(height: 24.dp),
               Obx(
@@ -150,9 +153,11 @@ class RestoreAccountScreen extends Screen<RestoreAccountState, String?> {
       case RestoreBack _:
         popBackNavigate();
       case RestoreSubmit a:
-        final email = a.email.trim();
-        if (!email.contains('@') || !email.contains('.') || email.length < 5) {
-          showAppError('email_invalid'.tr);
+        if (state.isLoading.value) return;
+        final email = a.email.trim().toLowerCase();
+        final emailErr = AuthValidators.emailError(email);
+        if (emailErr != null) {
+          showAppError(emailErr);
           return;
         }
         final number = a.number.trim();
@@ -171,7 +176,7 @@ class RestoreAccountScreen extends Screen<RestoreAccountState, String?> {
           final result = await repo.submitRestoreRequest(
             email: email,
             number: number.isEmpty ? null : number,
-            reason: a.reason,
+            reason: a.reason.trim(),
           );
           result.when(
             success: (_) {
@@ -180,6 +185,8 @@ class RestoreAccountScreen extends Screen<RestoreAccountState, String?> {
             },
             failure: showAppError,
           );
+        } catch (e) {
+          showAppError(AuthValidators.safeError(e));
         } finally {
           state.isLoading.value = false;
         }

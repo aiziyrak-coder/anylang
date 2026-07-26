@@ -36,7 +36,11 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
       case CodeChanged a:
         state.code.value = a.code;
       case ResendCode _:
-        if (state.email.value.isEmpty) return;
+        if (state.email.value.trim().isEmpty) {
+          showAppError('email_required'.tr);
+          return;
+        }
+        if (state.isLoading.value) return;
         state.isLoading.value = true;
         try {
           final repo = Get.find<AuthRepository>();
@@ -51,7 +55,7 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
           if (kDebugMode && otp != null && otp.isNotEmpty) {
             state.debugOtp.value = otp;
             state.code.value = otp;
-            showAppMessage('Tasdiqlash kodi: $otp');
+            showAppMessage('verify_debug_otp'.trParams({'otp': otp}));
           } else {
             showAppMessage('code_sent'.tr);
           }
@@ -59,7 +63,10 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
           state.isLoading.value = false;
         }
       case VerifySubmit a:
-        if (state.email.value.isEmpty) return;
+        if (state.email.value.trim().isEmpty) {
+          showAppError('email_required'.tr);
+          return;
+        }
         if (state.isLoading.value) return;
         if (a.code.trim().length != 6) {
           showAppError('code_invalid'.tr);

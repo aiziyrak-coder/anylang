@@ -265,7 +265,8 @@ class ProductsContent extends ScreenContent<ProductsState> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (showSections) ...[
-                            if (state.recommended.isNotEmpty) ...[
+                            if (state.recommended.isNotEmpty ||
+                                state.forYouLoadFailed.value) ...[
                               _forYouBlock(context, c, state, sendAction),
                               SizedBox(height: 22.dp),
                             ],
@@ -524,6 +525,8 @@ class ProductsContent extends ScreenContent<ProductsState> {
     void Function(MyAction) sendAction,
   ) {
     final basedOnViews = state.forYouBasedOnViews.value;
+    final loadFailed = state.forYouLoadFailed.value;
+    final empty = state.recommended.isEmpty;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20.dp),
       child: Container(
@@ -566,33 +569,43 @@ class ProductsContent extends ScreenContent<ProductsState> {
               ),
             ),
             SizedBox(height: 12.dp),
-            SizedBox(
-              height: 200.dp,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: state.recommended.length,
-                separatorBuilder: (_, _) => SizedBox(width: 12.dp),
-                itemBuilder: (_, i) {
-                  final p = state.recommended[i];
-                  final hasVideo = (p.videoUrl ?? '').isNotEmpty;
-                  return ProductTopCard(
-                    iconAsset: p.iconAsset,
-                    tileGradient: p.tileGradient,
-                    name: p.name,
-                    price: p.price,
-                    views: p.views,
-                    imageUrl: p.imageUrl,
-                    hasVideo: hasVideo,
-                    trustBadges: p.trustBadges,
-                    onTap: () => sendAction(OpenProduct(p)),
-                    onVideoTap: hasVideo
-                        ? () =>
-                            showProductVideoDialog(context, url: p.videoUrl!)
-                        : null,
-                  );
-                },
+            if (loadFailed && empty)
+              Text(
+                'products_for_you_failed'.tr,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            else if (!empty)
+              SizedBox(
+                height: 200.dp,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: state.recommended.length,
+                  separatorBuilder: (_, _) => SizedBox(width: 12.dp),
+                  itemBuilder: (_, i) {
+                    final p = state.recommended[i];
+                    final hasVideo = (p.videoUrl ?? '').isNotEmpty;
+                    return ProductTopCard(
+                      iconAsset: p.iconAsset,
+                      tileGradient: p.tileGradient,
+                      name: p.name,
+                      price: p.price,
+                      views: p.views,
+                      imageUrl: p.imageUrl,
+                      hasVideo: hasVideo,
+                      trustBadges: p.trustBadges,
+                      onTap: () => sendAction(OpenProduct(p)),
+                      onVideoTap: hasVideo
+                          ? () =>
+                              showProductVideoDialog(context, url: p.videoUrl!)
+                          : null,
+                    );
+                  },
+                ),
               ),
-            ),
           ],
         ),
       ),

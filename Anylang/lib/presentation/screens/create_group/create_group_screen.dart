@@ -19,11 +19,16 @@ import '../chat/chat_screen.dart';
 import '../friends/friend.dart';
 
 class CreateGroupState extends GetxController {
+  static const defaultMemberCap = 100;
+  static const friendsFetchLimit = 100;
+
   final title = ''.obs;
   final friends = <Friend>[].obs;
   final selectedIds = <int>{}.obs;
   final loading = true.obs;
   final submitting = false.obs;
+  final friendsLoadFailed = false.obs;
+  final friendsTruncated = false.obs;
 }
 
 class CreateGroupScreen extends Screen<CreateGroupState, void> {
@@ -36,18 +41,31 @@ class CreateGroupScreen extends Screen<CreateGroupState, void> {
 
   Future<void> _loadFriends() async {
     state.loading.value = true;
-    final result = await Get.find<FriendsRepository>().listFriends(limit: 100);
-    result.when(
-      success: (data) {
-        final items = asList(data)
-            .whereType<Map>()
-            .map((e) => Friend.fromApi(Map<String, dynamic>.from(e)))
-            .toList();
-        state.friends.assignAll(items);
-      },
-      failure: showAppError,
-    );
-    state.loading.value = false;
+    state.friendsLoadFailed.value = false;
+    state.friendsTruncated.value = false;
+    try {
+      final result = await Get.find<FriendsRepository>().listFriends(
+        limit: CreateGroupState.friendsFetchLimit,
+      );
+      result.when(
+        success: (data) {
+          final items = asList(data)
+              .whereType<Map>()
+              .map((e) => Friend.fromApi(Map<String, dynamic>.from(e)))
+              .toList();
+          state.friends.assignAll(items);
+          if (items.length >= CreateGroupState.friendsFetchLimit) {
+            state.friendsTruncated.value = true;
+          }
+        },
+        failure: (_) {
+          state.friendsLoadFailed.value = true;
+          showAppError('group_friends_load_failed'.tr);
+        },
+      );
+    } finally {
+      state.loading.value = false;
+    }
   }
 
   @override
@@ -67,12 +85,23 @@ class CreateGroupScreen extends Screen<CreateGroupState, void> {
     }
     if (action is _SubmitGroup) {
       final title = state.title.value.trim();
+      if (title.isEmpty) {
+        showAppError('group_title_required'.tr);
+        return;
+      }
       if (title.length < 2) {
         showAppError('group_title_required'.tr);
         return;
       }
       if (state.selectedIds.isEmpty) {
         showAppError('group_members_required'.tr);
+        return;
+      }
+      final totalMembers = state.selectedIds.length + 1;
+      if (totalMembers > CreateGroupState.defaultMemberCap) {
+        showAppError('group_members_max'.trParams({
+          'max': '${CreateGroupState.defaultMemberCap}',
+        }));
         return;
       }
       state.submitting.value = true;
@@ -91,9 +120,9 @@ class CreateGroupScreen extends Screen<CreateGroupState, void> {
           showAppError('error'.tr);
           return;
         }
-        if (!context.mounted) return;
-        final chat = ChatScreen()
-          ..payload = ChatPayload(
+        await navigate(
+          ChatScreen(),
+          payload: ChatPayload(
             chatId: chatId,
             peerId: 0,
             name: title,
@@ -101,9 +130,7 @@ class CreateGroupScreen extends Screen<CreateGroupState, void> {
             avatarGradient: avatarGradientFor(chatId),
             online: false,
             isGroup: true,
-          );
-        await Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => chat.build()),
+          ),
         );
       } finally {
         state.submitting.value = false;
@@ -158,12 +185,27 @@ class _CreateGroupContent extends ScreenContent<CreateGroupState> {
                   ),
                 ),
                 SizedBox(height: 8.dp),
-                if (state.friends.isEmpty)
+                if (state.friendsLoadFailed.value)
+                  Text(
+                    'group_friends_load_failed'.tr,
+                    style: TextStyle(color: const Color(0xFFB42318), fontSize: 14.sp),
+                  )
+                else if (state.friends.isEmpty)
                   Text(
                     'group_no_friends'.tr,
                     style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
                   )
-                else
+                else ...[
+                  if (state.friendsTruncated.value)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 8.dp),
+                      child: Text(
+                        'group_friends_truncated'.trParams({
+                          'n': '${CreateGroupState.friendsFetchLimit}',
+                        }),
+                        style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
+                      ),
+                    ),
                   ...state.friends.map((f) {
                     final selected = state.selectedIds.contains(f.id);
                     return CheckboxListTile(
@@ -174,6 +216,7 @@ class _CreateGroupContent extends ScreenContent<CreateGroupState> {
                       controlAffinity: ListTileControlAffinity.trailing,
                     );
                   }),
+                ],
                 SizedBox(height: 20.dp),
                 Obx(
                   () => RichButton(

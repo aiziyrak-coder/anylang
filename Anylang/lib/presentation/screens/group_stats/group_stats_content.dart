@@ -15,7 +15,6 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
 import 'group_stats_action.dart';
-import 'group_stats_models.dart';
 import 'group_stats_state.dart';
 
 class GroupStatsContent extends ScreenContent<GroupStatsState> {
@@ -38,6 +37,20 @@ class GroupStatsContent extends ScreenContent<GroupStatsState> {
                 onBack: () => sendAction(Back()),
               ),
             ),
+            Obx(() {
+              final subtitle = state.title.value.trim();
+              if (subtitle.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: EdgeInsets.fromLTRB(20.dp, 4.dp, 20.dp, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+                  ),
+                ),
+              );
+            }),
             Expanded(
               child: Obx(() {
                 if (state.loading.value) {

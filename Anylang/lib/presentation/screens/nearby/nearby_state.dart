@@ -9,6 +9,8 @@ class NearbyState extends GetxController {
   final RxBool locked = false.obs;
   final RxBool sharingEnabled = true.obs;
   final RxBool permissionDenied = false.obs;
+  final RxBool locationServiceOff = false.obs;
+  final RxBool gpsFailed = false.obs;
   final RxList<NearbyPerson> people = <NearbyPerson>[].obs;
   /// null = barcha tillar
   final RxnString languageFilter = RxnString();

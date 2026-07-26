@@ -37,6 +37,7 @@ class ChatState extends GetxController {
   final Rx<ChatMessage?> replyTo = Rx<ChatMessage?>(null);
   final RxBool recording = false.obs;
   final RxBool loading = true.obs;
+  final RxBool loadError = false.obs;
   final RxBool sending = false.obs;
   final RxBool aiSuggesting = false.obs;
   /// Hozir yuklanayotgan AI uslubi (chip spinner).
@@ -94,6 +95,7 @@ class ChatState extends GetxController {
     sending.value = false;
     messages.clear();
     loading.value = true;
+    loadError.value = false;
     scrollPinnedToBottom = _scrollPinnedByChat[p.chatId] ?? true;
     savedScrollOffset =
         scrollPinnedToBottom ? null : _scrollOffsetByChat[p.chatId];

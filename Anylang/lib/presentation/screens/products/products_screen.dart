@@ -79,16 +79,19 @@ class ProductsScreen extends Screen<ProductsState, void> {
       return;
     }
     state.aiMatchingLoading.value = true;
+    state.aiMatchingLoadFailed.value = false;
     final result = await Get.find<AiMatchingRepository>().matches(
       locale: _matchingLocale(),
     );
     state.aiMatchingLoading.value = false;
     result.when(
       success: (data) {
+        state.aiMatchingLoadFailed.value = false;
         state.aiMatching.value = AiMatchingResult.fromApi(data);
       },
       failure: (_) {
-        state.aiMatching.value = const AiMatchingResult();
+        state.aiMatchingLoadFailed.value = true;
+        state.aiMatching.value = null;
       },
     );
   }
@@ -97,9 +100,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
     try {
       return SessionStore.appLanguage();
     } catch (_) {
-      final code = Get.locale?.toString() ?? 'uz_UZ';
-      if (code.startsWith('ru')) return 'ru_RU';
-      if (code.startsWith('en') || code.startsWith('us')) return 'us_US';
       return 'uz_UZ';
     }
   }
@@ -117,6 +117,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
     );
     result.when(
       success: (data) {
+        state.categoriesLoadFailed.value = false;
         final items = <ProductCategoryOption>[];
         for (final e in asList(data)) {
           if (e is! Map) continue;
@@ -127,7 +128,10 @@ class ProductsScreen extends Screen<ProductsState, void> {
         }
         state.categories.assignAll(items);
       },
-      failure: (err) => debugPrint('categories load failed: $err'),
+      failure: (_) {
+        state.categoriesLoadFailed.value = true;
+        showAppWarning('products_categories_failed'.tr);
+      },
     );
   }
 
@@ -211,11 +215,13 @@ class ProductsScreen extends Screen<ProductsState, void> {
       final forYou = await repo.forYou(limit: 12);
       forYou.when(
         success: (data) {
+          state.forYouLoadFailed.value = false;
           final map = asMap(data);
           state.forYouBasedOnViews.value = map?['based_on_views'] == true;
           state.recommended.assignAll(_mapProducts(data));
         },
         failure: (_) {
+          state.forYouLoadFailed.value = true;
           state.forYouBasedOnViews.value = false;
           state.recommended.clear();
         },
@@ -224,6 +230,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
       state.newest.clear();
       state.recommended.clear();
       state.forYouBasedOnViews.value = false;
+      state.forYouLoadFailed.value = false;
     }
 
     if (q.isNotEmpty) {
@@ -719,6 +726,10 @@ class ProductsScreen extends Screen<ProductsState, void> {
         await _refreshBusinessFlag();
         if (!state.isBusiness.value) {
           showAppError('add_product_business_required'.tr);
+          return;
+        }
+        if (state.aiMatchingLoadFailed.value) {
+          showAppWarning('ai_matching_load_failed'.tr);
           return;
         }
         if (state.aiMatching.value == null && !state.aiMatchingLoading.value) {

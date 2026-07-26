@@ -285,8 +285,20 @@ async def redeem_promo_on_payment(
     discount_amount: Decimal,
     amount_after: Decimal,
 ) -> None:
-    promo = await get_promo(db, promo_id)
-    promo.used_count = int(promo.used_count or 0) + 1
+    promo = await db.execute(
+        select(PromoCode).where(PromoCode.id == promo_id).with_for_update()
+    )
+    promo = promo.scalar_one_or_none()
+    if promo is None:
+        raise AppError(message="Promokod topilmadi", error_code="PROMO_NOT_FOUND", status_code=404)
+    used = int(promo.used_count or 0)
+    if promo.max_uses is not None and used >= int(promo.max_uses):
+        raise AppError(
+            message="Promokod limiti tugagan",
+            error_code="PROMO_EXHAUSTED",
+            status_code=409,
+        )
+    promo.used_count = used + 1
     db.add(
         PromoRedemption(
             promo_code_id=promo.id,

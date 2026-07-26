@@ -15,6 +15,7 @@ class UserProfileState extends GetxController {
   final RxnInt friendshipRequestId = RxnInt();
   final RxBool isRequestIncoming = false.obs;
   final RxBool friendBusy = false.obs;
+  final RxnString listingsError = RxnString();
 
   void syncFriendshipFromPayload(UserProfilePayload? p) {
     friendshipStatus.value = p?.friendshipStatus ?? 'none';

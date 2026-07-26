@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
@@ -17,13 +18,36 @@ import 'profile_edit_state.dart';
 class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
   ProfileEditScreen() : super(mobileContent: ProfileEditContent());
 
+  void _applyGenderFromMap(Map<String, dynamic> map) {
+    final g = (map['gender'] as String?)?.toLowerCase();
+    if (g == 'female' || g == 'male') {
+      state.gender.value = g!;
+    }
+  }
+
+  void _seedFromSession() {
+    final user = SessionStore.user();
+    if (user == null) return;
+    _applyGenderFromMap(user);
+    final bd = user['birth_date']?.toString();
+    if (bd != null && bd.isNotEmpty) {
+      state.birthDate.value = DateTime.tryParse(bd);
+    }
+    final code = (user['country'] as String?)?.trim().toUpperCase() ?? '';
+    if (code.length == 2) {
+      state.country.value = code;
+    }
+  }
+
   @override
   void initState(ProfileAccount? payload) {
     state.isSaving.value = false;
+    state.avatarUploading.value = false;
+    state.hydrateFailed.value = false;
     state.account.value = payload;
     state.country.value = payload?.countryCode ?? '';
-    state.gender.value = 'male';
     state.birthDate.value = null;
+    _seedFromSession();
     if (payload != null) state.formEpoch.value++;
     unawaited(_hydrateFromApi());
   }
@@ -32,8 +56,12 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
     final result = await Get.find<ProfileRepository>().getMe();
     result.when(
       success: (data) {
+        state.hydrateFailed.value = false;
         final map = asMap(data);
-        if (map == null) return;
+        if (map == null) {
+          state.hydrateFailed.value = true;
+          return;
+        }
         unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
         final acc = ProfileAccount.fromApi(map);
         state.account.value = acc;
@@ -43,15 +71,17 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
         } else if (acc.countryCode.isNotEmpty) {
           state.country.value = acc.countryCode;
         }
-        final g = (map['gender'] as String?)?.toLowerCase();
-        state.gender.value = (g == 'female' || g == 'male') ? g! : 'male';
+        _applyGenderFromMap(map);
         final bd = map['birth_date']?.toString();
         if (bd != null && bd.isNotEmpty) {
           state.birthDate.value = DateTime.tryParse(bd);
         }
         state.formEpoch.value++;
       },
-      failure: showAppError,
+      failure: (err) {
+        state.hydrateFailed.value = true;
+        showAppError(err);
+      },
     );
   }
 
@@ -59,6 +89,20 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
     final m = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');
     return '${d.year}-$m-$day';
+  }
+
+  bool _validateBirthDate(DateTime date) {
+    final now = DateTime.now();
+    if (date.isAfter(now)) {
+      showAppError('birth_date_future'.tr);
+      return false;
+    }
+    final ageYears = now.difference(date).inDays / 365.25;
+    if (ageYears < 13) {
+      showAppError('birth_too_young'.tr);
+      return false;
+    }
+    return true;
   }
 
   @override
@@ -69,7 +113,7 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
       case ChangeProfilePhoto _:
         final file = await pickImage(context);
         if (file == null) return;
-        state.isSaving.value = true;
+        state.avatarUploading.value = true;
         try {
           final acc = state.account.value;
           final result = acc?.isBusiness == true
@@ -101,14 +145,16 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
                     state.avatarEpoch.value++;
                   }
                 },
-                failure: (_) {},
+                failure: (err) {
+                  debugPrint('avatar getMe failed: $err');
+                },
               );
               showAppMessage('profile_avatar_updated'.tr);
             },
             failure: (e) async => showAppError(e),
           );
         } finally {
-          state.isSaving.value = false;
+          state.avatarUploading.value = false;
         }
       case SelectProfileBirthDate a:
         state.birthDate.value = a.date;
@@ -117,17 +163,24 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
       case SelectProfileGender a:
         state.gender.value = a.gender;
       case SaveProfileEdit a:
+        if (state.hydrateFailed.value) {
+          showAppError('profile_edit_hydrate_failed'.tr);
+          return;
+        }
         final name = a.fullName.trim();
         if (name.length < 2) {
           showAppError('name_too_short'.tr);
+          return;
+        }
+        final bd = state.birthDate.value;
+        if (bd != null && !_validateBirthDate(bd)) {
           return;
         }
         state.isSaving.value = true;
         try {
           final body = <String, dynamic>{
             'full_name': name,
-            if (state.birthDate.value != null)
-              'birth_date': _fmtDate(state.birthDate.value!),
+            if (bd != null) 'birth_date': _fmtDate(bd),
             if (state.gender.value == 'male' || state.gender.value == 'female')
               'gender': state.gender.value,
             if (state.country.value.length == 2)

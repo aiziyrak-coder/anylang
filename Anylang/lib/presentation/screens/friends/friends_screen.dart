@@ -11,6 +11,7 @@ import '../../../data/network/profile_repository.dart';
 import '../../modal/country_picker_bottom_sheet.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
@@ -70,6 +71,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
     );
     result.when(
       success: (data) {
+        state.categoriesLoadFailed.value = false;
         final items = <ProductCategoryOption>[];
         for (final e in asList(data)) {
           if (e is! Map) continue;
@@ -80,7 +82,10 @@ class FriendsScreen extends Screen<FriendsState, void> {
         }
         state.productCategories.assignAll(items);
       },
-      failure: (_) {},
+      failure: (err) {
+        state.categoriesLoadFailed.value = true;
+        showAppWarning('friends_categories_failed'.tr);
+      },
     );
   }
 
@@ -88,7 +93,11 @@ class FriendsScreen extends Screen<FriendsState, void> {
     final result = await Get.find<FriendsRepository>().listRequests(type: 'incoming');
     result.when(
       success: (data) {
-        state.pendingCount.value = asList(data).whereType<Map>().length;
+        final count = asList(data)
+            .whereType<Map>()
+            .where((e) => (e['status'] as String?) == 'pending')
+            .length;
+        state.pendingCount.value = count;
       },
       failure: showAppError,
     );
@@ -101,6 +110,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
     );
     result.when(
       success: (data) {
+        state.recommendationsLoadFailed.value = false;
         final map = asMap(data);
         final items = asList(data)
             .whereType<Map>()
@@ -115,6 +125,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
             (total != null && total > 0) ? total : state.recommendations.length;
       },
       failure: (_) {
+        state.recommendationsLoadFailed.value = true;
         state.recommendations.clear();
         state.recommendationTotalCount.value = 0;
       },
@@ -193,6 +204,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
       success: (data) {
         requests = asList(data)
             .whereType<Map>()
+            .where((e) => (e['status'] as String?) == 'pending')
             .map((e) => FriendRequest.fromApi(Map<String, dynamic>.from(e)))
             .where((r) => r.requestId > 0)
             .toList();
@@ -248,8 +260,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
         showAppMessage('add_friend_requested'.tr);
       },
       failure: (err) {
-        final msg = err?.toString() ?? '';
-        if (msg.contains('REQUEST_ALREADY_SENT') || msg.contains('allaqachon')) {
+        if (AuthValidators.hasErrorCode(err, 'REQUEST_ALREADY_SENT')) {
           showAppMessage('add_friend_requested'.tr);
           return;
         }

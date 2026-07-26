@@ -19,30 +19,46 @@ class GroupStatsScreen extends Screen<GroupStatsState, GroupStatsPayload> {
 
   @override
   void initState(GroupStatsPayload? payload) {
-    if (payload != null) {
-      state.chatId.value = payload.chatId;
-      state.title.value = payload.title;
+    if (payload == null) {
+      Future.microtask(() {
+        showAppError('screen_payload_missing'.tr);
+        popBackNavigate();
+      });
+      return;
     }
+    state.chatId.value = payload.chatId;
+    state.title.value = payload.title;
     _load();
   }
 
   Future<void> _load() async {
     final chatId = state.chatId.value;
     if (chatId <= 0) {
-      state.loading.value = false;
+      showAppError('group_stats_invalid_chat'.tr);
+      popBackNavigate();
       return;
     }
     state.loading.value = true;
-    final result = await Get.find<ChatRepository>().groupStats(chatId);
-    state.loading.value = false;
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        if (map == null) return;
-        state.data.value = GroupStatsData.fromApi(map);
-      },
-      failure: showAppError,
-    );
+    try {
+      final result = await Get.find<ChatRepository>().groupStats(chatId);
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          if (map == null) {
+            showAppError('unknown_error'.tr);
+            return;
+          }
+          state.data.value = GroupStatsData.fromApi(map);
+          final t = map['group_title']?.toString().trim();
+          if (t != null && t.isNotEmpty) {
+            state.title.value = t;
+          }
+        },
+        failure: showAppError,
+      );
+    } finally {
+      state.loading.value = false;
+    }
   }
 
   Future<void> _openUser(int userId) async {

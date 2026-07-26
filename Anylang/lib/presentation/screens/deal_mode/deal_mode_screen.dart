@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import 'deal_mode_action.dart';
@@ -26,39 +27,57 @@ class DealModeScreen extends Screen<DealModeState, DealModePayload> {
   Future<void> _ensureAndLoad() async {
     final chatId = state.chatId.value;
     if (chatId <= 0) {
-      state.loading.value = false;
+      showAppError('deal_mode_invalid_chat'.tr);
+      popBackNavigate();
       return;
     }
     state.loading.value = true;
-    final repo = Get.find<ChatRepository>();
-    // Avval mavjud deal, yo‘q bo‘lsa start
-    var result = await repo.getDeal(chatId);
-    var map = asMap(result.dataOrNull);
-    final existing = map?['deal'];
-    if (existing == null) {
-      result = await repo.startDeal(chatId);
-      map = asMap(result.dataOrNull);
+    state.loadError.value = null;
+    try {
+      final repo = Get.find<ChatRepository>();
+      var result = await repo.getDeal(chatId);
+      var map = asMap(result.dataOrNull);
+      final existing = map?['deal'];
+      if (existing == null) {
+        result = await repo.startDeal(chatId);
+        map = asMap(result.dataOrNull);
+      }
+      if (map == null) {
+        final msg = AuthValidators.safeError(
+          result.errorOrNull,
+          fallbackKey: 'deal_mode_offline',
+        );
+        state.loadError.value = msg;
+        showAppError(msg);
+        return;
+      }
+      _applyResponse(map);
+    } finally {
+      state.loading.value = false;
     }
-    state.loading.value = false;
-    if (map == null) {
-      showAppError(result.errorOrNull ?? 'error'.tr);
-      return;
-    }
-    _applyResponse(map);
   }
 
   Future<void> _reload() async {
     final chatId = state.chatId.value;
     if (chatId <= 0) return;
     state.loading.value = true;
-    final result = await Get.find<ChatRepository>().getDeal(chatId);
-    state.loading.value = false;
-    final map = asMap(result.dataOrNull);
-    if (map == null) {
-      showAppError(result.errorOrNull ?? 'error'.tr);
-      return;
+    state.loadError.value = null;
+    try {
+      final result = await Get.find<ChatRepository>().getDeal(chatId);
+      final map = asMap(result.dataOrNull);
+      if (map == null) {
+        final msg = AuthValidators.safeError(
+          result.errorOrNull,
+          fallbackKey: 'deal_mode_offline',
+        );
+        state.loadError.value = msg;
+        showAppError(msg);
+        return;
+      }
+      _applyResponse(map);
+    } finally {
+      state.loading.value = false;
     }
-    _applyResponse(map);
   }
 
   void _applyResponse(Map<String, dynamic> map) {

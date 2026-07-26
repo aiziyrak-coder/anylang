@@ -110,6 +110,13 @@ class SessionStore {
     return lang;
   }
 
+  static bool get onboardingCompleted =>
+      _box.get('onboarding_completed', defaultValue: false) == true;
+
+  static Future<void> setOnboardingCompleted() async {
+    await _box.put('onboarding_completed', true);
+  }
+
   /// Tarjima maqsad tili = ona tili (native_language).
   static String preferredLanguage() => nativeLanguage();
 

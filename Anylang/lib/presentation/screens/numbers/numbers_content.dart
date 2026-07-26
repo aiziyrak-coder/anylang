@@ -163,7 +163,9 @@ class NumbersContent extends ScreenContent<NumbersState> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'numbers_my_label'.tr,
+              state.myFromCache.value
+                  ? 'numbers_my_cached_label'.tr
+                  : 'numbers_my_label'.tr,
               style: TextStyle(
                 color: c.textSecondary,
                 fontSize: 13.sp,

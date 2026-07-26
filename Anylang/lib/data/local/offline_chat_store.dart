@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:get/get.dart';
 import 'package:hive/hive.dart';
+
+import '../../presentation/utils/app_snackbar.dart';
 
 /// Offline chatlar + yuborilmagan xabarlar (Telegram uslubi).
 class OfflineChatStore {
@@ -29,13 +32,22 @@ class OfflineChatStore {
     final previous = _writeChain ?? Future<void>.value();
     final gate = Completer<void>();
     _writeChain = gate.future;
-    return previous.catchError((_) {}).then((_) async {
-      try {
-        return await fn();
-      } finally {
-        gate.complete();
-      }
-    });
+    return previous
+        .catchError((Object e, StackTrace st) {
+          // Oldingi yozuv xatosi zanjirni to'xtatmasin; log qilamiz.
+          assert(() {
+            // ignore: avoid_print
+            print('OfflineChatStore write error: $e\n$st');
+            return true;
+          }());
+        })
+        .then((_) async {
+          try {
+            return await fn();
+          } finally {
+            gate.complete();
+          }
+        });
   }
 
   static Future<void> saveConversations(List<Map<String, dynamic>> items) {
@@ -68,22 +80,39 @@ class OfflineChatStore {
     return _decodeList(_box.get('$_keyMessagesPrefix$chatId')?.toString());
   }
 
+  /// Outbox to‘lganida false qaytaradi (eski xabarlarni o‘chirmaydi).
+  static Future<bool> tryEnqueueOutbox(Map<String, dynamic> item) async {
+    try {
+      await enqueueOutbox(item);
+      return true;
+    } on StateError catch (e) {
+      if (e.message == 'OUTBOX_FULL') {
+        showAppError('outbox_full'.tr);
+        return false;
+      }
+      rethrow;
+    }
+  }
+
   static Future<void> enqueueOutbox(Map<String, dynamic> item) {
     return _serialized(() async {
       await open();
       final list = loadOutbox();
       final clientId = item['client_message_id']?.toString();
+      final replacing = clientId != null &&
+          clientId.isNotEmpty &&
+          list.any((e) => e['client_message_id'] == clientId);
       if (clientId != null && clientId.isNotEmpty) {
         list.removeWhere((e) => e['client_message_id'] == clientId);
+      }
+      if (!replacing && list.length >= _maxOutbox) {
+        throw StateError('OUTBOX_FULL');
       }
       final next = Map<String, dynamic>.from(item);
       next['created_at'] ??= DateTime.now().toIso8601String();
       list.add(next);
       list.sort(_byCreatedAt);
-      final capped = list.length <= _maxOutbox
-          ? list
-          : list.sublist(list.length - _maxOutbox);
-      await _box.put(_keyOutbox, jsonEncode(capped));
+      await _box.put(_keyOutbox, jsonEncode(list));
     });
   }
 

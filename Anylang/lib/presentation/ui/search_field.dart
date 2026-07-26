@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'theme/colors.dart';
 import '../utils/size_controller.dart';
 
@@ -86,7 +87,8 @@ class _SearchFieldState extends State<SearchField> {
             IconButton(
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints: BoxConstraints(minWidth: 32.dp, minHeight: 32.dp),
+              constraints: BoxConstraints(minWidth: 48.dp, minHeight: 48.dp),
+              tooltip: 'clear'.tr,
               onPressed: () {
                 _controller.clear();
                 setState(() {});

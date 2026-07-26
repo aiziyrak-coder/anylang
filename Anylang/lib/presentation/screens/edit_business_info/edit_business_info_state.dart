@@ -32,6 +32,7 @@ class EditBusinessInfoState extends GetxController {
   final RxnString auditReportUrl = RxnString();
   RxBool isSaving = false.obs;
   RxBool loading = true.obs;
+  final RxnString loadError = RxnString();
   final RxnString logoUrl = RxnString();
   /// Controllersni UI yangilash uchun — API hydrate bo'lganda ++.
   final RxInt formEpoch = 0.obs;

@@ -5,6 +5,8 @@ import '../../ui/theme/theme_controller.dart';
 import '../../utils/language_localizations.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../../utils/app_snackbar.dart';
+import '../login/login_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import 'select_language_action.dart';
 import 'select_language_content.dart';
@@ -35,8 +37,13 @@ class SelectLanguageScreen extends Screen<SelectLanguageState, void> {
     switch (action) {
       case SelectLang a:
         state.selectedKey.value = a.key;
-        final box = Hive.box('user');
-        await box.put('native_language', SessionStore.normalizeLangCode(a.langCode));
+        try {
+          final box = Hive.box('user');
+          await box.put('native_language', SessionStore.normalizeLangCode(a.langCode));
+          await SessionStore.applyNativeLanguage(SessionStore.normalizeLangCode(a.langCode));
+        } catch (_) {
+          showAppError('select_language_hive_error'.tr);
+        }
         if (a.localeCode != null) {
           LanguageLocalizations.changeLocale(a.localeCode!);
         }
@@ -49,12 +56,23 @@ class SelectLanguageScreen extends Screen<SelectLanguageState, void> {
           (o) => o.key == state.selectedKey.value,
           orElse: () => languageOptions.first,
         );
-        final box = Hive.box('user');
-        await box.put('native_language', SessionStore.normalizeLangCode(selected.langCode));
+        try {
+          final box = Hive.box('user');
+          final iso = SessionStore.normalizeLangCode(selected.langCode);
+          await box.put('native_language', iso);
+          await SessionStore.applyNativeLanguage(iso);
+        } catch (_) {
+          showAppError('select_language_hive_error'.tr);
+          return;
+        }
         if (selected.localeCode != null) {
           LanguageLocalizations.changeLocale(selected.localeCode!);
         }
-        navigate(OnboardingScreen());
+        if (SessionStore.onboardingCompleted) {
+          navigate(LoginScreen());
+        } else {
+          navigate(OnboardingScreen());
+        }
     }
   }
 }

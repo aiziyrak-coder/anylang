@@ -26,6 +26,13 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
 
   @override
   void initState(UserProfilePayload? payload) {
+    if (payload == null) {
+      Future.microtask(() {
+        showAppError('screen_payload_missing'.tr);
+        popBackNavigate();
+      });
+      return;
+    }
     state.data = payload;
     state.syncFriendshipFromPayload(payload);
     _loadListings();
@@ -36,20 +43,23 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
     final data = state.data;
     if (data == null || data.id <= 0 || !data.business) return;
     state.listings.clear();
+    state.listingsError.value = null;
     state.listingsLoading.value = true;
-    final result =
-        await Get.find<ProductsRepository>().listByUser(data.id, limit: 20);
-    if (result.errorOrNull != null) {
+    try {
+      final result =
+          await Get.find<ProductsRepository>().listByUser(data.id, limit: 20);
+      if (result.errorOrNull != null) {
+        state.listingsError.value = result.errorOrNull?.toString() ?? 'error'.tr;
+        return;
+      }
+      final items = asList(result.dataOrNull)
+          .whereType<Map>()
+          .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))
+          .toList();
+      state.listings.assignAll(items);
+    } finally {
       state.listingsLoading.value = false;
-      showAppError(result.errorOrNull);
-      return;
     }
-    final items = asList(result.dataOrNull)
-        .whereType<Map>()
-        .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))
-        .toList();
-    state.listings.assignAll(items);
-    state.listingsLoading.value = false;
   }
 
   Future<void> _refreshFriendship() async {
@@ -69,7 +79,9 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
         state.data = updated;
         state.syncFriendshipFromPayload(updated);
       },
-      failure: (_) {},
+      failure: (_) {
+        showAppWarning('profile_friendship_refresh_failed'.tr);
+      },
     );
   }
 
@@ -81,6 +93,10 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
       case WriteMessage _:
         final data = state.data;
         if (data == null || data.id <= 0) return;
+        if (SessionStore.isUserBlocked(data.id)) {
+          showAppWarning('chat_blocked'.tr);
+          return;
+        }
         // Chat ichidan profil ochilgan — mavjud chatga orqaga (yangi screen yo'q).
         final existingId = data.existingChatId;
         if (existingId != null && existingId > 0) {
@@ -92,6 +108,10 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
           success: (raw) {
             final map = asMap(raw);
             final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+            if (chatId <= 0) {
+              showAppError('chat_open_failed'.tr);
+              return;
+            }
             navigate(
               ChatScreen(),
               payload: ChatPayload(
@@ -139,6 +159,10 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
   Future<void> _sendFriendRequest(UserProfileState state) async {
     final data = state.data;
     if (data == null || data.id <= 0) return;
+    if (SessionStore.isUserBlocked(data.id)) {
+      showAppWarning('chat_blocked'.tr);
+      return;
+    }
     if (state.friendBusy.value) return;
     if (state.friendshipStatus.value == 'pending' ||
         state.friendshipStatus.value == 'accepted') {

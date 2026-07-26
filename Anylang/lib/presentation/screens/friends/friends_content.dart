@@ -149,8 +149,11 @@ class FriendsContent extends ScreenContent<FriendsState> {
                   : filtered.where((f) => !f.online).toList();
               final onlineVisible = online;
               final recs = state.recommendations.toList();
+              final recsFailed = state.recommendationsLoadFailed.value;
               final showRecs =
                   q.isEmpty && !state.hasActiveFilters && recs.isNotEmpty;
+              final showRecsFailed =
+                  q.isEmpty && !state.hasActiveFilters && recsFailed;
               final viewers = state.profileViewers.toList();
               final viewersTotal = state.profileViewersTotal.value;
               final viewersLocked = state.profileViewersLocked.value;
@@ -162,6 +165,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
               if (onlineVisible.isEmpty &&
                   others.isEmpty &&
                   !showRecs &&
+                  !showRecsFailed &&
                   !showViewers) {
                 final noFilters = q.isEmpty && !state.hasActiveFilters;
                 return AppEmptyState(
@@ -247,6 +251,21 @@ class FriendsContent extends ScreenContent<FriendsState> {
                           onChat: () => sendAction(OpenRecommendedChat(item)),
                         );
                       },
+                    ),
+                  ),
+                );
+              }
+              if (showRecsFailed) {
+                children.add(
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 8.dp),
+                    child: Text(
+                      'friends_recommendations_failed'.tr,
+                      style: TextStyle(
+                        color: c.textSecondary,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 );
@@ -625,7 +644,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
         showQuickActions: true,
         onTap: () => sendAction(OpenFriendProfile(f)),
         onMessage: () => sendAction(OpenChat(f)),
-        onCall: () => sendAction(OpenFriendCall(f)),
+        onCall: null,
         onLiveTranslate: () => sendAction(OpenFriendLive(f)),
         onProducts: () => sendAction(OpenFriendProducts(f)),
         onProfile: () => sendAction(OpenFriendProfile(f)),

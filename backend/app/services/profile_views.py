@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import BusinessProfile, ProfileView, Subscription, User
@@ -24,25 +25,23 @@ async def record_profile_view(
     if profile_user_id == viewer_user_id:
         return
     now = datetime.now(UTC)
-    result = await db.execute(
-        select(ProfileView).where(
-            ProfileView.profile_user_id == profile_user_id,
-            ProfileView.viewer_user_id == viewer_user_id,
-        )
-    )
-    row = result.scalar_one_or_none()
-    if row is not None:
-        row.view_count = int(row.view_count or 0) + 1
-        row.last_viewed_at = now
-        return
-    db.add(
-        ProfileView(
+    stmt = (
+        pg_insert(ProfileView)
+        .values(
             profile_user_id=profile_user_id,
             viewer_user_id=viewer_user_id,
             view_count=1,
             last_viewed_at=now,
         )
+        .on_conflict_do_update(
+            constraint="uq_profile_viewer",
+            set_={
+                "view_count": ProfileView.view_count + 1,
+                "last_viewed_at": now,
+            },
+        )
     )
+    await db.execute(stmt)
 
 
 async def list_profile_viewers(

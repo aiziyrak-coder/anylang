@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str = "redis://localhost:6379/0"
 
+    # SQLAlchemy pool (override via env in prod under load)
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    log_level: str = "INFO"
+
     s3_endpoint_url: str | None = None
     s3_access_key: str = ""
     s3_secret_key: str = ""

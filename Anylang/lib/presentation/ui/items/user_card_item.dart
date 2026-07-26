@@ -215,7 +215,7 @@ class UserCardItem extends StatelessWidget {
   Widget _quickActionsRow() {
     final actions = <(String, String, VoidCallback?)>[
       ('💬', 'user_card_action_chat', onMessage),
-      ('📞', 'user_card_action_call', onCall),
+      if (onCall != null) ('📞', 'user_card_action_call', onCall),
       ('🎤', 'user_card_action_live', onLiveTranslate),
       ('📦', 'user_card_action_products', onProducts),
       ('👤', 'user_card_action_profile', onProfile),

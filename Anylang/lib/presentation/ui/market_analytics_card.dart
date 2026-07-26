@@ -9,6 +9,7 @@ import 'theme/colors.dart';
 class MarketAnalyticsCard extends StatelessWidget {
   final MarketAnalyticsResult? result;
   final bool loading;
+  final bool loadFailed;
   final VoidCallback? onTap;
   final VoidCallback? onRetry;
 
@@ -16,6 +17,7 @@ class MarketAnalyticsCard extends StatelessWidget {
     super.key,
     this.result,
     this.loading = false,
+    this.loadFailed = false,
     this.onTap,
     this.onRetry,
   });
@@ -84,6 +86,22 @@ class MarketAnalyticsCard extends StatelessWidget {
                 Text(
                   'market_analytics_loading'.tr,
                   style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+                )
+              else if (loadFailed)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'market_analytics_load_failed'.tr,
+                        style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+                      ),
+                    ),
+                    if (onRetry != null)
+                      TextButton(
+                        onPressed: onRetry,
+                        child: Text('common_retry'.tr),
+                      ),
+                  ],
                 )
               else if (top == null)
                 Row(

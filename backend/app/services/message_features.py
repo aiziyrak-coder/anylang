@@ -94,15 +94,21 @@ async def _publish_message_personalized(
         sender_map = await _load_sender_public_map(db, {message.sender_id})
         s_name, s_avatar = sender_map.get(message.sender_id, (None, None))
     hub = get_hub()
+    # Reply payload til bo‘yicha: eng ko‘p uchragan tillarni bir marta yuklaymiz.
+    reply_by_lang: dict[str, dict | None] = {}
+    if message.reply_to_id:
+        langs = {user_preferred_lang(peer) for peer in users}
+        for lang in langs:
+            rmap = await _load_reply_to_payloads(db, [message], viewer_language=lang)
+            reply_by_lang[lang] = rmap.get(message.reply_to_id)
     for peer in users:
-        reply_map = await _load_reply_to_payloads(
-            db, [message], viewer_language=user_preferred_lang(peer)
-        )
+        lang = user_preferred_lang(peer)
+        reply_to = reply_by_lang.get(lang) if message.reply_to_id else None
         payload = _serialize_message(
             message,
             viewer_id=peer.id,
-            viewer_language=user_preferred_lang(peer),
-            reply_to=reply_map.get(message.reply_to_id) if message.reply_to_id else None,
+            viewer_language=lang,
+            reply_to=reply_to,
             sender_name=s_name,
             sender_avatar_url=s_avatar,
         )

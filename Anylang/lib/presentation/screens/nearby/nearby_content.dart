@@ -132,6 +132,32 @@ class NearbyContent extends ScreenContent<NearbyState> {
                 ),
               );
             }
+            if (state.locationServiceOff.value) {
+              return _centered(
+                AppEmptyState(
+                  icon: Icons.gps_off_outlined,
+                  title: 'nearby_gps_off'.tr,
+                  subtitle: 'nearby_gps_off_hint'.tr,
+                ),
+                child: SecondaryButton(
+                  text: 'nearby_permission_retry'.tr,
+                  onTap: () => sendAction(RetryNearby()),
+                ),
+              );
+            }
+            if (state.gpsFailed.value) {
+              return _centered(
+                AppEmptyState(
+                  icon: Icons.my_location_outlined,
+                  title: 'nearby_gps_failed'.tr,
+                  subtitle: 'nearby_gps_failed_hint'.tr,
+                ),
+                child: SecondaryButton(
+                  text: 'common_retry'.tr,
+                  onTap: () => sendAction(RetryNearby()),
+                ),
+              );
+            }
             if (state.locked.value) {
               return _centered(
                 AppEmptyState(

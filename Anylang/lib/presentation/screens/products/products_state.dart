@@ -39,6 +39,9 @@ class ProductsState extends GetxController {
   RxBool isBusiness = false.obs;
   final Rxn<AiMatchingResult> aiMatching = Rxn<AiMatchingResult>();
   final RxBool aiMatchingLoading = false.obs;
+  final RxBool aiMatchingLoadFailed = false.obs;
+  final RxBool categoriesLoadFailed = false.obs;
+  final RxBool forYouLoadFailed = false.obs;
 
   /// Search field sync (clear/load bilan UI bir xil bo‘lsin).
   final TextEditingController searchController = TextEditingController();

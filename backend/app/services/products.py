@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from PIL import Image
 from sqlalchemy import String, and_, case, cast, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -17,6 +18,7 @@ from app.models.product import Product, ProductFavorite, ProductImage, ProductTo
 from app.models.user import BusinessProfile, Subscription, User
 from app.schemas.product import ProductCreateIn, ProductUpdateIn
 from app.services.factory_verification import build_factory_verification, build_product_trust_badges
+from app.services.business import _key_from_url
 
 MAX_IMAGES_PER_PRODUCT = 10
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -325,10 +327,13 @@ async def _attach_images(
 
     if not image_ids:
         for img in existing:
-            img.product_id = None
-            img.is_primary = False
-            img.position = 0
-            img.attached_at = None
+            key = _key_from_url(img.url)
+            if key:
+                try:
+                    await get_storage().delete_object(key)
+                except Exception:
+                    pass
+            await db.delete(img)
         return
 
     result = await db.execute(
@@ -349,10 +354,13 @@ async def _attach_images(
     keep = set(image_ids)
     for img in existing:
         if img.id not in keep:
-            img.product_id = None
-            img.is_primary = False
-            img.position = 0
-            img.attached_at = None
+            key = _key_from_url(img.url)
+            if key:
+                try:
+                    await get_storage().delete_object(key)
+                except Exception:
+                    pass
+            await db.delete(img)
 
     primary_id = primary_image_id or image_ids[0]
     if primary_id not in image_ids:
@@ -1029,17 +1037,14 @@ async def get_product_detail(
 
 async def _record_view(db: AsyncSession, *, product_id: int, viewer_id: int) -> None:
     bucket = _day_bucket()
-    existing = await db.execute(
-        select(ProductView.id).where(
-            ProductView.user_id == viewer_id,
-            ProductView.product_id == product_id,
-            ProductView.day_bucket == bucket,
-        )
+    stmt = (
+        pg_insert(ProductView)
+        .values(user_id=viewer_id, product_id=product_id, day_bucket=bucket)
+        .on_conflict_do_nothing(constraint="uq_view_day")
     )
-    if existing.scalar_one_or_none() is not None:
+    result = await db.execute(stmt)
+    if not result.rowcount:
         return
-
-    db.add(ProductView(user_id=viewer_id, product_id=product_id, day_bucket=bucket))
     await db.execute(
         update(Product)
         .where(Product.id == product_id)
@@ -1159,6 +1164,12 @@ async def delete_product_image(db: AsyncSession, *, user: User, image_id: int) -
             error_code="PRODUCT_IMAGE_NOT_FOUND",
             status_code=400,
         )
+    key = _key_from_url(image.url)
+    if key:
+        try:
+            await get_storage().delete_object(key)
+        except Exception:
+            pass
     await db.delete(image)
 
 
@@ -1336,15 +1347,6 @@ async def update_product(
             attributes=product.attributes or [],
         )
 
-    if new_status is not None:
-        if new_status not in {"draft", "published", "archived"}:
-            raise AppError(
-                message="Status noto'g'ri",
-                error_code="VALIDATION_ERROR",
-                status_code=400,
-            )
-        product.status = new_status
-
     if image_ids is not None:
         await _attach_images(
             db,
@@ -1354,7 +1356,26 @@ async def update_product(
             primary_image_id=primary_image_id,
         )
 
-    await db.refresh(product, attribute_names=["images", "seller"])
+    if new_status is not None:
+        if new_status not in {"draft", "published", "archived"}:
+            raise AppError(
+                message="Status noto'g'ri",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        product.status = new_status
+
+    await db.flush()
+    result = await db.execute(
+        select(Product)
+        .where(Product.id == product.id)
+        .options(
+            selectinload(Product.images),
+            selectinload(Product.seller).selectinload(User.subscription),
+            selectinload(Product.seller).selectinload(User.business),
+        )
+    )
+    product = result.scalar_one()
     if not was_published and product.status == "published":
         from app.services.feed import create_system_post
 

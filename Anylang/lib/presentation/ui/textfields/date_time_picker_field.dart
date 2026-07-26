@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../custom_date_time_picker.dart';
 
@@ -24,6 +25,7 @@ class DateTimePickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Get.locale ?? const Locale('uz');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -44,8 +46,8 @@ class DateTimePickerField extends StatelessWidget {
             value: value.isEmpty ? hint : value,
             minTime: minTime,
             maxTime: maxTime ?? DateTime.now().add(Duration(days: 10)),
-            cancelText: "Bekor qilish",
-            confirmText: "Belgilash",
+            cancelText: 'cancel'.tr,
+            confirmText: 'select_language_confirm'.tr,
             textStyle: TextStyle(
               fontFamily: 'Fustat',
                 color: Colors.black,
@@ -53,7 +55,7 @@ class DateTimePickerField extends StatelessWidget {
                 fontWeight: FontWeight.normal
             ),
             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            locale: Locale("uz"),
+            locale: Locale(locale.languageCode),
             onChange: (dateTime) {
               selectedDate(dateTime.toString());
             },

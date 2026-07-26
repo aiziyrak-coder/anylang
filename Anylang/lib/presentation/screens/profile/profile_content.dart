@@ -175,6 +175,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                       () => AiMatchingCard(
                         result: state.aiMatching.value,
                         loading: state.aiMatchingLoading.value,
+                        loadFailed: state.aiMatchingLoadFailed.value,
                         onTap: () => sendAction(OpenAiMatching()),
                         onRetry: () => sendAction(RetryAiMatching()),
                       ),
@@ -184,6 +185,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                       () => MarketAnalyticsCard(
                         result: state.marketAnalytics.value,
                         loading: state.marketAnalyticsLoading.value,
+                        loadFailed: state.marketAnalyticsLoadFailed.value,
                         onTap: () => sendAction(OpenMarketAnalytics()),
                         onRetry: () => sendAction(RetryMarketAnalytics()),
                       ),

@@ -39,6 +39,8 @@ class FriendsState extends GetxController {
 
   /// Mahsulot kategoriyalari (picker uchun).
   RxList<ProductCategoryOption> productCategories = <ProductCategoryOption>[].obs;
+  RxBool categoriesLoadFailed = false.obs;
+  RxBool recommendationsLoadFailed = false.obs;
 
   bool get hasActiveFilters =>
       filterCountry.value != null ||

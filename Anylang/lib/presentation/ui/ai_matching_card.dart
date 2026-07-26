@@ -9,6 +9,7 @@ import 'theme/colors.dart';
 class AiMatchingCard extends StatelessWidget {
   final AiMatchingResult? result;
   final bool loading;
+  final bool loadFailed;
   final VoidCallback? onTap;
   final VoidCallback? onRetry;
 
@@ -16,6 +17,7 @@ class AiMatchingCard extends StatelessWidget {
     super.key,
     this.result,
     this.loading = false,
+    this.loadFailed = false,
     this.onTap,
     this.onRetry,
   });
@@ -80,6 +82,22 @@ class AiMatchingCard extends StatelessWidget {
                 Text(
                   'ai_matching_loading'.tr,
                   style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+                )
+              else if (loadFailed)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'ai_matching_load_failed'.tr,
+                        style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
+                      ),
+                    ),
+                    if (onRetry != null)
+                      TextButton(
+                        onPressed: onRetry,
+                        child: Text('common_retry'.tr),
+                      ),
+                  ],
                 )
               else if (top == null)
                 Row(

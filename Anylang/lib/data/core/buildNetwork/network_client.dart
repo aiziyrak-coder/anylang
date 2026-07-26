@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:get/get.dart' hide Response;
 
 import '../../../presentation/utils/app_snackbar.dart';
 import 'api_service.dart';
@@ -55,7 +56,7 @@ class NetworkClient {
     } on DioException catch (e) {
       return dioToError(e);
     } catch (e) {
-      return Error("Noma'lum xatolik");
+      return Error('unknown_error'.tr);
     }
   }
 
@@ -125,7 +126,7 @@ class NetworkClient {
       } catch (_) {}
       return result;
     } catch (e) {
-      final result = Error("Noma'lum xatolik");
+      final result = Error('unknown_error'.tr);
       try {
         _toast(result, notify: notify);
       } catch (_) {}

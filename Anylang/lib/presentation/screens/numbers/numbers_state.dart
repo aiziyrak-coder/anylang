@@ -18,4 +18,5 @@ class NumbersState extends GetxController {
   final hasMore = false.obs;
   final total = 0.obs;
   final awaitingPayment = false.obs;
+  final myFromCache = false.obs;
 }

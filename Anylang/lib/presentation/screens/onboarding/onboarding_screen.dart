@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../data/local/session_store.dart';
 import '../../../data/permissions/app_permissions.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../../utils/app_snackbar.dart';
 import '../login/login_screen.dart';
 import 'onboarding_action.dart';
 import 'onboarding_content.dart';
@@ -36,6 +38,7 @@ class OnboardingScreen extends Screen<OnboardingState, void> {
                 ),
               ],
             ),
+            barrierDismissible: false,
           ) ??
           false;
       if (goSettings) {
@@ -47,17 +50,28 @@ class OnboardingScreen extends Screen<OnboardingState, void> {
     }
   }
 
+  Future<void> _goLogin({required bool deferredPermissions}) async {
+    if (deferredPermissions) {
+      showAppMessage('onboarding_skip_deferred'.tr);
+    }
+    await SessionStore.setOnboardingCompleted();
+    navigate(LoginScreen());
+  }
+
   @override
   Future<void> actionHandler(OnboardingState state, MyAction action) async {
     switch (action) {
       case PageChanged a:
         state.currentPage.value = a.index;
       case SkipOnboarding _:
-        final ok = await _ensurePermissions(state);
-        if (ok) navigate(LoginScreen());
+        await _goLogin(deferredPermissions: true);
       case Continue _:
         final ok = await _ensurePermissions(state);
-        if (ok) navigate(LoginScreen());
+        if (ok) {
+          await _goLogin(deferredPermissions: false);
+        } else {
+          showAppWarning('onboarding_permissions_required'.tr);
+        }
     }
   }
 }

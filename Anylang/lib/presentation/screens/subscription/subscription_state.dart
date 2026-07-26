@@ -31,4 +31,8 @@ class SubscriptionState extends GetxController {
 
   RxString promoInput = ''.obs;
   Rxn<PromoPreview> promoPreview = Rxn<PromoPreview>();
+  /// Promo preview va checkout uchun tanlangan reja kodi.
+  RxnString promoPlanCode = RxnString();
+  /// Serverdan kelgan valyuta belgisi (masalan $, so‘m).
+  RxString priceCurrencyPrefix = '\$'.obs;
 }

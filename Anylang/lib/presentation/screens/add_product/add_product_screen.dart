@@ -10,6 +10,7 @@ import '../../modal/image_picker.dart';
 import '../../modal/video_picker.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/business_plan_dialog.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -50,6 +51,12 @@ class AddProductScreen extends Screen<AddProductState, void> {
   }
 
   @override
+  void dispose() {
+    state.videoUploading.value = false;
+    super.dispose();
+  }
+
+  @override
   Future<void> actionHandler(AddProductState state, MyAction action) async {
     switch (action) {
       case Back _:
@@ -68,6 +75,7 @@ class AddProductScreen extends Screen<AddProductState, void> {
           );
         }
       case RemoveProductImage a:
+        if (a.index < 0 || a.index >= state.images.length) return;
         final removedWasPrimary = state.images[a.index].isPrimary;
         state.images.removeAt(a.index);
         if (removedWasPrimary && state.images.isNotEmpty) {
@@ -106,7 +114,10 @@ class AddProductScreen extends Screen<AddProductState, void> {
           final map = asMap(up.dataOrNull);
           final url = (map?['url'] as String?)?.trim();
           if (url == null || url.isEmpty) {
-            showAppError(up.errorOrNull ?? 'product_video_upload_failed'.tr);
+            showAppError(AuthValidators.safeError(
+              up.errorOrNull,
+              fallbackKey: 'product_video_upload_failed',
+            ));
             return;
           }
           state.productVideoUrl.value = url;
@@ -184,14 +195,26 @@ class AddProductScreen extends Screen<AddProductState, void> {
       showAppError('add_product_price_invalid'.tr);
       return;
     }
+    final parsedPrice = double.parse(price);
+    if (parsedPrice <= 0) {
+      showAppError('add_product_price_invalid'.tr);
+      return;
+    }
+    if (state.videoUploading.value) {
+      showAppWarning('product_video_uploading'.tr);
+      return;
+    }
     final paths = state.images
         .map((e) => e.filePath)
         .whereType<String>()
         .where((p) => p.isNotEmpty && File(p).existsSync())
         .toList();
-    if (paths.isEmpty) {
+    if (paths.isEmpty && status == 'published') {
       showAppError('add_product_image_required'.tr);
       return;
+    }
+    if (paths.isEmpty && status == 'draft') {
+      showAppMessage('add_product_draft_no_image_hint'.tr);
     }
 
     state.isSubmitting.value = true;
@@ -203,7 +226,10 @@ class AddProductScreen extends Screen<AddProductState, void> {
         final map = asMap(up.dataOrNull);
         final id = (map?['id'] as num?)?.toInt();
         if (id == null) {
-          showAppError(up.errorOrNull ?? 'add_product_image_upload_failed'.tr);
+          showAppError(AuthValidators.safeError(
+            up.errorOrNull,
+            fallbackKey: 'add_product_image_upload_failed',
+          ));
           return;
         }
         imageIds.add(id);
@@ -219,8 +245,8 @@ class AddProductScreen extends Screen<AddProductState, void> {
         'price': price,
         'currency': state.currency.value,
         'category': cat,
-        'image_ids': imageIds,
-        'primary_image_id': imageIds.first,
+        if (imageIds.isNotEmpty) 'image_ids': imageIds,
+        if (imageIds.isNotEmpty) 'primary_image_id': imageIds.first,
         'status': status,
         'shipping_countries': state.shippingCountries.toList(),
         'capabilities': state.capabilities.toList(),
@@ -240,19 +266,15 @@ class AddProductScreen extends Screen<AddProductState, void> {
         popBackNavigate();
         return;
       }
-      final err = result.errorOrNull?.toString() ?? '';
-      final lower = err.toLowerCase();
-      if (err.contains('NOT_A_BUSINESS') ||
-          lower.contains('biznes') ||
-          lower.contains('business') ||
-          lower.contains('ruxsat yo')) {
+      final errCode = AuthValidators.apiErrorCode(result.errorOrNull);
+      if (errCode == 'NOT_A_BUSINESS') {
         showAppError('add_product_business_required'.tr);
         final goPlans = await showBusinessPlanRequiredDialog();
         if (goPlans) {
           await navigate(SubscriptionScreen());
         }
       } else {
-        showAppError(result.errorOrNull ?? 'error'.tr);
+        showAppError(AuthValidators.safeError(result.errorOrNull));
       }
     } finally {
       state.isSubmitting.value = false;

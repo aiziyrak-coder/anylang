@@ -9,6 +9,7 @@ from uuid import uuid4
 from PIL import Image
 from redis.asyncio import Redis
 from sqlalchemy import func, inspect as sa_inspect, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -651,7 +652,34 @@ async def create_message(
     # Async: relationship lazy-load → MissingGreenlet. Serialize oldidan bo'sh list.
     message.translations = []
     db.add(message)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        # Concurrent idempotent retry — return the existing row.
+        existing = await db.execute(
+            select(Message)
+            .where(
+                Message.chat_id == chat_id,
+                Message.client_message_id == client_message_id,
+            )
+            .options(selectinload(Message.translations))
+        )
+        duplicate = existing.scalar_one_or_none()
+        if duplicate is None:
+            raise
+        reply_map = await _load_reply_to_payloads(
+            db, [duplicate], viewer_language=user_preferred_lang(user)
+        )
+        s_name, s_avatar = _sender_public_fields(user)
+        return _serialize_message(
+            duplicate,
+            viewer_id=user.id,
+            viewer_language=user_preferred_lang(user),
+            reply_to=reply_map.get(duplicate.reply_to_id) if duplicate.reply_to_id else None,
+            sender_name=s_name,
+            sender_avatar_url=s_avatar,
+        )
 
     chat.last_message_id = message.id
     chat.last_message_at = message.created_at
@@ -681,15 +709,15 @@ async def create_message(
         try:
             await hub.publish(user.id, "new_message", {**event_data, "message": sender_payload})
             for peer in recipients:
-                if user_preferred_lang(peer) == user_preferred_lang(user):
-                    peer_reply = reply_payload
-                else:
+                peer_reply = reply_payload
+                if (
+                    message.reply_to_id
+                    and user_preferred_lang(peer) != user_preferred_lang(user)
+                ):
                     peer_reply_map = await _load_reply_to_payloads(
                         db, [msg], viewer_language=user_preferred_lang(peer)
                     )
-                    peer_reply = (
-                        peer_reply_map.get(msg.reply_to_id) if msg.reply_to_id else None
-                    )
+                    peer_reply = peer_reply_map.get(msg.reply_to_id)
                 peer_payload = _serialize_message(
                     msg,
                     viewer_id=peer.id,

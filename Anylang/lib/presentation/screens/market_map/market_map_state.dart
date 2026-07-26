@@ -7,4 +7,5 @@ class MarketMapState extends GetxController {
   final RxList<MarketMapCountry> countries = <MarketMapCountry>[].obs;
   final RxInt totalManufacturers = 0.obs;
   final Rxn<MarketMapCountry> selected = Rxn<MarketMapCountry>();
+  final RxnString loadError = RxnString();
 }

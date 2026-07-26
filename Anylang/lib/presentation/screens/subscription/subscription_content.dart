@@ -186,10 +186,27 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                       }
                       return Column(
                         children: [
+                          if (state.loadError.value) ...[
+                            Text(
+                              'subscription_plans_partial_failed'.tr,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: c.textSecondary,
+                                fontSize: 13.sp,
+                              ),
+                            ),
+                            SizedBox(height: 8.dp),
+                            TextButton(
+                              onPressed: () => sendAction(RetryLoadPlans()),
+                              child: Text('common_retry'.tr),
+                            ),
+                            SizedBox(height: 8.dp),
+                          ],
                           for (final plan in state.plans) ...[
                             _planCard(
                               plan,
                               state.billingMonths.value,
+                              state,
                               sendAction,
                             ),
                             SizedBox(height: 16.dp),
@@ -293,6 +310,7 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
   Widget _planCard(
     SubscriptionPlan plan,
     int months,
+    SubscriptionState state,
     void Function(MyAction) sendAction,
   ) {
     String? note;
@@ -324,7 +342,10 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
       ctaText: plan.isCurrent
           ? 'subscription_current_plan_cta'.tr
           : 'subscription_choose_plan_cta'.tr,
-      ctaEnabled: !plan.isCurrent,
+      ctaEnabled: !plan.isCurrent &&
+          !state.loadError.value &&
+          !state.loading.value &&
+          !state.awaitingPayment.value,
       onCta: () => sendAction(SelectPlan(plan)),
     );
   }

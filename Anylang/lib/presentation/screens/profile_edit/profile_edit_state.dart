@@ -7,8 +7,10 @@ class ProfileEditState extends GetxController {
 
   Rx<DateTime?> birthDate = Rx<DateTime?>(null);
   RxString country = ''.obs;
-  RxString gender = 'male'.obs; // 'female' | 'male'
+  RxString gender = ''.obs; // 'female' | 'male'
   RxBool isSaving = false.obs;
+  RxBool avatarUploading = false.obs;
+  RxBool hydrateFailed = false.obs;
   final RxInt avatarEpoch = 0.obs;
   /// Forma maydonlarini API bilan sinxronlash.
   final RxInt formEpoch = 0.obs;

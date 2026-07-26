@@ -12,6 +12,7 @@ import '../../modal/image_picker.dart';
 import '../../modal/telegram_action_sheet.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
@@ -31,7 +32,13 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
   @override
   void initState(GroupSettingsPayload? payload) {
     final p = payload;
-    if (p == null) return;
+    if (p == null) {
+      Future.microtask(() {
+        showAppError('screen_payload_missing'.tr);
+        popBackNavigate();
+      });
+      return;
+    }
     state.chatId = p.chatId;
     state.title.value = p.title;
     state.avatarUrl.value = p.avatarUrl;
@@ -76,29 +83,35 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
 
       case ReloadMembers _:
         state.loading.value = true;
-        final result = await repo.listMembers(state.chatId);
-        result.when(
-          success: (data) {
-            final map = asMap(data) ?? {};
-            final items = (map['items'] as List?) ?? const [];
-            state.members.assignAll(
-              items
-                  .whereType<Map>()
-                  .map((e) => GroupMemberVm.fromApi(Map<String, dynamic>.from(e))),
-            );
-            repo.getInvite(state.chatId).then((inv) {
-              inv.when(
-                success: (d) {
-                  final m = asMap(d) ?? {};
-                  state.inviteLink.value = m['link']?.toString();
-                },
-                failure: (_) {},
-              );
-            });
-          },
-          failure: showAppError,
-        );
-        state.loading.value = false;
+        try {
+          final result = await repo.listMembers(state.chatId);
+          final data = result.dataOrNull;
+          if (data == null) {
+            showAppError(result.errorOrNull);
+            break;
+          }
+          final map = asMap(data);
+          if (map == null) {
+            showAppError('unknown_error'.tr);
+            break;
+          }
+          final items = (map['items'] as List?) ?? const [];
+          state.members.assignAll(
+            items
+                .whereType<Map>()
+                .map((e) => GroupMemberVm.fromApi(Map<String, dynamic>.from(e))),
+          );
+          final inv = await repo.getInvite(state.chatId);
+          inv.when(
+            success: (d) {
+              final m = asMap(d) ?? {};
+              state.inviteLink.value = m['link']?.toString();
+            },
+            failure: showAppError,
+          );
+        } finally {
+          state.loading.value = false;
+        }
 
       case AddGroupMembers _:
         await _addMembers();
@@ -107,13 +120,16 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
       case SaveGroupTitle a:
         if (!_isAdmin) return;
         final title = a.title.trim();
-        if (title.isEmpty) return;
+        if (title.isEmpty) {
+          showAppError('group_settings_title_required'.tr);
+          return;
+        }
         state.saving.value = true;
         final result = await repo.updateGroup(chatId: state.chatId, title: title);
         result.when(
           success: (_) {
             state.title.value = title;
-            _toast('group_settings_saved'.tr);
+            showAppMessage('group_settings_saved'.tr);
           },
           failure: showAppError,
         );
@@ -129,7 +145,7 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
           success: (data) {
             final m = asMap(data) ?? {};
             state.avatarUrl.value = m['avatar_url']?.toString();
-            _toast('group_settings_saved'.tr);
+            showAppMessage('group_settings_saved'.tr);
           },
           failure: showAppError,
         );
@@ -197,7 +213,7 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
           success: (_) {
             state.myRole.value = 'admin';
             sendAction(ReloadMembers());
-            _toast('group_settings_saved'.tr);
+            showAppMessage('group_settings_saved'.tr);
           },
           failure: showAppError,
         );
@@ -222,7 +238,7 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
         final link = state.inviteLink.value;
         if (link == null || link.isEmpty) return;
         await Clipboard.setData(ClipboardData(text: link));
-        _toast('group_settings_invite_copied'.tr);
+        showAppMessage('group_settings_invite_copied'.tr);
 
       case RegenerateInviteLink _:
         if (!_isAdmin) return;
@@ -231,7 +247,7 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
           success: (d) {
             final m = asMap(d) ?? {};
             state.inviteLink.value = m['link']?.toString();
-            _toast('group_settings_invite_renewed'.tr);
+            showAppMessage('group_settings_invite_renewed'.tr);
           },
           failure: showAppError,
         );
@@ -242,7 +258,7 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
         result.when(
           success: (_) {
             state.inviteLink.value = null;
-            _toast('group_settings_invite_disabled'.tr);
+            showAppMessage('group_settings_invite_disabled'.tr);
           },
           failure: showAppError,
         );
@@ -261,6 +277,7 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
     final friendsResult =
         await Get.find<FriendsRepository>().listFriends(limit: 100);
     final friends = <Friend>[];
+    var friendsLoadFailed = false;
     friendsResult.when(
       success: (data) {
         friends.addAll(
@@ -270,10 +287,19 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
               .where((f) => !existing.contains(f.id)),
         );
       },
-      failure: showAppError,
+      failure: (_) {
+        friendsLoadFailed = true;
+      },
     );
+    if (friendsLoadFailed) {
+      showAppError(AuthValidators.safeError(
+        friendsResult.errorOrNull,
+        fallbackKey: 'group_settings_friends_load_failed',
+      ));
+      return;
+    }
     if (friends.isEmpty) {
-      _toast('group_settings_no_friends_to_add'.tr);
+      showAppMessage('group_settings_no_friends_to_add'.tr);
       return;
     }
     if (!context.mounted) return;
@@ -291,7 +317,7 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
     result.when(
       success: (_) {
         sendAction(ReloadMembers());
-        _toast('group_settings_members_added'.tr);
+        showAppMessage('group_settings_members_added'.tr);
       },
       failure: showAppError,
     );
@@ -319,12 +345,13 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
         success: (_) {
           state.isSuper.value = true;
           state.memberLimit.value = null;
-          _toast('group_settings_super_ok'.tr);
+          showAppMessage('group_settings_super_ok'.tr);
         },
         failure: showAppError,
       );
       return;
     }
+    var succeeded = false;
     for (var i = 0; i < 8; i++) {
       await Future.delayed(const Duration(seconds: 2));
       final st = await pay.getPayment(id);
@@ -332,14 +359,14 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
       if (p['status'] == 'succeeded') {
         state.isSuper.value = true;
         state.memberLimit.value = null;
-        _toast('group_settings_super_ok'.tr);
+        showAppMessage('group_settings_super_ok'.tr);
+        succeeded = true;
         break;
       }
     }
-  }
-
-  void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (!succeeded) {
+      showAppWarning('group_settings_payment_timeout'.tr);
+    }
   }
 
   Future<bool> _confirm({

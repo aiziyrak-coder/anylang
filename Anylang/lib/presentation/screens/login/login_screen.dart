@@ -6,6 +6,7 @@ import '../../../data/network/google_auth_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../ui/my_snackbar.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../forgot_password/forgot_password_screen.dart';
@@ -21,23 +22,20 @@ import 'login_state.dart';
 class LoginScreen extends Screen<LoginState, void> {
   LoginScreen() : super(mobileContent: LoginContent());
 
-  bool _validEmail(String email) {
-    final v = email.trim();
-    return v.contains('@') && v.contains('.') && v.length >= 5;
-  }
-
   @override
   Future<void> actionHandler(LoginState state, MyAction action) async {
     switch (action) {
       case LoginSubmit a:
         state.email = a.email;
-        state.password = a.password;
-        if (!_validEmail(a.email)) {
-          showAppError('email_invalid'.tr);
+        state.password = '';
+        final emailErr = AuthValidators.emailError(a.email);
+        if (emailErr != null) {
+          showAppError(emailErr);
           return;
         }
-        if (a.password.trim().length < 8) {
-          showAppError('password_short'.tr);
+        final passErr = AuthValidators.passwordError(a.password);
+        if (passErr != null) {
+          showAppError(passErr);
           return;
         }
         state.isLoading.value = true;
@@ -64,14 +62,14 @@ class LoginScreen extends Screen<LoginState, void> {
             return;
           }
 
-          outcome.result.when(
+          await outcome.result.when(
             success: (_) async {
               state.password = '';
               MySnackBar.dismiss();
               await connectRealtimeIfNeeded();
               navigateAndRemoveUntil(MainScreen());
             },
-            failure: showAppError,
+            failure: (err) async => showAppError(err),
           );
         } finally {
           state.isLoading.value = false;
@@ -105,16 +103,16 @@ class LoginScreen extends Screen<LoginState, void> {
             );
             return;
           }
-          outcome.result.when(
+          await outcome.result.when(
             success: (_) async {
               MySnackBar.dismiss();
               await connectRealtimeIfNeeded();
               navigateAndRemoveUntil(MainScreen());
             },
-            failure: showAppError,
+            failure: (err) async => showAppError(err),
           );
         } catch (e) {
-          showAppError(e.toString());
+          showAppError(AuthValidators.safeError(e, fallbackKey: 'google_failed'));
         } finally {
           state.isGoogleLoading.value = false;
         }

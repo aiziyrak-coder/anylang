@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/network/google_auth_service.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/rich_button.dart';
 import '../../ui/gradient_background.dart';
@@ -75,6 +77,7 @@ class LoginContent extends ScreenContent<LoginState> {
                 hint: 'email_hint'.tr,
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
                 onChanged: (v) => state.email = v,
               ),
               SizedBox(height: 18.dp),
@@ -84,6 +87,7 @@ class LoginContent extends ScreenContent<LoginState> {
                 controller: _passCtrl,
                 isPassword: true,
                 textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.password],
                 onChanged: (v) => state.password = v,
               ),
               SizedBox(height: 12.dp),
@@ -121,20 +125,24 @@ class LoginContent extends ScreenContent<LoginState> {
                     isLoading: state.isLoading.value,
                     enabled: !state.isGoogleLoading.value,
                     onTap: () {
-                      state.email = _emailCtrl.text;
-                      state.password = _passCtrl.text;
-                      sendAction(
-                        LoginSubmit(_emailCtrl.text, _passCtrl.text),
-                      );
+                      final email = _emailCtrl.text;
+                      final password = _passCtrl.text;
+                      state.email = email;
+                      _passCtrl.clear();
+                      state.password = '';
+                      sendAction(LoginSubmit(email, password));
                     },
                   )),
               SizedBox(height: 22.dp),
               LabeledDivider(label: 'or'.tr),
               SizedBox(height: 22.dp),
-              Obx(() => RichButton(
+              Obx(() {
+                final googleOk =
+                    kDebugMode || GoogleAuthService.serverClientId.isNotEmpty;
+                return RichButton(
                       text: 'google_sign_in'.tr,
                     isLoading: state.isGoogleLoading.value,
-                    enabled: !state.isLoading.value,
+                    enabled: !state.isLoading.value && googleOk,
                     onTap: () => sendAction(GoogleLogin()),
                     iconNearText: true,
                     startIcon: Image.asset('assets/images/ic_google.png', width: 20.dp, height: 20.dp),
@@ -147,7 +155,8 @@ class LoginContent extends ScreenContent<LoginState> {
                       borderRadius: BorderRadius.circular(18.dp),
                       border: Border.all(color: c.surfaceBorder),
                     ),
-                  )),
+                  );
+              }),
               SizedBox(height: 20.dp),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

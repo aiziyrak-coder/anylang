@@ -7,6 +7,7 @@ import '../../../data/network/feed_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/create_feed_bottom_sheet.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../user_profile/user_profile_payload.dart';
@@ -21,8 +22,10 @@ class BusinessFeedScreen extends Screen<BusinessFeedState, void> {
 
   @override
   void initState(void payload) {
-    _detectBusiness();
-    _load(reset: true);
+    Future.microtask(() async {
+      await _detectBusiness();
+      await _load(reset: true);
+    });
   }
 
   Future<void> _detectBusiness() async {
@@ -36,44 +39,55 @@ class BusinessFeedScreen extends Screen<BusinessFeedState, void> {
   Future<void> _load({required bool reset}) async {
     if (reset) {
       state.loading.value = true;
+      state.loadError.value = null;
       state.page.value = 1;
     } else {
       if (state.loadingMore.value || !state.hasMore.value) return;
       state.loadingMore.value = true;
     }
     final page = reset ? 1 : state.page.value + 1;
-    final result = await Get.find<FeedRepository>().list(
-      page: page,
-      limit: 20,
-      postType: state.filterType.value,
-    );
-    if (reset) state.loading.value = false;
-    state.loadingMore.value = false;
+    try {
+      final result = await Get.find<FeedRepository>().list(
+        page: page,
+        limit: 20,
+        postType: state.filterType.value,
+      );
 
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        final raw = map?['items'];
-        final items = <FeedPost>[];
-        if (raw is List) {
-          for (final e in raw) {
-            if (e is Map) {
-              items.add(FeedPost.fromApi(Map<String, dynamic>.from(e)));
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final raw = map?['items'];
+          final items = <FeedPost>[];
+          if (raw is List) {
+            for (final e in raw) {
+              if (e is Map) {
+                items.add(FeedPost.fromApi(Map<String, dynamic>.from(e)));
+              }
             }
           }
-        }
-        if (reset) {
-          state.posts.assignAll(items);
-        } else {
-          state.posts.addAll(items);
-        }
-        state.page.value = page;
-        state.hasMore.value = map?['has_more'] == true;
-      },
-      failure: (err) {
-        if (reset) showAppError(err);
-      },
-    );
+          if (reset) {
+            state.posts.assignAll(items);
+          } else {
+            state.posts.addAll(items);
+          }
+          state.page.value = page;
+          state.hasMore.value = map?['has_more'] == true;
+        },
+        failure: (err) {
+          if (reset) {
+            state.loadError.value =
+                AuthValidators.safeError(err, fallbackKey: 'feed_load_failed');
+          } else {
+            showAppError(
+              AuthValidators.safeError(err, fallbackKey: 'feed_load_more_failed'),
+            );
+          }
+        },
+      );
+    } finally {
+      if (reset) state.loading.value = false;
+      state.loadingMore.value = false;
+    }
   }
 
   @override
@@ -138,7 +152,10 @@ class BusinessFeedScreen extends Screen<BusinessFeedState, void> {
       case FeedOpenAuthor a:
         if (a.authorId <= 0) return;
         final me = SessionStore.userId();
-        if (me != null && me == a.authorId) return;
+        if (me != null && me == a.authorId) {
+          showAppMessage('feed_self_profile'.tr);
+          return;
+        }
         final profile = await Get.find<ProfileRepository>().getPublicUser(a.authorId);
         final map = asMap(profile.dataOrNull);
         if (map == null) {

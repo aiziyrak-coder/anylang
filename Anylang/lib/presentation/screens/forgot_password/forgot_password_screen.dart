@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../ui/buttons/primary_button.dart';
@@ -7,6 +8,7 @@ import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/screen_options/screen_content.dart';
@@ -40,6 +42,7 @@ class ForgotPasswordContent extends ScreenContent<ForgotPasswordState> {
   late final TextEditingController emailCtrl;
   late final TextEditingController codeCtrl;
   late final TextEditingController passCtrl;
+  int _lastStep = 0;
 
   @override
   void initContent() {
@@ -68,12 +71,18 @@ class ForgotPasswordContent extends ScreenContent<ForgotPasswordState> {
           padding: EdgeInsets.fromLTRB(24.dp, 16.dp, 24.dp, 24.dp),
           child: Obx(() {
             final step = state.step.value;
+            if (_lastStep == 1 && step == 0) {
+              codeCtrl.clear();
+              passCtrl.clear();
+            }
+            _lastStep = step;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Align(
                   alignment: Alignment.centerLeft,
                   child: IconButton(
+                    tooltip: 'nav_back'.tr,
                     onPressed: () => sendAction(ForgotBack()),
                     icon: Icon(Icons.arrow_back_ios_new, color: c.textPrimary),
                   ),
@@ -112,6 +121,8 @@ class ForgotPasswordContent extends ScreenContent<ForgotPasswordState> {
                     hint: '000000',
                     controller: codeCtrl,
                     keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                   SizedBox(height: 16.dp),
                   AppTextField(
@@ -155,8 +166,13 @@ class ForgotPasswordScreen extends Screen<ForgotPasswordState, void> {
         }
       case ForgotSendCode a:
         final email = a.email.trim().toLowerCase();
-        if (!email.contains('@')) {
-          showAppError('email_invalid'.tr);
+        if (email.isEmpty) {
+          showAppError('email_required'.tr);
+          return;
+        }
+        final emailErr = AuthValidators.emailError(email);
+        if (emailErr != null) {
+          showAppError(emailErr);
           return;
         }
         state.isLoading.value = true;
@@ -179,8 +195,9 @@ class ForgotPasswordScreen extends Screen<ForgotPasswordState, void> {
           showAppError('code_invalid'.tr);
           return;
         }
-        if (a.password.length < 8) {
-          showAppError('password_short'.tr);
+        final passErr = AuthValidators.passwordError(a.password);
+        if (passErr != null) {
+          showAppError(passErr);
           return;
         }
         state.isLoading.value = true;

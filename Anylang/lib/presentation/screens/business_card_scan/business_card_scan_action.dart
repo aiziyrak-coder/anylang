@@ -8,3 +8,5 @@ class BusinessCardScanned extends BusinessCardScanAction {
 }
 
 class CloseBusinessCardScan extends BusinessCardScanAction {}
+
+class BusinessCardClearError extends BusinessCardScanAction {}

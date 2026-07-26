@@ -18,17 +18,39 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "7"
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+        redis-server --requirepass "$$REDIS_PASSWORD";
+      else
+        redis-server;
+      fi'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:
       - "127.0.0.1:16380:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD-SHELL",
+          'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG; else redis-cli ping | grep -q PONG; fi',
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   minio:
     image: minio/minio:latest
@@ -73,7 +95,8 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://anylang:${POSTGRES_PASSWORD}@postgres:5432/anylang
-      REDIS_URL: redis://redis:6379/0
+      # Prefer REDIS_URL from deploy/.env (include password when REDIS_PASSWORD is set).
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       S3_ENDPOINT_URL: http://minio:9000
     ports:
       - "127.0.0.1:8105:8000"
@@ -90,9 +113,14 @@ services:
       timeout: 10s
       retries: 8
       start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
     command: >
       sh -c "alembic upgrade head &&
-             gunicorn app.main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 -w 2"
+             gunicorn app.main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 -w 2 --timeout 120 --graceful-timeout 30 --keep-alive 5"
 
   worker:
     build:
@@ -103,12 +131,17 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://anylang:${POSTGRES_PASSWORD}@postgres:5432/anylang
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"
     command: arq app.workers.settings.WorkerSettings
 
   admin:

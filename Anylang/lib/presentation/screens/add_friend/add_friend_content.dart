@@ -71,6 +71,14 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
 
                   if (isSearching) {
                     if (state.searching.value) return const AppLoading();
+                    final err = state.searchError.value;
+                    if (err != null && err.isNotEmpty) {
+                      return AppEmptyState(
+                        icon: Icons.error_outline_rounded,
+                        title: 'add_friend_search_failed'.tr,
+                        subtitle: err,
+                      );
+                    }
                     final items = state.results.toList();
                     if (items.isEmpty) {
                       return AppEmptyState(
@@ -84,6 +92,14 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
                   // Input bo'sh / qisqa: do'stlar rejimida yuborilgan so'rovlar
                   if (isFriendsMode) {
                     if (state.loadingSent.value) return const AppLoading();
+                    final sentErr = state.sentLoadError.value;
+                    if (sentErr != null && sentErr.isNotEmpty) {
+                      return AppEmptyState(
+                        icon: Icons.error_outline_rounded,
+                        title: 'add_friend_sent_load_failed'.tr,
+                        subtitle: sentErr,
+                      );
+                    }
                     final sent = state.sentRequests.toList();
                     if (sent.isEmpty) {
                       return AppEmptyState(
@@ -92,6 +108,17 @@ class AddFriendContent extends ScreenContent<AddFriendState> {
                       );
                     }
                     return _buildList(sent, true, sendAction);
+                  }
+
+                  final qHint = state.searchError.value;
+                  if (q.length >= 1 &&
+                      q.length < 3 &&
+                      qHint != null &&
+                      qHint.isNotEmpty) {
+                    return AppEmptyState(
+                      icon: Icons.tag_rounded,
+                      title: qHint,
+                    );
                   }
 
                   return AppEmptyState(

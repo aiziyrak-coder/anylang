@@ -7,6 +7,7 @@ class GroupCatalogState extends GetxController {
   final RxInt chatId = 0.obs;
   final RxString section = 'products'.obs;
   final RxBool loading = true.obs;
+  final RxnString loadError = RxnString();
   final RxList<GroupCatalogProduct> products = <GroupCatalogProduct>[].obs;
   final RxList<GroupCatalogDocument> documents = <GroupCatalogDocument>[].obs;
   final RxList<GroupCatalogCompany> companies = <GroupCatalogCompany>[].obs;

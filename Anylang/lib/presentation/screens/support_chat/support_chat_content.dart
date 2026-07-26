@@ -203,6 +203,7 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
                   padding: EdgeInsets.symmetric(horizontal: 16.dp),
                   child: TextField(
                     controller: _composer,
+                    enabled: !state.sending.value,
                     minLines: 1,
                     maxLines: 5,
                     textInputAction: TextInputAction.send,

@@ -9,6 +9,7 @@ import '../../../domain/models/country_option.dart';
 import '../../../data/network/auth_repository.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../main/main_screen.dart';
@@ -97,6 +98,7 @@ class RegisterScreen extends Screen<RegisterState, void> {
   }
 
   Future<void> _submit(RegisterState state, RegisterSubmit a) async {
+    if (state.isLoading.value) return;
     final name = a.fullName.trim();
     final email = a.email.trim().toLowerCase();
     final password = a.password;
@@ -125,17 +127,14 @@ class RegisterScreen extends Screen<RegisterState, void> {
       _fail('country_required'.tr);
       return;
     }
-    if (!email.contains('@') || !email.contains('.')) {
-      _fail('email_invalid'.tr);
+    final emailErr = AuthValidators.emailError(email);
+    if (emailErr != null) {
+      _fail(emailErr);
       return;
     }
-    if (password.length < 8) {
-      _fail('password_short'.tr);
-      return;
-    }
-    if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
-        !RegExp(r'\d').hasMatch(password)) {
-      _fail('password_weak'.tr);
+    final passErr = AuthValidators.passwordError(password);
+    if (passErr != null) {
+      _fail(passErr);
       return;
     }
 
@@ -154,8 +153,7 @@ class RegisterScreen extends Screen<RegisterState, void> {
 
       final data = result.dataOrNull;
       if (data == null) {
-        final err = result.errorOrNull?.toString() ?? 'error'.tr;
-        _fail(err);
+        _fail(AuthValidators.safeError(result.errorOrNull));
         return;
       }
 
@@ -163,8 +161,8 @@ class RegisterScreen extends Screen<RegisterState, void> {
       final otp = map?['debug_otp']?.toString().trim();
       final serverMsg = map?['message']?.toString();
 
-      // SMTP yo‘q / bootstrap: OTP bilan darhol verify → asosiy ekran.
-      if (otp != null && otp.length == 6) {
+      // SMTP yo‘q / bootstrap: OTP bilan darhol verify → asosiy ekran (faqat debug).
+      if (kDebugMode && otp != null && otp.length == 6) {
         final verified = await repo.verifyEmail(email: email, code: otp);
         if (verified.dataOrNull != null) {
           showAppMessage('register_done'.tr);
@@ -184,7 +182,7 @@ class RegisterScreen extends Screen<RegisterState, void> {
       _goVerify(email, otp);
     } catch (e, st) {
       debugPrint('register submit error: $e\n$st');
-      _fail(e.toString());
+      _fail(AuthValidators.safeError(e));
     } finally {
       state.isLoading.value = false;
     }

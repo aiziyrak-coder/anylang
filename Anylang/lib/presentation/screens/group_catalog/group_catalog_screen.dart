@@ -23,40 +23,58 @@ class GroupCatalogScreen extends Screen<GroupCatalogState, GroupCatalogPayload> 
 
   @override
   void initState(GroupCatalogPayload? payload) {
-    if (payload != null) {
-      state.chatId.value = payload.chatId;
-      state.title.value = payload.title;
-      state.section.value = payload.initialSection;
+    if (payload == null) {
+      Future.microtask(() {
+        showAppError('screen_payload_missing'.tr);
+        popBackNavigate();
+      });
+      return;
     }
+    state.chatId.value = payload.chatId;
+    state.title.value = payload.title;
+    state.section.value = payload.initialSection;
     _load();
   }
 
   Future<void> _load() async {
     final chatId = state.chatId.value;
     if (chatId <= 0) {
-      state.loading.value = false;
+      showAppError('group_catalog_invalid_chat'.tr);
+      popBackNavigate();
       return;
     }
     state.loading.value = true;
-    final result = await Get.find<ChatRepository>().groupCatalog(
-      chatId,
-      section: 'all',
-    );
-    state.loading.value = false;
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        if (map == null) return;
-        final catalog = GroupCatalogData.fromApi(map);
-        state.products.assignAll(catalog.products);
-        state.documents.assignAll(catalog.documents);
-        state.companies.assignAll(catalog.companies);
-        state.counts
-          ..clear()
-          ..addAll(catalog.counts);
-      },
-      failure: showAppError,
-    );
+    state.loadError.value = null;
+    try {
+      final section = state.section.value;
+      final result = await Get.find<ChatRepository>().groupCatalog(
+        chatId,
+        section: section == 'all' ? 'all' : section,
+      );
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          if (map == null) {
+            state.loadError.value = 'unknown_error'.tr;
+            return;
+          }
+          final catalog = GroupCatalogData.fromApi(map);
+          state.products.assignAll(catalog.products);
+          state.documents.assignAll(catalog.documents);
+          state.companies.assignAll(catalog.companies);
+          state.counts
+            ..clear()
+            ..addAll(catalog.counts);
+          final t = map['title']?.toString().trim();
+          if (t != null && t.isNotEmpty) {
+            state.title.value = t;
+          }
+        },
+        failure: (err) => showAppError(err),
+      );
+    } finally {
+      state.loading.value = false;
+    }
   }
 
   Future<void> _openProduct(GroupCatalogProduct item) async {
@@ -136,6 +154,7 @@ class GroupCatalogScreen extends Screen<GroupCatalogState, GroupCatalogPayload> 
         await _load();
       case GroupCatalogSelectSection a:
         state.section.value = a.section;
+        await _load();
       case GroupCatalogOpenProduct a:
         await _openProduct(a.item);
       case GroupCatalogOpenDocument a:

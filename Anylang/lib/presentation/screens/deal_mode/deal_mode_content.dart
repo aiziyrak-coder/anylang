@@ -6,7 +6,9 @@ import 'package:get/get.dart';
 
 import '../../ui/app_loading.dart';
 import '../../ui/app_top_bar.dart';
+import '../../ui/app_empty_state.dart';
 import '../../ui/buttons/primary_button.dart';
+import '../../ui/buttons/secondary_button.dart';
 import '../../ui/buttons/rich_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/keyboard_aware_scroll.dart';
@@ -69,6 +71,29 @@ class DealModeContent extends ScreenContent<DealModeState> {
               child: Obx(() {
                 if (state.loading.value) {
                   return const Center(child: AppLoading());
+                }
+                final loadErr = state.loadError.value;
+                if (loadErr != null && loadErr.isNotEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.dp),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppEmptyState(
+                            icon: Icons.wifi_off_rounded,
+                            title: 'deal_mode_offline'.tr,
+                            subtitle: loadErr,
+                          ),
+                          SizedBox(height: 16.dp),
+                          SecondaryButton(
+                            text: 'common_retry'.tr,
+                            onTap: () => sendAction(DealModeRefresh()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 }
                 final deal = state.deal.value;
                 if (deal == null) {

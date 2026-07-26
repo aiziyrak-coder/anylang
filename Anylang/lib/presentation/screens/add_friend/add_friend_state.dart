@@ -12,11 +12,17 @@ class AddFriendState extends GetxController {
   /// Qidiruv matni.
   RxString query = ''.obs;
 
+  /// Qidiruv xatosi (API muvaffaqiyatsiz).
+  RxnString searchError = RxnString();
+
   /// API qidiruv ketmoqda.
   RxBool searching = false.obs;
 
   /// Yuborilgan so'rovlar yuklanmoqda.
   RxBool loadingSent = false.obs;
+
+  /// Outgoing ro'yxat yuklash xatosi.
+  RxnString sentLoadError = RxnString();
 
   /// Xabarlar (+) yoki Do'stlar (so'rov) rejimi — initState'da beriladi.
   AddFriendMode mode = AddFriendMode.chat;

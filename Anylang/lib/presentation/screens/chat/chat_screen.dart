@@ -139,6 +139,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             return at.compareTo(bt);
           });
         state.messages.assignAll(merged);
+        state.loadError.value = false;
         final pinned = merged.where((m) => m.pinned).toList();
         state.pinnedMessages.assignAll(pinned);
         state.pinnedBanner.value = pinned.isNotEmpty ? pinned.last : null;
@@ -148,7 +149,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             .whereType<int>()
             .toList();
         if (ids.isNotEmpty) {
-          Get.find<ChatRepository>().markRead(chatId, ids);
+          unawaited(_markReadSafe(chatId, ids));
         }
         if (chatId > 0) {
           unawaited(_loadPinned(chatId, session));
@@ -172,6 +173,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           state.messages.assignAll(merged);
           return;
         }
+        state.loadError.value = true;
         if (!isNetworkFailure(err)) {
           showAppError(err);
         }
@@ -211,7 +213,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         state.pinnedMessages.assignAll(mapped);
         state.pinnedBanner.value = mapped.isNotEmpty ? mapped.last : null;
       },
-      failure: (_) {},
+      failure: (err) {
+        state.pinnedMessages.clear();
+        state.pinnedBanner.value = null;
+        debugPrint('pinned load failed: $err');
+      },
     );
   }
 
@@ -828,7 +834,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         state.messages.add(optimistic);
 
         if (!online) {
-          await OfflineChatStore.enqueueOutbox({
+          await OfflineChatStore.tryEnqueueOutbox({
             'kind': 'voice',
             'chat_id': state.chatId.value,
             'client_message_id': clientId,
@@ -859,7 +865,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               state.messages[idx] =
                   state.messages[idx].withStatus(ChatStatus.pending);
             }
-            await OfflineChatStore.enqueueOutbox({
+            await OfflineChatStore.tryEnqueueOutbox({
               'kind': 'voice',
               'chat_id': state.chatId.value,
               'client_message_id': clientId,
@@ -903,7 +909,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
                 state.messages[idx] =
                     state.messages[idx].withStatus(ChatStatus.pending);
               }
-              await OfflineChatStore.enqueueOutbox({
+              await OfflineChatStore.tryEnqueueOutbox({
                 'kind': 'voice',
                 'chat_id': state.chatId.value,
                 'client_message_id': clientId,
@@ -956,7 +962,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
                 state.messages[idx] =
                     state.messages[idx].withStatus(ChatStatus.pending);
               }
-              await OfflineChatStore.enqueueOutbox({
+              await OfflineChatStore.tryEnqueueOutbox({
                 'kind': 'voice',
                 'chat_id': state.chatId.value,
                 'client_message_id': clientId,
@@ -1052,6 +1058,14 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     return _isGroupAdmin();
   }
 
+  Future<void> _markReadSafe(int chatId, List<int> ids) async {
+    final result = await Get.find<ChatRepository>().markRead(chatId, ids);
+    result.when(
+      success: (_) {},
+      failure: (err) => debugPrint('markRead failed chat=$chatId: $err'),
+    );
+  }
+
   Future<void> _clearHistoryFlow() async {
     final isGroup = state.isGroup.value;
     final canEveryone = !isGroup || _isGroupAdmin();
@@ -1090,6 +1104,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     required bool showToast,
     bool forEveryone = false,
   }) async {
+    final snapshot = state.messages.toList();
+    final pinnedSnapshot = state.pinnedMessages.toList();
+    final bannerSnapshot = state.pinnedBanner.value;
+    final replySnapshot = state.replyTo.value;
     state.messages.clear();
     state.replyTo.value = null;
     state.pinnedBanner.value = null;
@@ -1099,10 +1117,20 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         state.chatId.value,
         forEveryone: forEveryone,
       );
+      var ok = false;
       result.when(
-        success: (_) {},
+        success: (_) {
+          ok = true;
+        },
         failure: showAppError,
       );
+      if (!ok) {
+        state.messages.assignAll(snapshot);
+        state.pinnedMessages.assignAll(pinnedSnapshot);
+        state.pinnedBanner.value = bannerSnapshot;
+        state.replyTo.value = replySnapshot;
+        return;
+      }
     }
     if (showToast) _toast('chat_history_cleared'.tr);
   }
@@ -1230,7 +1258,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     _bumpConversationPreview(text);
 
     if (!online) {
-      await OfflineChatStore.enqueueOutbox({
+      await OfflineChatStore.tryEnqueueOutbox({
         'kind': 'text',
         'chat_id': state.chatId.value,
         'client_message_id': clientId,
@@ -1293,7 +1321,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     if (idx >= 0) {
       state.messages[idx] = state.messages[idx].withStatus(ChatStatus.pending);
     }
-    await OfflineChatStore.enqueueOutbox({
+    await OfflineChatStore.tryEnqueueOutbox({
       'kind': 'text',
       'chat_id': state.chatId.value,
       'client_message_id': clientId,
@@ -1617,7 +1645,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final file = picked.files.first;
     final path = file.path;
     if (path == null || path.isEmpty) {
-      showAppMessage('Fayl ochilmadi');
+      showAppMessage('file_open_failed'.tr);
       return;
     }
     final name = file.name;
@@ -2175,7 +2203,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     state.messages.add(optimisticRow);
 
     if (!online) {
-      await OfflineChatStore.enqueueOutbox({
+      await OfflineChatStore.tryEnqueueOutbox({
         'kind': messageType,
         'chat_id': state.chatId.value,
         'client_message_id': clientId,
@@ -2220,7 +2248,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           state.messages[idx] =
               state.messages[idx].withStatus(ChatStatus.pending);
         }
-        await OfflineChatStore.enqueueOutbox({
+        await OfflineChatStore.tryEnqueueOutbox({
           'kind': messageType,
           'chat_id': state.chatId.value,
           'client_message_id': clientId,
@@ -2264,7 +2292,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             state.messages[idx] =
                 state.messages[idx].withStatus(ChatStatus.pending);
           }
-          await OfflineChatStore.enqueueOutbox({
+          await OfflineChatStore.tryEnqueueOutbox({
             'kind': messageType,
             'chat_id': state.chatId.value,
             'client_message_id': clientId,
@@ -2317,7 +2345,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             state.messages[idx] =
                 state.messages[idx].withStatus(ChatStatus.pending);
           }
-          await OfflineChatStore.enqueueOutbox({
+          await OfflineChatStore.tryEnqueueOutbox({
             'kind': messageType,
             'chat_id': state.chatId.value,
             'client_message_id': clientId,
@@ -2388,7 +2416,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       if (result.errorOrNull != null) {
         showAppError(result.errorOrNull!);
       } else {
-        showAppMessage('Mahsulot topilmadi');
+        showAppMessage('product_not_found'.tr);
       }
       return null;
     }

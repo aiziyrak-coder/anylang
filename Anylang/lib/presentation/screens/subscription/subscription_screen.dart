@@ -47,6 +47,13 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
     _lifecycle?.dispose();
     _pendingPaymentId = null;
     state.awaitingPayment.value = false;
+    super.dispose();
+  }
+
+  String _money(String amount) {
+    final prefix = state.priceCurrencyPrefix.value;
+    if (amount.startsWith(prefix) || amount.startsWith('\$')) return amount;
+    return '$prefix$amount';
   }
 
   Future<void> _loadAll() async {
@@ -88,7 +95,10 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           state.autoRenew.value = false;
         }
       },
-      failure: (_) {},
+      failure: (err) {
+        state.loadError.value = true;
+        showAppError(err);
+      },
     );
   }
 
@@ -104,6 +114,11 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         if (data is! Map || data['plans'] is! List) {
           state.loadError.value = true;
           return;
+        }
+        final currency = data['currency']?.toString().trim();
+        if (currency != null && currency.isNotEmpty) {
+          state.priceCurrencyPrefix.value =
+              currency.length <= 3 ? currency : '\$';
         }
         var currentCode = state.currentPlanCode.value;
         if (currentCode == null) {
@@ -131,6 +146,8 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           final yearly = raw['yearly_price']?.toString();
           final yearlyTotal = raw['yearly_total']?.toString();
           final savings = raw['savings_percent'];
+          String price(String? v) =>
+              v == null || v.isEmpty ? '' : _money(v.replaceAll('\$', ''));
           final code = raw['code']?.toString() ?? '';
           final isCurrent = currentCode != null &&
               currentCode == code.toLowerCase();
@@ -147,8 +164,8 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
               final sp = p['savings_percent'];
               periods[m] = PlanPeriod(
                 months: m,
-                total: p['total']?.toString() ?? '',
-                perMonth: p['per_month']?.toString() ?? '',
+                total: price(p['total']?.toString()),
+                perMonth: price(p['per_month']?.toString()),
                 savingsPercent: sp is int
                     ? sp
                     : (sp is num ? sp.toInt() : null),
@@ -159,9 +176,9 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
             code: code,
             title: raw['title']?.toString() ?? '',
             isFree: raw['is_free'] == true,
-            monthlyPrice: monthly != null ? '\$$monthly' : '',
-            yearlyPrice: yearly != null ? '\$$yearly' : '',
-            yearlyTotal: yearlyTotal != null ? '\$$yearlyTotal' : null,
+            monthlyPrice: price(monthly),
+            yearlyPrice: price(yearly),
+            yearlyTotal: yearlyTotal != null ? price(yearlyTotal) : null,
             savingsPercent: savings is int
                 ? savings
                 : (savings is num ? savings.toInt() : null),
@@ -183,6 +200,14 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
             ..clear()
             ..addAll(items);
           state.loadError.value = false;
+          if (state.promoPlanCode.value == null) {
+            for (final p in items) {
+              if (!p.isFree) {
+                state.promoPlanCode.value = p.code;
+                break;
+              }
+            }
+          }
         }
       },
       failure: (err) {
@@ -208,6 +233,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
       case CheckPendingPayment _:
         await _pollPendingPayment(showWaiting: true);
       case SelectPlan a:
+        state.promoPlanCode.value = a.plan.code;
         await _selectPlan(a.plan);
       case CancelSubscription _:
         await _cancelSubscription();
@@ -227,12 +253,21 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
     }
     // Preview against first paid plan for UX; checkout re-validates per plan.
     SubscriptionPlan? paid;
-    for (final p in state.plans) {
-      if (!p.isFree) {
-        paid = p;
-        break;
+    final targetCode = state.promoPlanCode.value;
+    if (targetCode != null) {
+      for (final p in state.plans) {
+        if (p.code == targetCode && !p.isFree) {
+          paid = p;
+          break;
+        }
       }
     }
+    paid ??= () {
+      for (final p in state.plans) {
+        if (!p.isFree) return p;
+      }
+      return null;
+    }();
     if (paid == null) {
       showAppMessage('subscription_promo_need_plan'.tr);
       return;
@@ -444,6 +479,8 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
       if (done || attempts >= 40) {
         _pollTimer?.cancel();
         if (!done && attempts >= 40) {
+          state.awaitingPayment.value = false;
+          _pendingPaymentId = null;
           showAppMessage('subscription_payment_check_hint'.tr);
         }
       }

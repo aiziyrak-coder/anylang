@@ -6,6 +6,7 @@ import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/network/trade_assistant_repository.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../products/product.dart';
@@ -30,12 +31,14 @@ class TradeAssistantScreen
     state.sending.value = false;
     state.showSend.value = false;
     state.messages.clear();
+    final company = (payload?.companyName ?? '').trim();
+    final welcomeName = company.isNotEmpty ? company : 'trade_ai_guest'.tr;
     state.messages.add(
       TradeAssistantMessage(
         id: 'welcome',
         text: payload?.sellerId != null
             ? 'trade_ai_welcome_company'.trParams({
-                'name': payload?.companyName ?? '',
+                'name': welcomeName,
               })
             : 'trade_ai_welcome'.tr,
         isOutgoing: false,
@@ -152,12 +155,12 @@ class TradeAssistantScreen
         }
       },
       failure: (err) {
-        final msg = '$err'.trim();
+        final msg = AuthValidators.safeError(err, fallbackKey: 'trade_ai_failed');
         state.error.value = msg;
         if (idx >= 0) {
           state.messages[idx] = TradeAssistantMessage(
             id: pendingId,
-            text: msg.isNotEmpty ? msg : 'trade_ai_failed'.tr,
+            text: msg,
             isOutgoing: false,
             at: DateTime.now(),
             failed: true,

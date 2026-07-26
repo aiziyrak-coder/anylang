@@ -15,6 +15,8 @@ import 'business_card_scan_state.dart';
 class BusinessCardScanContent extends ScreenContent<BusinessCardScanState> {
   BusinessCardScanContent() : super(color: Colors.black);
 
+  DateTime? _lastDetectAt;
+
   @override
   Widget build(
     BuildContext context,
@@ -76,10 +78,19 @@ class BusinessCardScanContent extends ScreenContent<BusinessCardScanState> {
               MobileScanner(
                 onDetect: (capture) {
                   if (state.handled.value) return;
+                  final now = DateTime.now();
+                  if (_lastDetectAt != null &&
+                      now.difference(_lastDetectAt!) <
+                          const Duration(milliseconds: 900)) {
+                    return;
+                  }
                   for (final b in capture.barcodes) {
                     final raw = b.rawValue;
                     if (raw == null || raw.isEmpty) continue;
-                    sendAction(BusinessCardScanned(raw));
+                    _lastDetectAt = now;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      sendAction(BusinessCardScanned(raw));
+                    });
                     break;
                   }
                 },
@@ -109,10 +120,23 @@ class BusinessCardScanContent extends ScreenContent<BusinessCardScanState> {
                       color: Colors.black87,
                       borderRadius: BorderRadius.circular(12.dp),
                     ),
-                    child: Text(
-                      err,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white, fontSize: 13.sp),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          err,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white, fontSize: 13.sp),
+                        ),
+                        SizedBox(height: 10.dp),
+                        TextButton(
+                          onPressed: () => sendAction(BusinessCardClearError()),
+                          child: Text(
+                            'business_card_try_again'.tr,
+                            style: TextStyle(color: c.accent, fontSize: 13.sp),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );

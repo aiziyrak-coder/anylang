@@ -18,6 +18,7 @@ class AppTextField extends StatefulWidget {
   final String? prefixText;
   final ValueChanged<String>? onChanged;
   final List<TextInputFormatter>? inputFormatters;
+  final Iterable<String>? autofillHints;
   final Widget? suffix;
 
   const AppTextField({
@@ -34,6 +35,7 @@ class AppTextField extends StatefulWidget {
     this.prefixText,
     this.onChanged,
     this.inputFormatters,
+    this.autofillHints,
     this.suffix,
   });
 
@@ -112,6 +114,7 @@ class _AppTextFieldState extends State<AppTextField> {
                   controller: widget.controller,
                   focusNode: _focus,
                   obscureText: _obscure,
+                  autofillHints: widget.autofillHints,
                   keyboardType: widget.keyboardType,
                   textInputAction: widget.textInputAction,
                   inputFormatters: widget.inputFormatters,

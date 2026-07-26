@@ -32,3 +32,9 @@ fi
 echo "==> Deploy complete."
 echo "Admin: https://anylang.uz"
 echo "API:   https://anylang.uz/api/v1/docs (disabled in prod — use /health)"
+echo
+echo "Optional: install daily Postgres backup cron:"
+echo "  sudo cp $APP_DIR/deploy/scripts/backup_postgres.sh /usr/local/bin/anylang-backup-pg"
+echo "  sudo chmod +x /usr/local/bin/anylang-backup-pg"
+echo "  echo '15 3 * * * /usr/local/bin/anylang-backup-pg >> /var/log/anylang-backup.log 2>&1' | sudo tee /etc/cron.d/anylang-backup"
+echo "See PRODUCTION_RUNBOOK.md for rollback / restore."
