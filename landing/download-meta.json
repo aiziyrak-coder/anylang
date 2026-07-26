@@ -1,13 +1,13 @@
 {
-  "version": "1.0.58",
-  "build": 59,
-  "version_full": "1.0.58+59",
+  "version": "1.0.59",
+  "build": 60,
+  "version_full": "1.0.59+60",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.58+59.apk",
-  "size_bytes": 91087457,
-  "size_mb": 86.87,
-  "updated_at": "2026-07-26T06:06:04.320807+00:00",
+  "versioned_filename": "anylang-1.0.59+60.apk",
+  "size_bytes": 91185761,
+  "size_mb": 86.96,
+  "updated_at": "2026-07-26T06:22:25.511638+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.58 — production readiness: health/metrics, backup cron, nginx gzip/CSP, screen hardening"
+  "notes": "Release 1.0.59+60 — top-10 page hardening, auth/session resilience, outbox retry"
 }
