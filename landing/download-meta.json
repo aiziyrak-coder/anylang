@@ -1,13 +1,13 @@
 {
-  "version": "1.0.59",
-  "build": 60,
-  "version_full": "1.0.59+60",
+  "version": "1.0.60",
+  "build": 61,
+  "version_full": "1.0.60+61",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.59+60.apk",
-  "size_bytes": 91185761,
+  "versioned_filename": "anylang-1.0.60+61.apk",
+  "size_bytes": 91185961,
   "size_mb": 86.96,
-  "updated_at": "2026-07-26T06:22:25.511638+00:00",
+  "updated_at": "2026-07-26T06:48:52.677845+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.59+60 — top-10 page hardening, auth/session resilience, outbox retry"
+  "notes": "Release 1.0.60+61 — Telegram-like offline banner, WS connecting status, outbox flush"
 }
