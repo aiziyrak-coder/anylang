@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/local/session_store.dart';
@@ -20,7 +22,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
   MessagesContent() : super(color: Colors.transparent);
 
   @override
-  Widget build(BuildContext context, MessagesState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, MessagesState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return Padding(
@@ -107,7 +109,8 @@ class MessagesContent extends ScreenContent<MessagesState> {
                         iconSize: 20.dp,
                         backgroundColor: c.logoTileBg,
                         borderRadius: 12.dp,
-                        padding: EdgeInsets.all(10.dp),
+                        padding: EdgeInsets.all(14.dp),
+                        tooltip: 'messages_bulk_mute'.tr,
                       ),
                       SizedBox(width: 6.dp),
                       MyIconButton(
@@ -117,7 +120,8 @@ class MessagesContent extends ScreenContent<MessagesState> {
                         iconSize: 20.dp,
                         backgroundColor: c.logoTileBg,
                         borderRadius: 12.dp,
-                        padding: EdgeInsets.all(10.dp),
+                        padding: EdgeInsets.all(14.dp),
+                        tooltip: 'messages_bulk_hide'.tr,
                       ),
                       SizedBox(width: 6.dp),
                       MyIconButton(
@@ -127,7 +131,8 @@ class MessagesContent extends ScreenContent<MessagesState> {
                         iconSize: 20.dp,
                         backgroundColor: c.logoTileBg,
                         borderRadius: 12.dp,
-                        padding: EdgeInsets.all(10.dp),
+                        padding: EdgeInsets.all(14.dp),
+                        tooltip: 'cancel'.tr,
                       ),
                     ],
                   );
@@ -251,7 +256,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
                   final items = state.conversations.toList();
                   // Support doim tepada; bo'sh ro'yxatda ham ko'rinadi.
                   return RefreshIndicator(
-                    onRefresh: () async => sendAction(RefreshConversations()),
+                    onRefresh: () async { await sendAction(RefreshConversations()); },
                     child: ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
@@ -278,12 +283,36 @@ class MessagesContent extends ScreenContent<MessagesState> {
                           );
                         }
                         if (items.isEmpty) {
+                          final filter = state.listFilter.value;
+                          final (IconData icon, String title, String? hint) =
+                              switch (filter) {
+                            MessagesListFilter.unread => (
+                                Icons.mark_email_unread_outlined,
+                                'messages_empty_unread'.tr,
+                                null,
+                              ),
+                            MessagesListFilter.chats => (
+                                Icons.chat_bubble_outline_rounded,
+                                'messages_empty_chats'.tr,
+                                null,
+                              ),
+                            MessagesListFilter.groups => (
+                                Icons.groups_outlined,
+                                'messages_empty_groups'.tr,
+                                null,
+                              ),
+                            MessagesListFilter.all => (
+                                Icons.chat_bubble_outline_rounded,
+                                'messages_empty'.tr,
+                                'messages_empty_hint'.tr,
+                              ),
+                          };
                           return Padding(
                             padding: EdgeInsets.only(top: 24.dp),
                             child: AppEmptyState(
-                              icon: Icons.chat_bubble_outline_rounded,
-                              title: 'messages_empty'.tr,
-                              subtitle: 'messages_empty_hint'.tr,
+                              icon: icon,
+                              title: title,
+                              subtitle: hint,
                             ),
                           );
                         }
@@ -332,7 +361,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
   Widget _searchResults(
     AppColors c,
     MessagesState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final users = state.userResults.toList();
     final chats = state.searchResults.toList();
@@ -344,7 +373,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
       );
     }
     return RefreshIndicator(
-      onRefresh: () async => sendAction(RefreshConversations()),
+      onRefresh: () async { await sendAction(RefreshConversations()); },
       child: ListView(
         padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
         children: [

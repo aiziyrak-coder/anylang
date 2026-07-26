@@ -63,6 +63,9 @@ class ProductGridCard extends StatelessWidget {
                     Image.network(
                       url,
                       fit: BoxFit.cover,
+                      cacheWidth: (180 * MediaQuery.devicePixelRatioOf(context))
+                          .round()
+                          .clamp(120, 480),
                       loadingBuilder: (_, child, progress) {
                         if (progress == null) return child;
                         return Center(

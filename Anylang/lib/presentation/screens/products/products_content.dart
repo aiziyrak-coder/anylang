@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -18,13 +20,11 @@ import 'products_action.dart';
 import 'products_state.dart';
 
 enum _ProductsMenuAction {
-  addProduct,
   aiMatching,
   scan,
   feed,
   groups,
   tradeAi,
-  map,
 }
 
 class ProductsContent extends ScreenContent<ProductsState> {
@@ -35,7 +35,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
   Widget build(
     BuildContext context,
     ProductsState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 
@@ -86,8 +86,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
                       onSelected: (action) {
                         HapticFeedback.selectionClick();
                         switch (action) {
-                          case _ProductsMenuAction.addProduct:
-                            sendAction(OpenAddProduct());
                           case _ProductsMenuAction.aiMatching:
                             sendAction(OpenAiMatching());
                           case _ProductsMenuAction.scan:
@@ -98,19 +96,11 @@ class ProductsContent extends ScreenContent<ProductsState> {
                             sendAction(OpenMarketplaceGroups());
                           case _ProductsMenuAction.tradeAi:
                             sendAction(OpenTradeAssistant());
-                          case _ProductsMenuAction.map:
-                            sendAction(OpenMarketMap());
                         }
                       },
                       itemBuilder: (ctx) {
                         final isBiz = state.isBusiness.value;
                         return [
-                          _menuItem(
-                            c,
-                            value: _ProductsMenuAction.addProduct,
-                            icon: Icons.add_box_rounded,
-                            label: 'add_product_title'.tr,
-                          ),
                           if (isBiz)
                             _menuItem(
                               c,
@@ -118,18 +108,13 @@ class ProductsContent extends ScreenContent<ProductsState> {
                               icon: Icons.hub_outlined,
                               label: 'ai_matching_title'.tr,
                             ),
-                          _menuItem(
-                            c,
-                            value: _ProductsMenuAction.scan,
-                            icon: Icons.qr_code_scanner_rounded,
-                            label: 'business_card_scan_title'.tr,
-                          ),
-                          _menuItem(
-                            c,
-                            value: _ProductsMenuAction.feed,
-                            icon: Icons.campaign_outlined,
-                            label: 'feed_title'.tr,
-                          ),
+                          if (isBiz)
+                            _menuItem(
+                              c,
+                              value: _ProductsMenuAction.feed,
+                              icon: Icons.campaign_outlined,
+                              label: 'feed_title'.tr,
+                            ),
                           _menuItem(
                             c,
                             value: _ProductsMenuAction.groups,
@@ -144,9 +129,9 @@ class ProductsContent extends ScreenContent<ProductsState> {
                           ),
                           _menuItem(
                             c,
-                            value: _ProductsMenuAction.map,
-                            icon: Icons.map_outlined,
-                            label: 'products_map_view'.tr,
+                            value: _ProductsMenuAction.scan,
+                            icon: Icons.qr_code_scanner_rounded,
+                            label: 'business_card_scan_title'.tr,
                           ),
                         ];
                       },
@@ -159,6 +144,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
                 padding: EdgeInsets.symmetric(horizontal: 20.dp),
                 child: SearchField(
                   hint: 'products_smart_search_hint'.tr,
+                  controller: state.searchController,
                   onChanged: (v) => sendAction(ProductsSearchChanged(v)),
                 ),
               ),
@@ -259,15 +245,19 @@ class ProductsContent extends ScreenContent<ProductsState> {
                     return AppEmptyState(
                       icon: searching
                           ? Icons.search_off_rounded
-                          : Icons.storefront_outlined,
+                          : favorites
+                              ? Icons.favorite_border_rounded
+                              : Icons.storefront_outlined,
                       title: searching
                           ? 'empty_no_results'.tr
-                          : 'products_empty'.tr,
+                          : favorites
+                              ? 'favorites_empty'.tr
+                              : 'products_empty'.tr,
                     );
                   }
 
                   return RefreshIndicator(
-                    onRefresh: () async => sendAction(RefreshProducts()),
+                    onRefresh: () async { await sendAction(RefreshProducts()); },
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: EdgeInsets.only(bottom: 88.dp),
@@ -331,12 +321,13 @@ class ProductsContent extends ScreenContent<ProductsState> {
                                 20.dp,
                                 24.dp,
                               ),
-                              child: Text(
-                                'products_empty'.tr,
-                                style: TextStyle(
-                                  color: c.textSecondary,
-                                  fontSize: 14.sp,
-                                ),
+                              child: AppEmptyState(
+                                icon: favorites
+                                    ? Icons.favorite_border_rounded
+                                    : Icons.storefront_outlined,
+                                title: favorites
+                                    ? 'favorites_empty'.tr
+                                    : 'products_empty'.tr,
                               ),
                             )
                           else
@@ -390,7 +381,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
           ),
         ),
         Obx(() {
-          if (state.showingFavorites.value) {
+          if (state.showingFavorites.value || !state.isBusiness.value) {
             return const SizedBox.shrink();
           }
           return Positioned(

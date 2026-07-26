@@ -10,6 +10,7 @@ import '../../modal/image_picker.dart';
 import '../../modal/video_picker.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/business_plan_dialog.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../subscription/subscription_screen.dart';
@@ -246,23 +247,8 @@ class AddProductScreen extends Screen<AddProductState, void> {
           lower.contains('business') ||
           lower.contains('ruxsat yo')) {
         showAppError('add_product_business_required'.tr);
-        final goPlans = await Get.dialog<bool>(
-          AlertDialog(
-            title: Text('add_product_plan_required_title'.tr),
-            content: Text('add_product_plan_required_body'.tr),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(result: false),
-                child: Text('common_cancel'.tr),
-              ),
-              TextButton(
-                onPressed: () => Get.back(result: true),
-                child: Text('add_product_go_plans'.tr),
-              ),
-            ],
-          ),
-        );
-        if (goPlans == true) {
+        final goPlans = await showBusinessPlanRequiredDialog();
+        if (goPlans) {
           await navigate(SubscriptionScreen());
         }
       } else {

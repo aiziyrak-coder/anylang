@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -19,7 +21,7 @@ class MarketplaceGroupsContent extends ScreenContent<MarketplaceGroupsState> {
   Widget build(
     BuildContext context,
     MarketplaceGroupsState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 
@@ -57,7 +59,7 @@ class MarketplaceGroupsContent extends ScreenContent<MarketplaceGroupsState> {
                   );
                 }
                 return RefreshIndicator(
-                  onRefresh: () async => sendAction(MarketplaceGroupsRefresh()),
+                  onRefresh: () async { await sendAction(MarketplaceGroupsRefresh()); },
                   color: c.accent,
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
@@ -112,7 +114,7 @@ class MarketplaceGroupsContent extends ScreenContent<MarketplaceGroupsState> {
 
   List<Widget> _groupTiles(
     List<MarketplaceGroup> groups,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final out = <Widget>[];
     for (var i = 0; i < groups.length; i++) {

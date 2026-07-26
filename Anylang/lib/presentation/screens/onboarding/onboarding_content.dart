@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -44,7 +46,7 @@ class OnboardingContent extends ScreenContent<OnboardingState> {
   Widget build(
     BuildContext context,
     OnboardingState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 

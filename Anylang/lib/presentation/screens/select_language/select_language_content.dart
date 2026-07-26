@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/app_empty_state.dart';
@@ -17,7 +19,7 @@ import 'select_language_state.dart';
 class SelectLanguageContent extends ScreenContent<SelectLanguageState> {
 
   @override
-  Widget build(BuildContext context, SelectLanguageState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, SelectLanguageState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return GradientBackground(

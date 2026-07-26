@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/audio/voice_recorder_service.dart';
@@ -287,7 +289,7 @@ class ChatContent extends ScreenContent<ChatState> {
 
   @override
   Widget build(BuildContext context, ChatState state,
-      void Function(MyAction action) sendAction) {
+      FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
     final recorder = Get.find<VoiceRecorderService>();
     final topInset = MediaQuery.paddingOf(context).top;
@@ -450,7 +452,7 @@ class ChatContent extends ScreenContent<ChatState> {
   }
 
   Widget _list(AppColors c, ChatState state,
-      void Function(MyAction action) sendAction) {
+      FutureOr<void> Function(MyAction action) sendAction) {
     return Obx(() {
       if (state.loading.value) return const AppLoading();
       final selecting = state.selecting.value;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -21,7 +23,7 @@ class DealModeContent extends ScreenContent<DealModeState> {
   Widget build(
     BuildContext context,
     DealModeState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 

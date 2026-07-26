@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -26,7 +28,7 @@ class GroupSettingsContent extends ScreenContent<GroupSettingsState> {
   Widget build(
     BuildContext context,
     GroupSettingsState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
     return GradientBackground(

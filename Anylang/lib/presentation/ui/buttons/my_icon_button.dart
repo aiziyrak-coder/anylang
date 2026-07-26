@@ -19,6 +19,8 @@ class MyIconButton extends StatelessWidget {
   final double blurX;
   final double blurY;
   final List<BoxShadow>? boxShadow;
+  final String? tooltip;
+  final String? semanticLabel;
 
 
   const MyIconButton({
@@ -33,17 +35,20 @@ class MyIconButton extends StatelessWidget {
     this.icon,
     this.iconSize = 24,
     this.iconColor = Colors.black,
-    this.padding = const EdgeInsets.all(6),
+    this.padding = const EdgeInsets.all(12),
     this.border,
     this.boxShadow,
     this.blurX = 0,
     this.blurY = 0,
+    this.tooltip,
+    this.semanticLabel,
   });
 
   @override
   Widget build(BuildContext context) {
     // boxShadow ClipRRect tashqarisida (aks holda soya kesilib ketadi).
-    return Container(
+    Widget button = Container(
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: boxShadow,
@@ -69,23 +74,25 @@ class MyIconButton extends StatelessWidget {
                   borderRadius: BorderRadius.circular(borderRadius),
                   child: Padding(
                     padding: padding,
-                    child: svgIcon != null ? SvgPicture.asset(
-                      svgIcon!,
-                      width: iconSize,
-                      height: iconSize,
-                      colorFilter: iconColor != null
-                          ? ColorFilter.mode(iconColor!, BlendMode.srcIn)
-                          : null,
-                    ) : (
-                        imageIcon != null ? Image.asset(
-                          imageIcon!,
-                          width: iconSize,
-                          height: iconSize,
-                        ) : Icon(
-                          icon,
-                          size: iconSize,
-                          color: iconColor,
-                        )
+                    child: Center(
+                      child: svgIcon != null ? SvgPicture.asset(
+                        svgIcon!,
+                        width: iconSize,
+                        height: iconSize,
+                        colorFilter: iconColor != null
+                            ? ColorFilter.mode(iconColor!, BlendMode.srcIn)
+                            : null,
+                      ) : (
+                          imageIcon != null ? Image.asset(
+                            imageIcon!,
+                            width: iconSize,
+                            height: iconSize,
+                          ) : Icon(
+                            icon,
+                            size: iconSize,
+                            color: iconColor,
+                          )
+                      ),
                     ),
                   )
               ),
@@ -94,5 +101,19 @@ class MyIconButton extends StatelessWidget {
         ),
       ),
     );
+
+    if (tooltip != null && tooltip!.trim().isNotEmpty) {
+      button = Tooltip(message: tooltip!, child: button);
+    }
+    final label = semanticLabel ?? tooltip;
+    if (label != null && label.trim().isNotEmpty) {
+      button = Semantics(
+        button: true,
+        label: label,
+        enabled: enabled,
+        child: button,
+      );
+    }
+    return button;
   }
 }

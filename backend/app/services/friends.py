@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from redis.asyncio import Redis
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -237,14 +237,33 @@ async def list_friends(
 ) -> dict:
     params = normalize_page(page, limit, default_size=50, max_size=100)
 
-    friendships_query = select(Friendship).where(
+    friendship_filter = and_(
         Friendship.status == "accepted",
         or_(Friendship.user_low_id == user.id, Friendship.user_high_id == user.id),
     )
-    friendships_result = await db.execute(
-        friendships_query.order_by(Friendship.accepted_at.desc())
-    )
-    friendships = list(friendships_result.scalars().all())
+    friendships_query = select(Friendship).where(friendship_filter)
+
+    has_search = bool(search and search.strip())
+    if not has_search:
+        total = int(
+            (
+                await db.execute(
+                    select(func.count()).select_from(Friendship).where(friendship_filter)
+                )
+            ).scalar()
+            or 0
+        )
+        friendships_result = await db.execute(
+            friendships_query.order_by(Friendship.accepted_at.desc())
+            .offset(params.offset)
+            .limit(params.page_size)
+        )
+        friendships = list(friendships_result.scalars().all())
+    else:
+        friendships_result = await db.execute(
+            friendships_query.order_by(Friendship.accepted_at.desc())
+        )
+        friendships = list(friendships_result.scalars().all())
 
     other_ids = [
         f.user_high_id if f.user_low_id == user.id else f.user_low_id for f in friendships
@@ -259,15 +278,16 @@ async def list_friends(
                 or_(Friendship.user_low_id == user.id, Friendship.user_high_id == user.id),
             )
         )
+        empty_total = 0 if has_search else total
         return {
             "items": [],
             "page": params.page,
             "limit": params.page_size,
-            "total": 0,
-            "has_more": False,
+            "total": empty_total,
+            "has_more": (not has_search) and (params.offset + params.page_size < empty_total),
             "online_count": 0,
             "pending_incoming_count": int(pending_result.scalar() or 0),
-            "networking": await _networking(db, user, []),
+            "networking": await _networking(db, user, None),
         }
 
     users_query = (
@@ -275,7 +295,7 @@ async def list_friends(
         .where(User.id.in_(other_ids))
         .options(selectinload(User.subscription), selectinload(User.business))
     )
-    if search:
+    if has_search:
         pattern = f"%{search.strip()}%"
         users_query = users_query.where(
             or_(User.full_name.ilike(pattern), User.number.ilike(pattern))
@@ -295,8 +315,12 @@ async def list_friends(
         if friend_user is not None:
             rows.append((friendship, friend_user))
 
-    total = len(rows)
-    page_rows = rows[params.offset : params.offset + params.limit]
+    if has_search:
+        total = len(rows)
+        page_rows = rows[params.offset : params.offset + params.limit]
+    else:
+        # Friendships already SQL-paginated; keep precomputed total.
+        page_rows = rows
 
     pending_result = await db.execute(
         select(func.count())
@@ -343,11 +367,7 @@ async def list_friends(
         "has_more": params.offset + len(items) < total,
         "online_count": online_count,
         "pending_incoming_count": pending_incoming_count,
-        "networking": await _networking(
-            db,
-            user,
-            None if (search and search.strip()) else [u for _, u in rows],
-        ),
+        "networking": await _networking(db, user, None),
     }
 
 

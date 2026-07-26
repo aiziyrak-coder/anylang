@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/primary_button.dart';
@@ -39,7 +41,7 @@ class RegisterContent extends ScreenContent<RegisterState> {
   }
 
   @override
-  Widget build(BuildContext context, RegisterState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, RegisterState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
     final now = DateTime.now();
 

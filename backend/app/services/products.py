@@ -955,6 +955,7 @@ async def list_manufacturers_map(db: AsyncSession, *, viewer: User) -> dict:
             BusinessProfile.factory_verified,
         )
         .order_by(func.count(Product.id).desc())
+        .limit(500)
     )
 
     by_country: dict[str, dict] = {}
@@ -1523,7 +1524,11 @@ async def list_favorites(
             Product.status == "published",
             _seller_filter(),
         )
-        .options(selectinload(Product.images))
+        .options(
+            selectinload(Product.images),
+            selectinload(Product.seller).selectinload(User.subscription),
+            selectinload(Product.seller).selectinload(User.business),
+        )
         .order_by(ProductFavorite.created_at.desc())
     )
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -20,7 +22,7 @@ class BusinessFeedContent extends ScreenContent<BusinessFeedState> {
   Widget build(
     BuildContext context,
     BusinessFeedState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 
@@ -83,7 +85,7 @@ class BusinessFeedContent extends ScreenContent<BusinessFeedState> {
                   );
                 }
                 return RefreshIndicator(
-                  onRefresh: () async => sendAction(FeedRefreshRequested()),
+                  onRefresh: () async { await sendAction(FeedRefreshRequested()); },
                   color: c.accent,
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (n) {

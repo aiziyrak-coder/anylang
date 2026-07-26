@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -23,7 +25,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
   FriendsContent() : super(color: Colors.transparent);
 
   @override
-  Widget build(BuildContext context, FriendsState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, FriendsState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return Padding(
@@ -398,7 +400,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
               }
 
               return RefreshIndicator(
-                onRefresh: () async => sendAction(RefreshFriends()),
+                onRefresh: () async { await sendAction(RefreshFriends()); },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),

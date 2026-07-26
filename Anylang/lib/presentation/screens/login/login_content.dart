@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/primary_button.dart';
@@ -41,7 +43,7 @@ class LoginContent extends ScreenContent<LoginState> {
   }
 
   @override
-  Widget build(BuildContext context, LoginState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, LoginState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return GradientBackground(

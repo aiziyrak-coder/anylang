@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
@@ -70,7 +72,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
   }
 
   @override
-  Widget build(BuildContext context, AddProductState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, AddProductState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return GradientBackground(
@@ -107,6 +109,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
                             for (var i = 0; i < state.images.length; i++)
                               MediaTile.image(
                                 gradient: state.images[i].gradient,
+                                filePath: state.images[i].filePath,
                                 onRemove: () => sendAction(RemoveProductImage(i)),
                                 badgeText: state.images[i].isPrimary ? 'add_product_primary'.tr : null,
                               ),
@@ -123,13 +126,24 @@ class AddProductContent extends ScreenContent<AddProductState> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: AppTextField(
-                            label: 'add_product_price'.tr,
-                            hint: '0.00',
-                            controller: _priceCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            prefixText: '\$ ',
-                          ),
+                          child: Obx(() {
+                            final cur = state.currency.value;
+                            final prefix = switch (cur) {
+                              'EUR' => '€ ',
+                              'RUB' => '₽ ',
+                              'UZS' => 'so‘m ',
+                              _ => '\$ ',
+                            };
+                            return AppTextField(
+                              label: 'add_product_price'.tr,
+                              hint: '0.00',
+                              controller: _priceCtrl,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              prefixText: prefix,
+                            );
+                          }),
                         ),
                         SizedBox(width: 12.dp),
                         Expanded(

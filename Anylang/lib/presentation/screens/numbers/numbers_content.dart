@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -23,7 +25,7 @@ class NumbersContent extends ScreenContent<NumbersState> {
   Widget build(
     BuildContext context,
     NumbersState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 
@@ -67,7 +69,7 @@ class NumbersContent extends ScreenContent<NumbersState> {
                 }
 
                 return RefreshIndicator(
-                  onRefresh: () async => sendAction(NumbersRetry()),
+                  onRefresh: () async { await sendAction(NumbersRetry()); },
                   child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
@@ -61,7 +63,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
   }
 
   @override
-  Widget build(BuildContext context, ProfileEditState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, ProfileEditState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
     final now = DateTime.now();
     _bindHydrate(state);

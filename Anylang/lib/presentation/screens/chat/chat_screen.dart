@@ -894,8 +894,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           },
           replyToId: replyToId,
         );
-        send.when(
-          success: (data) {
+        await send.when(
+          success: (data) async {
             final map = asMap(data);
             if (map == null) {
               final idx = state.messages.indexWhere((m) => m.id == clientId);
@@ -903,7 +903,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
                 state.messages[idx] =
                     state.messages[idx].withStatus(ChatStatus.pending);
               }
-              unawaited(OfflineChatStore.enqueueOutbox({
+              await OfflineChatStore.enqueueOutbox({
                 'kind': 'voice',
                 'chat_id': state.chatId.value,
                 'client_message_id': clientId,
@@ -912,7 +912,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
                 'samples': downsampled,
                 'reply_to_id': replyToId,
                 'created_at': DateTime.now().toIso8601String(),
-              }));
+              });
               _scheduleOutboxFlush();
               return;
             }
@@ -947,16 +947,16 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             );
             final idx = state.messages.indexWhere((m) => m.id == clientId || m.id == real.id);
             if (idx >= 0) state.messages[idx] = merged;
-            unawaited(OfflineChatStore.removeOutbox(clientId));
+            await OfflineChatStore.removeOutbox(clientId);
           },
-          failure: (err) {
+          failure: (err) async {
             if (isNetworkFailure(err)) {
               final idx = state.messages.indexWhere((m) => m.id == clientId);
               if (idx >= 0) {
                 state.messages[idx] =
                     state.messages[idx].withStatus(ChatStatus.pending);
               }
-              unawaited(OfflineChatStore.enqueueOutbox({
+              await OfflineChatStore.enqueueOutbox({
                 'kind': 'voice',
                 'chat_id': state.chatId.value,
                 'client_message_id': clientId,
@@ -965,7 +965,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
                 'samples': downsampled,
                 'reply_to_id': replyToId,
                 'created_at': DateTime.now().toIso8601String(),
-              }));
+              });
               _scheduleOutboxFlush();
             } else {
               state.messages.removeWhere((m) => m.id == clientId);
@@ -1247,11 +1247,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       clientMessageId: clientId,
       replyToId: replyToId,
     );
-    result.when(
-      success: (data) {
+    await result.when(
+      success: (data) async {
         final map = asMap(data);
         if (map == null) {
-          _markPendingKeep(state, clientId, text, replyToId);
+          await _markPendingKeep(state, clientId, text, replyToId);
           return;
         }
         final real = _fromApi(
@@ -1267,11 +1267,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         } else {
           state.messages.add(real);
         }
-        unawaited(OfflineChatStore.removeOutbox(clientId));
+        await OfflineChatStore.removeOutbox(clientId);
       },
-      failure: (err) {
+      failure: (err) async {
         if (isNetworkFailure(err)) {
-          _markPendingKeep(state, clientId, text, replyToId);
+          await _markPendingKeep(state, clientId, text, replyToId);
           return;
         }
         state.messages.removeWhere(
@@ -2255,8 +2255,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       meta: extraMeta,
       replyToId: replyToId,
     );
-    send.when(
-      success: (data) {
+    await send.when(
+      success: (data) async {
         final map = asMap(data);
         if (map == null) {
           final idx = state.messages.indexWhere((m) => m.id == clientId);
@@ -2264,7 +2264,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             state.messages[idx] =
                 state.messages[idx].withStatus(ChatStatus.pending);
           }
-          unawaited(OfflineChatStore.enqueueOutbox({
+          await OfflineChatStore.enqueueOutbox({
             'kind': messageType,
             'chat_id': state.chatId.value,
             'client_message_id': clientId,
@@ -2276,7 +2276,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             'reply_to_id': replyToId,
             'extra_meta': extraMeta,
             'created_at': DateTime.now().toIso8601String(),
-          }));
+          });
           _scheduleOutboxFlush();
           return;
         }
@@ -2308,16 +2308,16 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             state.messages[idx] = real;
           }
         }
-        unawaited(OfflineChatStore.removeOutbox(clientId));
+        await OfflineChatStore.removeOutbox(clientId);
       },
-      failure: (err) {
+      failure: (err) async {
         if (isNetworkFailure(err)) {
           final idx = state.messages.indexWhere((m) => m.id == clientId);
           if (idx >= 0) {
             state.messages[idx] =
                 state.messages[idx].withStatus(ChatStatus.pending);
           }
-          unawaited(OfflineChatStore.enqueueOutbox({
+          await OfflineChatStore.enqueueOutbox({
             'kind': messageType,
             'chat_id': state.chatId.value,
             'client_message_id': clientId,
@@ -2329,7 +2329,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             'reply_to_id': replyToId,
             'extra_meta': extraMeta,
             'created_at': DateTime.now().toIso8601String(),
-          }));
+          });
           _scheduleOutboxFlush();
           return;
         }

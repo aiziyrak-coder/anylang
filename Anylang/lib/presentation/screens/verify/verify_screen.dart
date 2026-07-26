@@ -60,6 +60,7 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
         }
       case VerifySubmit a:
         if (state.email.value.isEmpty) return;
+        if (state.isLoading.value) return;
         if (a.code.trim().length != 6) {
           showAppError('code_invalid'.tr);
           return;
@@ -71,13 +72,13 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
             email: state.email.value,
             code: a.code,
           );
-          result.when(
+          await result.when(
             success: (_) async {
               MySnackBar.dismiss();
               await connectRealtimeIfNeeded();
               navigateAndRemoveUntil(MainScreen());
             },
-            failure: showAppError,
+            failure: (err) async => showAppError(err),
           );
         } finally {
           state.isLoading.value = false;

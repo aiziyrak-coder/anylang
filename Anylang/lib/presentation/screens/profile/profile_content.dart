@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
@@ -37,7 +39,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
 
   @override
   Widget build(BuildContext context, ProfileState state,
-      void Function(MyAction action) sendAction) {
+      FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return DecoratedBox(
@@ -77,7 +79,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
 
           return RefreshIndicator(
             color: c.accentText,
-            onRefresh: () async => sendAction(RefreshProfile()),
+            onRefresh: () async { await sendAction(RefreshProfile()); },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 24.dp),
@@ -204,8 +206,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
                   ],
                   SizedBox(height: 18.dp),
                   _settingsHub(c, sendAction),
-                  SizedBox(height: 18.dp),
-                  _sofiyaTile(c, sendAction),
                   SizedBox(height: 18.dp),
                   ProfileAchievementsSection(
                     achievements: d.insights.achievements,
@@ -606,16 +606,12 @@ class ProfileContent extends ScreenContent<ProfileState> {
         'profile_qr'.tr,
         () => sendAction(ShowBusinessCardQr()),
       ),
-      (
-        Icons.account_balance_wallet_outlined,
-        'profile_wallet'.tr,
-        () => sendAction(OpenWallet()),
-      ),
-      (
-        Icons.business_center_outlined,
-        'profile_business_account'.tr,
-        () => sendAction(OpenBusinessAccount()),
-      ),
+      if (!d.isBusiness)
+        (
+          Icons.business_center_outlined,
+          'profile_business_account'.tr,
+          () => sendAction(OpenBusinessAccount()),
+        ),
     ];
 
     return Column(
@@ -680,63 +676,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
           },
         ),
       ],
-    );
-  }
-
-  Widget _sofiyaTile(AppColors c, void Function(MyAction) sendAction) {
-    return ProfilePressable(
-      borderRadius: BorderRadius.circular(18.dp),
-      onTap: () => sendAction(OpenSofiyaAi()),
-      child: Container(
-        padding: EdgeInsets.all(14.dp),
-        decoration: BoxDecoration(
-          gradient: profileStatGradientA,
-          borderRadius: BorderRadius.circular(18.dp),
-          border: Border.all(color: c.surfaceBorder, width: 0.7),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42.dp,
-              height: 42.dp,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: c.accentSoft,
-                borderRadius: BorderRadius.circular(14.dp),
-              ),
-              child: Icon(Icons.smart_toy_rounded, color: c.accentText, size: 22.dp),
-            ),
-            SizedBox(width: 12.dp),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'profile_sofiya_title'.tr,
-                    style: TextStyle(
-                      color: c.textPrimary,
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SizedBox(height: 2.dp),
-                  Text(
-                    'profile_sofiya_desc'.tr,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: c.textSecondary,
-                      fontSize: 12.sp,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: c.textFaint, size: 22.dp),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1113,14 +1052,13 @@ class ProfileContent extends ScreenContent<ProfileState> {
     ProfileAccount d,
     void Function(MyAction) sendAction,
   ) {
-    final count = d.listingsCount ?? d.listings.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             Text(
-              '${'profile_my_listings'.tr} · $count',
+              '${'profile_my_listings'.tr} · ${d.listings.length}',
               style: TextStyle(
                 color: c.textPrimary,
                 fontSize: 14.sp,
@@ -1128,20 +1066,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
               ),
             ),
             const Spacer(),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => sendAction(AddProductRequested()),
-                borderRadius: BorderRadius.circular(8.dp),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 6.dp,
-                    vertical: 4.dp,
-                  ),
-                  child: Icon(Icons.add_rounded, size: 20.dp, color: c.accent),
-                ),
-              ),
-            ),
             if (d.listings.isNotEmpty)
               Material(
                 color: Colors.transparent,
@@ -1163,8 +1087,8 @@ class ProfileContent extends ScreenContent<ProfileState> {
                     ),
                   ),
                 ),
-              ),
-            if (d.listings.isEmpty)
+              )
+            else
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -1175,14 +1099,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                       horizontal: 6.dp,
                       vertical: 4.dp,
                     ),
-                    child: Text(
-                      'add_product_title'.tr,
-                      style: TextStyle(
-                        color: c.accentText,
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: Icon(Icons.add_rounded, size: 20.dp, color: c.accent),
                   ),
                 ),
               ),

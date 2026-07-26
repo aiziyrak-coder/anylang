@@ -14,6 +14,7 @@ import '../../modal/country_picker_bottom_sheet.dart';
 import '../../ui/ai_matching.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/business_plan_dialog.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
@@ -126,7 +127,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
         }
         state.categories.assignAll(items);
       },
-      failure: (_) {},
+      failure: (err) => debugPrint('categories load failed: $err'),
     );
   }
 
@@ -183,6 +184,9 @@ class ProductsScreen extends Screen<ProductsState, void> {
     state.showingFavorites.value = false;
     if (!keepQuery) {
       state.query.value = '';
+      if (state.searchController.text.isNotEmpty) {
+        state.searchController.clear();
+      }
       state.smartInterpretation.value = null;
       state.smartSearchActive.value = false;
       state.smartSort.value = null;
@@ -366,7 +370,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
         ? (state.smartSort.value ?? 'recommended')
         : state.listSort;
     final result = await _listWithState(
-      q: q.isEmpty || state.smartSearchActive.value ? null : q,
+      q: q.isEmpty ? null : q,
       sort: sort,
       limit: 40,
     );
@@ -612,11 +616,13 @@ class ProductsScreen extends Screen<ProductsState, void> {
   }
 
   Future<void> _refreshBusinessFlag() async {
-    final cached = SessionStore.user()?['is_business'] == true;
-    if (cached) state.isBusiness.value = true;
     final me = await Get.find<ProfileRepository>().getMe();
     final map = asMap(me.dataOrNull);
-    if (map == null) return;
+    if (map == null) {
+      // Cache bilan optimistik true qoldirmaslik — faqat session.
+      state.isBusiness.value = SessionStore.user()?['is_business'] == true;
+      return;
+    }
     await SessionStore.saveUser(Map<String, dynamic>.from(map));
     state.isBusiness.value = map['is_business'] == true;
   }
@@ -624,23 +630,8 @@ class ProductsScreen extends Screen<ProductsState, void> {
   Future<void> _openAddProduct() async {
     await _refreshBusinessFlag();
     if (!state.isBusiness.value) {
-      final goPlans = await Get.dialog<bool>(
-        AlertDialog(
-          title: Text('add_product_plan_required_title'.tr),
-          content: Text('add_product_plan_required_body'.tr),
-          actions: [
-            TextButton(
-              onPressed: () => Get.back(result: false),
-              child: Text('common_cancel'.tr),
-            ),
-            TextButton(
-              onPressed: () => Get.back(result: true),
-              child: Text('add_product_go_plans'.tr),
-            ),
-          ],
-        ),
-      );
-      if (goPlans != true) return;
+      final goPlans = await showBusinessPlanRequiredDialog();
+      if (!goPlans) return;
       await navigate(SubscriptionScreen());
       await _refreshBusinessFlag();
       if (!state.isBusiness.value) return;
@@ -685,17 +676,22 @@ class ProductsScreen extends Screen<ProductsState, void> {
         state.loading.value = true;
         state.showingFavorites.value = true;
         final fav = await Get.find<ProductsRepository>().listFavorites();
+        var ok = false;
         fav.when(
           success: (data) {
+            ok = true;
             final items = _mapProducts(data);
             state.top.clear();
             state.newest.clear();
             state.recommended.clear();
             state.all.assignAll(items);
-            if (items.isEmpty) showAppMessage('favorites_empty'.tr);
           },
           failure: showAppError,
         );
+        if (!ok) {
+          state.showingFavorites.value = false;
+          state.all.clear();
+        }
         state.loading.value = false;
       case OpenTradeAssistant _:
         await navigate(TradeAssistantScreen());

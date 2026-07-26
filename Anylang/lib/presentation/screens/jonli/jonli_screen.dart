@@ -42,6 +42,7 @@ class JonliScreen extends Screen<JonliState, void> {
 
   @override
   void initState(void payload) {
+    state.pauseOnLeaveHandler = _pauseLiveSession;
     state.ttsVoice.value = SessionStore.jonliTtsVoice();
     state.ttsSpeed.value = SessionStore.jonliTtsSpeed();
     if (Get.isRegistered<VoicePlayerService>()) {
@@ -49,6 +50,25 @@ class JonliScreen extends Screen<JonliState, void> {
     }
     _loadLiveLanguages();
     _ensureSession();
+  }
+
+  Future<void> _pauseLiveSession() async {
+    if (!state.conversationActive.value && state.sessionId.value == null) {
+      return;
+    }
+    _stopSilenceWatch();
+    _conversationGen++;
+    state.conversationActive.value = false;
+    state.busy.value = false;
+    final recorder = Get.find<VoiceRecorderService>();
+    if (recorder.isRecording.value) {
+      await recorder.cancel();
+    }
+    final id = state.sessionId.value;
+    if (id != null) {
+      unawaited(Get.find<LiveRepository>().endSession(id));
+      state.sessionId.value = null;
+    }
   }
 
   Future<void> _loadLiveLanguages() async {
@@ -87,6 +107,9 @@ class JonliScreen extends Screen<JonliState, void> {
 
   @override
   void dispose() {
+    if (identical(state.pauseOnLeaveHandler, _pauseLiveSession)) {
+      state.pauseOnLeaveHandler = null;
+    }
     _stopSilenceWatch();
     _conversationGen++;
     state.conversationActive.value = false;

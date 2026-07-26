@@ -102,6 +102,8 @@ class ProfileAvatar extends StatelessWidget {
               fit: BoxFit.cover,
               gaplessPlayback: true,
               filterQuality: FilterQuality.medium,
+              cacheWidth: (s * 3).round().clamp(64, 256),
+              cacheHeight: (s * 3).round().clamp(64, 256),
               errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
           ],

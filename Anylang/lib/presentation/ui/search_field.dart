@@ -10,6 +10,7 @@ class SearchField extends StatefulWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final String? initialValue;
+  final TextEditingController? controller;
 
   const SearchField({
     super.key,
@@ -18,6 +19,7 @@ class SearchField extends StatefulWidget {
     this.keyboardType,
     this.inputFormatters,
     this.initialValue,
+    this.controller,
   });
 
   @override
@@ -25,17 +27,23 @@ class SearchField extends StatefulWidget {
 }
 
 class _SearchFieldState extends State<SearchField> {
-  late final TextEditingController _controller;
+  TextEditingController? _owned;
+  TextEditingController get _controller => widget.controller ?? _owned!;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialValue ?? '');
+    if (widget.controller == null) {
+      _owned = TextEditingController(text: widget.initialValue ?? '');
+    } else if (widget.initialValue != null &&
+        widget.controller!.text.isEmpty) {
+      widget.controller!.text = widget.initialValue!;
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _owned?.dispose();
     super.dispose();
   }
 

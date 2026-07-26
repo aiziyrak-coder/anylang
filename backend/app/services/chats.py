@@ -489,6 +489,34 @@ async def list_chats(
     if hidden_ids:
         rows = [(c, p) for c, p in rows if c.id not in hidden_ids]
 
+    # activity/name: serialize only the requested page (avoids N+1 over full inbox).
+    if sort != "unread":
+        total = len(rows)
+        page_rows = rows[params.offset : params.offset + params.limit]
+        page_items = [
+            await _serialize_chat(
+                db, chat=chat, viewer=user, redis=redis, participant=participant
+            )
+            for chat, participant in page_rows
+        ]
+        if sort == "name":
+            page_items.sort(
+                key=lambda x: (
+                    0 if x.get("pinned") else 1,
+                    (
+                        (x.get("title") or (x.get("interlocutor") or {}).get("full_name") or "")
+                        .lower()
+                    ),
+                )
+            )
+        return {
+            "items": page_items,
+            "page": params.page,
+            "limit": params.page_size,
+            "total": total,
+            "has_more": params.offset + len(page_items) < total,
+        }
+
     items_full: list[dict] = []
     for chat, participant in rows:
         items_full.append(
@@ -497,28 +525,19 @@ async def list_chats(
             )
         )
 
-    if sort == "unread":
-        items_full.sort(
-            key=lambda x: (
-                0 if x.get("pinned") else 1,
-                0 if (x.get("unread_count") or 0) > 0 else 1,
-                -(
-                    datetime.fromisoformat(x["last_message_at"]).timestamp()
-                    if isinstance(x.get("last_message_at"), str)
-                    else (x["last_message_at"].timestamp() if x.get("last_message_at") else 0)
-                ),
-            )
+    items_full = [
+        x for x in items_full if (x.get("unread_count") or 0) > 0
+    ]
+    items_full.sort(
+        key=lambda x: (
+            0 if x.get("pinned") else 1,
+            -(
+                datetime.fromisoformat(x["last_message_at"]).timestamp()
+                if isinstance(x.get("last_message_at"), str)
+                else (x["last_message_at"].timestamp() if x.get("last_message_at") else 0)
+            ),
         )
-    elif sort == "name":
-        items_full.sort(
-            key=lambda x: (
-                0 if x.get("pinned") else 1,
-                (
-                    (x.get("title") or (x.get("interlocutor") or {}).get("full_name") or "")
-                    .lower()
-                ),
-            )
-        )
+    )
 
     total = len(items_full)
     page_items = items_full[params.offset : params.offset + params.limit]

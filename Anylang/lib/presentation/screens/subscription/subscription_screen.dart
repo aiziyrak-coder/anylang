@@ -14,6 +14,8 @@ import '../../ui/items/plan_card.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../products/products_state.dart';
+import '../profile/profile_state.dart';
 import 'subscription_action.dart';
 import 'subscription_content.dart';
 import 'subscription_plan.dart';
@@ -62,6 +64,18 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         final map = asMap(data);
         if (map == null) return;
         unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
+        final isBiz = map['is_business'] == true;
+        if (Get.isRegistered<ProductsState>()) {
+          Get.find<ProductsState>().isBusiness.value = isBiz;
+        }
+        if (Get.isRegistered<ProfileState>()) {
+          final ps = Get.find<ProfileState>();
+          final acc = ps.account.value;
+          if (acc != null && acc.isBusiness != isBiz) {
+            // Soft flag — to‘liq reload subscription ekranidan chiqqanda.
+            unawaited(ps.softRefreshHandler?.call());
+          }
+        }
         final sub = map['subscription'];
         if (sub is Map) {
           state.currentPlanCode.value =

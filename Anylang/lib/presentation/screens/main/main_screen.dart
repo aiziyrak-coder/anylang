@@ -12,6 +12,7 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../friends/friend.dart';
 import '../friends/friends_state.dart';
+import '../jonli/jonli_state.dart';
 import '../messages/conversation.dart';
 import '../messages/messages_state.dart';
 import '../products/products_state.dart';
@@ -59,7 +60,17 @@ class MainScreen extends Screen<MainState, void> {
         final prev = state.currentTab.value;
         state.currentTab.value = a.index;
         state.lastExitPromptAt = null;
-        if (a.index == prev) return;
+        if (prev == 3 && a.index != 3) {
+          await _pauseJonli();
+        }
+        if (a.index == prev) {
+          // Qayta bosish — soft refresh.
+          if (a.index == 0) await _refreshConversations();
+          if (a.index == 1) await _refreshFriends();
+          if (a.index == 2) await _softRefreshProducts();
+          if (a.index == 4) await _softRefreshProfile();
+          return;
+        }
         // IndexedStack re-init qilmaydi — tab ochilganda soft refresh.
         if (a.index == 0) await _refreshConversations();
         if (a.index == 1) await _refreshFriends();
@@ -68,6 +79,11 @@ class MainScreen extends Screen<MainState, void> {
       case HandleSystemBack _:
         await _onSystemBack(state);
     }
+  }
+
+  Future<void> _pauseJonli() async {
+    if (!Get.isRegistered<JonliState>()) return;
+    await Get.find<JonliState>().pauseOnLeaveHandler?.call();
   }
 
   Future<void> _softRefreshProducts() async {
@@ -83,8 +99,10 @@ class MainScreen extends Screen<MainState, void> {
   Future<void> _onSystemBack(MainState state) async {
     // Boshqa tabda → avval Xabarlar.
     if (state.currentTab.value != 0) {
+      final prev = state.currentTab.value;
       state.currentTab.value = 0;
       state.lastExitPromptAt = null;
+      if (prev == 3) await _pauseJonli();
       await _refreshConversations();
       return;
     }
@@ -103,7 +121,8 @@ class MainScreen extends Screen<MainState, void> {
   Future<void> _refreshConversations() async {
     if (!Get.isRegistered<MessagesState>()) return;
     final ms = Get.find<MessagesState>();
-    if (ms.loading.value) return;
+    // Soft tab refresh must not skip while a prior load is in flight —
+    // otherwise returning to Messages keeps a stale list until pull-to-refresh.
     final filter = ms.listFilter.value;
     final result = await Get.find<ChatRepository>().listChats(
       sort: filter == MessagesListFilter.unread ? 'unread' : 'activity',

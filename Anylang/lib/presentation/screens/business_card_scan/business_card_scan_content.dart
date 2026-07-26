@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -17,7 +19,7 @@ class BusinessCardScanContent extends ScreenContent<BusinessCardScanState> {
   Widget build(
     BuildContext context,
     BusinessCardScanState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/gradient_background.dart';
@@ -15,24 +17,36 @@ import 'main_bottom_nav.dart';
 import 'main_state.dart';
 
 class MainContent extends ScreenContent<MainState> {
+  /// Lazy tab bodies: faqat ochilgan tablar quriladi (API storm oldini olish).
+  final List<Widget?> _tabBodies = List<Widget?>.filled(5, null);
 
-  // Tab body'lari bir marta quriladi va IndexedStack'da tirik saqlanadi
-  // (tab almashganda qayta qurilmaydi, holat yo'qolmaydi).
-  late final List<Widget> _tabBodies;
+  Widget _buildTab(int index) {
+    return switch (index) {
+      0 => MessagesScreen().build(),
+      1 => FriendsScreen().build(),
+      2 => ProductsScreen().build(),
+      3 => JonliScreen().build(),
+      4 => ProfileScreen().build(),
+      _ => const SizedBox.shrink(),
+    };
+  }
 
-  @override
-  void initContent() {
-    _tabBodies = [
-      MessagesScreen().build(),        // 0 — Xabarlar
-      FriendsScreen().build(),         // 1 — Do'stlar
-      ProductsScreen().build(),        // 2 — Mahsulotlar
-      JonliScreen().build(),           // 3 — Jonli
-      ProfileScreen().build(),         // 4 — Profil
-    ];
+  Widget _ensureTab(int index) {
+    final existing = _tabBodies[index];
+    if (existing != null) return existing;
+    final built = _buildTab(index);
+    _tabBodies[index] = built;
+    return built;
   }
 
   @override
-  Widget build(BuildContext context, MainState state, void Function(MyAction action) sendAction) {
+  void initContent() {
+    // Default tab — xabarlar.
+    _ensureTab(0);
+  }
+
+  @override
+  Widget build(BuildContext context, MainState state, FutureOr<void> Function(MyAction action) sendAction) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -45,10 +59,17 @@ class MainContent extends ScreenContent<MainState> {
           child: Column(
             children: [
               Expanded(
-                child: Obx(() => IndexedStack(
-                      index: state.currentTab.value,
-                      children: _tabBodies,
-                    )),
+                child: Obx(() {
+                  final idx = state.currentTab.value;
+                  _ensureTab(idx);
+                  return IndexedStack(
+                    index: idx,
+                    children: List<Widget>.generate(
+                      5,
+                      (i) => _tabBodies[i] ?? const SizedBox.shrink(),
+                    ),
+                  );
+                }),
               ),
               // Pastki navigatsiya bari.
               Obx(() {

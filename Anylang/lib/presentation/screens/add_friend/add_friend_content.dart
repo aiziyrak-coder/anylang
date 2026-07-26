@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -19,7 +21,7 @@ import 'add_friend_state.dart';
 
 class AddFriendContent extends ScreenContent<AddFriendState> {
   @override
-  Widget build(BuildContext context, AddFriendState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, AddFriendState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
     final isFriendsMode = state.mode == AddFriendMode.friends;
 

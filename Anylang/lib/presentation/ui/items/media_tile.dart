@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
@@ -7,14 +9,14 @@ enum _MediaTileKind { upload, image }
 
 /// Rasm tanlash panellarida (Zavod rasmlari, Mahsulot rasmlari) ishlatiladigan
 /// bitta kvadrat plitka. `MediaTile.upload` — chiziqli chegarali "Yuklash"
-/// joy egallovchisi. `MediaTile.image` — tanlangan rasm (URL yoki gradient
-/// placeholder), ixtiyoriy olib tashlash tugmasi va ixtiyoriy belgi bilan.
+/// joy egallovchisi. `MediaTile.image` — tanlangan rasm (URL / fayl / gradient).
 class MediaTile extends StatelessWidget {
   final _MediaTileKind _kind;
   final String? uploadLabel;
   final VoidCallback? onTap;
   final LinearGradient? gradient;
   final String? imageUrl;
+  final String? filePath;
   final VoidCallback? onRemove;
   final String? badgeText;
   final double size;
@@ -27,6 +29,7 @@ class MediaTile extends StatelessWidget {
   })  : _kind = _MediaTileKind.upload,
         gradient = null,
         imageUrl = null,
+        filePath = null,
         onRemove = null,
         badgeText = null;
 
@@ -34,6 +37,7 @@ class MediaTile extends StatelessWidget {
     super.key,
     this.gradient,
     this.imageUrl,
+    this.filePath,
     this.onRemove,
     this.badgeText,
     this.onTap,
@@ -77,24 +81,40 @@ class MediaTile extends StatelessWidget {
     }
 
     final url = imageUrl?.trim();
+    final path = filePath?.trim();
     final g = gradient ??
         const LinearGradient(colors: [Color(0xFF1B3A57), Color(0xFF0A2340)]);
 
+    Widget imageChild;
+    if (path != null && path.isNotEmpty && File(path).existsSync()) {
+      imageChild = Image.file(
+        File(path),
+        width: s,
+        height: s,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => DecoratedBox(
+          decoration: BoxDecoration(gradient: g, borderRadius: radius),
+        ),
+      );
+    } else if (url != null && url.isNotEmpty) {
+      imageChild = Image.network(
+        url,
+        width: s,
+        height: s,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => DecoratedBox(
+          decoration: BoxDecoration(gradient: g, borderRadius: radius),
+        ),
+      );
+    } else {
+      imageChild = DecoratedBox(
+        decoration: BoxDecoration(gradient: g, borderRadius: radius),
+      );
+    }
+
     Widget body = ClipRRect(
       borderRadius: radius,
-      child: url != null && url.isNotEmpty
-          ? Image.network(
-              url,
-              width: s,
-              height: s,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => DecoratedBox(
-                decoration: BoxDecoration(gradient: g, borderRadius: radius),
-              ),
-            )
-          : DecoratedBox(
-              decoration: BoxDecoration(gradient: g, borderRadius: radius),
-            ),
+      child: imageChild,
     );
 
     if (onTap != null) {

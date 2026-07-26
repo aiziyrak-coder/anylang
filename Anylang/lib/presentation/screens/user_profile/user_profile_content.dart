@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
@@ -30,7 +32,7 @@ import 'user_profile_state.dart';
 class UserProfileContent extends ScreenContent<UserProfileState> {
 
   @override
-  Widget build(BuildContext context, UserProfileState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, UserProfileState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
     final d = state.data;
 

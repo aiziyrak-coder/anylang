@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -18,7 +20,7 @@ class GroupCatalogContent extends ScreenContent<GroupCatalogState> {
   Widget build(
     BuildContext context,
     GroupCatalogState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 
@@ -104,7 +106,7 @@ class GroupCatalogContent extends ScreenContent<GroupCatalogState> {
                   }
                   return RefreshIndicator(
                     color: c.accent,
-                    onRefresh: () async => sendAction(GroupCatalogRefresh()),
+                    onRefresh: () async { await sendAction(GroupCatalogRefresh()); },
                     child: ListView.separated(
                       padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
                       itemCount: state.products.length,
@@ -130,7 +132,7 @@ class GroupCatalogContent extends ScreenContent<GroupCatalogState> {
                   }
                   return RefreshIndicator(
                     color: c.accent,
-                    onRefresh: () async => sendAction(GroupCatalogRefresh()),
+                    onRefresh: () async { await sendAction(GroupCatalogRefresh()); },
                     child: ListView.separated(
                       padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
                       itemCount: state.documents.length,
@@ -155,7 +157,7 @@ class GroupCatalogContent extends ScreenContent<GroupCatalogState> {
                 }
                 return RefreshIndicator(
                   color: c.accent,
-                  onRefresh: () async => sendAction(GroupCatalogRefresh()),
+                  onRefresh: () async { await sendAction(GroupCatalogRefresh()); },
                   child: ListView.separated(
                     padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
                     itemCount: state.companies.length,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -21,7 +23,7 @@ class GroupStatsContent extends ScreenContent<GroupStatsState> {
   Widget build(
     BuildContext context,
     GroupStatsState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 
@@ -51,7 +53,7 @@ class GroupStatsContent extends ScreenContent<GroupStatsState> {
                 }
                 return RefreshIndicator(
                   color: c.accent,
-                  onRefresh: () async => sendAction(GroupStatsRefresh()),
+                  onRefresh: () async { await sendAction(GroupStatsRefresh()); },
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
                     children: [

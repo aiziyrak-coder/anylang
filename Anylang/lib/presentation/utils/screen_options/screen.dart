@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:anylang/presentation/utils/app_snackbar.dart';
@@ -27,15 +26,13 @@ abstract class Screen<S extends GetxController, Payload> {
 
   void uiBuildFinished() {}
 
-  void sendAction(MyAction action) {
-    Future<void>(() async {
-      try {
-        await actionHandler(state, action);
-      } catch (e, st) {
-        debugPrint('sendAction error: $e\n$st');
-        showAppError(e.toString());
-      }
-    });
+  Future<void> sendAction(MyAction action) async {
+    try {
+      await actionHandler(state, action);
+    } catch (e, st) {
+      debugPrint('sendAction error: $e\n$st');
+      showAppError(e.toString());
+    }
   }
 
   Future<void> actionHandler(S state, MyAction action) async {}

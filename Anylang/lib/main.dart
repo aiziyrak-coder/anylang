@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:anylang/presentation/screens/login/login_screen.dart';
+import 'package:anylang/presentation/screens/login/login_state.dart';
 import 'package:anylang/presentation/screens/main/main_screen.dart';
 import 'package:anylang/presentation/screens/select_language/select_language_screen.dart';
 import 'package:anylang/presentation/ui/my_snackbar.dart';
@@ -61,9 +62,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _sessionWorker = ever<int>(Get.find<SessionExpiredBus>().tick, (_) async {
       MySnackBar.dismiss();
-      // Login sahifasida / sessiya yo‘q — formani qayta qurib tozalamaslik.
-      if (!SessionStore.hasSession) return;
+      // TokenRefresher ko‘pincha avval clear qiladi — shunda ham Main'dan
+      // chiqish kerak (eski guard sticky Main qoldirardi).
       await SessionStore.clear();
+      if (Get.isRegistered<LoginState>()) {
+        Get.find<LoginState>().password = '';
+      }
       Get.offAll(() => LoginScreen().build());
     });
   }

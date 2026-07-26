@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/app_loading.dart';
@@ -28,7 +30,7 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
   Widget build(
     BuildContext context,
     SubscriptionState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 

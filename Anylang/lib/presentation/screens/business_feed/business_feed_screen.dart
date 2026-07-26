@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
@@ -106,6 +107,26 @@ class BusinessFeedScreen extends Screen<BusinessFeedState, void> {
           body: a.body,
         );
       case FeedDeleteRequested a:
+        final ok = await Get.dialog<bool>(
+          AlertDialog(
+            title: Text('confirm'.tr),
+            content: Text('feed_delete_confirm'.tr),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('settings_cancel'.tr),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text(
+                  'confirm'.tr,
+                  style: const TextStyle(color: Color(0xFFB42318)),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (ok != true) return;
         final result = await Get.find<FeedRepository>().delete(a.postId);
         result.when(
           success: (_) {

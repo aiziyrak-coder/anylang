@@ -22,6 +22,7 @@ import '../../ui/business_card_links.dart';
 import '../../ui/market_analytics.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/business_plan_dialog.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
@@ -248,23 +249,8 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case AddProductRequested _:
         final isBiz = state.account.value?.isBusiness == true;
         if (!isBiz) {
-          final goPlans = await Get.dialog<bool>(
-            AlertDialog(
-              title: Text('add_product_plan_required_title'.tr),
-              content: Text('add_product_plan_required_body'.tr),
-              actions: [
-                TextButton(
-                  onPressed: () => Get.back(result: false),
-                  child: Text('common_cancel'.tr),
-                ),
-                TextButton(
-                  onPressed: () => Get.back(result: true),
-                  child: Text('add_product_go_plans'.tr),
-                ),
-              ],
-            ),
-          );
-          if (goPlans != true) return;
+          final goPlans = await showBusinessPlanRequiredDialog();
+          if (!goPlans) return;
           await navigate(SubscriptionScreen());
           await _load();
           if (state.account.value?.isBusiness != true) return;

@@ -280,6 +280,8 @@ class MessagesScreen extends Screen<MessagesState, void> {
         await _load();
       case RefreshConversations _:
         await _load();
+        final q = state.query.value.trim();
+        if (q.isNotEmpty) await _search(q);
       case OpenSupportChat _:
         await navigate(SupportChatScreen());
       case OpenUserChat a:
@@ -307,6 +309,23 @@ class MessagesScreen extends Screen<MessagesState, void> {
         state.selecting.value = false;
         state.selectedIds.clear();
       case BulkMuteSelected _:
+        final ok = await Get.dialog<bool>(
+          AlertDialog(
+            title: Text('messages_bulk_mute'.tr),
+            content: Text('messages_bulk_mute_confirm'.tr),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('settings_cancel'.tr),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text('confirm'.tr),
+              ),
+            ],
+          ),
+        );
+        if (ok != true) return;
         final repo = Get.find<ChatRepository>();
         for (final id in state.selectedIds.toList()) {
           await repo.muteChat(id);
@@ -315,18 +334,55 @@ class MessagesScreen extends Screen<MessagesState, void> {
         state.selectedIds.clear();
         await _load();
       case BulkHideSelected _:
-        final repo = Get.find<ChatRepository>();
+        final okHide = await Get.dialog<bool>(
+          AlertDialog(
+            title: Text('messages_bulk_hide'.tr),
+            content: Text('messages_bulk_hide_confirm'.tr),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('settings_cancel'.tr),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text('confirm'.tr),
+              ),
+            ],
+          ),
+        );
+        if (okHide != true) return;
+        final hideRepo = Get.find<ChatRepository>();
         for (final id in state.selectedIds.toList()) {
-          await repo.hideChat(id);
+          await hideRepo.hideChat(id);
         }
         state.selecting.value = false;
         state.selectedIds.clear();
         await _load();
       case BulkDeleteSelected _:
-        final repo = Get.find<ChatRepository>();
+        final okDel = await Get.dialog<bool>(
+          AlertDialog(
+            title: Text('confirm'.tr),
+            content: Text('chat_delete_confirm'.tr),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('settings_cancel'.tr),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text(
+                  'confirm'.tr,
+                  style: const TextStyle(color: Color(0xFFB42318)),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (okDel != true) return;
+        final delRepo = Get.find<ChatRepository>();
         for (final id in state.selectedIds.toList()) {
-          await repo.clearHistory(id);
-          await repo.hideChat(id);
+          await delRepo.clearHistory(id);
+          await delRepo.hideChat(id);
         }
         state.selecting.value = false;
         state.selectedIds.clear();

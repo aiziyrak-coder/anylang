@@ -25,6 +25,9 @@ class JonliState extends GetxController {
   /// Keyingi (yoki joriy) navbat — sizmi.
   final RxBool nextIsMe = true.obs;
 
+  /// Tab o‘zgarganda (IndexedStack) jonli sessiyani to‘xtatish.
+  Future<void> Function()? pauseOnLeaveHandler;
+
   /// AI ovoz: female | male
   final RxString ttsVoice = 'female'.obs;
   /// AI ovoz tezligi 0.5–2.0

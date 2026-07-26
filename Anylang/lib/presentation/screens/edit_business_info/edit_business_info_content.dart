@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
@@ -153,7 +155,7 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
   }
 
   @override
-  Widget build(BuildContext context, EditBusinessInfoState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, EditBusinessInfoState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
     _bindHydrate(state);
 

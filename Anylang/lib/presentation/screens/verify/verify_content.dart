@@ -46,7 +46,7 @@ class VerifyContent extends ScreenContent<VerifyState> {
       '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 
   @override
-  Widget build(BuildContext context, VerifyState state, void Function(MyAction action) sendAction) {
+  Widget build(BuildContext context, VerifyState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
 
     return GradientBackground(

@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../../ui/ai_matching.dart';
@@ -39,6 +40,9 @@ class ProductsState extends GetxController {
   final Rxn<AiMatchingResult> aiMatching = Rxn<AiMatchingResult>();
   final RxBool aiMatchingLoading = false.obs;
 
+  /// Search field sync (clear/load bilan UI bir xil bo‘lsin).
+  final TextEditingController searchController = TextEditingController();
+
   /// Smart Search AI tushuntirishi (masalan: Turkiyadagi to‘qimachilik…).
   final RxnString smartInterpretation = RxnString();
   final RxBool smartSearchActive = false.obs;
@@ -47,6 +51,12 @@ class ProductsState extends GetxController {
 
   /// Main tab soft-refresh (IndexedStack).
   Future<void> Function()? softRefreshHandler;
+
+  @override
+  void onClose() {
+    searchController.dispose();
+    super.onClose();
+  }
 
   bool get hasActiveFilters =>
       category.value != null ||

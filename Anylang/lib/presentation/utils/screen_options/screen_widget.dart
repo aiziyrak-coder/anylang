@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:anylang/presentation/utils/screen_options/my_action.dart';
@@ -12,7 +14,7 @@ class ScreenWidget extends StatefulWidget {
   final void Function() dispose;
   final void Function() uiBuildFinished;
   final void Function(BuildContext) setContextCallback;
-  final void Function(MyAction) sendActionCallback;
+  final FutureOr<void> Function(MyAction) sendActionCallback;
 
   const ScreenWidget({
     super.key,

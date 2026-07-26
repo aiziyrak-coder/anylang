@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -36,7 +38,7 @@ class NearbyContent extends ScreenContent<NearbyState> {
   Widget build(
     BuildContext context,
     NearbyState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
 
@@ -160,7 +162,7 @@ class NearbyContent extends ScreenContent<NearbyState> {
             if (state.people.isEmpty) {
               return RefreshIndicator(
                 color: c.accentText,
-                onRefresh: () async => sendAction(RefreshNearby()),
+                onRefresh: () async { await sendAction(RefreshNearby()); },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(20.dp, 40.dp, 20.dp, 24.dp),
@@ -177,7 +179,7 @@ class NearbyContent extends ScreenContent<NearbyState> {
 
             return RefreshIndicator(
               color: c.accentText,
-              onRefresh: () async => sendAction(RefreshNearby()),
+              onRefresh: () async { await sendAction(RefreshNearby()); },
               child: ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 24.dp),

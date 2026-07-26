@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:get/get.dart';
@@ -30,7 +32,7 @@ class MarketMapContent extends ScreenContent<MarketMapState> {
   Widget build(
     BuildContext context,
     MarketMapState state,
-    void Function(MyAction action) sendAction,
+    FutureOr<void> Function(MyAction action) sendAction,
   ) {
     final c = context.appColors;
     final isDark = c.isDark;
@@ -101,7 +103,7 @@ class _MapBody extends StatelessWidget {
   final List<String> mapSubs;
   final List<MarketMapCountry> countries;
   final MarketMapState state;
-  final void Function(MyAction action) sendAction;
+  final FutureOr<void> Function(MyAction action) sendAction;
 
   const _MapBody({
     required this.mapController,
