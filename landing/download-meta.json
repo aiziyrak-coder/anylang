@@ -1,13 +1,13 @@
 {
-  "version": "1.0.56",
-  "build": 57,
-  "version_full": "1.0.56+57",
+  "version": "1.0.57",
+  "build": 58,
+  "version_full": "1.0.57+58",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.56+57.apk",
-  "size_bytes": 90857893,
+  "versioned_filename": "anylang-1.0.57+58.apk",
+  "size_bytes": 90857737,
   "size_mb": 86.65,
-  "updated_at": "2026-07-25T11:31:45.860810+00:00",
+  "updated_at": "2026-07-26T05:38:42.798551+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.56 — market 3-dot menu, remove analytics, scroll fix"
+  "notes": "Release 1.0.57 — production audit: soft-refresh await, unread chats, lazy tabs, UX confirms"
 }
