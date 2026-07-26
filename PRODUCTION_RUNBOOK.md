@@ -91,8 +91,10 @@ sudo mkdir -p /var/backups/anylang/postgres
 sudo cp /home/admin_root/anylang/deploy/scripts/backup_postgres.sh /usr/local/bin/anylang-backup-pg
 sudo chmod +x /usr/local/bin/anylang-backup-pg
 # cron: 03:15 UTC daily
-echo '15 3 * * * /usr/local/bin/anylang-backup-pg >> /var/log/anylang-backup.log 2>&1' | sudo tee /etc/cron.d/anylang-backup
+echo '15 3 * * * root /usr/local/bin/anylang-backup-pg >> /var/log/anylang-backup.log 2>&1' | sudo tee /etc/cron.d/anylang-backup
 ```
+
+Scripts dump via `docker exec` into the Postgres container (no `source` of `.env`).
 
 Manual backup:
 

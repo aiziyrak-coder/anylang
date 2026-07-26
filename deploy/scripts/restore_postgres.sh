@@ -22,17 +22,13 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-set -a
-# shellcheck source=/dev/null
-source "$ENV_FILE"
-set +a
-
 echo "Stopping API/worker to avoid writes..."
 cd "$APP_DIR/deploy"
 docker compose -f docker-compose.prod.yml --env-file "$ENV_FILE" stop api worker admin || true
 
 echo "Restoring $DUMP into $CONTAINER ..."
-gunzip -c "$DUMP" | docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" "$CONTAINER" \
+# Local socket inside container — no need to source .env for password.
+gunzip -c "$DUMP" | docker exec -i "$CONTAINER" \
   psql -U anylang -d anylang -v ON_ERROR_STOP=1
 
 echo "Starting services..."
