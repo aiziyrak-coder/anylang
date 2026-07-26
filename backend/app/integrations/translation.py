@@ -426,11 +426,16 @@ async def _translate_openai(
     source: str | None,
     *,
     domain: str = "general",
+    fast: bool = False,
 ) -> str:
     settings = get_settings()
     src_name = _lang_name(source)
     tgt_name = _lang_name(target)
-    model = _translation_model(settings)
+    # Live: prefer faster chat model; chat: quality model.
+    if fast:
+        model = (settings.openai_model or "gpt-4o-mini").strip() or "gpt-4o-mini"
+    else:
+        model = _translation_model(settings)
     tgt = _normalize_lang(target)
     dom = normalize_translation_domain(domain)
 
@@ -445,8 +450,11 @@ async def _translate_openai(
             f"Text to translate:\n{text}"
         ),
         temperature=0.0,
-        timeout=35.0,
+        timeout=18.0 if fast else 35.0,
     )
+
+    if fast:
+        return draft
 
     # Short / emoji-only: skip second pass.
     meaningful = re.sub(r"[\W_]+", "", draft, flags=re.UNICODE)
@@ -513,12 +521,16 @@ async def translate(
     source_lang: str | None = None,
     *,
     domain: str | None = None,
+    fast: bool = False,
 ) -> str:
-    """Translate text via OpenAI (domain-aware), DeepL, or mock."""
+    """Translate text via OpenAI (domain-aware), DeepL, or mock.
+
+    fast=True — single-pass, shorter timeout (Live turns).
+    """
     settings = get_settings()
     target = _normalize_lang(target_lang)
     source = _normalize_lang(source_lang) if source_lang else None
-    resolved_domain = resolve_translation_domain(text, preferred=domain)
+    resolved_domain = "general" if fast else resolve_translation_domain(text, preferred=domain)
 
     if not text.strip():
         return text
@@ -530,7 +542,12 @@ async def translate(
 
     protected, urls = _protect_urls(text)
     out = await _translate_provider(
-        protected, target, source, settings, domain=resolved_domain
+        protected,
+        target,
+        source,
+        settings,
+        domain=resolved_domain,
+        fast=fast,
     )
     return _restore_urls(out, urls)
 
@@ -542,6 +559,7 @@ async def _translate_provider(
     settings,
     *,
     domain: str = "general",
+    fast: bool = False,
 ) -> str:
     provider = (settings.translation_provider or "mock").strip().lower()
 
@@ -553,7 +571,9 @@ async def _translate_provider(
                 status_code=503,
             )
         try:
-            out = await _translate_openai(text, target, source, domain=domain)
+            out = await _translate_openai(
+                text, target, source, domain=domain, fast=fast
+            )
         except AppError:
             raise
         except httpx.HTTPError as exc:

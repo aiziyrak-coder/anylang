@@ -1471,6 +1471,8 @@ class LanguageLocalizations extends Translations {
       'jonli_export_failed': 'Eksport bo‘lmadi',
       'jonli_session_failed': 'Sessiya ochilmadi',
       'jonli_translate_failed': 'Tarjima bo‘lmadi',
+      'jonli_speak_louder':
+          'Nutq eshitilmadi. Mikrofon yaqinroq va balandroq gapiring',
     },
     'ru_RU': {
       'app_name': 'AnyLang',
@@ -2912,6 +2914,8 @@ class LanguageLocalizations extends Translations {
       'jonli_export_failed': 'Не удалось экспортировать',
       'jonli_session_failed': 'Не удалось открыть сессию',
       'jonli_translate_failed': 'Не удалось перевести',
+      'jonli_speak_louder':
+          'Речь не распознана. Говорите ближе к микрофону и громче',
     },
     'us_US': {
       'app_name': 'AnyLang',
@@ -4352,6 +4356,8 @@ class LanguageLocalizations extends Translations {
       'jonli_export_failed': 'Export failed',
       'jonli_session_failed': 'Could not start session',
       'jonli_translate_failed': 'Translation failed',
+      'jonli_speak_louder':
+          'No speech heard. Speak closer to the mic and a bit louder',
     },
     };
     // Qisqa locale kodlari — Material/GetX ba'zan countryCode'siz keladi.

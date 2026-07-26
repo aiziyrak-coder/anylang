@@ -28,9 +28,9 @@ import 'jonli_transcript_entry.dart';
 class JonliScreen extends Screen<JonliState, void> {
   JonliScreen() : super(mobileContent: JonliContent());
 
-  static const double _speechLevel = 0.14;
-  static const int _silenceMsNeeded = 1100;
-  static const int _minRecordMs = 900;
+  static const double _speechLevel = 0.07;
+  static const int _silenceMsNeeded = 1800;
+  static const int _minRecordMs = 1200;
   static const int _maxTurnMs = 45000;
 
   int _turnSeq = 0;
@@ -399,6 +399,25 @@ class JonliScreen extends Screen<JonliState, void> {
       if (clientTurnId != null) {
         state.turns.removeWhere((t) => t.clientTurnId == clientTurnId);
       }
+      if (advanceConversation && state.conversationActive.value) {
+        await _continueConversationAfter(
+          justSpokeIsMe: isMe,
+          hadSpeech: false,
+          gen: gen,
+        );
+      }
+      return;
+    }
+
+    // Lokal energiya tekshiruvi — bo'sh/juda past audio serverga ketmasin.
+    final energy = recorded.samples.isEmpty
+        ? 0.0
+        : recorded.samples.reduce((a, b) => a + b) / recorded.samples.length;
+    if (energy < 0.035 || recorded.duration.inMilliseconds < 600) {
+      if (clientTurnId != null) {
+        state.turns.removeWhere((t) => t.clientTurnId == clientTurnId);
+      }
+      showAppMessage('jonli_speak_louder'.tr);
       if (advanceConversation && state.conversationActive.value) {
         await _continueConversationAfter(
           justSpokeIsMe: isMe,

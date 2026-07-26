@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -18,6 +20,8 @@ from app.integrations.tts import synthesize_speech
 from app.integrations.translation import translate
 from app.models.chat import LiveSession, LiveTurn
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
 MAX_AUDIO_SECONDS = 60
@@ -297,19 +301,29 @@ async def create_turn(
             status_code=400,
         )
 
-    text_translated = await translate(
-        text_original,
-        target_lang=target_language,
-        source_lang=source_language,
-        domain=getattr(user, "translation_domain", None),
-    )
-
     storage = get_storage()
     audio_key = f"live/{session.id}/{uuid4().hex}{ext}"
-    audio_original_url = await storage.upload_bytes(
-        audio_key,
-        data,
-        content_type or "application/octet-stream",
+
+    async def _upload_original() -> str:
+        return await storage.upload_bytes(
+            audio_key,
+            data,
+            content_type or "application/octet-stream",
+        )
+
+    async def _fast_translate() -> str:
+        return await translate(
+            text_original,
+            target_lang=target_language,
+            source_lang=source_language,
+            domain="general",
+            fast=True,
+        )
+
+    # Parallel: translation + original audio upload (biggest latency win after STT).
+    text_translated, audio_original_url = await asyncio.gather(
+        _fast_translate(),
+        _upload_original(),
     )
 
     target_meta = LANGUAGE_BY_CODE.get(target_language, {})
@@ -327,6 +341,7 @@ async def create_turn(
                 language=target_language,
                 voice=voice,
                 speed=speed,
+                fast=True,
             )
             if synthesized is not None:
                 tts_bytes, tts_ctype, tts_dur = synthesized
@@ -339,6 +354,7 @@ async def create_turn(
                 tts_duration_seconds = max(1, int(round(tts_dur)))
         except Exception:
             # Partial success: keep STT + translation even if TTS fails.
+            logger.exception("Live TTS failed session=%s", session.id)
             audio_tts_url = None
             tts_duration_seconds = None
 

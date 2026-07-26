@@ -2,7 +2,7 @@ import 'dart:math';
 
 /// Amplitude / waveform yordamchilari — voice_pulse'dan ko'chirilgan mantiq.
 abstract final class WaveformUtils {
-  static const double minDb = -45;
+  static const double minDb = -52;
 
   /// dBFS → 0..1.
   static double normalizeDb(double dbfs) {

@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     # Chat auto-translate: stronger model for grammar/spelling (falls back to openai_model).
     openai_translation_model: str = "gpt-4o"
+    # Live STT — gpt-4o-mini-transcribe is faster/stronger; falls back to whisper-1.
+    openai_stt_model: str = "gpt-4o-mini-transcribe"
     deepgram_api_key: str = ""
     elevenlabs_api_key: str = ""
     # Optional overrides for Jonli TTS gender voices (ElevenLabs voice IDs).

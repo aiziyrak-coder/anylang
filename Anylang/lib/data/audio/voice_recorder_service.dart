@@ -54,7 +54,12 @@ class VoiceRecorderService extends GetxService {
     final path =
         '${Directory.systemTemp.path}/anylang_${DateTime.now().millisecondsSinceEpoch}.m4a';
     await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000),
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 96000,
+        sampleRate: 16000,
+        numChannels: 1,
+      ),
       path: path,
     );
 
@@ -100,7 +105,7 @@ class VoiceRecorderService extends GetxService {
     isRecording.value = false;
     elapsedLabel.value = '0:00';
 
-    if (discard || path == null || duration.inMilliseconds < 700) {
+    if (discard || path == null || duration.inMilliseconds < 500) {
       if (path != null) {
         try {
           await File(path).delete();

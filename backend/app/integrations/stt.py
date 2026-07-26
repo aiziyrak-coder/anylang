@@ -1,7 +1,10 @@
-"""Speech-to-text: OpenAI Whisper (preferred) → Deepgram → mock (non-prod only).
+"""Speech-to-text for Live / chat voice.
 
-Whisper is preferred because Deepgram nova-2 poorly handles Uzbek and some
-Turkic languages — empty transcripts were surfacing as NO_SPEECH_DETECTED.
+Order (ideal for Uzbek + multilingual):
+  1) OpenAI gpt-4o-mini-transcribe (fast, strong multilingual) → whisper-1
+  2) Auto-detect language if forced-lang returned empty
+  3) Deepgram nova-2 (skip for known-weak Turkic codes unless nothing else worked)
+  4) Production: NO_SPEECH_DETECTED; local: mock
 """
 
 from __future__ import annotations
@@ -19,8 +22,25 @@ logger = logging.getLogger(__name__)
 DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
 OPENAI_WHISPER_URL = "https://api.openai.com/v1/audio/transcriptions"
 
-# Deepgram nova-2 has weak / no support for these ISO codes.
-_DEEPGRAM_WEAK_LANGS = frozenset({"uz", "kk", "ky", "tg", "tk"})
+# Deepgram nova-2 is unreliable for these ISO codes — Whisper first, Deepgram last.
+_DEEPGRAM_WEAK_LANGS = frozenset({"uz", "kk", "ky", "tg", "tk", "az"})
+
+_LANG_PROMPTS: dict[str, str] = {
+    "uz": "O'zbek tili. Oddiy suhbat. To'g'ri o'zbekcha so'zlar.",
+    "kk": "Қазақ тілі. Қарапайым сөйлесу.",
+    "ky": "Кыргыз тили. Жөнөкөй сүйлөшүү.",
+    "tg": "Забони тоҷикӣ. Сӯҳбати оддӣ.",
+    "tr": "Türkçe konuşma. Günlük sohbet.",
+    "ru": "Русская речь. Обычный разговор.",
+    "en": "English speech. Everyday conversation.",
+    "ar": "كلام عربي فصيح أو عامي. محادثة عادية.",
+    "zh": "中文口语。日常对话。",
+    "ja": "日本語の会話。日常の話し言葉。",
+    "ko": "한국어 대화. 일상 회화.",
+    "de": "Deutsche Sprache. Alltagsgespräch.",
+    "fr": "Français parlé. Conversation quotidienne.",
+    "es": "Español hablado. Conversación cotidiana.",
+}
 
 
 def _iso_lang(language: str | None) -> str | None:
@@ -52,6 +72,17 @@ def _guess_ext(content_type: str | None, filename: str | None) -> str:
     }.get(mime, "m4a")
 
 
+def _stt_models(settings) -> list[str]:
+    primary = (getattr(settings, "openai_stt_model", None) or "").strip()
+    models: list[str] = []
+    if primary:
+        models.append(primary)
+    for m in ("gpt-4o-mini-transcribe", "whisper-1"):
+        if m not in models:
+            models.append(m)
+    return models
+
+
 async def transcribe_audio(
     data: bytes,
     *,
@@ -59,9 +90,9 @@ async def transcribe_audio(
     language: str | None = None,
     filename: str | None = None,
 ) -> str:
-    if not data:
+    if not data or len(data) < 256:
         raise AppError(
-            message="Audioda nutq topilmadi",
+            message="Audioda nutq topilmadi. Yaxshiroq eshitiladigan qilib qayta yozing",
             error_code="NO_SPEECH_DETECTED",
             status_code=400,
         )
@@ -70,49 +101,52 @@ async def transcribe_audio(
     lang = _iso_lang(language)
     ext = _guess_ext(content_type, filename)
     mime = (content_type or "").split(";")[0].strip().lower() or f"audio/{ext}"
-
-    # Prefer Whisper (Uzbek / multilingual). Fall back to Deepgram, then retry
-    # Whisper without a hard language lock if the first pass was empty.
     errors: list[str] = []
 
     if settings.openai_api_key:
-        try:
-            text = await _openai_whisper_transcribe(
-                data,
-                content_type=mime,
-                language=lang,
-                api_key=settings.openai_api_key,
-                ext=ext,
-            )
-            if text:
-                return text
-        except AppError as exc:
-            if exc.error_code != "NO_SPEECH_DETECTED":
-                errors.append(str(exc.message))
-                logger.warning("Whisper STT failed (%s); trying fallback", exc.error_code)
-            else:
-                # Retry auto-detect once — forced `uz` sometimes returns empty on short clips.
-                if lang:
-                    try:
-                        text = await _openai_whisper_transcribe(
-                            data,
-                            content_type=mime,
-                            language=None,
-                            api_key=settings.openai_api_key,
-                            ext=ext,
-                        )
-                        if text:
-                            return text
-                    except AppError:
-                        pass
+        # 1) Forced language (best when caller knows the speaker language).
+        # 2) Auto-detect (helps when forced code mismatches accent / short clips).
+        attempts: list[str | None] = [lang, None] if lang else [None]
+        # Prefer auto-detect first for weak Deepgram langs — Whisper lock often empties.
+        if lang in _DEEPGRAM_WEAK_LANGS:
+            attempts = [None, lang]
 
-    use_deepgram = bool(settings.deepgram_api_key) and lang not in _DEEPGRAM_WEAK_LANGS
-    if use_deepgram or (settings.deepgram_api_key and not settings.openai_api_key):
+        for model in _stt_models(settings):
+            for attempt_lang in attempts:
+                try:
+                    text = await _openai_transcribe(
+                        data,
+                        content_type=mime,
+                        language=attempt_lang,
+                        api_key=settings.openai_api_key,
+                        ext=ext,
+                        model=model,
+                        prompt=_LANG_PROMPTS.get(lang or "") or None,
+                    )
+                    if text:
+                        return text
+                except AppError as exc:
+                    if exc.error_code == "NO_SPEECH_DETECTED":
+                        continue
+                    if exc.error_code == "STT_MODEL_UNSUPPORTED":
+                        logger.info("STT model %s unsupported — trying next", model)
+                        break
+                    errors.append(str(exc.message))
+                    logger.warning(
+                        "OpenAI STT failed model=%s lang=%s: %s",
+                        model,
+                        attempt_lang,
+                        exc.error_code,
+                    )
+
+    # Deepgram: primary for strong langs; last resort even for weak langs.
+    if settings.deepgram_api_key:
+        dg_lang = None if lang in _DEEPGRAM_WEAK_LANGS else lang
         try:
             text = await _deepgram_transcribe(
                 data,
                 content_type=mime,
-                language=lang if lang not in _DEEPGRAM_WEAK_LANGS else None,
+                language=dg_lang,
                 api_key=settings.deepgram_api_key,
             )
             if text:
@@ -134,35 +168,51 @@ async def transcribe_audio(
     return "Hello"
 
 
-async def _openai_whisper_transcribe(
+async def _openai_transcribe(
     data: bytes,
     *,
     content_type: str,
     language: str | None,
     api_key: str,
     ext: str = "m4a",
+    model: str = "whisper-1",
+    prompt: str | None = None,
 ) -> str:
     form_file = (f"audio.{ext}", data, content_type or f"audio/{ext}")
     data_fields: dict[str, str] = {
-        "model": "whisper-1",
+        "model": model,
         "response_format": "json",
+        "temperature": "0",
     }
     if language:
         data_fields["language"] = language
+    if prompt and model.startswith("whisper"):
+        # prompt is supported on whisper-1; newer models may ignore it safely.
+        data_fields["prompt"] = prompt[:200]
 
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(timeout=45.0) as client:
             response = await client.post(
                 OPENAI_WHISPER_URL,
                 headers=headers,
                 files={"file": form_file},
                 data=data_fields,
             )
+            if response.status_code in {400, 404}:
+                body = (response.text or "")[:300].lower()
+                if "model" in body or "invalid" in body or response.status_code == 404:
+                    raise AppError(
+                        message="STT model unsupported",
+                        error_code="STT_MODEL_UNSUPPORTED",
+                        status_code=400,
+                    )
             response.raise_for_status()
             payload = response.json()
+    except AppError:
+        raise
     except httpx.HTTPError as exc:
-        logger.exception("OpenAI Whisper STT failed")
+        logger.exception("OpenAI STT failed model=%s", model)
         raise AppError(
             message="Nutqni aniqlab bo'lmadi",
             error_code="STT_FAILED",
@@ -186,16 +236,22 @@ async def _deepgram_transcribe(
     language: str | None,
     api_key: str,
 ) -> str:
-    params: dict[str, str] = {"model": "nova-2", "smart_format": "true"}
+    params: dict[str, str] = {
+        "model": "nova-2",
+        "smart_format": "true",
+        "punctuate": "true",
+    }
     if language:
         params["language"] = language
+    else:
+        params["detect_language"] = "true"
 
     headers = {
         "Authorization": f"Token {api_key}",
         "Content-Type": content_type or "application/octet-stream",
     }
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=35.0) as client:
             response = await client.post(
                 DEEPGRAM_URL,
                 params=params,

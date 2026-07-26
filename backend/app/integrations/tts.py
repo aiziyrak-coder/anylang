@@ -52,6 +52,7 @@ async def synthesize_speech(
     language: str | None = None,
     voice: str | None = "female",
     speed: float | None = 1.0,
+    fast: bool = False,
 ) -> tuple[bytes, str, float] | None:
     """Return (audio_bytes, content_type, duration_hint_seconds) or None on failure."""
     cleaned = (text or "").strip()
@@ -69,7 +70,7 @@ async def synthesize_speech(
                 voice=gender,
                 speed=rate,
                 api_key=settings.elevenlabs_api_key.strip(),
-    female_voice_id=(settings.elevenlabs_voice_female or "").strip(),
+                female_voice_id=(settings.elevenlabs_voice_female or "").strip(),
                 male_voice_id=(settings.elevenlabs_voice_male or "").strip(),
             )
             if result is not None:
@@ -85,6 +86,8 @@ async def synthesize_speech(
                 speed=rate,
                 api_key=settings.openai_api_key.strip(),
                 language=language,
+                # Live: tts-1 (~2x faster than tts-1-hd).
+                model="tts-1" if fast else "tts-1-hd",
             )
             if result is not None:
                 return result
@@ -156,16 +159,17 @@ async def _openai_tts(
     speed: float,
     api_key: str,
     language: str | None,
+    model: str = "tts-1-hd",
 ) -> tuple[bytes, str, float] | None:
     del language  # OpenAI TTS auto-detects; kept for API symmetry.
     payload = {
-        "model": "tts-1-hd",
+        "model": model or "tts-1-hd",
         "input": text[:4096],
         "voice": _OPENAI_VOICES[voice],
         "response_format": "mp3",
         "speed": max(0.5, min(2.0, speed)),
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=20.0) as client:
         resp = await client.post(
             OPENAI_SPEECH_URL,
             headers={
