@@ -37,6 +37,7 @@ import '../settings/settings_payload.dart';
 import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../numbers/numbers_screen.dart';
+import '../forgot_password/forgot_password_screen.dart';
 import '../support_chat/support_chat_screen.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
@@ -217,10 +218,10 @@ class ProfileScreen extends Screen<ProfileState, void> {
     }
   }
 
-  Future<void> _openSettings() async {
+  Future<void> _openSettings([SettingsFocus focus = SettingsFocus.app]) async {
     await navigate(
       SettingsScreen(),
-      payload: const SettingsPayload(focus: SettingsFocus.app),
+      payload: SettingsPayload(focus: focus),
     );
     await _load();
   }
@@ -238,20 +239,23 @@ class ProfileScreen extends Screen<ProfileState, void> {
         await _load();
       case OpenSettings _:
       case OpenAppSettings _:
+        await _openSettings(SettingsFocus.app);
       case OpenSettingsLanguage _:
+        await _openSettings(SettingsFocus.language);
       case OpenSettingsTheme _:
+        await _openSettings(SettingsFocus.theme);
       case OpenSettingsNotifications _:
+        await _openSettings(SettingsFocus.notifications);
       case OpenSettingsTranslation _:
-      case OpenSettingsAiAssistant _:
-        await _openSettings();
+        await _openSettings(SettingsFocus.translation);
       case OpenSettingsPrivacy _:
+        await _openSettings(SettingsFocus.privacy);
       case OpenSettingsSecurity _:
+        await navigate(ForgotPasswordScreen());
       case OpenAccountSettings _:
-        await navigate(
-          SettingsScreen(),
-          payload: const SettingsPayload(focus: SettingsFocus.account),
-        );
-        await _load();
+        await _openSettings(SettingsFocus.account);
+      case OpenSettingsAiAssistant _:
+        await navigate(SupportChatScreen());
       case OpenSupportFromProfile _:
         await navigate(SupportChatScreen());
       case OpenSofiyaAi _:

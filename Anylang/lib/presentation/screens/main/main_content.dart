@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/connection_status_banner.dart';
 import '../../ui/gradient_background.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
@@ -58,6 +59,7 @@ class MainContent extends ScreenContent<MainState> {
           bottom: false,
           child: Column(
             children: [
+              const ConnectionStatusBanner(),
               Expanded(
                 child: Obx(() {
                   final idx = state.currentTab.value;

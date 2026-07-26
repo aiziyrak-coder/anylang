@@ -16,17 +16,37 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
 import 'settings_action.dart';
+import 'settings_payload.dart';
 import 'settings_state.dart';
 
 /// Yagona sozlamalar: til, ko‘rinish, bildirishnomalar, maxfiylik, hisob.
 class SettingsContent extends ScreenContent<SettingsState> {
   SettingsContent() : super(color: Colors.transparent);
 
+  bool _didAutoFocus = false;
+  final _scrollController = ScrollController();
+  final _themeKey = GlobalKey();
+  final _notifKey = GlobalKey();
+  final _privacyKey = GlobalKey();
+
   String _visibilityLabel(String key) => 'settings_visibility_$key'.tr;
+
+  @override
+  void onClose() {
+    _scrollController.dispose();
+    super.onClose();
+  }
 
   @override
   Widget build(BuildContext context, SettingsState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
+    if (!_didAutoFocus) {
+      _didAutoFocus = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        _applyFocus(context, state, sendAction);
+      });
+    }
 
     return GradientBackground(
       child: SafeArea(
@@ -41,6 +61,7 @@ class SettingsContent extends ScreenContent<SettingsState> {
             ),
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: EdgeInsets.fromLTRB(16.dp, 16.dp, 16.dp, 24.dp),
                 child: _body(context, c, state, sendAction),
               ),
@@ -48,6 +69,44 @@ class SettingsContent extends ScreenContent<SettingsState> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _applyFocus(
+    BuildContext context,
+    SettingsState state,
+    FutureOr<void> Function(MyAction) sendAction,
+  ) async {
+    final focus = state.focus.value;
+    switch (focus) {
+      case SettingsFocus.language:
+        await _openAppLanguage(context, state, sendAction);
+      case SettingsFocus.translation:
+        await _openTranslationDomain(context, state, sendAction);
+      case SettingsFocus.privacy:
+        await _scrollTo(_privacyKey);
+        await sendAction(OpenProfileVisibility());
+      case SettingsFocus.security:
+        await sendAction(OpenChangePassword());
+      case SettingsFocus.theme:
+        await _scrollTo(_themeKey);
+      case SettingsFocus.notifications:
+        await _scrollTo(_notifKey);
+      case SettingsFocus.account:
+        await _scrollTo(_privacyKey);
+      case SettingsFocus.app:
+        break;
+    }
+  }
+
+  Future<void> _scrollTo(GlobalKey key) async {
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    await Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
     );
   }
 
@@ -86,70 +145,96 @@ class SettingsContent extends ScreenContent<SettingsState> {
           ),
         ], padHorizontal: false),
         SizedBox(height: 20.dp),
-        _sectionLabel(c, 'settings_appearance'.tr),
-        SizedBox(height: 9.dp),
-        _card(c, [
-          Padding(
-            padding: EdgeInsets.only(bottom: 10.dp),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'settings_theme'.tr,
-                style: TextStyle(
-                  color: c.textPrimary,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w700,
+        KeyedSubtree(
+          key: _themeKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sectionLabel(c, 'settings_appearance'.tr),
+              SizedBox(height: 9.dp),
+              _card(c, [
+                Padding(
+                  padding: EdgeInsets.only(bottom: 10.dp),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'settings_theme'.tr,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+                ThemeSelector(onSelect: (mode) => sendAction(ChangeThemeMode(mode))),
+              ], divide: false),
+            ],
           ),
-          ThemeSelector(onSelect: (mode) => sendAction(ChangeThemeMode(mode))),
-        ], divide: false),
+        ),
         SizedBox(height: 20.dp),
-        _sectionLabel(c, 'settings_notifications'.tr),
-        SizedBox(height: 9.dp),
-        _card(c, [
-          Obx(() => ToggleRow(
-                label: 'settings_notif_messages'.tr,
-                value: state.newMessagesEnabled.value,
-                onChanged: (v) => sendAction(ToggleNotification('new_messages', v)),
-              )),
-          Obx(() => ToggleRow(
-                label: 'settings_notif_friend_requests'.tr,
-                value: state.friendRequestsEnabled.value,
-                onChanged: (v) =>
-                    sendAction(ToggleNotification('friend_requests', v)),
-              )),
-          Obx(() => ToggleRow(
-                label: 'settings_notif_marketing'.tr,
-                value: state.marketingEnabled.value,
-                onChanged: (v) => sendAction(ToggleNotification('marketing', v)),
-              )),
-        ]),
+        KeyedSubtree(
+          key: _notifKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sectionLabel(c, 'settings_notifications'.tr),
+              SizedBox(height: 9.dp),
+              _card(c, [
+                Obx(() => ToggleRow(
+                      label: 'settings_notif_messages'.tr,
+                      value: state.newMessagesEnabled.value,
+                      onChanged: (v) =>
+                          sendAction(ToggleNotification('new_messages', v)),
+                    )),
+                Obx(() => ToggleRow(
+                      label: 'settings_notif_friend_requests'.tr,
+                      value: state.friendRequestsEnabled.value,
+                      onChanged: (v) =>
+                          sendAction(ToggleNotification('friend_requests', v)),
+                    )),
+                Obx(() => ToggleRow(
+                      label: 'settings_notif_marketing'.tr,
+                      value: state.marketingEnabled.value,
+                      onChanged: (v) =>
+                          sendAction(ToggleNotification('marketing', v)),
+                    )),
+              ]),
+            ],
+          ),
+        ),
         SizedBox(height: 20.dp),
-        _sectionLabel(c, 'settings_privacy'.tr),
-        SizedBox(height: 9.dp),
-        _card(c, [
-          Obx(() => InfoRow(
-                icon: Icons.visibility_outlined,
-                label: 'settings_profile_visibility'.tr,
-                value: _visibilityLabel(state.profileVisibilityKey.value),
-                showChevron: true,
-                onTap: () => sendAction(OpenProfileVisibility()),
-              )),
-          InfoRow(
-            icon: Icons.block_outlined,
-            label: 'settings_blocked_users'.tr,
-            showChevron: true,
-            onTap: () => sendAction(OpenBlockedUsers()),
+        KeyedSubtree(
+          key: _privacyKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sectionLabel(c, 'settings_privacy'.tr),
+              SizedBox(height: 9.dp),
+              _card(c, [
+                Obx(() => InfoRow(
+                      icon: Icons.visibility_outlined,
+                      label: 'settings_profile_visibility'.tr,
+                      value: _visibilityLabel(state.profileVisibilityKey.value),
+                      showChevron: true,
+                      onTap: () => sendAction(OpenProfileVisibility()),
+                    )),
+                InfoRow(
+                  icon: Icons.block_outlined,
+                  label: 'settings_blocked_users'.tr,
+                  showChevron: true,
+                  onTap: () => sendAction(OpenBlockedUsers()),
+                ),
+                InfoRow(
+                  icon: Icons.lock_outline_rounded,
+                  label: 'settings_change_password'.tr,
+                  showChevron: true,
+                  onTap: () => sendAction(OpenChangePassword()),
+                ),
+              ], padHorizontal: false),
+            ],
           ),
-          InfoRow(
-            icon: Icons.lock_outline_rounded,
-            label: 'settings_change_password'.tr,
-            showChevron: true,
-            onTap: () => sendAction(OpenChangePassword()),
-          ),
-        ], padHorizontal: false),
+        ),
         SizedBox(height: 20.dp),
         _sectionLabel(c, 'settings_account_danger'.tr),
         SizedBox(height: 9.dp),
@@ -184,7 +269,7 @@ class SettingsContent extends ScreenContent<SettingsState> {
   Future<void> _openAppLanguage(
     BuildContext context,
     SettingsState state,
-    void Function(MyAction) sendAction,
+    FutureOr<void> Function(MyAction) sendAction,
   ) async {
     final picked = await showLanguageBottomSheet(
       context,
@@ -192,13 +277,13 @@ class SettingsContent extends ScreenContent<SettingsState> {
       desc: 'settings_app_language_desc'.tr,
       selectedKey: state.currentLanguageKey.value,
     );
-    if (picked != null) sendAction(SelectAppLanguage(picked));
+    if (picked != null) await sendAction(SelectAppLanguage(picked));
   }
 
   Future<void> _openTranslationDomain(
     BuildContext context,
     SettingsState state,
-    void Function(MyAction) sendAction,
+    FutureOr<void> Function(MyAction) sendAction,
   ) async {
     final codes = SessionStore.translationDomains;
     final labels = codes.map((c) => 'translation_domain_$c'.tr).toList();
@@ -212,7 +297,7 @@ class SettingsContent extends ScreenContent<SettingsState> {
     if (picked == null) return;
     final idx = labels.indexOf(picked);
     if (idx < 0) return;
-    sendAction(SelectTranslationDomain(codes[idx]));
+    await sendAction(SelectTranslationDomain(codes[idx]));
   }
 
   Widget _sectionLabel(AppColors c, String text) {

@@ -9,6 +9,7 @@ import 'package:web_socket_channel/io.dart';
 
 import '../core/buildNetwork/api_config.dart';
 import '../local/session_store.dart';
+import 'connectivity_service.dart';
 
 /// Secure WebSocket client — Authorization bearer header (query token legacy fallback removed).
 /// userId hech qachon URL'da yuborilmaydi (TZ 7.9).
@@ -41,9 +42,19 @@ class SocketService extends GetxService with WidgetsBindingObserver {
   final _connectionController =
       StreamController<SocketStatus>.broadcast();
 
+  /// UI uchun (banner) — oxirgi holat.
+  final status = SocketStatus.disconnected.obs;
+
   Stream<Map<String, dynamic>> get messages => _messageController.stream;
   Stream<SocketStatus> get connection => _connectionController.stream;
   bool get isConnected => _channel != null;
+
+  void _emit(SocketStatus next) {
+    status.value = next;
+    if (!_connectionController.isClosed) {
+      _connectionController.add(next);
+    }
+  }
 
   @override
   void onInit() {
@@ -54,6 +65,8 @@ class SocketService extends GetxService with WidgetsBindingObserver {
   /// Ulanish — token SessionStore'dan olinadi.
   Future<void> connect({String? accessToken}) async {
     _manuallyClosed = false;
+    _retry = 0;
+    _reconnectTimer?.cancel();
     await _open(forcedToken: accessToken);
   }
 
@@ -68,6 +81,7 @@ class SocketService extends GetxService with WidgetsBindingObserver {
     }
 
     _connecting = true;
+    _emit(SocketStatus.connecting);
     _reconnectTimer?.cancel();
     final uri = Uri.parse('$_wsBase/ws/');
     _log('ulanmoqda... #${_retry + 1} -> $uri');
@@ -87,7 +101,7 @@ class SocketService extends GetxService with WidgetsBindingObserver {
 
       _channel = channel;
       _retry = 0;
-      _connectionController.add(SocketStatus.connected);
+      _emit(SocketStatus.connected);
       _log('ULANDI');
 
       _clientPingTimer?.cancel();
@@ -112,27 +126,40 @@ class SocketService extends GetxService with WidgetsBindingObserver {
     } catch (e) {
       _log('ulanish xato: $e');
       _channel = null;
-      _connectionController.add(SocketStatus.error);
+      _emit(SocketStatus.error);
       _scheduleReconnect();
     } finally {
       _connecting = false;
     }
   }
 
-  void _onDrop(SocketStatus status) {
+  void _onDrop(SocketStatus next) {
     _clientPingTimer?.cancel();
     _channelSub?.cancel();
     _channelSub = null;
     _channel = null;
-    _connectionController.add(status);
+    _emit(next);
     _scheduleReconnect();
   }
 
   void _scheduleReconnect() {
     if (_manuallyClosed) return;
     if (_reconnectTimer?.isActive ?? false) return;
+    // Offline bo‘lsa urinishni kutamiz — online bo‘lganda
+    // ConnectionStatusService.connect() chaqiriladi.
+    if (Get.isRegistered<ConnectivityService>() &&
+        !Get.find<ConnectivityService>().online.value) {
+      if (status.value != SocketStatus.disconnected) {
+        _emit(SocketStatus.disconnected);
+      }
+      return;
+    }
     _retry++;
     final seconds = (2 * _retry).clamp(2, _maxBackoffSeconds).toInt();
+    // Keyingi urinishgacha ham “connecting” ko‘rinsin (Telegram).
+    if (status.value != SocketStatus.connecting) {
+      _emit(SocketStatus.connecting);
+    }
     _reconnectTimer = Timer(Duration(seconds: seconds), () {
       if (_channel == null && !_connecting) _open();
     });
@@ -155,7 +182,7 @@ class SocketService extends GetxService with WidgetsBindingObserver {
     _channelSub = null;
     _channel?.sink.close();
     _channel = null;
-    _connectionController.add(SocketStatus.disconnected);
+    _emit(SocketStatus.disconnected);
   }
 
   @override
@@ -182,4 +209,4 @@ class SocketService extends GetxService with WidgetsBindingObserver {
   }
 }
 
-enum SocketStatus { connected, disconnected, error }
+enum SocketStatus { connecting, connected, disconnected, error }

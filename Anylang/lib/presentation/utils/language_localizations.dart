@@ -185,6 +185,8 @@ class LanguageLocalizations extends Translations {
           'Juda ko‘p urinish. Biroz kutib qayta urinib ko‘ring',
       'error_server': 'Server xatosi. Keyinroq urinib ko‘ring',
       'error_generic': 'Xatolik yuz berdi. Qayta urinib ko‘ring',
+      'connection_waiting_network': 'Internet yo‘q…',
+      'connection_connecting': 'Ulanmoqda…',
       'verify_email_missing':
           'Email topilmadi. Tasdiqlash uchun email orqali kiring',
       'full_name_required': 'Ismni to‘liq kiriting',
@@ -1616,6 +1618,8 @@ class LanguageLocalizations extends Translations {
           'Слишком много попыток. Подождите и попробуйте снова',
       'error_server': 'Ошибка сервера. Попробуйте позже',
       'error_generic': 'Произошла ошибка. Попробуйте снова',
+      'connection_waiting_network': 'Нет сети…',
+      'connection_connecting': 'Подключение…',
       'verify_email_missing':
           'Email не найден. Для подтверждения войдите через email',
       'full_name_required': 'Введите полное имя',
@@ -3044,6 +3048,8 @@ class LanguageLocalizations extends Translations {
       'error_rate_limited': 'Too many attempts. Wait a bit and try again',
       'error_server': 'Server error. Try again later',
       'error_generic': 'Something went wrong. Please try again',
+      'connection_waiting_network': 'Waiting for network…',
+      'connection_connecting': 'Connecting…',
       'verify_email_missing':
           'Email not found. Sign in with email to verify',
       'full_name_required': 'Enter your full name',

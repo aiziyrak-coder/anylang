@@ -32,6 +32,7 @@ import '../data/network/business_card_deep_link_service.dart';
 import '../data/network/feed_repository.dart';
 import '../data/network/nearby_repository.dart';
 import '../data/network/connectivity_service.dart';
+import '../data/network/connection_status_service.dart';
 import '../data/network/offline_outbox_service.dart';
 import '../data/local/offline_chat_store.dart';
 
@@ -137,6 +138,10 @@ class DataModule {
     );
     await Get.putAsync<OfflineOutboxService>(
       () => OfflineOutboxService().init(),
+      permanent: true,
+    );
+    await Get.putAsync<ConnectionStatusService>(
+      () => ConnectionStatusService().init(),
       permanent: true,
     );
     await Get.putAsync<InviteDeepLinkService>(
