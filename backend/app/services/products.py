@@ -26,6 +26,39 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_VIDEO_BYTES = 25 * 1024 * 1024
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/x-m4v"}
 MAX_PENDING_TOP_REQUESTS = 3
+PRODUCT_TOP_BOOST_DAYS = 30
+
+
+def _aware(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
+def is_effectively_top_pinned(product: Product) -> bool:
+    """Paid boost expires via top_pinned_until; admin pin may have until=None."""
+    if not product.is_top_pinned:
+        return False
+    until = _aware(product.top_pinned_until)
+    if until is None:
+        return True
+    return until > datetime.now(UTC)
+
+
+async def expire_stale_top_pins(db: AsyncSession) -> int:
+    now = datetime.now(UTC)
+    result = await db.execute(
+        update(Product)
+        .where(
+            Product.is_top_pinned.is_(True),
+            Product.top_pinned_until.is_not(None),
+            Product.top_pinned_until <= now,
+        )
+        .values(is_top_pinned=False)
+    )
+    return int(result.rowcount or 0)
 
 PRODUCT_CATEGORIES: dict[str, dict[str, str]] = {
     "clothing_accessories": {
@@ -172,6 +205,8 @@ async def _favorite_ids(db: AsyncSession, user_id: int, product_ids: list[int]) 
 
 
 async def _top_product_ids(db: AsyncSession, *, limit: int = 10) -> list[int]:
+    await expire_stale_top_pins(db)
+    now = datetime.now(UTC)
     pinned_result = await db.execute(
         select(Product.id)
         .join(User, User.id == Product.seller_id)
@@ -179,9 +214,13 @@ async def _top_product_ids(db: AsyncSession, *, limit: int = 10) -> list[int]:
         .where(
             Product.status == "published",
             Product.is_top_pinned.is_(True),
+            or_(
+                Product.top_pinned_until.is_(None),
+                Product.top_pinned_until > now,
+            ),
             _seller_filter(),
         )
-        .order_by(Product.created_at.desc())
+        .order_by(Product.top_pinned_until.desc().nullslast(), Product.created_at.desc())
     )
     pinned_ids = list(pinned_result.scalars().all())
 
@@ -492,8 +531,9 @@ async def _serialize_product(
     top_ids: set[int] | None = None,
     force_top: bool | None = None,
 ) -> dict:
+    effectively_pinned = is_effectively_top_pinned(product)
     is_top = force_top if force_top is not None else (
-        product.is_top_pinned or (top_ids is not None and product.id in top_ids)
+        effectively_pinned or (top_ids is not None and product.id in top_ids)
     )
     seller = getattr(product, "seller", None)
     trust = build_product_trust_badges(
@@ -509,6 +549,7 @@ async def _serialize_product(
         "primary_image_url": _primary_url(product),
         "views_count": product.views_count,
         "is_top": is_top,
+        "top_pinned_until": product.top_pinned_until if effectively_pinned else None,
         "is_favorited": product.id in favorite_ids,
         "status": product.status,
         "seller_id": product.seller_id,
@@ -1740,7 +1781,78 @@ async def review_top_request(
     req.reviewed_at = datetime.now(UTC)
     if approve:
         product.is_top_pinned = True
+        # Admin pin: no expiry (permanent until manually cleared).
+        product.top_pinned_until = None
         if product.status != "published":
             product.status = "published"
     await db.flush()
     return _serialize_top_request(req, product=product)
+
+
+async def prepare_product_top_checkout(
+    db: AsyncSession,
+    *,
+    user: User,
+    product_id: int,
+) -> Product:
+    """Validate ownership before creating a $5/mo TOP boost payment."""
+    await _require_business_account(user)
+    product = await _get_product_or_404(
+        db, product_id, viewer=user, allow_owner_draft=True
+    )
+    if product.seller_id != user.id:
+        raise AppError(
+            message="Bu mahsulot sizga tegishli emas",
+            error_code="NOT_PRODUCT_OWNER",
+            status_code=403,
+        )
+    if product.status != "published":
+        raise AppError(
+            message="Faqat e'lon qilingan mahsulot uchun TOP boost",
+            error_code="PRODUCT_NOT_PUBLISHED",
+            status_code=400,
+        )
+    return product
+
+
+async def activate_product_top_from_payment(db: AsyncSession, payment) -> Product:
+    """Apply paid TOP boost (stacks remaining time)."""
+    meta = payment.meta or {}
+    try:
+        product_id = int(meta.get("product_id"))
+    except (TypeError, ValueError) as exc:
+        raise AppError(
+            message="Noto'g'ri mahsulot TOP to'lovi",
+            error_code="PAYMENT_INVALID",
+            status_code=400,
+        ) from exc
+    try:
+        days = int(meta.get("days") or PRODUCT_TOP_BOOST_DAYS)
+    except (TypeError, ValueError):
+        days = PRODUCT_TOP_BOOST_DAYS
+    days = max(1, min(days, 366))
+
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise AppError(
+            message="Mahsulot topilmadi",
+            error_code="PRODUCT_NOT_FOUND",
+            status_code=404,
+        )
+    if product.seller_id != payment.user_id:
+        raise AppError(
+            message="To'lov egasi mahsulot egasi emas",
+            error_code="PAYMENT_INVALID",
+            status_code=400,
+        )
+
+    now = datetime.now(UTC)
+    until = _aware(product.top_pinned_until)
+    base = until if (product.is_top_pinned and until and until > now) else now
+    product.is_top_pinned = True
+    product.top_pinned_until = base + timedelta(days=days)
+    if product.status != "published":
+        product.status = "published"
+    await db.flush()
+    return product
+

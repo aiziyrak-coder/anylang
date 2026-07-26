@@ -55,9 +55,11 @@ class ProductsContent extends ScreenContent<ProductsState> {
                         padding: EdgeInsets.only(left: 8.dp),
                         child: Obx(
                           () => Text(
-                            state.showingFavorites.value
-                                ? 'favorites_title'.tr
-                                : 'products_title'.tr,
+                            state.showingMyProducts.value
+                                ? 'my_products_title'.tr
+                                : state.showingFavorites.value
+                                    ? 'favorites_title'.tr
+                                    : 'products_title'.tr,
                             style: TextStyle(
                               color: c.textPrimary,
                               fontSize: 27.sp,
@@ -66,6 +68,23 @@ class ProductsContent extends ScreenContent<ProductsState> {
                           ),
                         ),
                       ),
+                    ),
+                    Obx(
+                      () {
+                        if (!state.isBusiness.value) {
+                          return const SizedBox.shrink();
+                        }
+                        return IconButton(
+                          onPressed: () => sendAction(ShowMyProducts()),
+                          tooltip: 'my_products_title'.tr,
+                          icon: Icon(
+                            state.showingMyProducts.value
+                                ? Icons.inventory_2_rounded
+                                : Icons.inventory_2_outlined,
+                            color: c.accent,
+                          ),
+                        );
+                      },
                     ),
                     Obx(
                       () => IconButton(
@@ -209,7 +228,8 @@ class ProductsContent extends ScreenContent<ProductsState> {
                 );
               }),
               Obx(() {
-                if (state.showingFavorites.value) {
+                if (state.showingFavorites.value ||
+                    state.showingMyProducts.value) {
                   return const SizedBox.shrink();
                 }
                 return Column(
@@ -233,8 +253,12 @@ class ProductsContent extends ScreenContent<ProductsState> {
                   final q = state.query.value.trim();
                   final searching = q.isNotEmpty;
                   final favorites = state.showingFavorites.value;
+                  final myProducts = state.showingMyProducts.value;
                   final showSections =
-                      !searching && !favorites && !state.hasActiveFilters;
+                      !searching &&
+                      !favorites &&
+                      !myProducts &&
+                      !state.hasActiveFilters;
                   final all = state.all.toList();
 
                   if (all.isEmpty &&
@@ -247,12 +271,19 @@ class ProductsContent extends ScreenContent<ProductsState> {
                           ? Icons.search_off_rounded
                           : favorites
                               ? Icons.favorite_border_rounded
-                              : Icons.storefront_outlined,
+                              : myProducts
+                                  ? Icons.inventory_2_outlined
+                                  : Icons.storefront_outlined,
                       title: searching
                           ? 'empty_no_results'.tr
                           : favorites
                               ? 'favorites_empty'.tr
-                              : 'products_empty'.tr,
+                              : myProducts
+                                  ? 'my_products_empty'.tr
+                                  : 'products_empty'.tr,
+                      subtitle: myProducts
+                          ? 'my_products_empty_hint'.tr
+                          : null,
                     );
                   }
 
@@ -302,7 +333,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 20.dp),
                             child: Text(
-                              (searching || favorites
+                              (searching || favorites || myProducts
                                       ? 'products_results'
                                       : 'products_all')
                                   .tr,

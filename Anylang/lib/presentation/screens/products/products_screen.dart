@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/core/buildNetwork/base_result.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/ai_matching_repository.dart';
+import '../../../data/network/payment_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/ai_matching_bottom_sheet.dart';
@@ -18,6 +21,7 @@ import '../../utils/business_plan_dialog.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
+import '../add_product/add_product_payload.dart';
 import '../add_product/add_product_screen.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
@@ -27,6 +31,7 @@ import '../business_card_scan/business_card_scan_screen.dart';
 import '../marketplace_groups/marketplace_groups_screen.dart';
 import '../market_map/market_map_screen.dart';
 import '../subscription/subscription_screen.dart';
+import 'own_product_actions_sheet.dart';
 import 'product.dart';
 import 'product_info_bottom_sheet.dart';
 import 'products_action.dart';
@@ -634,7 +639,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
     state.isBusiness.value = map['is_business'] == true;
   }
 
-  Future<void> _openAddProduct() async {
+  Future<void> _openAddProduct({int? editProductId}) async {
     await _refreshBusinessFlag();
     if (!state.isBusiness.value) {
       final goPlans = await showBusinessPlanRequiredDialog();
@@ -643,8 +648,158 @@ class ProductsScreen extends Screen<ProductsState, void> {
       await _refreshBusinessFlag();
       if (!state.isBusiness.value) return;
     }
-    await navigate(AddProductScreen());
-    await _load(keepQuery: true);
+    await navigate(
+      AddProductScreen(),
+      payload: editProductId != null && editProductId > 0
+          ? AddProductPayload(editProductId: editProductId)
+          : null,
+    );
+    if (state.showingMyProducts.value) {
+      await _loadMyProducts();
+    } else {
+      await _load(keepQuery: true);
+    }
+  }
+
+  Future<void> _loadMyProducts() async {
+    state.loading.value = true;
+    state.showingMyProducts.value = true;
+    state.showingFavorites.value = false;
+    final mine = await Get.find<ProductsRepository>().listMine(limit: 50);
+    var ok = false;
+    mine.when(
+      success: (data) {
+        ok = true;
+        final items = _mapProducts(data);
+        state.top.clear();
+        state.newest.clear();
+        state.recommended.clear();
+        state.all.assignAll(items);
+      },
+      failure: showAppError,
+    );
+    if (!ok) {
+      state.showingMyProducts.value = false;
+      state.all.clear();
+    }
+    state.loading.value = false;
+  }
+
+  Future<void> _handleOwnProduct(Product product) async {
+    final action = await showOwnProductActionsSheet(context, product: product);
+    if (action == null) return;
+    switch (action) {
+      case OwnProductAction.edit:
+        await _openAddProduct(editProductId: product.id);
+      case OwnProductAction.boostTop:
+        await _boostProductTop(product);
+      case OwnProductAction.publish:
+        await _setProductStatus(product, 'published');
+      case OwnProductAction.unpublish:
+        await _setProductStatus(product, 'draft');
+      case OwnProductAction.delete:
+        final ok = await Get.dialog<bool>(
+              AlertDialog(
+                title: Text('my_products_delete_title'.tr),
+                content: Text('my_products_delete_body'.tr),
+                actions: [
+                  TextButton(
+                    onPressed: () => Get.back(result: false),
+                    child: Text('cancel'.tr),
+                  ),
+                  TextButton(
+                    onPressed: () => Get.back(result: true),
+                    child: Text(
+                      'my_products_delete'.tr,
+                      style: const TextStyle(color: kListenRed),
+                    ),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+        if (!ok) return;
+        final result =
+            await Get.find<ProductsRepository>().archive(product.id);
+        if (result.errorOrNull != null) {
+          showAppError(result.errorOrNull);
+          return;
+        }
+        showAppMessage('my_products_deleted'.tr);
+        await _loadMyProducts();
+    }
+  }
+
+  Future<void> _setProductStatus(Product product, String status) async {
+    final result = await Get.find<ProductsRepository>().update(
+      product.id,
+      {'status': status},
+    );
+    if (result.errorOrNull != null) {
+      showAppError(result.errorOrNull);
+      return;
+    }
+    showAppMessage(
+      status == 'published'
+          ? 'my_products_published'.tr
+          : 'my_products_unpublished'.tr,
+    );
+    await _loadMyProducts();
+  }
+
+  Future<void> _boostProductTop(Product product) async {
+    final confirm = await Get.dialog<bool>(
+          AlertDialog(
+            title: Text('my_products_boost_title'.tr),
+            content: Text('my_products_boost_body'.tr),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('cancel'.tr),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text('my_products_boost_pay'.tr),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirm) return;
+
+    final payments = Get.find<PaymentRepository>();
+    final checkout =
+        await payments.checkoutProductTop(productId: product.id);
+    await checkout.when(
+      success: (data) async {
+        if (data is! Map) return;
+        final id = data['id'];
+        final checkoutUrl = data['checkout_url']?.toString();
+        final mockConfirm = data['mock_confirm'] == true;
+        if (checkoutUrl != null &&
+            checkoutUrl.isNotEmpty &&
+            mockConfirm != true) {
+          final uri = Uri.tryParse(checkoutUrl);
+          if (uri != null) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+          showAppMessage('my_products_boost_checkout_opened'.tr);
+          return;
+        }
+        if (id is num && (kDebugMode || mockConfirm == true)) {
+          final confirmPay = await payments.confirmMock(id.toInt());
+          if (confirmPay.errorOrNull != null) {
+            showAppError(confirmPay.errorOrNull);
+            return;
+          }
+          showAppMessage('my_products_boost_success'.tr);
+          await _loadMyProducts();
+        } else {
+          showAppMessage('my_products_boost_checkout_opened'.tr);
+        }
+      },
+      failure: (e) async => showAppError(e),
+    );
   }
 
   @override
@@ -667,13 +822,35 @@ class ProductsScreen extends Screen<ProductsState, void> {
           state.searching.value = false;
         });
       case RefreshProducts _:
-        state.showingFavorites.value = false;
-        await _load(keepQuery: true);
-        await _refreshBusinessFlag();
+        if (state.showingMyProducts.value) {
+          await _loadMyProducts();
+        } else if (state.showingFavorites.value) {
+          await actionHandler(state, ShowFavorites());
+        } else {
+          state.showingFavorites.value = false;
+          state.showingMyProducts.value = false;
+          await _load(keepQuery: true);
+          await _refreshBusinessFlag();
+        }
       case SoftRefreshProducts _:
         await _refreshBusinessFlag();
       case OpenAddProduct _:
         await _openAddProduct();
+      case ShowMyProducts _:
+        if (state.showingMyProducts.value) {
+          state.showingMyProducts.value = false;
+          await _load();
+          return;
+        }
+        await _refreshBusinessFlag();
+        if (!state.isBusiness.value) {
+          final goPlans = await showBusinessPlanRequiredDialog();
+          if (!goPlans) return;
+          await navigate(SubscriptionScreen());
+          await _refreshBusinessFlag();
+          if (!state.isBusiness.value) return;
+        }
+        await _loadMyProducts();
       case ShowFavorites _:
         if (state.showingFavorites.value) {
           state.showingFavorites.value = false;
@@ -682,6 +859,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
         }
         state.loading.value = true;
         state.showingFavorites.value = true;
+        state.showingMyProducts.value = false;
         final fav = await Get.find<ProductsRepository>().listFavorites();
         var ok = false;
         fav.when(
@@ -821,6 +999,10 @@ class ProductsScreen extends Screen<ProductsState, void> {
       case ProductsBannerTap a:
         await _applyBanner(a.id);
       case OpenProduct a:
+        if (state.showingMyProducts.value) {
+          await _handleOwnProduct(a.product);
+          return;
+        }
         showProductInfoBottomSheet(
           context,
           a.product,

@@ -35,6 +35,8 @@ class ProductsState extends GetxController {
   RxBool loading = true.obs;
   RxBool searching = false.obs;
   RxBool showingFavorites = false.obs;
+  /// Biznes: o‘z e’lonlari (edit/delete/boost).
+  RxBool showingMyProducts = false.obs;
 
   RxBool isBusiness = false.obs;
   final Rxn<AiMatchingResult> aiMatching = Rxn<AiMatchingResult>();

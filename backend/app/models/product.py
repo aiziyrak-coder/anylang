@@ -35,6 +35,10 @@ class Product(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True, nullable=False)
     views_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_top_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Paid boost expiry (None = admin permanent pin, or unset).
+    top_pinned_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     attributes: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     capabilities: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)

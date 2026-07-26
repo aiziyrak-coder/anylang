@@ -456,6 +456,25 @@ async def handle_complete(db: AsyncSession, payload: dict[str, Any]) -> dict[str
             billing_cycle=payment.billing_cycle,
             auto_renew=False,
         )
+    elif payment.kind == "product_top":
+        from app.services.products import activate_product_top_from_payment
+
+        await activate_product_top_from_payment(db, payment)
+    elif payment.kind in {"number", "super_group"}:
+        from app.services.payments import apply_payment
+
+        # Status already "paid"; apply_payment expects pending→succeeded.
+        # Call kind-specific fulfillment directly via apply helpers.
+        if payment.kind == "number" and payment.number:
+            from app.services import numbers as numbers_service
+
+            await numbers_service.assign_purchased_number(db, user, payment.number)
+        elif payment.kind == "super_group":
+            chat_id = (payment.meta or {}).get("chat_id")
+            if chat_id:
+                from app.services.group_admin import mark_chat_super
+
+                await mark_chat_super(db, chat_id=int(chat_id), payment_id=payment.id)
 
     return _click_response(
         click_trans_id=click_trans_id,

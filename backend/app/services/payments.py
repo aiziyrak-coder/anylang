@@ -22,9 +22,11 @@ from app.services.subscription import (
 )
 from app.services.users import load_user_for_response, serialize_user
 
-PaymentKind = Literal["subscription", "number", "super_group"]
+PaymentKind = Literal["subscription", "number", "super_group", "product_top"]
 
 SUPER_GROUP_PRICE = Decimal("10.00")
+PRODUCT_TOP_PRICE_USD = Decimal("5.00")
+PRODUCT_TOP_DAYS = 30
 
 
 def _compute_subscription_amount(plan: str, billing_cycle: str) -> tuple[Decimal, int, str]:
@@ -66,6 +68,8 @@ def _checkout_description(payment: Payment) -> str:
         return f"AnyLang {payment.plan} ({payment.billing_cycle})"
     if payment.kind == "super_group":
         return f"AnyLang Super Group #{(payment.meta or {}).get('chat_id')}"
+    if payment.kind == "product_top":
+        return f"AnyLang TOP boost #{(payment.meta or {}).get('product_id')}"
     return f"AnyLang number {payment.number}"
 
 
@@ -89,6 +93,7 @@ async def create_checkout(
     billing_cycle: str | None = None,
     number: str | None = None,
     chat_id: int | None = None,
+    product_id: int | None = None,
     promo_code: str | None = None,
     provider: str | None = None,
 ) -> dict[str, Any]:
@@ -138,6 +143,7 @@ async def create_checkout(
     amount_before: Decimal | None = None
     discount_amount = Decimal("0.00")
     applied_promo: str | None = None
+    resolved: str | None = None
 
     if kind == "subscription":
         if not plan or plan == "basic":
@@ -194,6 +200,36 @@ async def create_checkout(
             )
         amount = SUPER_GROUP_PRICE
         meta = {"chat_id": chat_id}
+    elif kind == "product_top":
+        if product_id is None:
+            raise AppError(
+                message="product_id talab qilinadi",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        from app.payments.click import ClickProvider
+        from app.payments.fx import usd_to_uzs
+        from app.services.products import prepare_product_top_checkout
+
+        await prepare_product_top_checkout(db, user=user, product_id=product_id)
+        amount_usd = PRODUCT_TOP_PRICE_USD
+        country = (getattr(user, "country", None) or "").strip().upper()
+        click = ClickProvider()
+        prefer_click = chosen == "click" or (
+            not chosen and country == "UZ" and click.is_configured()
+        )
+        if prefer_click and click.is_configured():
+            amount = usd_to_uzs(amount_usd)
+            currency = "UZS"
+            resolved = "click"
+        else:
+            amount = amount_usd
+            currency = "USD"
+        meta = {
+            "product_id": int(product_id),
+            "days": PRODUCT_TOP_DAYS,
+            "amount_usd": f"{amount_usd:.2f}",
+        }
     else:
         raise AppError(message="Noto'g'ri to'lov turi", error_code="PAYMENT_INVALID", status_code=400)
 
@@ -204,7 +240,8 @@ async def create_checkout(
             status_code=400,
         )
 
-    resolved = _resolve_provider()
+    if resolved is None:
+        resolved = _resolve_provider()
     payment = Payment(
         user_id=user.id,
         kind=kind,
@@ -226,6 +263,15 @@ async def create_checkout(
         base["amount_before"] = f"{amount_before:.2f}"
         base["discount_amount"] = f"{discount_amount:.2f}"
         base["promo_code"] = applied_promo
+
+    if resolved == "click":
+        from app.payments.click import ClickProvider
+
+        data = await ClickProvider().create_checkout(payment)
+        base["checkout_url"] = data.get("checkout_url")
+        base["mock_confirm"] = False
+        base["stripe_session_id"] = None
+        return base
 
     if resolved == "mock":
         base["mock_confirm"] = True
@@ -369,6 +415,10 @@ async def apply_payment(db: AsyncSession, payment: Payment) -> dict[str, Any]:
             from app.services.group_admin import mark_chat_super
 
             await mark_chat_super(db, chat_id=int(chat_id), payment_id=payment.id)
+        elif payment.kind == "product_top":
+            from app.services.products import activate_product_top_from_payment
+
+            await activate_product_top_from_payment(db, payment)
         else:
             raise AppError(message="Noto'g'ri to'lov turi", error_code="PAYMENT_INVALID", status_code=400)
     except AppError as exc:

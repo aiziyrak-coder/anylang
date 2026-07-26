@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import '../../utils/screen_options/screen.dart';
 import '../subscription/subscription_screen.dart';
 import 'add_product_action.dart';
 import 'add_product_content.dart';
+import 'add_product_payload.dart';
 import 'add_product_state.dart';
 import 'product_image_draft.dart';
 
@@ -37,17 +39,89 @@ const Map<String, String> _kCategoryCodes = {
   'add_product_cat_other': 'other',
 };
 
-class AddProductScreen extends Screen<AddProductState, void> {
+class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
   AddProductScreen() : super(mobileContent: AddProductContent());
 
   @override
-  void initState(void payload) {
+  void initState(AddProductPayload? payload) {
     state.images.clear();
     state.shippingCountries.clear();
     state.capabilities.clear();
     state.productVideoUrl.value = null;
     state.videoUploading.value = false;
     state.category.value = kProductCategoryKeys.first;
+    state.editingProductId.value = payload?.editProductId;
+    final editId = payload?.editProductId;
+    if (editId != null && editId > 0) {
+      unawaited(_hydrateForEdit(editId));
+    }
+  }
+
+  Future<void> _hydrateForEdit(int productId) async {
+    final result = await Get.find<ProductsRepository>().detail(productId);
+    final map = asMap(result.dataOrNull);
+    if (map == null) {
+      showAppError(result.errorOrNull ?? 'product_not_found'.tr);
+      return;
+    }
+    state.draftName.value = map['name']?.toString() ?? '';
+    state.draftPrice.value = map['price']?.toString() ?? '';
+    state.draftShort.value = map['short_description']?.toString() ?? '';
+    state.draftDetailed.value = map['description']?.toString() ?? '';
+    state.draftMoq.value = map['moq']?.toString() ?? '';
+    state.draftShipping.value = map['shipping_info']?.toString() ?? '';
+    state.draftFactoryVideo.value = map['factory_video_url']?.toString() ?? '';
+    state.draftProcessVideo.value = map['process_video_url']?.toString() ?? '';
+    final video = map['video_url']?.toString();
+    state.productVideoUrl.value =
+        (video != null && video.isNotEmpty) ? video : null;
+    final currency = map['currency']?.toString();
+    if (currency != null && currency.isNotEmpty) {
+      state.currency.value = currency;
+    }
+    final catCode = map['category']?.toString() ?? 'other';
+    final catKey = _kCategoryCodes.entries
+        .firstWhere(
+          (e) => e.value == catCode,
+          orElse: () => const MapEntry('add_product_cat_other', 'other'),
+        )
+        .key;
+    state.category.value = catKey;
+    state.shippingCountries.assignAll(
+      (map['shipping_countries'] is List)
+          ? (map['shipping_countries'] as List)
+              .map((e) => e.toString().toUpperCase())
+              .where((e) => e.isNotEmpty)
+              .toList()
+          : const <String>[],
+    );
+    final caps = map['capabilities'];
+    if (caps is List) {
+      state.capabilities.assignAll(
+        caps.map((e) => e.toString()).where((e) => e.isNotEmpty),
+      );
+    }
+    final images = <ProductImageDraft>[];
+    final rawImages = map['images'];
+    if (rawImages is List) {
+      for (var i = 0; i < rawImages.length; i++) {
+        final item = rawImages[i];
+        if (item is! Map) continue;
+        final id = (item['id'] as num?)?.toInt();
+        final url = item['url']?.toString();
+        if (id == null || url == null || url.isEmpty) continue;
+        images.add(
+          ProductImageDraft(
+            gradient: _kImageGradientPool[i % _kImageGradientPool.length],
+            isPrimary: item['is_primary'] == true || i == 0,
+            imageId: id,
+            imageUrl: url,
+          ),
+        );
+      }
+    }
+    state.images.assignAll(images);
+    state.draftHydrateToken.value++;
   }
 
   @override
@@ -84,6 +158,8 @@ class AddProductScreen extends Screen<AddProductState, void> {
             gradient: first.gradient,
             isPrimary: true,
             filePath: first.filePath,
+            imageId: first.imageId,
+            imageUrl: first.imageUrl,
           );
         }
       case SelectCurrency a:
@@ -215,18 +291,22 @@ class AddProductScreen extends Screen<AddProductState, void> {
         .whereType<String>()
         .where((p) => p.isNotEmpty && File(p).existsSync())
         .toList();
-    if (paths.isEmpty && status == 'published') {
+    final existingIds = state.images
+        .where((e) => !e.hasLocalFile && (e.imageId ?? 0) > 0)
+        .map((e) => e.imageId!)
+        .toList();
+    if (paths.isEmpty && existingIds.isEmpty && status == 'published') {
       showAppError('add_product_image_required'.tr);
       return;
     }
-    if (paths.isEmpty && status == 'draft') {
+    if (paths.isEmpty && existingIds.isEmpty && status == 'draft') {
       showAppMessage('add_product_draft_no_image_hint'.tr);
     }
 
     state.isSubmitting.value = true;
     try {
       final repo = Get.find<ProductsRepository>();
-      final imageIds = <int>[];
+      final imageIds = <int>[...existingIds];
       for (final path in paths) {
         final up = await repo.uploadImage(path);
         final map = asMap(up.dataOrNull);
@@ -262,12 +342,18 @@ class AddProductScreen extends Screen<AddProductState, void> {
       if (videoUrl.isNotEmpty) body['video_url'] = videoUrl;
       if (factoryVideoUrl.isNotEmpty) body['factory_video_url'] = factoryVideoUrl;
       if (processVideoUrl.isNotEmpty) body['process_video_url'] = processVideoUrl;
-      final result = await repo.create(body);
+
+      final editId = state.editingProductId.value;
+      final result = (editId != null && editId > 0)
+          ? await repo.update(editId, body)
+          : await repo.create(body);
       if (result.dataOrNull != null) {
         showAppMessage(
           status == 'draft'
               ? 'add_product_draft_saved'.tr
-              : 'add_product_published'.tr,
+              : (editId != null && editId > 0)
+                  ? 'edit_product_saved'.tr
+                  : 'add_product_published'.tr,
         );
         popBackNavigate();
         return;

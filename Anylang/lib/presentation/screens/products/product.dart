@@ -19,6 +19,7 @@ class Product {
   final bool isTop;
   final String status;
   final String? topRequestStatus;
+  final String? topPinnedUntil;
   final String? videoUrl;
   final String? factoryVideoUrl;
   final String? processVideoUrl;
@@ -45,6 +46,7 @@ class Product {
     this.isTop = false,
     this.status = 'published',
     this.topRequestStatus,
+    this.topPinnedUntil,
     this.videoUrl,
     this.factoryVideoUrl,
     this.processVideoUrl,
@@ -124,6 +126,7 @@ class Product {
       isTop: json['is_top'] == true,
       status: (json['status'] as String?) ?? 'published',
       topRequestStatus: topStatus,
+      topPinnedUntil: json['top_pinned_until']?.toString(),
       videoUrl: _optUrl(json['video_url']),
       factoryVideoUrl: _optUrl(json['factory_video_url']),
       processVideoUrl: _optUrl(json['process_video_url']),
@@ -148,6 +151,7 @@ class Product {
     bool? isTop,
     String? status,
     String? topRequestStatus,
+    String? topPinnedUntil,
     ProductTrustBadges? trustBadges,
     List<String>? capabilities,
   }) {
@@ -166,6 +170,7 @@ class Product {
       isTop: isTop ?? this.isTop,
       status: status ?? this.status,
       topRequestStatus: topRequestStatus ?? this.topRequestStatus,
+      topPinnedUntil: topPinnedUntil ?? this.topPinnedUntil,
       videoUrl: videoUrl,
       factoryVideoUrl: factoryVideoUrl,
       processVideoUrl: processVideoUrl,

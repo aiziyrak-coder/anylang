@@ -44,6 +44,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
   late final TextEditingController _videoCtrl;
   late final TextEditingController _factoryVideoCtrl;
   late final TextEditingController _processVideoCtrl;
+  Worker? _hydrateWorker;
 
   @override
   void initContent() {
@@ -59,7 +60,26 @@ class AddProductContent extends ScreenContent<AddProductState> {
   }
 
   @override
+  void uiBuildFinished(AddProductState state) {
+    _hydrateWorker?.dispose();
+    _hydrateWorker = ever(state.draftHydrateToken, (_) {
+      _nameCtrl.text = state.draftName.value ?? '';
+      _priceCtrl.text = state.draftPrice.value ?? '';
+      _shortDescCtrl.text = state.draftShort.value ?? '';
+      _detailedDescCtrl.text = state.draftDetailed.value ?? '';
+      _moqCtrl.text = state.draftMoq.value ?? '';
+      _shippingCtrl.text = state.draftShipping.value ?? '';
+      _factoryVideoCtrl.text = state.draftFactoryVideo.value ?? '';
+      _processVideoCtrl.text = state.draftProcessVideo.value ?? '';
+      final v = state.productVideoUrl.value;
+      if (v != null && v.isNotEmpty) _videoCtrl.text = v;
+    });
+  }
+
+  @override
   void onClose() {
+    _hydrateWorker?.dispose();
+    _hydrateWorker = null;
     _nameCtrl.dispose();
     _priceCtrl.dispose();
     _shortDescCtrl.dispose();
@@ -82,7 +102,10 @@ class AddProductContent extends ScreenContent<AddProductState> {
             Padding(
               padding: EdgeInsets.fromLTRB(16.dp, 4.dp, 16.dp, 0),
               child: AppTopBar(
-                title: 'add_product_title'.tr,
+                title: (state.isEditing
+                        ? 'edit_product_title'
+                        : 'add_product_title')
+                    .tr,
                 leadingIcon: Icons.close_rounded,
                 onBack: () => sendAction(Back()),
               ),
@@ -110,6 +133,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
                               MediaTile.image(
                                 gradient: state.images[i].gradient,
                                 filePath: state.images[i].filePath,
+                                imageUrl: state.images[i].imageUrl,
                                 onRemove: () => sendAction(RemoveProductImage(i)),
                                 badgeText: state.images[i].isPrimary ? 'add_product_primary'.tr : null,
                               ),

@@ -99,5 +99,32 @@ class ProductsBannerTap extends ProductsAction {
 /// Biznes — mahsulot qo‘shish (FAB / header).
 class OpenAddProduct extends ProductsAction {}
 
+/// Mening mahsulotlarim (ishlab chiqaruvchi).
+class ShowMyProducts extends ProductsAction {}
+
+/// Egasi: tahrirlash.
+class EditOwnProduct extends ProductsAction {
+  final Product product;
+  EditOwnProduct(this.product);
+}
+
+/// Egasi: o‘chirish (arxiv).
+class DeleteOwnProduct extends ProductsAction {
+  final Product product;
+  DeleteOwnProduct(this.product);
+}
+
+/// Egasi: e'lon / qoralama.
+class ToggleOwnProductPublish extends ProductsAction {
+  final Product product;
+  ToggleOwnProductPublish(this.product);
+}
+
+/// Egasi: TOP boost ($5/oy).
+class BoostOwnProductTop extends ProductsAction {
+  final Product product;
+  BoostOwnProductTop(this.product);
+}
+
 /// Tab qayta ochilganda is_business / AI kartalarni soft yangilash.
 class SoftRefreshProducts extends ProductsAction {}

@@ -59,6 +59,17 @@ class PaymentRepository {
     );
   }
 
+  /// Mahsulotni TOP ga chiqarish — $5 / 30 kun.
+  Future<BaseResult> checkoutProductTop({required int productId}) {
+    return _client.post(
+      api: 'api/v1/payments/checkout',
+      data: {
+        'kind': 'product_top',
+        'product_id': productId,
+      },
+    );
+  }
+
   Future<BaseResult> confirmMock(int paymentId) {
     return _client.post(api: 'api/v1/payments/$paymentId/confirm');
   }

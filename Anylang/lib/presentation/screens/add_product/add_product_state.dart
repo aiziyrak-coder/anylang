@@ -10,4 +10,20 @@ class AddProductState extends GetxController {
   RxBool isSubmitting = false.obs;
   RxnString productVideoUrl = RxnString();
   RxBool videoUploading = false.obs;
+
+  /// null = yangi mahsulot; >0 = tahrirlash.
+  final RxnInt editingProductId = RxnInt();
+
+  /// Edit hydrate (content TextFieldlarga bir marta yozadi).
+  final RxnString draftName = RxnString();
+  final RxnString draftPrice = RxnString();
+  final RxnString draftShort = RxnString();
+  final RxnString draftDetailed = RxnString();
+  final RxnString draftMoq = RxnString();
+  final RxnString draftShipping = RxnString();
+  final RxnString draftFactoryVideo = RxnString();
+  final RxnString draftProcessVideo = RxnString();
+  final RxInt draftHydrateToken = 0.obs;
+
+  bool get isEditing => (editingProductId.value ?? 0) > 0;
 }
