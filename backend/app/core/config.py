@@ -60,13 +60,38 @@ class Settings(BaseSettings):
     elevenlabs_voice_male: str = ""
     translation_provider: str = "mock"  # mock | deepl | openai
 
-    payment_provider: str = "mock"  # mock | stripe
+    payment_provider: str = "mock"  # mock | stripe | click | paddle
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_success_url: str = "https://anylang.uz/billing/success"
     stripe_cancel_url: str = "https://anylang.uz/billing/cancel"
     allow_mock_payments: bool = False
     allow_mock_translation: bool = False
+
+    # Click (UZS) — placeholders until merchant credentials are set.
+    click_merchant_id: str = ""
+    click_service_id: str = ""
+    click_secret_key: str = ""
+    click_merchant_user_id: str = ""
+    click_pay_base_url: str = "https://my.click.uz/services/pay"
+    # Public backend URL used in return_url (set via env in prod).
+    public_api_base_url: str = "https://anylang.uz"
+
+    # Paddle MoR (USD) — placeholders until vendor credentials are set.
+    paddle_api_key: str = ""
+    paddle_webhook_secret: str = ""
+    paddle_vendor_id: str = ""
+    paddle_api_base_url: str = "https://api.paddle.com"  # sandbox: https://sandbox-api.paddle.com
+    # Price IDs from Paddle dashboard (TODO if empty).
+    paddle_price_premium_monthly: str = ""
+    paddle_price_premium_yearly: str = ""
+    paddle_price_business_monthly: str = ""
+    paddle_price_business_yearly: str = ""
+
+    # USD→UZS rate for Click amounts (manual / CB update). Override via USD_UZS_RATE.
+    usd_uzs_rate: str = "12500"
+    # cancel_and_recreate | return_existing
+    payment_pending_policy: str = "cancel_and_recreate"
 
     # Admin bootstrap (only used when APP_ENV != production, or when explicitly set)
     admin_email: str = "admin@anylang.com"

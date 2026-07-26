@@ -13,7 +13,11 @@
 # | S3_* | yes | all | Object storage (MinIO/R2) |
 # | SMTP_* | recommended | staging/prod | OTP email delivery |
 # | OPENAI_API_KEY / DEEPL_* | as needed | staging/prod | Translation |
-# | STRIPE_* | when payments live | prod | Billing |
+# | STRIPE_* | legacy optional | prod | Legacy Stripe checkout |
+# | CLICK_* | when UZ payments live | staging/prod | Click.uz (UZS) |
+# | PADDLE_* | when intl payments live | staging/prod | Paddle MoR (USD) |
+# | USD_UZS_RATE | when Click live | staging/prod | USD→UZS conversion |
+# | PUBLIC_API_BASE_URL | yes (payments) | staging/prod | return_url / webhook base |
 # | CORS_ORIGINS | yes | all | Comma-separated allowed origins |
 # | TRUSTED_HOSTS | yes | staging/prod | Host header allowlist |
 # | SENTRY_DSN | optional | staging/prod | Error tracking |

@@ -1,7 +1,8 @@
 # AnyLang — Backend Texnik Topshiriq (TZ)
 
-**Holati:** Qoralama — bosqichma-bosqich to'ldiriladi
-**Qamrovi:** Auth · Profil/Hisob · Tariflar · Bozor · Xabarlar · Chat · Do'stlar · Jonli · Raqamlar
+**Holati:** Asosiy modullar yozilgan — qarorlar yakunlangan; ops (kalitlar) va keyingi
+bosqichlar (Remote Live, Admin, Push) 14-checklist da
+**Qamrovi:** Auth · Profil/Hisob · Tariflar · Bozor · Xabarlar · Chat · Do'stlar · Tarmoq · Guruh chatlar · Jonli · Raqamlar · To'lov (Click+Paddle)
 
 > Bu hujjat backend API'ni **modul-modul** tasvirlaydi. Har safar loyihaning yangi qismi
 > ko'rib chiqilib, shu faylga **yangi bo'lim sifatida qo'shiladi** — mavjud bo'limlar
@@ -22,13 +23,18 @@ mobil ilova (Flutter, GetX). Asosiy funksiyalar (`main_bottom_nav.dart`dagi 5 ta
 | Tab | Vazifa |
 |---|---|
 | Xabarlar (Messages/Chat) | Foydalanuvchilar orasida matnli/ovozli chat, avtomatik tarjima bilan |
-| Do'stlar (Friends) | Do'st qo'shish, so'rovlar, do'stlar ro'yxati |
+| Tarmoq (Network) | B2B kontakt/ishonch tarmog'i (UI nomi; 9-bo'lim state machine + **12-bo'lim**) |
 | Bozor (Products) | Kichik biznes/hunarmandlar uchun mahsulot e'loni va katalogi |
 | Jonli (Live) | Ikki kishi orasida **real vaqtda ovozli tarjima** (asosiy "wow" funksiya) |
 | Profil | Foydalanuvchi profili, sozlamalar, obuna |
 
+> ✅ **QAROR (Tarmoq vs Do'stlar):** pastki 2-tab UI nomi — **«Tarmoq»**. Bu 9-bo'limning
+> oddiy qayta nomlanishi emas: **9 = friendship protokoli** (`/friends`, pending/accepted),
+> **12 = B2B tarmoq qatlami** (trust, risk, viewers, filtrlar). Bitta UI ekran, ikki TZ
+> bo'limi — batafsil **12.0**.
+
 Qo'shimcha: **Subscription** (Basic — bepul / Premium / Business tariflari), **Biznes profil**
-(sotuvchilar uchun sertifikat va ishlab chiqarish ma'lumotlari).
+(sotuvchilar uchun sertifikat va ishlab chiqarish ma'lumotlari), **Guruh chatlar** (13-bo'lim).
 
 Ushbu TZ hozircha faqat **kirish eshigi** — foydalanuvchi ilovaga birinchi marta kirganda
 o'tadigan bosqichlarni (til tanlash, ro'yxatdan o'tish, email tasdiqlash, login, Google orqali
@@ -896,6 +902,276 @@ Loyihada ikki **butunlay boshqa** "tasdiqlangan" tushunchasi bor, ularni aralash
 - Bu bosqichda **admin panel API'si yozilmaydi** — faqat `User.verified_badge` maydoni va uni
   qaytarish nazarda tutiladi (standart `false`).
 
+### 4.15 Yutuqlar (Achievements)
+
+Gamifikatsiya — profil/yutuqlar ekrani. Backend **unlock** holatini saqlaydi va hisoblaydi;
+ikonka URL yoki kod klient lokal assetga bog'lashi mumkin.
+
+#### 4.15.1 `GET api/v1/users/me/achievements`
+
+**Response `200`:**
+
+```json
+{
+  "items": [
+    {
+      "code": "TRANSLATIONS_100",
+      "title": "100 ta tarjima",
+      "icon": "translations_100",
+      "unlocked": true,
+      "unlocked_at": "2026-06-12T10:22:00Z",
+      "progress": 100,
+      "target": 100
+    },
+    {
+      "code": "FIRST_LISTING",
+      "title": "Birinchi e'lon",
+      "icon": "first_listing",
+      "unlocked": false,
+      "unlocked_at": null,
+      "progress": 0,
+      "target": 1
+    }
+  ]
+}
+```
+
+#### 4.15.2 `code` — enum va til xaritasi
+
+| Kod | uz_UZ | ru_RU | us_US |
+|---|---|---|---|
+| `TRANSLATIONS_100` | 100 ta tarjima | 100 переводов | 100 translations |
+| `LANGUAGES_10` | 10 til | 10 языков | 10 languages |
+| `FIRST_LISTING` | Birinchi e'lon | Первое объявление | First listing |
+| `RATING_5_STARS` | 5 yulduzli reyting | Рейтинг 5 звёзд | 5-star rating |
+| `CONNECTIONS_50` | 50 ta aloqa | 50 связей | 50 connections |
+| `VERIFIED_SELLER` | Tasdiqlangan sotuvchi | Проверенный продавец | Verified seller |
+
+> Enum **kengaytiriladi** — yangi kod qo'shilganda shu jadval yangilanadi; noma'lum kodni
+> klient "yutuq" umumiy matni bilan ko'rsatishi mumkin.
+
+#### 4.15.3 Unlock triggerlari
+
+| Kod | Qachon unlock | Kim tekshiradi |
+|---|---|---|
+| `TRANSLATIONS_100` | Foydalanuvchi jami ≥ 100 ta xabar tarjimasi (8.1) | Background job (ARQ) — kuniga yoki har N soat |
+| `LANGUAGES_10` | Suhbatdoshlar / tarjima tillari bo'yicha ≥ 10 ta turli `native_language` | Background job |
+| `FIRST_LISTING` | Birinchi `published` mahsulot yaratilganda | Sync (6.7) yoki job |
+| `RATING_5_STARS` | Business `rating >= 4.95` va `reviews_count >= 5` | Job (sharh moduli bilan) |
+| `CONNECTIONS_50` | Accepted friendship / tarmoq aloqalari ≥ 50 | Job (9 / 12) |
+| `VERIFIED_SELLER` | `verified_badge == true` berilganda | Admin amali bilan sync |
+
+**Qoidalar:**
+- Bir marta unlock bo'lgach `unlocked_at` o'zgarmaydi (qayta hisoblanmaydi).
+- `progress` / `target` — UI progress bari uchun; unlock bo'lsa `progress == target`.
+- `title` — so'rov `Accept-Language` / `language` query bo'yicha lokalizatsiya (1.5).
+
+**Xatoliklar:** `401 UNAUTHORIZED`.
+
+### 4.16 AI Matching — «Sizning mahsulotingizni qidirayotganlar»
+
+#### `GET api/v1/users/me/ai-matches`
+
+Business foydalanuvchi uchun: o'z mahsulot kategoriyalari bilan boshqa foydalanuvchilarning
+**qidiruv so'rovlari / ko'rishlari** orasidagi sodda moslik.
+
+**v1 (soddalashtirilgan):** kim oxirgi 30 kunda shu `category` bo'yicha `GET /products`
+qidirgan yoki sevimliga qo'shgan bo'lsa — ro'yxatga tushadi. To'liq ML embedding **emas**.
+
+**Response `200`:**
+
+```json
+{
+  "items": [
+    {
+      "user_id": 88,
+      "company_name": "Nordic Imports",
+      "country": "FI",
+      "matched_category": "textiles",
+      "match_percent": 78,
+      "reason": "category_search"
+    }
+  ],
+  "total": 1
+}
+```
+
+**Qoidalar:**
+- Faqat `subscription.plan == "business"` va aktiv obuna — aks holda `403 NOT_A_BUSINESS_ACCOUNT`
+  yoki bo'sh `items` (mahsulot qarori: **403** tavsiya).
+- `match_percent` — 0–100, v1 da kategoriya to'liq mosligi = 70–90 oralig'ida taxminiy ball.
+
+### 4.17 AI Market Analytics — insight feed
+
+#### `GET api/v1/users/me/market-insights`
+
+**Response `200`:**
+
+```json
+{
+  "items": [
+    {
+      "id": 501,
+      "title": "Tekstil bozorida talab o'smoqda",
+      "description": "Oxirgi 7 kunda «textiles» qidiruvlari +18%.",
+      "category": "textiles",
+      "created_at": "2026-07-20T08:00:00Z"
+    }
+  ]
+}
+```
+
+> ✅ **QAROR (market-insights manbasi):** v1 — **faqat ilova ichidagi** signallar
+> (ko'rishlar, e'lonlar, qidiruv/kategoriya fokus) + qoidalar agregatsiyasi; `OPENAI_API_KEY`
+> bo'lsa matn boyitiladi (`generated_by: rules | openai | curated`). **Tashqi bozor API /
+> hamkor feed** — keyingi bosqich (feature flag); v1 kontraktida tashqi manba shart emas.
+
+**Xatoliklar:** `401 UNAUTHORIZED`.
+
+### 4.18 Zavod videolari (factory videos)
+
+4.9-dagi `factory_images` ga o'xshash, lekin **video**.
+
+#### `POST api/v1/users/me/business/factory-videos`
+
+`multipart/form-data`: `file` (video).
+
+| Limit | Qiymat |
+|---|---|
+| Maksimal hajm | **100 MB** |
+| Maksimal davomiylik | **120 soniya** (2 daqiqa) |
+| Formatlar | `mp4`, `mov`, `webm` |
+| Maksimal soni | 10 ta (rasmlar bilan alohida hisob) |
+
+**Response `201`:**
+
+```json
+{
+  "id": 901,
+  "url": "https://cdn.anylang.uz/factory/42/v901.mp4",
+  "thumbnail_url": "https://cdn.anylang.uz/factory/42/v901_thumb.jpg",
+  "duration_seconds": 45,
+  "file_size": 12400000
+}
+```
+
+**Qoidalar:**
+- Thumbnail — backend **avtomatik** generatsiya qiladi (ffmpeg yoki cloud transcoder).
+- Faqat business hisob.
+- `GET /users/me/business` va public profil (`4.11`) javobidagi `business.factory_videos`
+  massiviga qo'shiladi.
+
+**Xatoliklar:** `413 FILE_TOO_LARGE`, `400 VOICE_TOO_LONG` o'rniga `VIDEO_TOO_LONG`,
+`UNSUPPORTED_FILE_TYPE`, `403 NOT_A_BUSINESS_ACCOUNT`.
+
+#### `DELETE api/v1/users/me/business/factory-videos/{id}`
+
+**Response `200`:** `{ "id": 901, "deleted": true }`
+
+### 4.19 AnyLang raqami va QR kod
+
+11-bo'limdagi `number` (7 xonali) — asosiy identifikator. UI'da «AnyLang raqami» + QR.
+
+| Maydon | Izoh |
+|---|---|
+| `number` | Mavjud 7 xonali AnyLang raqami (3/11) — **yagona manba** |
+| QR content | Deep link: `anylang://user/{id}` yoki `https://anylang.uz/u/{number}` |
+
+**Klientda hisoblanadi (backend yubormaydi):**
+- QR rasmning o'zi (bitmaps) — klient `qr` paketida `number` / deep link dan chizadi.
+- Raqamni «783 11 11» ko'rinishida bo'shliq bilan formatlash.
+
+> Agar alohida 10 xonali `anylang_number` kerak bo'lsa — bu **11-bo'lim bilan chalkashadi**.
+> Hozirgi qaror: **yangi maydon qo'shilmaydi**, mavjud `number` ishlatiladi.
+
+### 4.20 Kengaytirilgan analitika (vaqt seriyasi)
+
+4.12-dagi oddiy `stats` ga qo'shimcha.
+
+#### `GET api/v1/users/me/analytics?period=7d|30d`
+
+**Response `200`:**
+
+```json
+{
+  "period": "7d",
+  "series": [
+    {
+      "date": "2026-07-19",
+      "views": 120,
+      "profile_visits": 14,
+      "listing_clicks": 33
+    },
+    {
+      "date": "2026-07-20",
+      "views": 98,
+      "profile_visits": 9,
+      "listing_clicks": 21
+    }
+  ],
+  "totals": {
+    "views": 780,
+    "profile_visits": 88,
+    "listing_clicks": 210
+  }
+}
+```
+
+**Qoidalar:**
+- Faqat o'z hisobi (`/me`). Boshqa foydalanuvchi analitikasiga `403`.
+- `views` — e'lon ko'rishlari yig'indisi (6.14).
+- `profile_visits` — 12.4 / 4.11 view tracking.
+- `listing_clicks` — e'lon kartasiga bosish (klient event yuboradi yoki product detail ochilishi).
+- Grafik chizish — **klient**; backend faqat xom kunlik sonlar.
+
+**Xatoliklar:** `400 VALIDATION_ERROR` (noto'g'ri `period`), `403 NOT_A_BUSINESS_ACCOUNT`
+(agar faqat businessga ochiq — tavsiya: business + premium).
+
+### 4.21 Sertifikatlar sxemasi — BREAKING CHANGE
+
+Hozirgi 4.5 / 4.7: `certificates: string[]` (faqat nom). UI skrinshotida raqamli kod
+(`12908765`) alohida ko'rsatiladi — sxema o'zgaradi.
+
+**Yangi shakl:**
+
+```json
+"certificates": [
+  {
+    "name": "ISO 9001",
+    "number": "12908765",
+    "issued_by": "TÜV",
+    "issued_at": "2024-03-01",
+    "file_url": "https://cdn.anylang.uz/certs/42/iso.pdf"
+  }
+]
+```
+
+| Maydon | Tip | Majburiy |
+|---|---|---|
+| `name` | string | ha |
+| `number` | string \| null | yo'q |
+| `issued_by` | string \| null | yo'q |
+| `issued_at` | date (ISO) \| null | yo'q |
+| `file_url` | string \| null | yo'q |
+
+**Migratsiya:** eski `["ISO 9001"]` → `[{ "name": "ISO 9001", "number": null, ... }]`.
+`PATCH /users/me/business` endi obyektlar massivini qabul qiladi.
+
+> ⚠️ **BREAKING:** Flutter `business.certificates` tipini yangilash shart
+> (`anylang_mobile.md`). Eski klient string kutsa — parse xato beradi.
+
+### 4.22 Aniqlangan UI gap'lar (4-bo'lim qo'shimchalari)
+
+| UI | Backend holati | Izoh |
+|---|---|---|
+| Yutuqlar ro'yxati / progress | 4.15 yozildi | Trigger job hali implementatsiya bo'lmasa UI mock ko'rsatishi mumkin |
+| «N kompaniya qidirmoqda» banner | 4.16 | v1 content-based |
+| Market insights kartalar | 4.17 | Ichki signal + ixtiyoriy LLM |
+| Zavod video yuklash | 4.18 | Thumbnail serverda |
+| QR kod | 4.19 | Rasm klientda |
+| 7/30 kun grafik | 4.20 | Formatlash klientda |
+| Sertifikat raqami | 4.21 | Breaking schema |
+
 ---
 
 ## 5. Modul: Tariflar va Obuna (Subscription)
@@ -907,7 +1183,7 @@ Ekran: `subscription` (S16). Uch tarif — Basic (bepul) / Premium / Business.
 | Tarif | Kod | Narx | Asosiy xususiyatlar (S16 kartalari) |
 |---|---|---|---|
 | Basic | `basic` | Bepul | Kuniga 20 ta tarjima; matn & ovozli chat; jonli rejim **yo'q** |
-| Premium | `premium` | oylik/yillik | Cheksiz tarjima; jonli muloqot rejimi; reklamasiz & ustuvor tezlik |
+| Premium | `premium` | oylik/yillik | Cheksiz tarjima; jonli muloqot; reklamasiz; **kim profilni ko'rdi** (12.4) |
 | Business | `business` | oylik/yillik | Premium'dagi barchasi; biznes profil & e'lonlar; sertifikat & ko'rish statistikasi |
 
 - Narxlar **oylik va yillik** ko'rinishida (S16'da segmented toggle). Yillik ~20% arzon.
@@ -1012,9 +1288,9 @@ Ekran: S16 → tarif kartasidagi "Tarifni tanlash" tugmasi.
 
 **Qoidalar:**
 - `basic`ga o'tish (downgrade) — bepul, darhol amalga oshadi.
-- `premium`/`business`ga o'tish — **to'lov talab qiladi.** To'lov integratsiyasi (provayder,
-  webhook, cheklar) bu bosqichda **to'liq loyihalanmaydi** — 5.7-bo'lim. Kontrakt shakli
-  shu, ammo to'lov muvaffaqiyatidan keyin obuna faollashadi.
+- `premium`/`business`ga o'tish — **to'lov talab qiladi.** Klient avval
+  `POST /subscription/checkout` (5.7) orqali to'lovni boshlaydi; webhook `paid`
+  bo'lgach obuna faollashadi. To'g'ridan `subscribe` pullik planga → `402 PAYMENT_REQUIRED`.
 - Joriy tarif bilan bir xil planga qayta so'rov → `400 ALREADY_ON_PLAN`.
 - `business`ga o'tishda — 5.6-bo'lim (biznes profil yaratiladi).
 - **Raqam tekshiruvi kerak emas:** har bir foydalanuvchida register paytidanoq raqam bor
@@ -1039,14 +1315,138 @@ Header: `Authorization: Bearer <access_token>`
 - Ilgari business bo'lib, keyin tushib qolgan bo'lsa — eski biznes ma'lumoti **saqlangan**
   bo'ladi va qayta tiklanadi (4.0-bo'lim qoidasi).
 
-### 5.7 To'lov (deferred)
+### 5.7 To'lov — Click (UZS) + Paddle MoR (USD)
 
-To'lov provayderi (masalan Payme/Click/Stripe), to'lov webhook'lari, cheklar va soliq —
-**alohida keyingi bosqichda** batafsil loyihalanadi. Hozircha:
-- `subscribe` endpointi kontrakt sifatida belgilandi.
-- To'lov oqimi ulanmaguncha, Premium/Business obuna faollashuvi backend tomonda mock/manual
-  bo'lishi mumkin (test uchun). UI (`subscription_screen.dart`) allaqachon `SelectPlan` action'ini
-  yuboradi, lekin haqiqiy so'rov TODO holatida — bu endpoint tayyor bo'lgach ulanadi.
+Modul: `backend/app/payments/` (`click.py`, `paddle.py`, `service.py`, `router.py`).
+
+#### Nima uchun ikki provayder
+
+| Provayder | Kim uchun | Valyuta | Kartalar |
+|---|---|---|---|
+| **Click** | O'zbekiston (mahalliy) | UZS | Uzcard / Humo / mahalliy Visa-Mastercard |
+| **Paddle** (Merchant of Record) | Xalqaro | USD | Chet ellik Visa / Mastercard |
+
+O'zbekiston yuridik shaxsi Stripe/PayPal hisobiga to'g'ridan ulana olmaydi — xalqaro
+kartalar uchun MoR (Paddle) orqali qabul qilinadi, daromad Payoneer/Wise/bankka o'tkaziladi.
+
+`.env` (placeholder bo'lsa checkout URL stub qaytadi — TODO merchant credentials):
+
+```
+CLICK_MERCHANT_ID=
+CLICK_SERVICE_ID=
+CLICK_SECRET_KEY=
+CLICK_MERCHANT_USER_ID=
+PADDLE_API_KEY=
+PADDLE_WEBHOOK_SECRET=
+PADDLE_VENDOR_ID=
+USD_UZS_RATE=12500
+PAYMENT_PENDING_POLICY=cancel_and_recreate
+PUBLIC_API_BASE_URL=https://anylang.uz
+```
+
+#### `payments` jadvali
+
+| Maydon | Izoh |
+|---|---|
+| `provider` | `click` \| `paddle` (legacy: `mock` \| `stripe`) |
+| `provider_transaction_id` | unique — webhook idempotentlik |
+| `plan` / `billing_cycle` | `premium`\|`business` · `1`\|`12` (oy) |
+| `amount` / `currency` | UZS yoki USD |
+| `status` | `pending` \| `paid` \| `failed` \| `cancelled` \| `refunded` |
+| `raw_payload` | JSONB — webhook audit / dispute |
+
+**Qoida:** faqat `status=paid` bo'lganda `activate_subscription()` chaqiriladi (5.4/5.6).
+
+#### `POST api/v1/subscription/checkout`
+
+Yagona kirish nuqtasi (pullik tarif). Header: Bearer.
+
+**Request:**
+
+```json
+{
+  "plan": "premium",
+  "billing_cycle": "yearly",
+  "provider": "click"
+}
+```
+
+`provider`: `click` \| `paddle`. Klient `country == "UZ"` bo'lsa Click ni default qilishi
+mumkin, lekin foydalanuvchi ikkalasini ham tanlay oladi.
+
+**Response `200`:**
+
+```json
+{
+  "payment_id": 1042,
+  "provider": "click",
+  "checkout_url": "https://my.click.uz/services/pay?service_id=...&merchant_id=...&amount=...&transaction_param=1042",
+  "amount": "159900.00",
+  "currency": "UZS"
+}
+```
+
+- Narx 5.2 plans (USD) dan; Click uchun `USD_UZS_RATE` orqali UZS ga konvertatsiya.
+- `checkout_url` Flutter WebView da ochiladi.
+
+> ✅ **QAROR (pending siyosat):** default **`cancel_and_recreate`** — foydalanuvchi
+> yangi checkout so'rasa eski pending bekor qilinadi (ideal UX). Env orqali
+> `return_existing` yoki `reject` (409) ham mumkin.
+
+#### Click — Prepare / Complete
+
+Hujjat: https://docs.click.uz (SHOP API).
+
+1. Checkout URL: `transaction_param={payment_id}`, `return_url={PUBLIC_API_BASE_URL}/billing/success`
+   (alias: `/payment/success`).
+2. `POST /api/v1/payments/click/prepare` (JWT yo'q — faqat `sign_string`):
+   - `md5(click_trans_id + service_id + SECRET + merchant_trans_id + amount + action + sign_time)`
+   - amount mosligi; status `pending`
+3. `POST /api/v1/payments/click/complete`:
+   - formulaga `merchant_prepare_id` qo'shiladi
+   - Prepare o'tgan bo'lishi shart; success → `paid` + `activate_subscription()`
+   - Takroriy Complete → idempotent `error: 0`
+
+#### Paddle — Billing API
+
+Hujjat: https://developer.paddle.com
+
+1. Checkout: `POST https://api.paddle.com/transactions` + `custom_data.payment_id`.
+2. `POST /api/v1/payments/paddle/webhook` — `Paddle-Signature` HMAC-SHA256.
+3. `transaction.completed` → `paid` + `activate_subscription(auto_renew=True)`.
+4. `subscription.canceled` / `updated` → `User.subscription.auto_renew` sinxron.
+
+#### `activate_subscription(user_id, plan, billing_cycle, auto_renew=…)`
+
+Ikkala webhook shu umumiy funksiyani chaqiradi (`app/payments/service.py`).
+
+> ✅ **QAROR (`expires_at`):**
+> - **Bir xil plan** hali aktiv → qolgan muddat **saqlanadi**, yangi period **ustiga qo'shiladi** (erta yangilash).
+> - **Plan o'zgarsa** yoki muddat o'tgan → `started_at=now`, `expires_at=now+period` (**qayta boshlanadi**).
+> - Period: `30 * months` kun (`monthly`→30, `yearly`→360).
+> - `auto_renew`: Click=`false` (one-shot); Paddle=`true` (MoR recurring).
+
+> ✅ **QAROR (credentials):** Click/Paddle kalitlari va 4 ta Paddle `price_id` —
+> **ops / .env** masalasi (kodda placeholder + stub URL). Product qarori emas;
+> sandbox qiymatlari `.env.test` da, prod — deploy `.env`.
+
+#### Xatolik kodlari
+
+| `error_code` | HTTP | Qachon |
+|---|---|---|
+| `PAYMENT_ALREADY_PENDING` | 409 | Faol pending (`reject` siyosati) |
+| `INVALID_PROVIDER` | 400 | provider na click na paddle |
+| `PAYMENT_NOT_FOUND` | 404 | Webhook noma'lum payment_id |
+| `AMOUNT_MISMATCH` | 400 | (Click ichki error -2; API xabar) |
+| `SIGNATURE_INVALID` | 401 | Click/Paddle imzo noto'g'ri |
+| `ALREADY_PROCESSED` | 200 | Idempotent takroriy webhook |
+| `PAYMENT_REQUIRED` | 402 | `subscribe` pullik planga to'g'ridan |
+
+#### Local test (ngrok)
+
+Click/Paddle production serverlari `localhost` ga yetmaydi — tunnel kerak
+(`backend/README.md`). Sandbox: `.env.test`. Pytest:
+`tests/test_click_webhook_duplicate.py`, `tests/test_paddle_webhook_signature.py`.
 
 ### 5.8 Muddat tugashi va downgrade
 
@@ -1393,6 +1793,109 @@ Qo'llab-quvvatlanadigan qiymatlar (`kProductCurrencies` bilan bir xil): `USD`, `
 | `PRODUCT_IMAGE_NOT_FOUND` | 400 | `image_ids`da mavjud bo'lmagan yoki boshqa foydalanuvchi yuklagan rasm `id` |
 | `VALIDATION_ERROR` | 400 | Yuqoridagi qoidalar buzilsa |
 
+### 6.19 Aniqlangan qo'shimchalar — «Siz uchun tavsiya»
+
+#### `GET api/v1/products/recommended`
+
+Shaxsiylashtirilgan mahsulotlar (Bozor asosiy ekrani / «Siz uchun» blok).
+
+**v1 (content-based, ML emas):** foydalanuvchi oxirgi ko'rgan / sevimliga qo'shgan
+mahsulotlarning `category` / `country` bo'yicha o'xshash e'lonlar. O'z e'lonlari chiqarib
+tashlanadi.
+
+**v2 (kelajak):** embedding / collaborative filtering — alohida bosqich.
+
+**Query:** `page`, `limit` (standart 20).
+
+**Response `200`:** 6.1-dagi `Product` list item shakli (`items`, `page`, `has_more`).
+
+**Qoidalar:**
+- Auth majburiy. Autentifikatsiyasiz — umumiy TOP (6.4) ga fallback yoki bo'sh — **tavsiya:
+  auth majburiy, `401`**.
+- Natija keshlanishi mumkin (Redis, 15–60 daqiqa).
+
+### 6.20 Map View — geografik qidiruv
+
+`business` obyektiga (4.5) qo'shimcha maydonlar:
+
+| Maydon | Tip | Izoh |
+|---|---|---|
+| `latitude` | float \| null | WGS84 |
+| `longitude` | float \| null | WGS84 |
+
+`PATCH /users/me/business` orqali yangilanadi (ixtiyoriy).
+
+#### `GET api/v1/products` — yangi query parametrlar (6.3 ga qo'shimcha)
+
+| Query | Izoh |
+|---|---|
+| `near_lat` | Markaz kenglik |
+| `near_lng` | Markaz uzunlik |
+| `radius_km` | Radius (standart 50, max 500) |
+
+**Qoidalar:**
+- Uchala parametr birga beriladi; faqat bittasi → `400 VALIDATION_ERROR`.
+- Masofa bo'yicha tartiblash ixtiyoriy (`sort=distance`).
+- **Masofa matni ("1.2 km") backenddan kelmaydi** — klient `latitude`/`longitude` dan
+  hisoblaydi (8.3.1 uslubi), yoki list itemga `distance_km` xom float qo'shilishi mumkin
+  (tavsiya: **xom `distance_km`** qaytarish, format klientda).
+
+### 6.21 Reklama bannerlari (carousel)
+
+#### `GET api/v1/marketplace/banners`
+
+Admin boshqaradigan kontent (public, auth ixtiyoriy).
+
+**Response `200`:**
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "image_url": "https://cdn.anylang.uz/banners/1.jpg",
+      "title": "Tekstil yarmarkasi",
+      "link_type": "category",
+      "link_value": "textiles",
+      "position": 0
+    }
+  ]
+}
+```
+
+| `link_type` | `link_value` |
+|---|---|
+| `category` | 6.12 enum kodi |
+| `country` | ISO 3166-1 alpha-2 |
+| `url` | https URL |
+| `product` | product id (string) |
+
+**Qoidalar:**
+- Faqat aktiv (`is_active`) bannerlar; `position` o'sish tartibida.
+- CRUD — **Admin panel** (14-bo'lim checklist).
+
+### 6.22 «Durable» — mahsulot capability (sotuvchi badge emas)
+
+> ✅ **QAROR:** «Durable» — **sotuvchi `verified_badge` emas**. Bu mahsulot
+> `capabilities` massividagi kod: `"durable"` (chidamli / uzoq muddatli tovar).
+> Boshqa capability lar qatori: `waterproof`, `eco_friendly`, `lightweight`, …
+> (max 8 ta; `PRODUCT_CAPABILITIES` enum).
+
+| Narsa | Qiymat |
+|---|---|
+| Qayerda | `Product.capabilities[]` — create/update/list/detail |
+| UI | Chip / filter («Durable») — lokalizatsiya klientda (`product_cap_durable`) |
+| Emas | Alohida `durable_badge` maydoni **yo'q**; `verified_badge` (admin) bilan aralashmasin |
+
+### 6.23 Aniqlangan UI gap'lar (6-bo'lim qo'shimchalari)
+
+| UI | Backend | Izoh |
+|---|---|---|
+| «Siz uchun tavsiya» | 6.19 | v1 sodda |
+| Xarita / yaqin | 6.20 | lat/lng + radius |
+| Banner carousel | 6.21 | Admin CRUD keyin |
+| Durable chip | 6.22 | `capabilities: ["durable"]` |
+
 ---
 
 ## 7. Modul: Xabarlar — suhbatlar ro'yxati (S13)
@@ -1457,6 +1960,10 @@ indikatori. Ular `chat` ekrani bosqichida yoziladi.
 | `unread_count` | Joriy foydalanuvchi o'qimagan xabarlar soni. `0` bo'lsa UI belgini ko'rsatmaydi |
 | `updated_at` | Saralash uchun (oxirgi xabar vaqti) |
 
+> **Guruh chatlar (13-bo'lim):** suhbat `type: "direct" | "group"` maydoni qo'shiladi.
+> Guruhda `interlocutor` o'rniga `name` / `avatar_url` / `members_count` (batafsil 13).
+> Eski klientlar uchun `type` yo'q bo'lsa — `direct` deb hisoblansin.
+
 > **Eslatma:** `conversation_item.dart`dagi `highlighted` (lime fon) maydoni **backenddan
 > kelmaydi** — u klientda `unread_count > 0` dan hisoblanadi (dizaynda o'qilmagan suhbat
 > ajratib ko'rsatilgan).
@@ -1491,7 +1998,8 @@ matnni yig'adi. Aks holda til almashtirilganda eski suhbatlar noto'g'ri tilda qo
 | `contact` | `{ "contact_name": "Ali Valiyev" }` | 👤 Kontakt |
 
 - `type` qiymatlari `chat_message.dart`dagi `ChatMsgType` enum bilan **aynan bir xil**:
-  `text`, `image`, `voice`, `product`, `location`, `file`, `contact`.
+  `text`, `image`, `voice`, `product`, `location`, `file`, `contact`,
+  `invoice`, `offer`, `catalog`, `business_card` (8.3).
 - `is_outgoing` — oxirgi xabarni joriy foydalanuvchi yozganmi. `true` bo'lsa UI oldida ✓
   (yetkazilish) belgisi ko'rsatiladi.
 - `status` — **faqat `is_outgoing: true` bo'lganda** ma'noli: `sent` | `delivered` | `read`
@@ -1865,7 +2373,7 @@ Bu eng muhim nuqta: bitta xabar ikki foydalanuvchida **turlicha** ko'rinadi.
 | Maydon | Izoh |
 |---|---|
 | `client_message_id` | Klient yaratgan UUID — 8.4-bo'lim (dublikat oldini olish) |
-| `type` | `text` \| `image` \| `voice` \| `file` \| `product` \| `location` \| `contact` — `ChatMsgType` enum bilan **aynan bir xil** |
+| `type` | `text` \| `image` \| `voice` \| `file` \| `product` \| `location` \| `contact` \| `invoice` \| `offer` \| `catalog` \| `business_card` — `ChatMsgType` enum bilan **aynan bir xil** |
 | `is_outgoing` | So'rovchi yozganmi (`sender_id == joriy user`) |
 | `reply_to` | Javob berilgan xabar — `null` bo'lsa oddiy xabar. `preview_text` — sitata uchun qisqa matn |
 | `meta` | Turga xos ma'lumot — 8.3-bo'lim |
@@ -1888,6 +2396,10 @@ Bu eng muhim nuqta: bitta xabar ikki foydalanuvchida **turlicha** ko'rinadi.
 | `product` | `{ "product_id": 501, "name": "Qo'lda to'qilgan sharf", "price": "24.00", "currency": "USD", "image_url": "...", "is_available": true }` | "Ko'rish" → 6.5 mahsulot detali |
 | `location` | `{ "latitude": 41.31, "longitude": 69.28, "label": "Do'kon manzili" }` | **Masofa ("1.2 km") backenddan kelmaydi** — 8.3.1 |
 | `contact` | `{ "contact_name": "Doniyor Karimov", "contact_phone": "+998 90 123 45 67", "contact_user_id": 88 }` | `contact_user_id` — agar bu odam ilovada bo'lsa (profiliga o'tish uchun), aks holda `null` |
+| `invoice` | `{ "invoice_number", "items": [{ "name", "qty", "price" }], "total", "currency", "due_date", "pdf_url" }` | Hisob-faktura pufakchasi — 8.3.3 |
+| `offer` | `{ "title", "description", "price", "currency", "valid_until" }` | Kommersiya taklifi («Taklif») |
+| `catalog` | `{ "products": [ { "product_id", "name", "price", "currency", "image_url", "is_available" } ] }` | Bir nechta mahsulot — **snapshot** (8.3.2) |
+| `business_card` | `{ "user_id", "company_name", "logo_url", "phone", "website", "country", "business_role" }` | Vizitka — 4.5 dan qisqartirilgan snapshot |
 
 #### 8.3.1 Backenddan KELMAYDIGAN narsalar (klient hisoblaydi)
 
@@ -1900,6 +2412,8 @@ Bularni backend yubormasligi kerak — aks holda noto'g'ri bo'ladi:
 | **Vaqt ko'rinishi** (`14:33`, `Bugun`) | ISO'dan mahalliy vaqt zonasi + til bo'yicha klientda (7.10 qoidasi) |
 | **Fayl hajmi matni** (`248 KB`) | Xom bayt (`253952`) keladi, formatlash klientda |
 | **Sana ajratkichlari** ("Bugun", "Kecha") | `created_at` bo'yicha klientda guruhlanadi |
+| **Valyuta belgisini formatlash** (`$24.00` / `24,00 €`) | Backend `price` + `currency` kodini beradi; lokal format klientda |
+| **Invoice / offer «muddati o'tgan» badge** | `due_date` / `valid_until` dan klient hisoblaydi |
 
 #### 8.3.2 Mahsulot xabari — snapshot qoidasi
 
@@ -1909,6 +2423,34 @@ Bularni backend yubormasligi kerak — aks holda noto'g'ri bo'ladi:
 **Sabab:** mahsulot keyin o'chirilishi, narxi o'zgarishi yoki sotuvchining obunasi tugashi
 mumkin. Snapshot bo'lmasa eski suhbatdagi pufakcha bo'sh qolib ketadi. `is_available: false`
 bo'lsa — UI kartani ko'rsatadi, lekin "Ko'rish" tugmasini o'chiradi.
+
+**`catalog` uchun:** har bir `product_ids` elementi bo'yicha xuddi shu snapshot massivi
+yig'iladi va `meta.products` ga yoziladi.
+
+#### 8.3.3 Yangi biriktirish turlari — yaratish qoidalari
+
+| `type` | Yuborish usuli | Alohida upload? |
+|---|---|---|
+| `offer` | `POST /chats/{id}/messages` — bodyda `type` + maydonlar | Yo'q |
+| `catalog` | `POST .../messages` — `{ "type": "catalog", "product_ids": [501, 502] }` (max 10) | Yo'q — snapshot serverda |
+| `business_card` | `POST .../messages` — `{ "type": "business_card" }` (o'z profili) yoki `user_id` | Yo'q — 4.5 dan snapshot |
+| `invoice` | Qo'lda meta (asosiy) | PDF ixtiyoriy — 8.5 `file` + `pdf_url` |
+
+> ✅ **QAROR (invoice):** **asosiy yo'l — qo'lda.**
+> `POST /chats/{id}/messages` + `type: "invoice"` + meta (`invoice_number`, `items`,
+> `total`, `currency`, `due_date`, `pdf_url?`). PDF kerak bo'lsa avval 8.5 upload.
+>
+> **Avto-generator** (`POST /chats/{id}/invoices` — deal/order dan PDF) — keyingi bosqich;
+> v1 da shart emas. Deal Mode / stats invoice xabarlarini allaqachon hisoblaydi.
+
+**Request namunalari (8.4 ga qo'shimcha):**
+
+```json
+{ "client_message_id": "…", "type": "offer", "title": "500 dona sharf", "description": "FOB Istanbul", "price": "4200.00", "currency": "USD", "valid_until": "2026-08-01" }
+{ "client_message_id": "…", "type": "catalog", "product_ids": [501, 502, 503] }
+{ "client_message_id": "…", "type": "business_card" }
+{ "client_message_id": "…", "type": "invoice", "invoice_number": "INV-2026-014", "items": [{ "name": "Sharf", "qty": 100, "price": "12.00" }], "total": "1200.00", "currency": "USD", "due_date": "2026-08-15", "pdf_url": null }
+```
 
 ### 8.4 `POST api/v1/chats/{chat_id}/messages` — xabar yuborish
 
@@ -2123,13 +2665,73 @@ deb belgilash" tugmasi kerak bo'lsa — shu endpointga `{ "mark_all": true }` ba
 | `MEDIA_NOT_FOUND` | 400 | `media_id` mavjud emas yoki boshqa foydalanuvchiniki |
 | `VOICE_TOO_LONG` | 400 | 5 daqiqadan uzun ovozli xabar |
 | `VALIDATION_ERROR` | 400 | Bo'sh matn, noto'g'ri koordinata va h.k. |
+| `PRODUCT_IDS_LIMIT` | 400 | `catalog` da 10 tadan ko'p `product_ids` |
+| `PRODUCT_NOT_FOUND` | 404 | `catalog` / `product` da mavjud bo'lmagan mahsulot |
+| `SUGGEST_REPLIES_FAILED` | 502 | LLM / AI gateway xatosi (8.11) |
+| `RATE_LIMITED` | 429 | Smart Reply juda tez-tez so'ralganda |
+
+### 8.11 AI Smart Reply — `POST api/v1/chats/{chat_id}/suggest-replies`
+
+Kiruvchi xabarga tayyor javob variantlari (Professional / Do'stona / Savdo / Muzokara).
+
+**Request:**
+
+```json
+{
+  "message_id": 9812
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "suggestions": [
+    { "tone": "professional", "text": "Rahmat. Taklifingizni ko'rib chiqamiz va bugun javob beramiz." },
+    { "tone": "friendly", "text": "Zo'r! Tez orada qaytaman 😊" },
+    { "tone": "sales", "text": "Ajoyib. Minimal buyurtma 200 dona — narxni yuboraymi?" },
+    { "tone": "negotiation", "text": "Narxni biroz pasaytirsak kelishuvimiz mumkin. Qanday chegirma taklif qilasiz?" }
+  ]
+}
+```
+
+#### 8.11.1 `tone` — enum va til xaritasi
+
+| Kod | uz_UZ | ru_RU | us_US |
+|---|---|---|---|
+| `professional` | Professional javob | Деловой ответ | Professional |
+| `friendly` | Do'stona javob | Дружеский ответ | Friendly |
+| `sales` | Savdo uslubida | В стиле продаж | Sales |
+| `negotiation` | Muzokara uslubida | Переговорный стиль | Negotiation |
+
+**Qoidalar:**
+- `message_id` shu chatga tegishli bo'lishi shart; aks holda `404 MESSAGE_NOT_FOUND`.
+- Kontekst: oxirgi **5–10** ta xabar (`text_original` / tarjima) + so'rovchining
+  `native_language` — javob **so'rovchi tilida**.
+- LLM (Claude / OpenAI / ichki gateway) — tashqi chaqiruv, timeout majburiy (1.0).
+- Tavsiyalar **saqlanmaydi** — har so'rovda yangidan generatsiya.
+- Foydalanuvchi tanlagan matnni yuborish — oddiy `POST .../messages` (`type: text`).
+- Tarif: Basic da kunlik limit (masalan 10) — `429 RATE_LIMITED`; Premium/Business cheksiz
+  (5.1 bilan bog'lanishi mumkin).
+
+### 8.12 Aniqlangan UI gap'lar (8-bo'lim qo'shimchalari)
+
+| UI | Backend | Izoh |
+|---|---|---|
+| Invoice / Taklif / Katalog / Vizitka pufakchalari | 8.3 yangi typelar | Snapshot qoidalari |
+| Smart Reply stillar sheet | 8.11 | Tone enum lokalizatsiya klientda |
+| Invoice (qo'lda meta) | 8.3.3 QAROR | Avto PDF — keyin |
+| Catalog max 10 | `PRODUCT_IDS_LIMIT` | |
 
 ---
 
 ## 9. Modul: Do'stlar (Friends)
 
-Ekranlar: `friends` (Do'stlar tabi), `add_friend` (Do'st qo'shish),
-`ui/items/friend_result_item.dart`.
+Ekranlar: `friends` (UI tabi «Tarmoq» — **12.0 QAROR**),
+`add_friend` (Hamkor/do'st qo'shish), `ui/items/friend_result_item.dart` / `user_card_item.dart`.
+
+> **Bog'lanish:** pastki tab — **«Tarmoq»**. Friendship `pending`/`accepted` — **9-bo'lim**;
+> B2B trust, risk, viewers, filtrlar — **12-bo'lim**.
 
 ### 9.0 Do'stlik holati (state machine) — ASOSIY LOGIKA
 
@@ -2470,10 +3072,13 @@ audioni o'ynatadi. Flutter tarafda hech qanday nutq tanish/sintez kutubxonasi ke
 | To'lqin animatsiyasi, "Tinglanmoqda…" | Dekorativ |
 | Tillarni almashtirish tugmasi (⇄) | Klientda almashtiriladi, keyin sessiya yangilanadi (10.3) |
 
-### 10.1 ⚠️ Obuna cheklovi — Jonli faqat Premium/Business uchun
+### 10.1 Obuna cheklovi — Jonli faqat Premium/Business
+
+> ✅ **QAROR:** Basic da Jonli **yo'q** → `403 SUBSCRIPTION_REQUIRED` (`required_plan: premium`).
+> Tekshiruv sessiya yaratishda va har turn'da. UI: Basic tab → «Premium kerak» (`anylang_mobile.md`).
 
 **5.1-bo'limdagi tariflar jadvaliga ko'ra:** Basic (bepul) tarifda *"Jonli muloqot rejimi"*
-xususiyati **`included: false`** — ya'ni bepul foydalanuvchi bu rejimdan foydalana olmaydi.
+xususiyati **`included: false`**.
 
 | Tarif | Jonli rejim | Kunlik limit |
 |---|---|---|
@@ -2485,9 +3090,6 @@ xususiyati **`included: false`** — ya'ni bepul foydalanuvchi bu rejimdan foyda
   qolishi mumkin).
 - `403` javobida `{ "error_code": "SUBSCRIPTION_REQUIRED", "required_plan": "premium" }`
   qaytariladi — ilova foydalanuvchini Tariflar ekraniga (S16) yo'naltiradi.
-
-> **UI gap:** hozir Jonli tabi hammaga ochiq va cheklov tekshirilmaydi. Basic foydalanuvchida
-> tab bosilganda "Premium kerak" ekrani/modali ko'rsatilishi kerak (`anylang_mobile.md`).
 
 ### 10.2 `GET api/v1/live/languages` — qo'llab-quvvatlanadigan tillar
 
@@ -2720,6 +3322,44 @@ yo'qotishdan yaxshi.
   so'rov butun ishchi jarayonni band qiladi. `httpx.AsyncClient(timeout=...)`.
 - Pydantic sxemalari `LiveTurnOut`, `LiveSessionOut` — `/docs` orqali Flutter tarafi kontraktni
   tekshiradi.
+
+### 10.11 Masofaviy (remote) Jonli chaqiruv — qaror
+
+Tarmoq (12) kontakt kartochkasidagi **«Live»** tugmasi mahsulotning asosiy «wow»
+funksiyasiga bog'liq.
+
+> ✅ **QAROR:**
+> 1. **Mahsulot maqsadi — remote Live (HA).** Ikki foydalanuvchi turli qurilmalardan
+>    real vaqtda ovozli tarjima chaqiruvi: ringing/accept, WebRTC (yoki chunked audio),
+>    har tomonda STT→MT→TTS, push.
+> 2. **To'liq spetsifikatsiya** — alohida «10-bis / Remote Live» bo'limi (14-checklist).
+>    Shu yerdagi jadval faqat eskiz.
+> 3. **v1 interim (hozir):** «Live» tugmasi **lokal 10.0** oqimini ochadi — peer
+>    `native_language` oldindan tanlanadi; audio peer'ga **ketmaydi**. Yangi API yo'q.
+>    Remote modul ship qilingach, shu tugma remote chaqiruvga o'tadi (klient feature flag).
+
+#### v1 interim — lokal / device-share (10.0)
+
+1. Tarmoqdan «Live» → Jonli ekrani, suhbatdosh tili peer `native_language`idan.
+2. Audio faqat shu qurilmada STT→tarjima→TTS.
+3. Yangi API **kerak emas**.
+
+#### Keyingi bosqich — remote eskiz
+
+| Qadam | Texnika |
+|---|---|
+| Chaqiruv boshlash | `POST /live/calls` `{ "callee_id": 15 }` → `{ "call_id", "status": "ringing" }` |
+| Real-time | WS: `call_incoming`, `call_accepted`, `call_declined`, `call_ended` |
+| Audio | Har tomon o'z mikrofonini stream qiladi (WebRTC yoki chunked WS) |
+| Tarjima | Har tomonda alohida STT→MT→TTS (10.5 zanjiri) |
+| Push | Callee offline bo'lsa FCM/APNs |
+
+### 10.12 Aniqlangan UI gap'lar (10-bo'lim)
+
+| UI | Backend | Izoh |
+|---|---|---|
+| Tarmoqdagi Live tugmasi | 10.11 | v1 lokal; remote — 10-bis |
+| Basic da Jonli ochiqligi | 10.1 | UI cheklovi |
 
 ---
 
@@ -3002,20 +3642,502 @@ Foydalanuvchi istalgan vaqtda yangi raqam olishi mumkin (bepul tasodifiy yoki ka
 
 ---
 
-## 12. Keyingi TZ bosqichlari (hali yozilmagan)
+## 12. Modul: Tarmoq (Network) — B2B kontakt / trust
+
+Ekranlar: `friends` (UI sarlavhasi «Tarmog'im»), `user_card_item`, profile viewers,
+networking score bar.
+
+### 12.0 Do'stlar vs Tarmoq — qaror
+
+> ✅ **QAROR:** **alohida qatlamlar, bitta UI tab.**
+>
+> | Qatlam | Vazifa | API |
+> |---|---|---|
+> | **9. Do'stlar** | Friendship state machine (`pending` / `accepted` / qayta so'rov) | `/friends/*`, `/users/search` |
+> | **12. Tarmoq** | B2B trust, risk, viewers, networking score, filtrlar | `/users/me/profile-viewers`, kengaytirilgan list maydonlari; keyin `/network/search` |
+>
+> UI pastki tab nomi — **«Tarmoq»** (Do'stlar emas). Yangi friendship jadvali **ochilmaydi** —
+> 9.0 qayta ishlatiladi. Tarmoq maydonlari shu bo'limda hujjatlashtiriladi.
+
+**Qamrov:** trust score, AI xavf ogohlantirishi, connections/countries hisoblagichlari,
+profile viewers, tarmoq qidiruvi, kontakt kartochka amallari.
+
+### 12.1 Trust Score
+
+`trust_score` — butun son **0–100** (foiz). Business profil uchun hisoblanadi; shaxsiy
+hisobda `null` yoki `0`.
+
+#### 12.1.1 Hisoblash formulasi (4.10 uslubida)
+
+Jami 100 ball — omillar ulushi:
+
+| # | Omil | Max ball | Qachon to'liq beriladi |
+|---|---|---|---|
+| 1 | Profil to'ldirilganlik | 20 | `completeness` (4.10) ≥ 90 → 20; aks holda `completeness * 0.2` |
+| 2 | Sertifikatlar | 15 | kamida 1 ta sertifikat (`certificates`) |
+| 3 | Tasdiqlangan hujjatlar | 20 | `documents_verified == true` (+ ixtiyoriy `factory_verified` +5 ichida) |
+| 4 | `verified_badge` | 10 | admin bergan belgi |
+| 5 | Reyting | 15 | `rating` 0–5 → `(rating/5)*15`; sharh yo'q → 0 |
+| 6 | Muvaffaqiyatli bitimlar | 10 | `successful_deals` (≥10 → 10, liniya) |
+| 7 | Akkaunt yoshi | 5 | ≥ 180 kun → 5; ≥ 30 kun → 3; aks holda 1 |
+| 8 | Shikoyatlar jarimasi | −40 gacha | har `complaints_count` uchun −8 (min 0 ga qisqaradi) |
+
+**Qoidalar:**
+- Natija `max(0, min(100, round(sum)))`.
+- Ro'yxat (friends list) uchun **engil** variant (sync, DB so'rovsiz) ruxsat — to'liq variant
+  profil (`4.11` / `trust_score` obyekti) da breakdown bilan.
+- Public javobda qisqa shakl: `{ "score": 72, "level": "medium" }` yoki faqat `trust: 72`.
+
+`level` (ixtiyoriy): `low` (<40) / `medium` (40–69) / `high` (≥70).
+
+### 12.2 AI xavf ogohlantirishi (scam / risk)
+
+Boshqa foydalanuvchi profilida ko'rinadigan obyekt:
+
+```json
+{
+  "risk_level": "high",
+  "risk_score": 78,
+  "show_warning": true,
+  "message": "Bu kompaniyada xavf yuqori.",
+  "reasons": [
+    { "key": "NEW_ACCOUNT", "label": "Yangi hisob" },
+    { "key": "UNVERIFIED_DOCUMENTS", "label": "Tasdiqlanmagan hujjatlar" }
+  ],
+  "generated_by": "rules"
+}
+```
+
+#### 12.2.1 `risk_level`
+
+| Kod | Ma'nosi |
+|---|---|
+| `none` | Ogohlantirish yo'q |
+| `low` | Past |
+| `medium` | O'rtacha — UI sariq |
+| `high` | Yuqori / scammer — UI qizil |
+
+#### 12.2.2 `reasons` — enum va til xaritasi (4.5.1 uslubida)
+
+| Kod | uz_UZ | ru_RU | us_US |
+|---|---|---|---|
+| `NEW_ACCOUNT` | Yangi hisob | Новый аккаунт | New account |
+| `UNVERIFIED_DOCUMENTS` | Noto'g'ri yoki tasdiqlanmagan hujjatlar | Непроверенные документы | Unverified documents |
+| `MANY_BLOCKS` | Ko'p foydalanuvchi bloklagan | Много блокировок | Many blocks |
+| `SUSPICIOUS_ACTIVITY` | Shubhali harakatlar | Подозрительная активность | Suspicious activity |
+| `HIGH_COMPLAINTS` | Ko'p shikoyat | Много жалоб | High complaints |
+| `LOW_TRUST` | Past trust score | Низкий trust score | Low trust score |
+
+#### 12.2.3 Yondashuv — qaror (A + B)
+
+| Yondashuv | Qanday ishlaydi | `generated_by` |
+|---|---|---|
+| **A) Qoidalar dvijogi** (majburiy) | Akkaunt yoshi, sertifikat, complaints, trust, shubhali faollik → `risk_score` / `risk_level` / `reasons` | `rules` |
+| **B) LLM** (ixtiyoriy) | Ball va `reasons` o'zgarmaydi; faqat `message` matni OpenAI bilan boyitiladi (kalit yo'q → A matni) | `openai` |
+
+> ✅ **QAROR:** production — **A majburiy + B ixtiyoriy**. Score hech qachon faqat LLM dan
+> kelmaydi (deterministik, auditable). `OPENAI_API_KEY` bo'lmasa to'liq A ishlaydi.
+
+**Qayerda qaytadi:** `GET /users/{id}` (4.11) ichida `scam_risk` / `risk` maydoni;
+tarmoq kartochkasida qisqa: `is_scammer`, `risk_level` (12.7).
+
+### 12.3 Connections / Countries hisoblagichlari
+
+| Maydon | Ma'nosi |
+|---|---|
+| `connections_count` | Accepted aloqalar (friendship) soni |
+| `countries_count` | Aloqalar + o'z `export_countries` / `country` bo'yicha **turli** davlatlar soni |
+
+**Qayerda:**
+- `GET /friends` javobidagi `networking: { connections, countries, trust }` (mavjud
+  `NetworkingScoreOut` bilan mos).
+- Profil / tarmoq header («🤝 5 Connections», «🌍 1 Countries», «⭐ Trust 56»).
+
+### 12.4 Profile viewers — «Kim sizni qidirdi»
+
+#### Tracking
+
+`GET /users/{id}` (4.11) chaqirilganda (autentifikatsiyalangan ko'ruvchi, o'zini emas):
+backend `profile_views` jadvaliga yozadi: `(viewer_id, viewed_id, viewed_at)`.
+Bir kun ichida bir xil juftlik — **upsert** (spam oldini olish).
+
+#### `GET api/v1/users/me/profile-viewers`
+
+**Query:** `page`, `limit` (standart 20).
+
+> Alias (ixtiyoriy keyin): `GET /network/viewers` — xuddi shu handler.
+
+**Response `200` (Premium/Business):**
+
+```json
+{
+  "items": [
+    {
+      "user_id": 88,
+      "full_name": "Nordic Imports",
+      "avatar_url": "...",
+      "country": "FI",
+      "is_business": true,
+      "viewed_at": "2026-07-25T18:02:00Z"
+    }
+  ],
+  "page": 1,
+  "limit": 20,
+  "total": 14,
+  "has_more": false,
+  "locked": false
+}
+```
+
+**Response `200` (Basic — locked):**
+
+```json
+{
+  "items": [],
+  "total": 14,
+  "locked": true,
+  "upgrade_plan": "premium"
+}
+```
+
+> ✅ **QAROR (viewers tarif):** **LinkedIn uslubi — Premium / Business.** Basic da faqat
+> `total` + `locked: true` (kimligi yashirin). Tracking hamma autentifikatsiyalangan
+> ko'ruvchi uchun yoziladi; **ko'rish huquqi** tarifga bog'liq. `FEATURE_LOCKED` / `locked`
+> maydoni — klient upgrade CTA uchun.
+
+**Xatoliklar:** `401 UNAUTHORIZED`.
+
+### 12.5 `GET api/v1/network/search` — tarmoq qidiruvi
+
+9.3 (`GET /users/search`) ga o'xshash, lekin B2B filtrlari bilan.
+
+| Query | Izoh |
+|---|---|
+| `q` | Ism / kompaniya / AnyLang raqam |
+| `country` | ISO 3166-1 alpha-2 |
+| `business_role` | 4.5.1 enum |
+| `category` | 6.12 mahsulot kategoriyasi (sotuvchining e'lonlari orqali) |
+| `verified` | `true` → `verified_badge == true` |
+| `online` | `true` → hozir onlayn |
+| `page`, `limit` | Standart pagination |
+
+**Response `200`:**
+
+```json
+{
+  "items": [
+    {
+      "id": 42,
+      "full_name": "Anadolu Craft Co.",
+      "company_name": "Anadolu Craft Co.",
+      "number": "7831111",
+      "avatar_url": "...",
+      "is_online": false,
+      "last_seen_at": "2026-07-25T10:00:00Z",
+      "country": "TR",
+      "is_business": true,
+      "verified_badge": true,
+      "business_role": "manufacturer",
+      "rating": 4.8,
+      "reviews_count": 24,
+      "trust": 72,
+      "risk_level": "none",
+      "is_scammer": false,
+      "products_count": 8,
+      "countries_count": 3,
+      "friendship_status": "none"
+    }
+  ],
+  "page": 1,
+  "limit": 20,
+  "total": 1,
+  "has_more": false
+}
+```
+
+### 12.6 Kontakt kartochkadagi 4 tugma
+
+| Tugma | Backend | Izoh |
+|---|---|---|
+| Chat | `POST /chats` (7.5) | Mavjud |
+| Live | → **10.11** (v1 lokal; remote — 10-bis) | Feature flag |
+| Mahsulot | `GET /users/{id}/products` (6.10) | Mavjud |
+| Profil | `GET /users/{id}` (4.11) | + risk/trust |
+
+### 12.7 Asosiy ro'yxat — `GET api/v1/friends` kengaytmasi
+
+9.2 javobidagi har bir `Friend` ga qo'shimcha maydonlar (breaking emas — ixtiyoriy):
+
+| Maydon | Tip |
+|---|---|
+| `rating` | float \| null |
+| `reviews_count` | int |
+| `trust` | int \| null |
+| `risk_level` | string |
+| `is_scammer` | bool |
+| `products_count` | int |
+| `countries_count` | int |
+| `keywords` | string[] |
+| `product_categories` | string[] |
+
+**Response qo'shimcha root:**
+
+```json
+{
+  "networking": {
+    "connections": 5,
+    "countries": 1,
+    "trust": 56
+  },
+  "pending_incoming_count": 2
+}
+```
+
+### 12.8 Backenddan KELMAYDIGAN narsalar (klient hisoblaydi)
+
+| Narsa | Nega klientda |
+|---|---|
+| «Online» / «Kecha» / «5 daqiqa oldin» | 7.8 + 7.10 — til va vaqt zonasi |
+| Davlat nomi + bayroq emoji | Backend faqat `country` kodi; nom lokalizatsiya |
+| «Kompaniya» / «Foydalanuvchi» chip matni | `is_business` + `business_role` dan klient |
+| Reyting yulduzchasini chizish | `rating` xom float |
+| Scammer qizil UI | `is_scammer` / `risk_level` — rang klientda |
+
+### 12.9 Xatolik kodlari (Tarmoq)
+
+| `error_code` | HTTP | Qachon |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | Token yo'q |
+| `VALIDATION_ERROR` | 400 | Noto'g'ri filtr |
+| `USER_NOT_FOUND` | 404 | Qidiruv / profil |
+| `FEATURE_LOCKED` | 403 | Viewers Basic da to'liq ochilmasa (`locked: true` ham mumkin) |
+
+### 12.10 Aniqlangan UI gap'lar (12-bo'lim)
+
+| UI | Backend | Izoh |
+|---|---|---|
+| Trust / Connections / Countries header | 12.3 / 12.7 | |
+| Karta reyting + scammer qizil | 12.2 / 12.7 | |
+| Filtrlar: Davlat / Soha / Mahsulot / Verified | 12.5 | |
+| Profile viewers horizontal | 12.4 | Premium/Business |
+| Live tugmasi | 10.11 | v1 lokal → remote |
+| Do'stlar vs Tarmoq | 12.0 | Bitta UI, 9+12 qatlam |
+
+---
+
+## 13. Modul: Guruh chatlar (Group chats)
+
+8-bo'lim faqat **1-1** chatni qamraydi. Skrinshotlarda «Yangi guruh» va guruh suhbati bor —
+shu modul.
+
+### 13.0 Qamrov
+
+- Guruh yaratish, a'zolar, rollar, sozlamalar
+- Guruh xabarlari (8.2 ga o'xshash + `sender`)
+- WebSocket eventlari
+- Tarjima (ko'p tilli fan-out)
+
+**Kirish nuqtasi:** suhbatlar ro'yxatida `chat.type == "group"` (7.2 ga maydon qo'shiladi).
+
+### 13.1 `POST api/v1/groups` — guruh yaratish
+
+**Request:**
+
+```json
+{
+  "name": "Tekstil hamkorlar",
+  "avatar_id": null,
+  "member_ids": [15, 22, 31]
+}
+```
+
+**Response `201`:**
+
+```json
+{
+  "id": 9001,
+  "type": "group",
+  "name": "Tekstil hamkorlar",
+  "avatar_url": null,
+  "owner_id": 1,
+  "members_count": 4,
+  "created_at": "2026-07-26T09:00:00Z"
+}
+```
+
+**Qoidalar:**
+- Yaratuvchi avtomatik `owner` va a'zo.
+- `member_ids` — mavjud userlar; o'zini qayta qo'shish e'tiborsiz.
+- Minimal a'zolar: yaratuvchi + kamida 1 (yoki 2 — mahsulot qarori: **kamida 1**).
+- Max a'zolar (tavsiya): 200.
+
+**Xatoliklar:** `400 VALIDATION_ERROR`, `404 USER_NOT_FOUND`, `403 USER_BLOCKED`.
+
+### 13.2 Rollar va ruxsatlar
+
+| Amal | owner | admin | member |
+|---|---|---|---|
+| Xabar yozish | ✓ | ✓ | ✓ |
+| Guruh nomini/rasmini o'zgartirish | ✓ | ✓ | ✗ |
+| A'zo qo'shish | ✓ | ✓ | ✗ |
+| A'zoni chiqarish | ✓ | ✓ (owner/admin chiqara olmaydi) | ✗ |
+| Admin tayinlash / olish | ✓ | ✗ | ✗ |
+| Tark etish (leave) | ✓* | ✓ | ✓ |
+| Guruhni o'chirish (delete) | ✓ | ✗ | ✗ |
+
+\* Owner leave qilsa — avval boshqa a'zoga ownership o'tkazilishi yoki guruh o'chirilishi
+kerak (qoida: **ownership majburiy o'tkazish**, aks holda `400 OWNER_MUST_TRANSFER`).
+
+### 13.3 Guruh xabari
+
+8.2 `Message` ga qo'shimcha:
+
+```json
+{
+  "id": 12001,
+  "chat_id": 9001,
+  "client_message_id": "…",
+  "type": "text",
+  "is_outgoing": false,
+  "sender": {
+    "id": 15,
+    "full_name": "Anna Müller",
+    "avatar_url": "…"
+  },
+  "text_original": "Hallo!",
+  "text_translated": "Salom!",
+  "translated_language": "uz",
+  "is_translated": true,
+  "created_at": "2026-07-26T09:05:00Z",
+  "read_count": 2,
+  "members_count": 4
+}
+```
+
+**Qoida:** 1-1 da `is_outgoing` yetarli edi; guruhda **har doim** `sender` to'ldiriladi
+(o'z xabarida ham).
+
+Xabar yuborish: `POST /chats/{chat_id}/messages` (8.4) — guruh `chat_id` bilan ishlaydi.
+
+### 13.4 Ko'p tomonlama o'qilganlik
+
+> ✅ **QAROR:** guruhda default — **sodda hisoblagich.**
+>
+> | Variant | Schema | Holat |
+> |---|---|---|
+> | **Sodda (default)** | `read_count` + `members_count` — UI «2/4 o'qidi» | v1 |
+> | To'liq (opt-in keyin) | `read_by: [{ "user_id", "read_at" }]` — faqat kichik guruh yoki `?expand=read_by` | keyin |
+>
+> Katta guruhlarda to'liq ro'yxat og'ir — shuning uchun v1 da count yetarli.
+
+`POST /chats/{id}/read` (7.6 / 8.7) guruhda ham ishlaydi — o'qilgan `message_ids` uchun
+hisoblagich oshadi.
+
+### 13.5 Guruh sozlamalari — endpointlar
+
+| Method | Path | Izoh |
+|---|---|---|
+| `GET` | `/groups/{id}` | Nom, avatar, a'zolar, mening rol |
+| `PATCH` | `/groups/{id}` | `{ "name"?, "avatar_id"? }` — owner/admin |
+| `POST` | `/groups/{id}/members` | `{ "user_ids": [...] }` |
+| `DELETE` | `/groups/{id}/members/{user_id}` | Kick |
+| `POST` | `/groups/{id}/leave` | Tark etish |
+| `DELETE` | `/groups/{id}` | Faqat owner — soft delete |
+
+**`GET /groups/{id}` response namunasi:**
+
+```json
+{
+  "id": 9001,
+  "name": "Tekstil hamkorlar",
+  "avatar_url": null,
+  "owner_id": 1,
+  "my_role": "owner",
+  "members": [
+    { "user_id": 1, "full_name": "Men", "role": "owner", "avatar_url": "…" },
+    { "user_id": 15, "full_name": "Anna Müller", "role": "member", "avatar_url": "…" }
+  ],
+  "members_count": 2
+}
+```
+
+### 13.6 WebSocket eventlari (8.9 / 9.5 uslubida)
+
+| Event | Qachon | `data` |
+|---|---|---|
+| `group_message` | Yangi guruh xabari | `Message` (13.3) + `chat_id` |
+| `group_member_added` | A'zo qo'shildi | `chat_id`, `members[]` |
+| `group_member_removed` | Kick / leave | `chat_id`, `user_id` |
+| `group_updated` | Nom/avatar | `chat_id`, `name`, `avatar_url` |
+| `group_deleted` | Owner o'chirdi | `chat_id` |
+
+Format: `{ "type": "...", "data": { ... } }`. Redis pub/sub (1.0 / 7.9).
+
+### 13.7 Guruhda tarjima
+
+8.1 «ko'ruvchiga qarab tarjima» guruhda murakkablashadi: a'zolarning `native_language`
+har xil.
+
+> ✅ **QAROR:** **lazy per-viewer + cache** (8.1.1).
+>
+> | Strategiya | Holat |
+> |---|---|
+> | **Lazy per-viewer** | Tarjima so'rov / WS yetkazishda kerakli tilga; cache | **v1 default** |
+> | Eager fan-out | Barcha a'zo tillariga oldindan | **Yo'q** (qimmat) |
+>
+> Background job faqat faol (oxirgi N kun) tillar uchun ixtiyoriy prewarm — majburiy emas.
+
+### 13.8 Xatolik kodlari (Guruh)
+
+| `error_code` | HTTP | Qachon |
+|---|---|---|
+| `GROUP_NOT_FOUND` | 404 | Yo'q yoki a'zo emas |
+| `NOT_GROUP_ADMIN` | 403 | Ruxsat yo'q |
+| `OWNER_MUST_TRANSFER` | 400 | Owner leave qilmoqchi |
+| `MEMBERS_LIMIT` | 400 | Max a'zolar |
+| `VALIDATION_ERROR` | 400 | Bo'sh nom va h.k. |
+
+### 13.9 Backenddan KELMAYDIGAN narsalar
+
+| Narsa | Klient |
+|---|---|
+| «N kishi o'qidi» matni | `read_count` / `members_count` dan lokalizatsiya |
+| Sender ismi rangi / avatar gradient | `sender.id` dan |
+| Vaqt formatlash | 7.10 |
+
+### 13.10 Aniqlangan UI gap'lar (13-bo'lim)
+
+| UI | Backend | Izoh |
+|---|---|---|
+| Yangi guruh | 13.1 | |
+| Guruh chat bubblida ism | 13.3 `sender` | |
+| Guruh sozlamalari | 13.5 | |
+| Kim o'qidi | 13.4 | `read_count` (default) |
+| Ko'p tilli tarjima | 13.7 | Lazy + cache |
+
+---
+
+## 14. Keyingi TZ bosqichlari (hali yozilmagan / yangilangan)
 
 Quyidagilar navbat bilan, mavjud ekranlar asosida alohida bo'lim sifatida qo'shib boriladi:
 
 - [x] ~~**Auth**~~ — 2–3-bo'lim (yozildi)
 - [x] ~~**Profil / Hisob turlari**~~ — 4-bo'lim (yozildi)
+- [x] ~~**Profil qo'shimchalari**~~ — 4.15–4.21 (yutuqlar, AI match/insights, factory video, analytics, certificates breaking)
 - [x] ~~**Tariflar / Obuna**~~ — 5-bo'lim (yozildi; to'lov integratsiyasi keyin)
 - [x] ~~**Bozor**~~ — 6-bo'lim (yozildi)
+- [x] ~~**Bozor qo'shimchalari**~~ — 6.19–6.22 (recommended, map, banners, Durable = capability)
 - [x] ~~**Xabarlar — suhbatlar ro'yxati + chat search**~~ — 7-bo'lim (yozildi)
 - [x] ~~**Chat (suhbat ichi)**~~ — 8-bo'lim (yozildi; asl+tarjima bir yo'la keladi)
+- [x] ~~**Chat attachment + Smart Reply**~~ — 8.3 / 8.11 (invoice qo'lda; offer/catalog/business_card)
 - [x] ~~**Do'stlar**~~ — 9-bo'lim (yozildi)
+- [x] ~~**Tarmoq (Network)**~~ — 12-bo'lim (yozildi; qarorlar yakunlandi)
+- [x] ~~**Guruh chatlar**~~ — 13-bo'lim (yozildi; read=count, tarjima=lazy)
 - [x] ~~**Jonli rejim**~~ — 10-bo'lim (yozildi; STT→tarjima→TTS to'liq backendda)
+- [ ] **Remote Jonli chaqiruv (10-bis)** — 10.11 QAROR: HA; to'liq spets + WebRTC/push keyingi bosqich
 - [x] ~~**AnyLang raqamlari**~~ — 11-bo'lim (yozildi; guruhlar, katalog, bonus obuna)
 - [ ] **Sozlamalar / Maxfiylik** — `settings` (bildirishnoma sozlamalari, profil ko'rinishi, bloklangan foydalanuvchilar, parol o'zgartirish, email o'zgartirish)
-- [ ] **To'lov** — Premium/Business obuna to'lovi va **raqam sotib olish** (5.7, 11.5 — provayder, webhook, cheklar)
-- [ ] **Admin** — **raqam guruhlarini yaratish/bonus belgilash (11.1)**, `verified_badge` berish, hisoblarni bloklash (`is_active`)
-- [ ] Push-bildirishnomalar (umumiy infratuzilma)
+- [ ] **To'lov** — Click/Paddle credentials + Paddle price_id lar productionda to'ldirish; Flutter checkout WebView ulash (5.7)
+- [ ] **Invoice avto-PDF** — ixtiyoriy `POST /chats/{id}/invoices` (8.3.3; v1 qo'lda yetarli)
+- [ ] **Admin** — **raqam guruhlarini yaratish/bonus belgilash (11.1)**, `verified_badge` berish, hisoblarni bloklash (`is_active`), **marketplace bannerlar CRUD (6.21)**
+- [ ] Push-bildirishnomalar (umumiy infratuzilma; remote Live chaqiruv uchun ham)

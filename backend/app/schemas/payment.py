@@ -1,12 +1,20 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.user import BillingCycle, SubscriptionPlan, UserOut
 
 PaymentKind = Literal["subscription", "number", "super_group"]
-PaymentStatus = Literal["pending", "succeeded", "failed", "canceled"]
-PaymentProvider = Literal["mock", "stripe"]
+PaymentStatus = Literal[
+    "pending",
+    "paid",
+    "succeeded",
+    "failed",
+    "canceled",
+    "cancelled",
+    "refunded",
+]
+PaymentProvider = Literal["mock", "stripe", "click", "paddle"]
 
 
 class CheckoutIn(BaseModel):
@@ -16,6 +24,8 @@ class CheckoutIn(BaseModel):
     promo_code: str | None = Field(default=None, min_length=3, max_length=64)
     number: str | None = Field(default=None, min_length=7, max_length=7)
     chat_id: int | None = None
+    # Optional: when set, subscription checkout uses Click/Paddle module.
+    provider: Literal["click", "paddle"] | None = None
 
 
 class CheckoutOut(BaseModel):

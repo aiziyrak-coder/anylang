@@ -90,7 +90,48 @@ async def create_checkout(
     number: str | None = None,
     chat_id: int | None = None,
     promo_code: str | None = None,
+    provider: str | None = None,
 ) -> dict[str, Any]:
+    # Click / Paddle subscription path (TZ 5.7) — preferred when requested or configured.
+    chosen = (provider or "").strip().lower()
+    settings = get_settings()
+    if not chosen and kind == "subscription":
+        if settings.payment_provider in {"click", "paddle"}:
+            chosen = settings.payment_provider
+        else:
+            country = (getattr(user, "country", None) or "").strip().upper()
+            if country == "UZ" and (
+                settings.click_merchant_id and settings.click_service_id and settings.click_secret_key
+            ):
+                chosen = "click"
+            elif settings.paddle_api_key and settings.paddle_webhook_secret:
+                chosen = "paddle"
+
+    if kind == "subscription" and chosen in {"click", "paddle"}:
+        from app.payments.service import create_subscription_checkout
+
+        if not plan or plan == "basic":
+            raise AppError(
+                message="Pullik tarif tanlang",
+                error_code="PAYMENT_INVALID",
+                status_code=400,
+            )
+        data = await create_subscription_checkout(
+            db,
+            user,
+            plan=plan,
+            billing_cycle=billing_cycle or "monthly",
+            provider=chosen,
+        )
+        payment = await db.get(Payment, int(data["payment_id"]))
+        assert payment is not None
+        out = _serialize_payment(payment)
+        out["checkout_url"] = data["checkout_url"]
+        out["mock_confirm"] = False
+        out["client_secret"] = None
+        out["stripe_session_id"] = None
+        return out
+
     amount: Decimal
     currency = "USD"
     meta: dict[str, Any] = {}
@@ -163,12 +204,12 @@ async def create_checkout(
             status_code=400,
         )
 
-    provider = _resolve_provider()
+    resolved = _resolve_provider()
     payment = Payment(
         user_id=user.id,
         kind=kind,
         status="pending",
-        provider=provider,
+        provider=resolved,
         amount=amount,
         currency=currency,
         plan=plan,
@@ -186,7 +227,7 @@ async def create_checkout(
         base["discount_amount"] = f"{discount_amount:.2f}"
         base["promo_code"] = applied_promo
 
-    if provider == "mock":
+    if resolved == "mock":
         base["mock_confirm"] = True
         return base
 

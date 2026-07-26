@@ -10,13 +10,14 @@ class PaymentRepository {
     required String plan,
     required String billingCycle,
     String? promoCode,
+    String? provider,
   }) {
     return _client.post(
-      api: 'api/v1/payments/checkout',
+      api: 'api/v1/subscription/checkout',
       data: {
-        'kind': 'subscription',
         'plan': plan,
         'billing_cycle': billingCycle,
+        'provider': provider ?? 'paddle',
         if (promoCode != null && promoCode.trim().isNotEmpty)
           'promo_code': promoCode.trim(),
       },

@@ -132,6 +132,15 @@ def create_app() -> FastAPI:
             )
         )
 
+    # Click / legacy return_url aliases
+    @app.get("/payment/success", response_class=HTMLResponse)
+    async def payment_success() -> HTMLResponse:
+        return await billing_success()
+
+    @app.get("/payment/cancel", response_class=HTMLResponse)
+    async def payment_cancel() -> HTMLResponse:
+        return await billing_cancel()
+
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "service": settings.app_name, "env": settings.app_env}

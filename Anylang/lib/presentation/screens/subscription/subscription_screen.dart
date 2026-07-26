@@ -431,16 +431,20 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         (state.promoInput.value.trim().isEmpty
             ? null
             : state.promoInput.value.trim());
+    final country =
+        (SessionStore.user()?['country']?.toString() ?? '').toUpperCase();
+    final provider = country == 'UZ' ? 'click' : 'paddle';
     final checkout = await payments.checkoutSubscription(
       plan: plan.code,
       billingCycle: cycle,
       promoCode: promo,
+      provider: provider,
     );
 
     await checkout.when<Future<void>>(
       success: (data) async {
         if (data is! Map) return;
-        final id = data['id'];
+        final id = data['id'] ?? data['payment_id'];
         final checkoutUrl = data['checkout_url']?.toString();
         final mockConfirm = data['mock_confirm'] == true;
 

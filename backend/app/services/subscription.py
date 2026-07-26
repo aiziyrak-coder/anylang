@@ -297,18 +297,40 @@ async def activate_paid_subscription(
     *,
     plan: PlanCode,
     billing_cycle: BillingCycle,
+    auto_renew: bool = False,
 ) -> None:
+    """Activate or extend a paid plan after successful payment.
+
+    Same plan + still active → stack remaining time onto new period.
+    Plan change or expired → restart from now.
+    """
     subscription = await ensure_basic_subscription(user, db)
 
     months = normalize_billing_months(billing_cycle)
     cycle = billing_cycle_code(months)
     now = datetime.now(UTC)
+    delta = _cycle_delta(cycle)
+
+    expires = subscription.expires_at
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=UTC)
+
+    same_active_plan = (
+        subscription.plan == plan
+        and subscription.is_active
+        and expires is not None
+        and expires > now
+    )
+    if same_active_plan:
+        # Renew early: keep remaining days, then add the new period.
+        subscription.expires_at = expires + delta
+    else:
+        subscription.started_at = now
+        subscription.expires_at = now + delta
+
     subscription.plan = plan
     subscription.billing_cycle = cycle
-    subscription.started_at = now
-    subscription.expires_at = now + _cycle_delta(cycle)
-    # Stripe Checkout is one-shot (mode=payment); no auto-charge until Billing is wired.
-    subscription.auto_renew = False
+    subscription.auto_renew = auto_renew
     subscription.is_active = True
     subscription.source = "purchase"
     if plan == "business":
@@ -341,7 +363,7 @@ async def subscribe(
             message="Pullik tarif uchun to'lov talab qilinadi",
             error_code="PAYMENT_REQUIRED",
             status_code=402,
-            extra={"hint": "POST /api/v1/payments/checkout"},
+            extra={"hint": "POST /api/v1/subscription/checkout"},
         )
 
     subscription.plan = "basic"

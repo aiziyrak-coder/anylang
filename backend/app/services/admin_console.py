@@ -469,7 +469,7 @@ async def analytics_overview(
     revenue = (
         await db.execute(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
-                Payment.status == "succeeded",
+                Payment.status.in_(("succeeded", "paid")),
                 Payment.paid_at.is_not(None),
                 Payment.paid_at >= d_from,
                 Payment.paid_at <= d_to,
@@ -540,7 +540,7 @@ async def analytics_timeseries(
             await db.execute(
                 select(day_col.label("day"), func.coalesce(func.sum(Payment.amount), 0))
                 .where(
-                    Payment.status == "succeeded",
+                    Payment.status.in_(("succeeded", "paid")),
                     Payment.paid_at.is_not(None),
                     Payment.paid_at >= start,
                     Payment.paid_at <= end,

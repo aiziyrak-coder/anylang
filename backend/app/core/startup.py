@@ -38,10 +38,25 @@ def validate_settings(settings: Settings) -> None:
         if settings.payment_provider == "mock" and not settings.allow_mock_payments:
             errors.append(
                 "PAYMENT_PROVIDER=mock is forbidden in production "
-                "(set PAYMENT_PROVIDER=stripe or ALLOW_MOCK_PAYMENTS=true explicitly)"
+                "(set PAYMENT_PROVIDER=click|paddle|stripe or ALLOW_MOCK_PAYMENTS=true explicitly)"
             )
         if settings.payment_provider == "stripe" and not settings.stripe_secret_key:
             errors.append("STRIPE_SECRET_KEY required when PAYMENT_PROVIDER=stripe")
+        if settings.payment_provider == "click" and not (
+            settings.click_merchant_id
+            and settings.click_service_id
+            and settings.click_secret_key
+        ):
+            errors.append(
+                "CLICK_MERCHANT_ID / CLICK_SERVICE_ID / CLICK_SECRET_KEY required "
+                "when PAYMENT_PROVIDER=click"
+            )
+        if settings.payment_provider == "paddle" and not (
+            settings.paddle_api_key and settings.paddle_webhook_secret
+        ):
+            errors.append(
+                "PADDLE_API_KEY / PADDLE_WEBHOOK_SECRET required when PAYMENT_PROVIDER=paddle"
+            )
         if settings.cors_origins.strip() in ("*", ""):
             errors.append("CORS_ORIGINS must be an explicit allow-list in production")
         if not settings.trusted_host_list:

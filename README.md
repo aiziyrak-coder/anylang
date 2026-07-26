@@ -58,4 +58,4 @@ Live site: https://anylang.uz — stack is Docker Compose + Nginx + Let’s Encr
 
 Auth · Users/Business · Subscription · Numbers · Products · Chats (+ WSS `/ws`) · Friends · Live · Admin
 
-Payment providers and real STT/TTS/DeepL activate when API keys are set in `.env` (mock mode otherwise).
+Payment providers: Click (UZS) + Paddle MoR (USD) via `POST /api/v1/subscription/checkout`; mock/Stripe remain for legacy. Real STT/TTS/DeepL activate when API keys are set.

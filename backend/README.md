@@ -36,3 +36,27 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ## Environment
 
 See `.env.example`. Never commit real secrets.
+
+### Payments (Click + Paddle)
+
+Subscription checkout: `POST /api/v1/subscription/checkout` with
+`{"plan","billing_cycle","provider":"click"|"paddle"}`.
+
+Webhooks (no JWT — signature only):
+
+| Provider | Endpoint |
+|---|---|
+| Click Prepare | `POST /api/v1/payments/click/prepare` |
+| Click Complete | `POST /api/v1/payments/click/complete` |
+| Paddle | `POST /api/v1/payments/paddle/webhook` |
+
+**Local webhook testing:** Click and Paddle call your public HTTPS URL. `localhost`
+is not reachable from their servers — use a tunnel (e.g. [ngrok](https://ngrok.com/)):
+
+```bash
+ngrok http 8000
+# Set PUBLIC_API_BASE_URL to the ngrok https URL
+# Register webhook URLs in Click / Paddle dashboards to https://<ngrok>/api/v1/payments/...
+```
+
+Sandbox placeholders: `.env.test`. Unit tests: `pytest tests/test_click_webhook_duplicate.py tests/test_paddle_webhook_signature.py`.

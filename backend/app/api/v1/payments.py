@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 
 from app.api.deps_auth import CurrentUser
 from app.core.deps import DbSession
+from app.payments.router import router as provider_webhooks_router
 from app.schemas.payment import CheckoutIn, CheckoutOut, ConfirmPaymentOut, PaymentOut
 from app.schemas.promo import PromoValidateIn, PromoValidateOut
 from app.services import payments as payments_service
@@ -9,6 +10,8 @@ from app.services import promo as promo_service
 from app.services.subscription import compute_period_price, normalize_billing_months
 
 router = APIRouter()
+# Click Prepare/Complete + Paddle webhook — no JWT (signature auth only).
+router.include_router(provider_webhooks_router)
 
 
 @router.post("/webhook/stripe")
@@ -54,6 +57,7 @@ async def create_checkout(
         number=body.number,
         chat_id=body.chat_id,
         promo_code=body.promo_code,
+        provider=body.provider,
     )
     await db.commit()
     return CheckoutOut.model_validate(data)
