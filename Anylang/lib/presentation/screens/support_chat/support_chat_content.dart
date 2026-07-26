@@ -20,6 +20,7 @@ import 'support_message.dart';
 class SupportChatContent extends ScreenContent<SupportChatState> {
   late final TextEditingController _composer;
   late final ScrollController _scroll;
+  Worker? _clearWorker;
 
   @override
   void initContent() {
@@ -28,7 +29,17 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
   }
 
   @override
+  void uiBuildFinished(SupportChatState state) {
+    _clearWorker?.dispose();
+    _clearWorker = ever(state.composerClearToken, (_) {
+      _composer.clear();
+    });
+  }
+
+  @override
   void onClose() {
+    _clearWorker?.dispose();
+    _clearWorker = null;
     _composer.dispose();
     _scroll.dispose();
   }
@@ -101,6 +112,7 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
               ProfileAvatar(
                 initial: 'S',
                 gradient: avatarGreenGradient,
+                imageUrl: 'assets/images/support_avatar.png',
                 size: 40,
                 shape: ProfileAvatarShape.circle,
               ),
@@ -263,8 +275,6 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
     final text = _composer.text.trim();
     if (text.isEmpty || state.sending.value) return;
     HapticFeedback.lightImpact();
-    _composer.clear();
-    sendAction(SupportComposerChanged(''));
     sendAction(SupportSend(text));
   }
 }

@@ -221,32 +221,23 @@ class _CustomDateTImePickerState extends State<CustomDateTImePicker>
           child: widget.timeWidgetBuilder!.call(_selectedDateTime));
     }
 
-    late String time;
     late String iconAssets;
 
     switch (widget.mode) {
       case CupertinoDatePickerMode.time:
-        time =
-            DateFormat(widget.timeFormat ?? 'HH:mm').format(_selectedDateTime);
         iconAssets = 'packages/time_picker_spinner_pop_up/assets/ic_clock.png';
         break;
       case CupertinoDatePickerMode.date:
-        time = DateFormat(widget.timeFormat ?? 'dd/MM/yyyy')
-            .format(_selectedDateTime);
         iconAssets =
-        'packages/time_picker_spinner_pop_up/assets/ic_calendar.png';
+            'packages/time_picker_spinner_pop_up/assets/ic_calendar.png';
         break;
       case CupertinoDatePickerMode.dateAndTime:
-        time = DateFormat(widget.timeFormat ?? 'dd/MM/yyyy HH:mm')
-            .format(_selectedDateTime);
         iconAssets =
-        'packages/time_picker_spinner_pop_up/assets/ic_calendar.png';
+            'packages/time_picker_spinner_pop_up/assets/ic_calendar.png';
         break;
       case CupertinoDatePickerMode.monthYear:
-        time = DateFormat(widget.timeFormat ?? 'MM/yyyy')
-            .format(_selectedDateTime);
         iconAssets =
-        'packages/time_picker_spinner_pop_up/assets/ic_calendar.png';
+            'packages/time_picker_spinner_pop_up/assets/ic_calendar.png';
         break;
     }
 

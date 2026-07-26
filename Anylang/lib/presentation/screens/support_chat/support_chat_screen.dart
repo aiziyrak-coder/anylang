@@ -20,6 +20,7 @@ class SupportChatScreen extends Screen<SupportChatState, void> {
     state.error.value = '';
     state.sending.value = false;
     state.showSend.value = false;
+    state.composerClearToken.value = 0;
     state.messages.clear();
     state.messages.add(
       SupportMessage(
@@ -108,6 +109,9 @@ class SupportChatScreen extends Screen<SupportChatState, void> {
             at: DateTime.now(),
           );
         }
+        state.composerClearToken.value++;
+        state.showSend.value = false;
+        state.error.value = '';
       },
       failure: (err) {
         final msg =

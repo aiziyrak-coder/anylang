@@ -276,7 +276,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
                             muted: false,
                             pinned: true,
                             isGroup: false,
-                            avatarUrl: null,
+                            avatarUrl: 'assets/images/support_avatar.png',
                             selected: false,
                             onTap: () => sendAction(OpenSupportChat()),
                             onLongPress: (_) {},

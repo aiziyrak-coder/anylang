@@ -302,6 +302,14 @@ main,
   color: var(--navy);
   background: linear-gradient(135deg, var(--lime), var(--teal));
   flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.device-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .device-online {

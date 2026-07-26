@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 
-import '../../presentation/utils/app_snackbar.dart';
 import '../core/buildNetwork/base_result.dart';
 import '../core/buildNetwork/error.dart';
 import '../core/buildNetwork/network_client.dart';

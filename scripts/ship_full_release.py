@@ -210,7 +210,7 @@ def main() -> int:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
         "package": "com.izodev.anylang",
-        "notes": f"Release {ver}+{build} — faster Live speech (Uzbek STT) + translation",
+        "notes": f"Release {ver}+{build} — Sofiya support avatar + chat polish",
     }
     meta_path = ROOT / "landing" / "download-meta.json"
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

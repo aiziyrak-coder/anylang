@@ -6,4 +6,6 @@ class SupportChatState extends GetxController {
   final RxBool sending = false.obs;
   final RxBool showSend = false.obs;
   final RxString error = ''.obs;
+  /// Composer matnini tozalash (yuborish muvaffaqiyatli bo‘lganda).
+  final RxInt composerClearToken = 0.obs;
 }

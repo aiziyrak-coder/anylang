@@ -86,6 +86,33 @@ class ProfileAvatar extends StatelessWidget {
     final fallback = _initialBody(c, s, borderRadius);
     if (url == null || url.isEmpty) return fallback;
 
+    final isAsset = url.startsWith('assets/');
+    final cache = (s * 3).round().clamp(64, 256);
+    final image = isAsset
+        ? Image.asset(
+            url,
+            key: ValueKey(url),
+            width: s,
+            height: s,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            cacheWidth: cache,
+            cacheHeight: cache,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          )
+        : Image.network(
+            url,
+            key: ValueKey(url),
+            width: s,
+            height: s,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.medium,
+            cacheWidth: cache,
+            cacheHeight: cache,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          );
+
     return ClipOval(
       child: SizedBox(
         width: s,
@@ -94,18 +121,7 @@ class ProfileAvatar extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             fallback,
-            Image.network(
-              url,
-              key: ValueKey(url),
-              width: s,
-              height: s,
-              fit: BoxFit.cover,
-              gaplessPlayback: true,
-              filterQuality: FilterQuality.medium,
-              cacheWidth: (s * 3).round().clamp(64, 256),
-              cacheHeight: (s * 3).round().clamp(64, 256),
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
+            image,
           ],
         ),
       ),
