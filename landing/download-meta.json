@@ -1,13 +1,13 @@
 {
-  "version": "1.0.62",
-  "build": 63,
-  "version_full": "1.0.62+63",
+  "version": "1.0.63",
+  "build": 64,
+  "version_full": "1.0.63+64",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.62+63.apk",
+  "versioned_filename": "anylang-1.0.63+64.apk",
   "size_bytes": 91202389,
   "size_mb": 86.98,
-  "updated_at": "2026-07-26T07:58:45.510161+00:00",
+  "updated_at": "2026-07-26T08:28:23.940094+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.62+63 — Click + Paddle subscription checkout"
+  "notes": "Release 1.0.63+64 — faster Live speech (Uzbek STT) + translation"
 }
