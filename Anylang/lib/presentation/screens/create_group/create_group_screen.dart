@@ -36,6 +36,11 @@ class CreateGroupScreen extends Screen<CreateGroupState, void> {
 
   @override
   void initState(void payload) {
+    state.title.value = '';
+    state.selectedIds.clear();
+    state.submitting.value = false;
+    state.friendsLoadFailed.value = false;
+    state.friendsTruncated.value = false;
     _loadFriends();
   }
 
@@ -84,6 +89,7 @@ class CreateGroupScreen extends Screen<CreateGroupState, void> {
       return;
     }
     if (action is _SubmitGroup) {
+      if (state.submitting.value) return;
       final title = state.title.value.trim();
       if (title.isEmpty) {
         showAppError('group_title_required'.tr);

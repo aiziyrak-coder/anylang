@@ -47,6 +47,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
     _lifecycle?.dispose();
     _pendingPaymentId = null;
     state.awaitingPayment.value = false;
+    state.checkoutInFlight.value = false;
     super.dispose();
   }
 
@@ -345,6 +346,16 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
   }
 
   Future<void> _selectPlan(SubscriptionPlan plan) async {
+    if (state.checkoutInFlight.value || state.awaitingPayment.value) return;
+    state.checkoutInFlight.value = true;
+    try {
+      await _selectPlanBody(plan);
+    } finally {
+      state.checkoutInFlight.value = false;
+    }
+  }
+
+  Future<void> _selectPlanBody(SubscriptionPlan plan) async {
     final current = state.currentPlanCode.value;
     final onPaid = current != null &&
         current != 'basic' &&

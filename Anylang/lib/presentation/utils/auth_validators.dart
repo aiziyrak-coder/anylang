@@ -26,6 +26,12 @@ abstract final class AuthValidators {
     return null;
   }
 
+  /// Login: faqat bo‘sh emas — kuch talabi register/reset uchun.
+  static String? loginPasswordError(String password) {
+    if (password.isEmpty) return 'password_required'.tr;
+    return null;
+  }
+
   /// Dio `error_code` yoki `[CODE]` qo‘shimchasidan kod.
   static String? apiErrorCode(Object? err) {
     final raw = err?.toString().trim() ?? '';

@@ -172,6 +172,7 @@ class NumbersScreen extends Screen<NumbersState, void> {
   }
 
   Future<void> _randomSwap() async {
+    if (state.purchasing.value) return;
     final mine = state.my.value;
     if (mine != null && !mine.canChangeFree) {
       final days = (mine.cooldownSeconds / 86400).ceil().clamp(1, 90);
@@ -196,25 +197,29 @@ class NumbersScreen extends Screen<NumbersState, void> {
         ) ??
         false;
     if (!ok) return;
+    if (state.purchasing.value) return;
 
     state.purchasing.value = true;
-    final result = await Get.find<NumbersRepository>().random();
-    state.purchasing.value = false;
-    await result.when(
-      success: (data) async {
-        final map = asMap(data);
-        final number = map?['number']?.toString() ?? '';
-        showAppMessage(
-          'numbers_swap_success'.trParams({
-            'number': formatNumber(number),
-          }),
-        );
-        await _refreshUser();
-        await _loadMine();
-        await _loadCatalog(reset: true);
-      },
-      failure: (e) async => showAppError(e),
-    );
+    try {
+      final result = await Get.find<NumbersRepository>().random();
+      await result.when(
+        success: (data) async {
+          final map = asMap(data);
+          final number = map?['number']?.toString() ?? '';
+          showAppMessage(
+            'numbers_swap_success'.trParams({
+              'number': formatNumber(number),
+            }),
+          );
+          await _refreshUser();
+          await _loadMine();
+          await _loadCatalog(reset: true);
+        },
+        failure: (e) async => showAppError(e),
+      );
+    } finally {
+      state.purchasing.value = false;
+    }
   }
 
   Future<void> _showBuySheet(CatalogNumber item) async {

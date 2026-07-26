@@ -80,9 +80,28 @@ class ConnectivityService extends GetxService {
   }
 }
 
+/// Transport / vaqtinchalik server xatolari — outbox va offline UX qayta urinadi.
+/// Haqiqiy 4xx validatsiya (masalan, chat topilmadi) bu yerda `false`.
 bool isNetworkFailure(Object? err) {
   final s = err?.toString().toLowerCase() ?? '';
   if (s.isEmpty) return false;
+
+  // Bracket error codes from dioToError / AuthValidators.
+  const retryCodes = [
+    'internal_error',
+    'dependency_unavailable',
+    'service_unavailable',
+    'too_many_requests',
+    'gateway_timeout',
+    'bad_gateway',
+  ];
+  for (final code in retryCodes) {
+    if (s.contains('[$code]') || s.contains(code)) return true;
+  }
+
+  // HTTP status fragments if present in message.
+  if (RegExp(r'\b(408|429|500|502|503|504)\b').hasMatch(s)) return true;
+
   const needles = [
     'socket',
     'connection',
@@ -107,6 +126,25 @@ bool isNetworkFailure(Object? err) {
     'clientexception',
     'http request failed',
     'software caused connection abort',
+    // i18n keys / localized server blips (mapDioError)
+    'error_timeout',
+    'error_ssl',
+    'error_connection',
+    'error_rate_limited',
+    'error_server',
+    'server xatosi',
+    'server error',
+    'ошибка сервера',
+    'juda ko‘p urinish',
+    'juda kop urinish',
+    'too many attempts',
+    'слишком много',
+    'server javob bermadi',
+    'server did not respond',
+    'сервер не отвечает',
+    'serverga ulanib',
+    'could not connect',
+    'не удалось подключиться',
   ];
   for (final n in needles) {
     if (s.contains(n)) return true;

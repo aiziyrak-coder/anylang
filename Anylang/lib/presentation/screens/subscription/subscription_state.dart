@@ -19,6 +19,8 @@ class SubscriptionState extends GetxController {
   RxBool loading = true.obs;
   RxBool loadError = false.obs;
   RxBool awaitingPayment = false.obs;
+  /// Checkout / cancel / subscribe so‘rovi ketayotganda ikki marta bosilmasin.
+  RxBool checkoutInFlight = false.obs;
   RxBool promoLoading = false.obs;
 
   /// 1 | 3 | 6 | 12

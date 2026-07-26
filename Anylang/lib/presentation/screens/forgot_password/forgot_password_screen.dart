@@ -153,6 +153,13 @@ class ForgotPasswordScreen extends Screen<ForgotPasswordState, void> {
   ForgotPasswordScreen() : super(mobileContent: ForgotPasswordContent());
 
   @override
+  void initState(void payload) {
+    state.isLoading.value = false;
+    state.step.value = 0;
+    state.email.value = '';
+  }
+
+  @override
   Future<void> actionHandler(
     ForgotPasswordState state,
     MyAction action,
@@ -165,6 +172,7 @@ class ForgotPasswordScreen extends Screen<ForgotPasswordState, void> {
           popBackNavigate();
         }
       case ForgotSendCode a:
+        if (state.isLoading.value) return;
         final email = a.email.trim().toLowerCase();
         if (email.isEmpty) {
           showAppError('email_required'.tr);
@@ -191,6 +199,7 @@ class ForgotPasswordScreen extends Screen<ForgotPasswordState, void> {
           state.isLoading.value = false;
         }
       case ForgotReset a:
+        if (state.isLoading.value) return;
         if (a.code.trim().length != 6) {
           showAppError('code_invalid'.tr);
           return;

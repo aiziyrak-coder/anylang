@@ -76,19 +76,34 @@ class TokenRefresher {
       if (kDebugMode) {
         debugPrint('Token refresh failed: $e');
       }
-      final isNetwork = e is DioException &&
-          (e.type == DioExceptionType.connectionError ||
-              e.type == DioExceptionType.connectionTimeout ||
-              e.type == DioExceptionType.receiveTimeout ||
-              e.type == DioExceptionType.sendTimeout);
-      if (isNetwork) {
-        final fallback = SessionStore.accessToken;
-        completer.complete(fallback ?? 'none');
-        return fallback ?? 'none';
+      // Faqat aniq auth o‘limida sessiyani o‘chiramiz.
+      // 5xx / 429 / timeout — vaqtinchalik; foydalanuvchini login’ga uloqtirilmasin.
+      if (e is DioException) {
+        final type = e.type;
+        final status = e.response?.statusCode ?? 0;
+        final isTransient = type == DioExceptionType.connectionError ||
+            type == DioExceptionType.connectionTimeout ||
+            type == DioExceptionType.receiveTimeout ||
+            type == DioExceptionType.sendTimeout ||
+            status == 408 ||
+            status == 429 ||
+            status >= 500;
+        if (isTransient) {
+          final fallback = SessionStore.accessToken;
+          completer.complete(fallback ?? 'none');
+          return fallback ?? 'none';
+        }
+        // 401/403 refresh — token haqiqatan yaroqsiz.
+        if (status == 401 || status == 403) {
+          await SessionStore.clear();
+          completer.complete('none');
+          return 'none';
+        }
       }
-      await SessionStore.clear();
-      completer.complete('none');
-      return 'none';
+      // Noma’lum xato: sessiya saqlansin (offline / parse glitch).
+      final fallback = SessionStore.accessToken;
+      completer.complete(fallback ?? 'none');
+      return fallback ?? 'none';
     } finally {
       _refreshCompleter = null;
     }

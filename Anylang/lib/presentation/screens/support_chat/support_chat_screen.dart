@@ -14,24 +14,21 @@ import 'support_message.dart';
 class SupportChatScreen extends Screen<SupportChatState, void> {
   SupportChatScreen() : super(mobileContent: SupportChatContent());
 
-  static bool _welcomeAdded = false;
-
   @override
   void initState(void payload) {
+    // Fenix singleton — har ochilishda tarixni tozalaymiz (boshqa user leak bo‘lmasin).
     state.error.value = '';
     state.sending.value = false;
     state.showSend.value = false;
-    if (!_welcomeAdded && state.messages.every((m) => m.id != 'welcome')) {
-      _welcomeAdded = true;
-      state.messages.add(
-        SupportMessage(
-          id: 'welcome',
-          text: 'support_welcome'.tr,
-          isOutgoing: false,
-          at: DateTime.now(),
-        ),
-      );
-    }
+    state.messages.clear();
+    state.messages.add(
+      SupportMessage(
+        id: 'welcome',
+        text: 'support_welcome'.tr,
+        isOutgoing: false,
+        at: DateTime.now(),
+      ),
+    );
   }
 
   @override
@@ -113,7 +110,8 @@ class SupportChatScreen extends Screen<SupportChatState, void> {
         }
       },
       failure: (err) {
-        final msg = AuthValidators.safeError(err, fallbackKey: 'support_send_failed');
+        final msg =
+            AuthValidators.safeError(err, fallbackKey: 'support_send_failed');
         state.error.value = msg;
         if (idx >= 0) {
           state.messages[idx] = SupportMessage(

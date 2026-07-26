@@ -1,11 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart' hide Response;
 
 import 'base_result.dart';
 import 'error.dart';
 import 'success.dart';
 
-/// DioException / umumiy xatolardan foydalanuvchiga tushunarli matn.
+/// DioException / umumiy xatolardan foydalanuvchiga tushunarli matn (i18n).
 String mapDioError(DioException e) {
   if (kDebugMode) {
     debugPrint('API error [${e.response?.statusCode}] ${e.requestOptions.path}');
@@ -15,30 +16,28 @@ String mapDioError(DioException e) {
     case DioExceptionType.connectionTimeout:
     case DioExceptionType.sendTimeout:
     case DioExceptionType.receiveTimeout:
-      return "Server javob bermadi. Internetni tekshirib, qayta urinib ko'ring";
+      return 'error_timeout'.tr;
     case DioExceptionType.connectionError:
       final detail = e.message ?? e.error?.toString() ?? '';
       if (detail.toLowerCase().contains('certificate') ||
           detail.toLowerCase().contains('handshake')) {
-        return "SSL xatosi. Telefon vaqtini tekshiring yoki qayta urinib ko'ring";
+        return 'error_ssl'.tr;
       }
-      return "Serverga ulanib bo'lmadi. Internetni yoqing va qayta urinib ko'ring";
+      return 'error_connection'.tr;
     case DioExceptionType.cancel:
-      return "So'rov bekor qilindi";
+      return 'error_cancelled'.tr;
     case DioExceptionType.badResponse:
       final parsed = _messageFromBody(e.response?.data);
       if (parsed != null && parsed.isNotEmpty) return parsed;
       final code = e.response?.statusCode;
-      if (code == 401) return "Sessiya tugadi. Qayta kiring";
-      if (code == 403) return "Ruxsat yo'q";
-      if (code == 404) return "Ma'lumot topilmadi";
-      if (code == 429) return "Juda ko'p urinish. Biroz kutib qayta urinib ko'ring";
-      if (code != null && code >= 500) {
-        return "Server xatosi. Keyinroq urinib ko'ring";
-      }
-      return "Xatolik yuz berdi. Qayta urinib ko'ring";
+      if (code == 401) return 'error_session_expired'.tr;
+      if (code == 403) return 'error_forbidden'.tr;
+      if (code == 404) return 'error_not_found'.tr;
+      if (code == 429) return 'error_rate_limited'.tr;
+      if (code != null && code >= 500) return 'error_server'.tr;
+      return 'error_generic'.tr;
     default:
-      return "Noma'lum xatolik. Qayta urinib ko'ring";
+      return 'unknown_error'.tr;
   }
 }
 
@@ -79,10 +78,11 @@ Map<String, dynamic>? dioErrorBody(DioException e) {
 
 Error<String> dioToError(DioException e) {
   final msg = mapDioError(e);
+  // error_code foydalanuvchi matniga qo‘shilmaydi — AuthValidators.apiErrorCode
+  // body orqali o‘qilishi mumkin; display string toza qoladi.
   final code = dioErrorCode(e);
-  if (code != null &&
-      code.isNotEmpty &&
-      !msg.contains(code)) {
+  if (code != null && code.isNotEmpty) {
+    // Kodni saqlash: ko‘p joylar `[CODE]` parse qiladi.
     return Error('$msg [$code]');
   }
   return Error(msg);

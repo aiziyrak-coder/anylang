@@ -125,11 +125,13 @@ class LoginContent extends ScreenContent<LoginState> {
                     isLoading: state.isLoading.value,
                     enabled: !state.isGoogleLoading.value,
                     onTap: () {
+                      if (state.isLoading.value || state.isGoogleLoading.value) {
+                        return;
+                      }
                       final email = _emailCtrl.text;
                       final password = _passCtrl.text;
                       state.email = email;
-                      _passCtrl.clear();
-                      state.password = '';
+                      state.password = password;
                       sendAction(LoginSubmit(email, password));
                     },
                   )),

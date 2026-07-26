@@ -26,14 +26,14 @@ class LoginScreen extends Screen<LoginState, void> {
   Future<void> actionHandler(LoginState state, MyAction action) async {
     switch (action) {
       case LoginSubmit a:
+        if (state.isLoading.value || state.isGoogleLoading.value) return;
         state.email = a.email;
-        state.password = '';
         final emailErr = AuthValidators.emailError(a.email);
         if (emailErr != null) {
           showAppError(emailErr);
           return;
         }
-        final passErr = AuthValidators.passwordError(a.password);
+        final passErr = AuthValidators.loginPasswordError(a.password);
         if (passErr != null) {
           showAppError(passErr);
           return;
@@ -69,7 +69,9 @@ class LoginScreen extends Screen<LoginState, void> {
               await connectRealtimeIfNeeded();
               navigateAndRemoveUntil(MainScreen());
             },
-            failure: (err) async => showAppError(err),
+            failure: (err) async => showAppError(
+              AuthValidators.safeError(err, fallbackKey: 'error_generic'),
+            ),
           );
         } finally {
           state.isLoading.value = false;
@@ -77,6 +79,7 @@ class LoginScreen extends Screen<LoginState, void> {
       case GoToRegister _:
         navigate(RegisterScreen());
       case GoogleLogin _:
+        if (state.isLoading.value || state.isGoogleLoading.value) return;
         if (GoogleAuthService.serverClientId.isEmpty && !kDebugMode) {
           showAppMessage('google_coming_soon'.tr);
           return;
@@ -94,12 +97,15 @@ class LoginScreen extends Screen<LoginState, void> {
               await repo.loginWithGoogleDetailed(idToken: idToken);
           final body = outcome.body;
           if (body != null && body['error_code'] == 'ACCOUNT_NOT_VERIFIED') {
+            final email = (body['email']?.toString() ?? '').trim();
+            if (email.isEmpty) {
+              showAppError('verify_email_missing'.tr);
+              return;
+            }
             showAppMessage('verify_required'.tr);
             navigate(
               VerifyScreen(),
-              payload: VerifyPayload(
-                email: body['email']?.toString() ?? '',
-              ),
+              payload: VerifyPayload(email: email.toLowerCase()),
             );
             return;
           }
@@ -109,7 +115,9 @@ class LoginScreen extends Screen<LoginState, void> {
               await connectRealtimeIfNeeded();
               navigateAndRemoveUntil(MainScreen());
             },
-            failure: (err) async => showAppError(err),
+            failure: (err) async => showAppError(
+              AuthValidators.safeError(err, fallbackKey: 'google_failed'),
+            ),
           );
         } catch (e) {
           showAppError(AuthValidators.safeError(e, fallbackKey: 'google_failed'));

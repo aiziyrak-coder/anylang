@@ -177,6 +177,12 @@ class AddProductScreen extends Screen<AddProductState, void> {
     required String processVideoUrl,
     required String status,
   }) async {
+    if (state.isSubmitting.value || state.videoUploading.value) {
+      if (state.videoUploading.value) {
+        showAppWarning('product_video_uploading'.tr);
+      }
+      return;
+    }
     name = name.trim();
     price = price.trim().replaceAll(',', '.');
     shortDescription = shortDescription.trim();

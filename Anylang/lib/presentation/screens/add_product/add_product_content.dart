@@ -392,8 +392,11 @@ class AddProductContent extends ScreenContent<AddProductState> {
                     Row(
                       children: [
                         Expanded(
-                          child: SecondaryButton(
+                          child: Obx(() => SecondaryButton(
                             text: 'add_product_draft'.tr,
+                            isLoading: state.isSubmitting.value,
+                            enabled: !state.isSubmitting.value &&
+                                !state.videoUploading.value,
                             onTap: () => sendAction(SaveDraftRequested(
                               name: _nameCtrl.text,
                               price: _priceCtrl.text,
@@ -405,13 +408,14 @@ class AddProductContent extends ScreenContent<AddProductState> {
                               factoryVideoUrl: _factoryVideoCtrl.text,
                               processVideoUrl: _processVideoCtrl.text,
                             )),
-                          ),
+                          )),
                         ),
                         SizedBox(width: 12.dp),
                         Expanded(
                           child: Obx(() => PrimaryButton(
                                 text: 'add_product_publish'.tr,
                                 isLoading: state.isSubmitting.value,
+                                enabled: !state.videoUploading.value,
                                 startIcon: const Icon(Icons.check_rounded, size: 18),
                                 onTap: () => sendAction(PublishProductRequested(
                                   name: _nameCtrl.text,

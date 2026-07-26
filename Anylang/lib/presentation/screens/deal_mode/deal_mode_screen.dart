@@ -128,17 +128,20 @@ class DealModeScreen extends Screen<DealModeState, DealModePayload> {
   Future<void> _accept() async {
     final chatId = state.chatId.value;
     if (chatId <= 0 || state.saving.value) return;
-    // Avval saqlash
-    await _saveSilent();
     state.saving.value = true;
-    final result = await Get.find<ChatRepository>().acceptDeal(chatId);
-    state.saving.value = false;
-    final map = asMap(result.dataOrNull);
-    if (map == null) {
-      showAppError(result.errorOrNull ?? 'error'.tr);
-      return;
+    try {
+      // Avval saqlash
+      await _saveSilent();
+      final result = await Get.find<ChatRepository>().acceptDeal(chatId);
+      final map = asMap(result.dataOrNull);
+      if (map == null) {
+        showAppError(result.errorOrNull ?? 'error'.tr);
+        return;
+      }
+      _applyResponse(map);
+    } finally {
+      state.saving.value = false;
     }
-    _applyResponse(map);
   }
 
   Future<void> _saveSilent() async {

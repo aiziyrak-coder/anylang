@@ -40,6 +40,7 @@ class MessagesScreen extends Screen<MessagesState, void> {
 
   Timer? _searchDebounce;
   int _searchSeq = 0;
+  int _loadSeq = 0;
 
   @override
   void initState(void payload) {
@@ -47,45 +48,67 @@ class MessagesScreen extends Screen<MessagesState, void> {
   }
 
   Future<void> _load() async {
+    final seq = ++_loadSeq;
+    final filter = state.listFilter.value;
     await connectRealtimeIfNeeded();
+    if (seq != _loadSeq) return;
     if (Get.isRegistered<OfflineOutboxService>()) {
       unawaited(Get.find<OfflineOutboxService>().flush());
     }
     state.loading.value = true;
-    final filter = state.listFilter.value;
-    final result = await Get.find<ChatRepository>().listChats(
-      sort: filter == MessagesListFilter.unread ? 'unread' : 'activity',
-      type: switch (filter) {
-        MessagesListFilter.chats => 'direct',
-        MessagesListFilter.groups => 'group',
-        _ => null,
-      },
-    );
-    result.when(
-      success: (data) {
-        final raw = asList(data)
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
-        unawaited(OfflineChatStore.saveConversations(raw));
-        final items = raw.map(Conversation.fromApi).toList();
-        state.conversations.assignAll(_filterConversations(items, filter));
-      },
-      failure: (err) {
-        final cached = OfflineChatStore.loadConversations();
-        if (cached.isNotEmpty) {
-          final items = cached.map(Conversation.fromApi).toList();
+    try {
+      final result = await Get.find<ChatRepository>().listChats(
+        sort: filter == MessagesListFilter.unread ? 'unread' : 'activity',
+        type: switch (filter) {
+          MessagesListFilter.chats => 'direct',
+          MessagesListFilter.groups => 'group',
+          _ => null,
+        },
+      );
+      if (seq != _loadSeq) return;
+      result.when(
+        success: (data) {
+          if (seq != _loadSeq) return;
+          final raw = asList(data)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          unawaited(OfflineChatStore.saveConversations(raw));
+          final items = <Conversation>[];
+          for (final e in raw) {
+            try {
+              items.add(Conversation.fromApi(e));
+            } catch (err, st) {
+              debugPrint('Conversation.fromApi skipped: $err\n$st');
+            }
+          }
           state.conversations.assignAll(_filterConversations(items, filter));
-          return;
-        }
-        if (!isNetworkFailure(err)) {
-          showAppError(err);
-        } else {
-          showAppMessage('conversations_load_failed'.tr);
-        }
-      },
-    );
-    state.loading.value = false;
+        },
+        failure: (err) {
+          if (seq != _loadSeq) return;
+          final cached = OfflineChatStore.loadConversations();
+          if (cached.isNotEmpty) {
+            final items = <Conversation>[];
+            for (final e in cached) {
+              try {
+                items.add(Conversation.fromApi(e));
+              } catch (_) {}
+            }
+            state.conversations.assignAll(_filterConversations(items, filter));
+            return;
+          }
+          if (!isNetworkFailure(err)) {
+            showAppError(err);
+          } else {
+            showAppMessage('conversations_load_failed'.tr);
+          }
+        },
+      );
+    } finally {
+      if (seq == _loadSeq) {
+        state.loading.value = false;
+      }
+    }
   }
 
   /// Guruhlar/Chatlar filterini clientda ham mustahkamlaydi (soft-reload

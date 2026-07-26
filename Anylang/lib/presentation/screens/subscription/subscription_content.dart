@@ -345,7 +345,8 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
       ctaEnabled: !plan.isCurrent &&
           !state.loadError.value &&
           !state.loading.value &&
-          !state.awaitingPayment.value,
+          !state.awaitingPayment.value &&
+          !state.checkoutInFlight.value,
       onCta: () => sendAction(SelectPlan(plan)),
     );
   }

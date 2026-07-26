@@ -170,6 +170,23 @@ class LanguageLocalizations extends Translations {
       'email_required': 'Email manzilini kiriting',
       'password_short': 'Parol kamida 8 belgidan iborat bo‘lishi kerak',
       'password_weak': 'Parolda kamida 1 ta harf va 1 ta raqam bo‘lishi kerak',
+      'password_required': 'Parolni kiriting',
+      'error_timeout':
+          'Server javob bermadi. Internetni tekshirib, qayta urinib ko‘ring',
+      'error_ssl':
+          'SSL xatosi. Telefon vaqtini tekshiring yoki qayta urinib ko‘ring',
+      'error_connection':
+          'Serverga ulanib bo‘lmadi. Internetni yoqing va qayta urinib ko‘ring',
+      'error_cancelled': 'So‘rov bekor qilindi',
+      'error_session_expired': 'Sessiya tugadi. Qayta kiring',
+      'error_forbidden': 'Ruxsat yo‘q',
+      'error_not_found': 'Maʼlumot topilmadi',
+      'error_rate_limited':
+          'Juda ko‘p urinish. Biroz kutib qayta urinib ko‘ring',
+      'error_server': 'Server xatosi. Keyinroq urinib ko‘ring',
+      'error_generic': 'Xatolik yuz berdi. Qayta urinib ko‘ring',
+      'verify_email_missing':
+          'Email topilmadi. Tasdiqlash uchun email orqali kiring',
       'full_name_required': 'Ismni to‘liq kiriting',
       'verify_required': 'Emailni tasdiqlash kerak',
       'google_failed': 'Google orqali kirib bo‘lmadi',
@@ -1584,6 +1601,23 @@ class LanguageLocalizations extends Translations {
       'email_required': 'Введите email',
       'password_short': 'Пароль должен быть не короче 8 символов',
       'password_weak': 'В пароле нужна хотя бы 1 буква и 1 цифра',
+      'password_required': 'Введите пароль',
+      'error_timeout':
+          'Сервер не отвечает. Проверьте интернет и попробуйте снова',
+      'error_ssl':
+          'Ошибка SSL. Проверьте время на телефоне или попробуйте снова',
+      'error_connection':
+          'Не удалось подключиться. Включите интернет и попробуйте снова',
+      'error_cancelled': 'Запрос отменён',
+      'error_session_expired': 'Сессия истекла. Войдите снова',
+      'error_forbidden': 'Нет доступа',
+      'error_not_found': 'Данные не найдены',
+      'error_rate_limited':
+          'Слишком много попыток. Подождите и попробуйте снова',
+      'error_server': 'Ошибка сервера. Попробуйте позже',
+      'error_generic': 'Произошла ошибка. Попробуйте снова',
+      'verify_email_missing':
+          'Email не найден. Для подтверждения войдите через email',
       'full_name_required': 'Введите полное имя',
       'verify_required': 'Подтвердите email',
       'google_failed': 'Не удалось войти через Google',
@@ -2996,6 +3030,22 @@ class LanguageLocalizations extends Translations {
       'email_required': 'Enter your email',
       'password_short': 'Password must be at least 8 characters',
       'password_weak': 'Password needs at least 1 letter and 1 digit',
+      'password_required': 'Enter your password',
+      'error_timeout':
+          'Server did not respond. Check your internet and try again',
+      'error_ssl':
+          'SSL error. Check your phone time or try again',
+      'error_connection':
+          'Could not connect. Turn on internet and try again',
+      'error_cancelled': 'Request cancelled',
+      'error_session_expired': 'Session expired. Please sign in again',
+      'error_forbidden': 'Access denied',
+      'error_not_found': 'Not found',
+      'error_rate_limited': 'Too many attempts. Wait a bit and try again',
+      'error_server': 'Server error. Try again later',
+      'error_generic': 'Something went wrong. Please try again',
+      'verify_email_missing':
+          'Email not found. Sign in with email to verify',
       'full_name_required': 'Enter your full name',
       'verify_required': 'Please verify your email',
       'google_failed': 'Google sign-in failed',
