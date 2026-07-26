@@ -17,6 +17,10 @@ class Friend {
   final String? country;
   final String? businessRole;
   final double? rating;
+  final int reviewsCount;
+  final int? trust;
+  final String riskLevel;
+  final bool isScammer;
   final bool verified;
   final bool isBusiness;
   final List<String> keywords;
@@ -39,6 +43,10 @@ class Friend {
     this.country,
     this.businessRole,
     this.rating,
+    this.reviewsCount = 0,
+    this.trust,
+    this.riskLevel = 'none',
+    this.isScammer = false,
     this.verified = false,
     this.isBusiness = false,
     this.keywords = const [],
@@ -47,6 +55,9 @@ class Friend {
     this.productsCount = 0,
     this.countriesCount = 0,
   });
+
+  bool get hasRiskWarning =>
+      isScammer || riskLevel == 'high' || riskLevel == 'medium';
 
   factory Friend.fromApi(Map<String, dynamic> json) {
     final id = (json['id'] as num?)?.toInt() ?? 0;
@@ -78,6 +89,7 @@ class Friend {
         if (s.isNotEmpty) categories.add(s);
       }
     }
+    final risk = (json['risk_level']?.toString() ?? 'none').toLowerCase();
     return Friend(
       id: id,
       initial: initialsOf(name),
@@ -92,6 +104,10 @@ class Friend {
       country: country,
       businessRole: role,
       rating: rating,
+      reviewsCount: (json['reviews_count'] as num?)?.toInt() ?? 0,
+      trust: (json['trust'] as num?)?.toInt(),
+      riskLevel: risk,
+      isScammer: json['is_scammer'] == true || risk == 'high',
       verified: verified,
       isBusiness: json['is_business'] == true,
       keywords: keywords,
@@ -117,6 +133,10 @@ class Friend {
       country: country,
       businessRole: businessRole,
       rating: rating,
+      reviewsCount: reviewsCount,
+      trust: trust,
+      riskLevel: riskLevel,
+      isScammer: isScammer,
       verified: verified,
       isBusiness: isBusiness,
       keywords: keywords,

@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.core.errors import AppError
 from app.core.pagination import normalize_page
 from app.models.chat import Friendship
-from app.models.user import User
+from app.models.user import BusinessProfile, User
 
 COOLDOWN_AFTER_DECLINE_HOURS = 24
 EXTENDED_COOLDOWN_DAYS = 7
@@ -39,6 +39,62 @@ def _spoken_languages(user: User) -> list[str]:
     return codes
 
 
+def _lite_trust(user: User, biz: BusinessProfile | None) -> int | None:
+    """Ro‘yxat uchun engil trust (DB so‘rovsiz)."""
+    if biz is None:
+        return None
+    score = 25
+    if biz.documents_verified:
+        score += 22
+    if user.verified_badge:
+        score += 8
+    if biz.factory_verified:
+        score += 12
+    if biz.inspection_passed:
+        score += 8
+    deals = int(biz.successful_deals or 0)
+    score += min(18, deals * 2)
+    complaints = int(biz.complaints_count or 0)
+    score -= min(45, complaints * 12)
+    if biz.rating is not None:
+        score += int((float(biz.rating) - 3.0) * 10)
+    return max(0, min(100, score))
+
+
+def _lite_risk(
+    user: User,
+    biz: BusinessProfile | None,
+    trust: int | None,
+) -> tuple[str, bool]:
+    """(risk_level, is_scammer) — list uchun tez qoida."""
+    if biz is None:
+        return "none", False
+    complaints = int(biz.complaints_count or 0)
+    rating = float(biz.rating) if biz.rating is not None else None
+    scammer = False
+    level = "none"
+    if complaints >= 3 or (
+        rating is not None and rating <= 1.8 and complaints >= 1
+    ):
+        level = "high"
+        scammer = True
+    elif complaints >= 2 or (trust is not None and trust < 30):
+        level = "high"
+        scammer = True
+    elif complaints >= 1 or (trust is not None and trust < 40):
+        level = "medium"
+    elif rating is not None and rating < 2.5:
+        level = "medium"
+    # Yangi business + shikoyat
+    if complaints >= 1 and not bool(biz.documents_verified):
+        if level == "none":
+            level = "medium"
+        if complaints >= 2:
+            level = "high"
+            scammer = True
+    return level, scammer
+
+
 def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> dict:
     is_business = bool(
         user.subscription and user.subscription.plan == "business" and user.subscription.is_active
@@ -49,6 +105,7 @@ def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> d
     country = (user.country or None)
     business_role = None
     rating = None
+    reviews_count = 0
     verified = bool(user.verified_badge)
     keywords: list[str] = []
     countries_count = 0
@@ -63,6 +120,7 @@ def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> d
             business_role = str(biz.business_role).strip() or None
         if biz.rating is not None:
             rating = float(biz.rating)
+        reviews_count = int(biz.reviews_count or 0)
         if biz.documents_verified:
             verified = True
         if biz.keywords:
@@ -83,6 +141,12 @@ def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> d
         country = str(country).strip().upper() or None
         if country and len(country) == 2:
             countries_count = 1
+
+    trust = _lite_trust(user, biz if is_business else None)
+    risk_level, is_scammer = _lite_risk(
+        user, biz if is_business else None, trust
+    )
+
     return {
         "id": user.id,
         "full_name": company_name or user.full_name,
@@ -97,6 +161,10 @@ def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> d
         "company_name": company_name or user.full_name,
         "business_role": business_role,
         "rating": rating,
+        "reviews_count": reviews_count,
+        "trust": trust,
+        "risk_level": risk_level,
+        "is_scammer": is_scammer,
         "friends_since": friends_since,
         "keywords": keywords,
         "product_categories": [],

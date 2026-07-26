@@ -21,6 +21,10 @@ class FriendOut(BaseModel):
     company_name: str | None = None
     business_role: str | None = None
     rating: float | None = None
+    reviews_count: int = Field(default=0, ge=0)
+    trust: int | None = Field(default=None, ge=0, le=100)
+    risk_level: str = "none"
+    is_scammer: bool = False
     friends_since: datetime | None = None
     keywords: list[str] = Field(default_factory=list)
     product_categories: list[str] = Field(default_factory=list)

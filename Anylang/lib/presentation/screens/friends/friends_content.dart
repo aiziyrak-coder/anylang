@@ -407,13 +407,22 @@ class FriendsContent extends ScreenContent<FriendsState> {
                   children.add(
                     _sectionHeader(
                       c,
-                      '${'friends_online'.tr.toUpperCase()} — ${onlineVisible.length}',
+                      'friends_section_online'.trParams({
+                        'n': '${onlineVisible.length}',
+                      }),
                     ),
                   );
                   children.addAll(onlineVisible.map((f) => _item(f, sendAction)));
                 }
                 if (others.isNotEmpty) {
-                  children.add(_sectionHeader(c, 'friends_others'.tr.toUpperCase()));
+                  children.add(
+                    _sectionHeader(
+                      c,
+                      'friends_section_all'.trParams({
+                        'n': '${others.length}',
+                      }),
+                    ),
+                  );
                   children.addAll(others.map((f) => _item(f, sendAction)));
                 }
               }
@@ -604,14 +613,13 @@ class FriendsContent extends ScreenContent<FriendsState> {
 
   Widget _sectionHeader(AppColors c, String label) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(11.dp, 12.dp, 11.dp, 6.dp),
+      padding: EdgeInsets.fromLTRB(12.dp, 14.dp, 12.dp, 6.dp),
       child: Text(
         label,
         style: TextStyle(
-          color: c.textFaint,
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
+          color: c.textPrimary,
+          fontSize: 14.sp,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -635,6 +643,10 @@ class FriendsContent extends ScreenContent<FriendsState> {
         keywords: f.keywords,
         isBusiness: f.isBusiness,
         rating: f.rating,
+        reviewsCount: f.reviewsCount,
+        trust: f.trust,
+        riskLevel: f.riskLevel,
+        isScammer: f.isScammer,
         verified: f.verified,
         languages: f.languages,
         productsCount: f.productsCount,
