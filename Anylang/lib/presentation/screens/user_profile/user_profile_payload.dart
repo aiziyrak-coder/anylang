@@ -45,6 +45,8 @@ class UserProfilePayload {
   final int networkingConnections;
   final int networkingCountries;
   final int? networkingTrust;
+  /// true: ekran ochiladi, to‘liq profil API dan kelguncha shimmer.
+  final bool loadFull;
 
   const UserProfilePayload({
     required this.business,
@@ -83,7 +85,34 @@ class UserProfilePayload {
     this.networkingConnections = 0,
     this.networkingCountries = 0,
     this.networkingTrust,
+    this.loadFull = false,
   });
+
+  /// Chat / ro‘yxatdan tez ochish — to‘liq ma’lumot keyin yuklanadi.
+  factory UserProfilePayload.preview({
+    required int id,
+    required String name,
+    String? initial,
+    LinearGradient? avatarGradient,
+    String? avatarUrl,
+    int? existingChatId,
+  }) {
+    final trimmed = name.trim().isEmpty ? 'User' : name.trim();
+    return UserProfilePayload(
+      id: id,
+      business: false,
+      name: trimmed,
+      initial: initial ?? initialsOf(trimmed),
+      avatarGradient: avatarGradient ?? avatarGradientFor(id),
+      flagAsset: '',
+      country: '',
+      role: '',
+      phone: '',
+      avatarUrl: avatarUrl,
+      existingChatId: existingChatId,
+      loadFull: true,
+    );
+  }
 
   factory UserProfilePayload.fromApi(
     Map<String, dynamic> json, {

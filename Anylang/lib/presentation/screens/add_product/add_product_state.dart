@@ -6,7 +6,6 @@ class AddProductState extends GetxController {
   RxString currency = 'USD'.obs;
   RxString category = ''.obs;
   RxList<String> shippingCountries = <String>[].obs;
-  RxList<String> capabilities = <String>[].obs;
   RxBool isSubmitting = false.obs;
   RxnString productVideoUrl = RxnString();
   RxBool videoUploading = false.obs;

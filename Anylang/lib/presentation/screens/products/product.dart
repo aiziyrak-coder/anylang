@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../data/core/mappers.dart';
-import '../../ui/product_capabilities.dart';
 import '../../ui/product_trust_badges.dart';
 
 /// Bitta mahsulot (Bozor).
@@ -29,7 +28,6 @@ class Product {
   final double? rating;
   final int reviewsCount;
   final ProductTrustBadges trustBadges;
-  final List<String> capabilities;
 
   const Product({
     required this.id,
@@ -56,7 +54,6 @@ class Product {
     this.rating,
     this.reviewsCount = 0,
     this.trustBadges = const ProductTrustBadges(),
-    this.capabilities = const [],
   });
 
   factory Product.fromApi(Map<String, dynamic> json) {
@@ -136,7 +133,6 @@ class Product {
       rating: rating,
       reviewsCount: reviewsCount,
       trustBadges: trust,
-      capabilities: parseProductCapabilities(json['capabilities']),
     );
   }
 
@@ -153,7 +149,6 @@ class Product {
     String? topRequestStatus,
     String? topPinnedUntil,
     ProductTrustBadges? trustBadges,
-    List<String>? capabilities,
   }) {
     return Product(
       id: id,
@@ -180,7 +175,6 @@ class Product {
       rating: rating,
       reviewsCount: reviewsCount,
       trustBadges: trustBadges ?? this.trustBadges,
-      capabilities: capabilities ?? this.capabilities,
     );
   }
 }

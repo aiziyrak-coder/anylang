@@ -514,10 +514,10 @@ class ChatMessageItem extends StatelessWidget {
         inviteToken.isNotEmpty &&
         onJoinGroupInvite != null;
     final bodyText = message.displayText.isEmpty ? '—' : message.displayText;
-    final original = message.originalAside;
 
-    // IntrinsicWidth: qisqa matn bubble'ni kontentga qisqartiradi;
-    // tashqi ConstrainedBox maxWidth (~76%) chegara sifatida qoladi.
+    // Default: faqat tarjima (displayText). Asl matn — long-press menyu
+    // orqali showingOriginal (tegilmaydi). IntrinsicWidth: qisqa matn
+    // bubble'ni kontentga qisqartiradi; tashqi maxWidth (~76%) chegara.
     return _bubble(
       c,
       IntrinsicWidth(
@@ -558,46 +558,6 @@ class ChatMessageItem extends StatelessWidget {
               linkColor: _out ? c.onAccent : c.accentText,
               onInviteTap: onJoinGroupInvite,
             ),
-            if (original != null) ...[
-              SizedBox(height: 8.dp),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.only(top: 8.dp),
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      color: (_out ? c.onAccent : c.outline)
-                          .withValues(alpha: 0.28),
-                    ),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'chat_original_label'.tr,
-                      style: TextStyle(
-                        color: _metaColor(c),
-                        fontSize: 10.sp,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    SizedBox(height: 3.dp),
-                    Text(
-                      original,
-                      style: TextStyle(
-                        color: _primaryText(c).withValues(alpha: 0.78),
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w400,
-                        height: 1.3,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             if (showJoin) ...[
               SizedBox(height: 10.dp),
               Material(
@@ -760,6 +720,11 @@ class ChatMessageItem extends StatelessWidget {
     final path = message.voicePath;
     final canPlay = VoicePlayerService.canPlay(path);
     final duration = Duration(milliseconds: message.voiceDurationMs ?? 0);
+    // Shimmer / matn cardni kengaytirsa — waveform + time ham shu kenglikka cho'ziladi.
+    final expandToTranscript = message.transcriptFailed ||
+        (message.transcriptPending && message.displayText.trim().isEmpty) ||
+        message.displayText.trim().isNotEmpty;
+    final transcriptMaxW = SizeController.screenWidth * 0.62;
 
     return _bubble(
       c,
@@ -767,203 +732,209 @@ class ChatMessageItem extends StatelessWidget {
         final active = player.activeId.value == message.id;
         final playing = active && player.isPlaying.value;
 
-        Widget wave(double p) => WaveformBars(
+        Widget wave(double p, int barCount) => WaveformBars(
               color: waveColor,
               inactiveColor: inactive,
               maxHeight: 20,
-              barCount: 22,
+              barCount: barCount,
               samples: message.voiceSamples,
               progress: p,
             );
 
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (message.reply != null) _replyQuote(c, message.reply!),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    if (!canPlay || path == null) return;
-                    HapticFeedback.selectionClick();
-                    player.toggle(
-                      id: message.id,
-                      path: path,
-                      duration: duration.inMilliseconds > 0
-                          ? duration
-                          : const Duration(seconds: 1),
-                      samples: message.voiceSamples,
-                      barCount: 22,
-                    );
-                  },
-                  child: Container(
-                    width: 40.dp,
-                    height: 40.dp,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _out ? c.onAccent.withValues(alpha: 0.18) : c.accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      !canPlay
-                          ? Icons.file_download_outlined
-                          : (playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                      size: 20.dp,
-                      color: c.onAccent,
+        Widget waveMeta({required bool expand}) {
+          final waveChild = LayoutBuilder(
+            builder: (context, constraints) {
+              final avail = constraints.maxWidth;
+              final barW = 2.5.dp;
+              final gap = 3.dp;
+              final barCount = expand
+                  ? ((avail + gap) / (barW + gap)).floor().clamp(18, 56)
+                  : 22;
+
+              void seek(Offset local) {
+                if (!canPlay || path == null) return;
+                final frac =
+                    (local.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                player.seek(
+                  id: message.id,
+                  path: path,
+                  duration: duration.inMilliseconds > 0
+                      ? duration
+                      : const Duration(seconds: 1),
+                  frac: frac,
+                  samples: message.voiceSamples,
+                  barCount: barCount,
+                );
+              }
+
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (d) => seek(d.localPosition),
+                onHorizontalDragUpdate: (d) => seek(d.localPosition),
+                child: active
+                    ? ValueListenableBuilder<double>(
+                        valueListenable: player.progress,
+                        builder: (_, p, _) => wave(p, barCount),
+                      )
+                    : wave(player.restingProgress(message.id), barCount),
+              );
+            },
+          );
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: expand ? null : 150.dp,
+                height: 20.dp,
+                child: waveChild,
+              ),
+              SizedBox(height: 6.dp),
+              Row(
+                children: [
+                  Text(
+                    message.voiceDuration ?? '',
+                    style: TextStyle(
+                      color: _out ? c.onAccent : c.textSecondary,
+                      fontSize: 11.sp,
                     ),
                   ),
-                ),
-                SizedBox(width: 10.dp),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 150.dp,
-                      height: 20.dp,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          void seek(Offset local) {
-                            if (!canPlay || path == null) return;
-                            final frac =
-                                (local.dx / constraints.maxWidth).clamp(0.0, 1.0);
-                            player.seek(
-                              id: message.id,
-                              path: path,
-                              duration: duration.inMilliseconds > 0
-                                  ? duration
-                                  : const Duration(seconds: 1),
-                              frac: frac,
-                              samples: message.voiceSamples,
-                              barCount: 22,
-                            );
-                          }
+                  const Spacer(),
+                  _meta(c),
+                ],
+              ),
+            ],
+          );
+        }
 
-                          return GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTapDown: (d) => seek(d.localPosition),
-                            onHorizontalDragUpdate: (d) => seek(d.localPosition),
-                            child: active
-                                ? ValueListenableBuilder<double>(
-                                    valueListenable: player.progress,
-                                    builder: (_, p, _) => wave(p),
-                                  )
-                                : wave(player.restingProgress(message.id)),
-                          );
-                        },
-                      ),
-                    ),
-                    SizedBox(height: 6.dp),
-                    SizedBox(
-                      width: 150.dp,
-                      child: Row(
-                        children: [
-                          Text(
-                            message.voiceDuration ?? '',
-                            style: TextStyle(
-                              color: _out ? c.onAccent : c.textSecondary,
-                              fontSize: 11.sp,
-                            ),
-                          ),
-                          const Spacer(),
-                          _meta(c),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+        final playBtn = GestureDetector(
+          onTap: () {
+            if (!canPlay || path == null) return;
+            HapticFeedback.selectionClick();
+            player.toggle(
+              id: message.id,
+              path: path,
+              duration: duration.inMilliseconds > 0
+                  ? duration
+                  : const Duration(seconds: 1),
+              samples: message.voiceSamples,
+              barCount: expandToTranscript ? 36 : 22,
+            );
+          },
+          child: Container(
+            width: 40.dp,
+            height: 40.dp,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _out ? c.onAccent.withValues(alpha: 0.18) : c.accent,
+              shape: BoxShape.circle,
             ),
+            child: Icon(
+              !canPlay
+                  ? Icons.file_download_outlined
+                  : (playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+              size: 20.dp,
+              color: c.onAccent,
+            ),
+          ),
+        );
+
+        final voiceRow = Row(
+          mainAxisSize: expandToTranscript ? MainAxisSize.max : MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            playBtn,
+            SizedBox(width: 10.dp),
+            if (expandToTranscript)
+              Expanded(child: waveMeta(expand: true))
+            else
+              SizedBox(width: 150.dp, child: waveMeta(expand: false)),
+          ],
+        );
+
+        Widget column = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: expandToTranscript
+              ? CrossAxisAlignment.stretch
+              : CrossAxisAlignment.start,
+          children: [
+            if (message.reply != null) _replyQuote(c, message.reply!),
+            voiceRow,
             if (message.transcriptFailed) ...[
               SizedBox(height: 8.dp),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: SizeController.screenWidth * 0.62,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.translate_rounded,
-                      size: 16.dp,
-                      color: _metaColor(c),
-                    ),
-                    SizedBox(width: 6.dp),
-                    Expanded(
-                      child: Text(
-                        'voice_transcript_failed'.tr,
-                        style: TextStyle(
-                          color: _metaColor(c),
-                          fontSize: 12.5.sp,
-                          fontStyle: FontStyle.italic,
-                          height: 1.3,
-                        ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.translate_rounded,
+                    size: 16.dp,
+                    color: _metaColor(c),
+                  ),
+                  SizedBox(width: 6.dp),
+                  Expanded(
+                    child: Text(
+                      'voice_transcript_failed'.tr,
+                      style: TextStyle(
+                        color: _metaColor(c),
+                        fontSize: 12.5.sp,
+                        fontStyle: FontStyle.italic,
+                        height: 1.3,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ] else if (message.transcriptPending &&
                 message.displayText.trim().isEmpty) ...[
               SizedBox(height: 8.dp),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: SizeController.screenWidth * 0.62,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.translate_rounded,
-                          size: 16.dp,
-                          color: _metaColor(c),
-                        ),
-                        SizedBox(width: 6.dp),
-                        Expanded(
-                          child: Text(
-                            'voice_transcribing'.tr,
-                            style: TextStyle(
-                              color: _metaColor(c),
-                              fontSize: 11.5.sp,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                      ],
+              Row(
+                children: [
+                  Icon(
+                    Icons.translate_rounded,
+                    size: 16.dp,
+                    color: _metaColor(c),
+                  ),
+                  SizedBox(width: 6.dp),
+                  Expanded(
+                    child: Text(
+                      'voice_transcribing'.tr,
+                      style: TextStyle(
+                        color: _metaColor(c),
+                        fontSize: 11.5.sp,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
-                    SizedBox(height: 6.dp),
-                    TranscriptShimmer(
-                      color: _out
-                          ? c.onAccent.withValues(alpha: 0.35)
-                          : c.textFaint.withValues(alpha: 0.35),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 6.dp),
+              TranscriptShimmer(
+                color: _out
+                    ? c.onAccent.withValues(alpha: 0.35)
+                    : c.textFaint.withValues(alpha: 0.35),
               ),
             ] else if (message.displayText.trim().isNotEmpty) ...[
               SizedBox(height: 8.dp),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: SizeController.screenWidth * 0.62,
-                ),
-                child: Text(
-                  message.displayText,
-                  style: TextStyle(
-                    color: _primaryText(c),
-                    fontSize: 14.sp,
-                    fontWeight: _out ? FontWeight.w600 : FontWeight.w400,
-                    height: 1.3,
-                  ),
+              Text(
+                message.displayText,
+                style: TextStyle(
+                  color: _primaryText(c),
+                  fontSize: 14.sp,
+                  fontWeight: _out ? FontWeight.w600 : FontWeight.w400,
+                  height: 1.3,
                 ),
               ),
             ],
           ],
         );
+
+        // Transcript/shimmer kengligiga voice qatorini bog'lash (Expanded ishlashi uchun).
+        if (expandToTranscript) {
+          column = SizedBox(width: transcriptMaxW, child: column);
+        }
+
+        return column;
       }),
     );
   }

@@ -10,7 +10,6 @@ import '../../ui/buttons/secondary_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/items/media_tile.dart';
 import '../../ui/items/removable_chip.dart';
-import '../../ui/product_capabilities.dart';
 import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
@@ -209,40 +208,6 @@ class AddProductContent extends ScreenContent<AddProductState> {
                     ),
                     SizedBox(height: 20.dp),
                     Text(
-                      'product_capabilities_title'.tr,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 6.dp),
-                    Text(
-                      'product_capabilities_hint'.tr,
-                      style: TextStyle(
-                        color: c.textSecondary,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: 10.dp),
-                    Obx(() {
-                      return Wrap(
-                        spacing: 8.dp,
-                        runSpacing: 8.dp,
-                        children: [
-                          for (final code in kProductCapabilityCodes)
-                            _CapabilityChip(
-                              label: productCapabilityLabel(code),
-                              selected: state.capabilities.contains(code),
-                              onTap: () =>
-                                  sendAction(ToggleProductCapability(code)),
-                            ),
-                        ],
-                      );
-                    }),
-                    SizedBox(height: 20.dp),
-                    Text(
                       'add_product_trade_section'.tr,
                       style: TextStyle(color: c.textPrimary, fontSize: 14.sp, fontWeight: FontWeight.w700),
                     ),
@@ -268,15 +233,15 @@ class AddProductContent extends ScreenContent<AddProductState> {
                           spacing: 10.dp,
                           runSpacing: 10.dp,
                           children: [
+                            RemovableChip.add(
+                              label: 'business_add_export_country'.tr,
+                              onTap: () => sendAction(AddShippingCountryRequested()),
+                            ),
                             for (final code in state.shippingCountries)
                               RemovableChip(
                                 label: formatCountryName(code),
                                 onRemove: () => sendAction(RemoveShippingCountry(code)),
                               ),
-                            RemovableChip.add(
-                              label: 'business_add_export_country'.tr,
-                              onTap: () => sendAction(AddShippingCountryRequested()),
-                            ),
                           ],
                         )),
                     SizedBox(height: 20.dp),
@@ -487,59 +452,5 @@ class AddProductContent extends ScreenContent<AddProductState> {
     if (picked == null) return;
     final idx = labels.indexOf(picked);
     if (idx >= 0) sendAction(SelectCategory(kProductCategoryKeys[idx]));
-  }
-}
-
-class _CapabilityChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _CapabilityChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    final radius = BorderRadius.circular(99.dp);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: Ink(
-          padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 8.dp),
-          decoration: BoxDecoration(
-            color: selected ? c.accentSoft : c.surface,
-            borderRadius: radius,
-            border: Border.all(color: selected ? c.accent : c.outline),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.circle_outlined,
-                size: 16.dp,
-                color: selected ? kOnline : c.textFaint,
-              ),
-              SizedBox(width: 6.dp),
-              Text(
-                label,
-                style: TextStyle(
-                  color: c.textPrimary,
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

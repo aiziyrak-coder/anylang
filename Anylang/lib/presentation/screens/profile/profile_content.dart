@@ -903,50 +903,15 @@ class ProfileContent extends ScreenContent<ProfileState> {
   }
 
   Widget _settingsHub(AppColors c, void Function(MyAction) sendAction) {
-    final tiles = <(IconData, String, String, MyAction)>[
-      (
-        Icons.language_rounded,
-        'profile_settings_language'.tr,
-        'settings_app_desc'.tr,
-        OpenSettingsLanguage(),
-      ),
-      (
-        Icons.palette_outlined,
-        'profile_settings_theme'.tr,
-        'settings_theme'.tr,
-        OpenSettingsTheme(),
-      ),
-      (
-        Icons.notifications_outlined,
-        'profile_settings_notifications'.tr,
-        'settings_notifications'.tr,
-        OpenSettingsNotifications(),
-      ),
-      (
-        Icons.lock_outline_rounded,
-        'profile_settings_privacy'.tr,
-        'settings_privacy'.tr,
-        OpenSettingsPrivacy(),
-      ),
-      (
-        Icons.shield_outlined,
-        'profile_settings_security'.tr,
-        'settings_change_password'.tr,
-        OpenSettingsSecurity(),
-      ),
-      (
-        Icons.translate_rounded,
-        'profile_settings_translation'.tr,
-        'settings_smart_translation'.tr,
-        OpenSettingsTranslation(),
-      ),
-      (
-        Icons.smart_toy_outlined,
-        'profile_settings_ai'.tr,
-        'profile_sofiya_desc'.tr,
-        OpenSettingsAiAssistant(),
-      ),
-    ];
+    final subtitle = [
+      'profile_settings_language'.tr,
+      'profile_settings_theme'.tr,
+      'profile_settings_notifications'.tr,
+      'profile_settings_privacy'.tr,
+      'profile_settings_security'.tr,
+      'profile_settings_translation'.tr,
+      'profile_settings_ai'.tr,
+    ].join(', ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -961,16 +926,13 @@ class ProfileContent extends ScreenContent<ProfileState> {
           ),
         ),
         SizedBox(height: 10.dp),
-        for (var i = 0; i < tiles.length; i++) ...[
-          if (i > 0) SizedBox(height: 10.dp),
-          _settingsTile(
-            c,
-            icon: tiles[i].$1,
-            title: tiles[i].$2,
-            subtitle: tiles[i].$3,
-            onTap: () => sendAction(tiles[i].$4),
-          ),
-        ],
+        _settingsTile(
+          c,
+          icon: Icons.settings_outlined,
+          title: 'profile_settings_hub'.tr,
+          subtitle: subtitle,
+          onTap: () => sendAction(OpenSettings()),
+        ),
       ],
     );
   }

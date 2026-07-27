@@ -223,7 +223,8 @@ class ChatMessage {
     return '';
   }
 
-  /// Asl matn (tarjima ostida ko‘rsatiladi).
+  /// Asl matn (ixtiyoriy yon ko‘rinish). Bubble default faqat [displayText];
+  /// asl — menyu orqali [showingOriginal].
   String? get originalAside {
     if (showingOriginal) return null;
     if (!hasDualLanguage) return null;

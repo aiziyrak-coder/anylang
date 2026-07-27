@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../product_video_badge.dart';
-import '../product_capabilities_view.dart';
 import '../product_trust_badges.dart';
 import '../product_trust_badges_view.dart';
 import '../theme/colors.dart';
@@ -19,7 +18,6 @@ class ProductGridCard extends StatelessWidget {
   final String? imageUrl;
   final bool hasVideo;
   final ProductTrustBadges trustBadges;
-  final List<String> capabilities;
   final VoidCallback onTap;
   final VoidCallback? onVideoTap;
 
@@ -35,7 +33,6 @@ class ProductGridCard extends StatelessWidget {
     this.imageUrl,
     this.hasVideo = false,
     this.trustBadges = const ProductTrustBadges(),
-    this.capabilities = const [],
     this.onVideoTap,
   });
 
@@ -123,13 +120,7 @@ class ProductGridCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (capabilities.isNotEmpty) ...[
-                    SizedBox(height: 6.dp),
-                    ProductCapabilitiesView(
-                      codes: capabilities.take(2).toList(),
-                      compact: true,
-                    ),
-                  ] else if (subtitle != null) ...[
+                  if (subtitle != null) ...[
                     SizedBox(height: 2.dp),
                     Text(
                       subtitle!,

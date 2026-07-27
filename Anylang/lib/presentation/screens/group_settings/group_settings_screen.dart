@@ -6,17 +6,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/core/mappers.dart';
 import '../../../data/network/chat_repository.dart';
-import '../../../data/network/friends_repository.dart';
 import '../../../data/network/payment_repository.dart';
+import '../../modal/add_group_members_bottom_sheet.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/telegram_action_sheet.dart';
-import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
-import '../../utils/size_controller.dart';
-import '../friends/friend.dart';
+import '../messages/conversation.dart';
 import '../group_catalog/group_catalog_payload.dart';
 import '../group_catalog/group_catalog_screen.dart';
 import '../group_stats/group_stats_payload.dart';
@@ -274,40 +272,48 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
 
   Future<void> _addMembers() async {
     final existing = state.members.map((m) => m.userId).toSet();
-    final friendsResult =
-        await Get.find<FriendsRepository>().listFriends(limit: 100);
-    final friends = <Friend>[];
-    var friendsLoadFailed = false;
-    friendsResult.when(
+    final chatsResult = await Get.find<ChatRepository>().listChats(
+      limit: 100,
+      type: 'direct',
+    );
+    final candidates = <GroupMemberCandidate>[];
+    var loadFailed = false;
+    chatsResult.when(
       success: (data) {
-        friends.addAll(
-          asList(data)
-              .whereType<Map>()
-              .map((e) => Friend.fromApi(Map<String, dynamic>.from(e)))
-              .where((f) => !existing.contains(f.id)),
-        );
+        final list = asList(data);
+        for (final raw in list) {
+          if (raw is! Map) continue;
+          final conv = Conversation.fromApi(Map<String, dynamic>.from(raw));
+          if (conv.isGroup || conv.isMarketplace || conv.peerId <= 0) {
+            continue;
+          }
+          candidates.add(
+            GroupMemberCandidate.fromConversation(
+              conv,
+              alreadyInGroup: existing.contains(conv.peerId),
+            ),
+          );
+        }
       },
       failure: (_) {
-        friendsLoadFailed = true;
+        loadFailed = true;
       },
     );
-    if (friendsLoadFailed) {
+    if (loadFailed) {
       showAppError(AuthValidators.safeError(
-        friendsResult.errorOrNull,
-        fallbackKey: 'group_settings_friends_load_failed',
+        chatsResult.errorOrNull,
+        fallbackKey: 'group_settings_chats_load_failed',
       ));
       return;
     }
-    if (friends.isEmpty) {
-      showAppMessage('group_settings_no_friends_to_add'.tr);
+    if (candidates.every((c) => c.alreadyInGroup)) {
+      showAppMessage('group_settings_no_contacts_to_add'.tr);
       return;
     }
     if (!context.mounted) return;
-    final selected = await showModalBottomSheet<Set<int>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _AddMembersSheet(friends: friends),
+    final selected = await showAddGroupMembersBottomSheet(
+      context,
+      candidates: candidates,
     );
     if (selected == null || selected.isEmpty) return;
     final result = await Get.find<ChatRepository>().addMembers(
@@ -389,81 +395,5 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
       ],
     );
     return choice == 'ok';
-  }
-}
-
-class _AddMembersSheet extends StatefulWidget {
-  final List<Friend> friends;
-  const _AddMembersSheet({required this.friends});
-
-  @override
-  State<_AddMembersSheet> createState() => _AddMembersSheetState();
-}
-
-class _AddMembersSheetState extends State<_AddMembersSheet> {
-  final _selected = <int>{};
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.75,
-      ),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.dp)),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(16.dp, 16.dp, 16.dp, 8.dp),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'group_settings_add_members'.tr,
-                    style: TextStyle(
-                      fontSize: 17.sp,
-                      fontWeight: FontWeight.w800,
-                      color: c.textPrimary,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: _selected.isEmpty
-                      ? null
-                      : () => Navigator.pop(context, _selected),
-                  child: Text('common_add'.tr),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: widget.friends.length,
-              itemBuilder: (_, i) {
-                final f = widget.friends[i];
-                final on = _selected.contains(f.id);
-                return CheckboxListTile(
-                  value: on,
-                  onChanged: (v) {
-                    setState(() {
-                      if (v == true) {
-                        _selected.add(f.id);
-                      } else {
-                        _selected.remove(f.id);
-                      }
-                    });
-                  },
-                  title: Text(f.name),
-                  controlAffinity: ListTileControlAffinity.trailing,
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

@@ -11,7 +11,6 @@ import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/chat_smart_pins_bar.dart';
 import '../../ui/connection_status_banner.dart';
-import '../../ui/group_catalog_bar.dart';
 import '../../ui/chat_wallpaper_background.dart';
 import '../../ui/items/chat_message_item.dart';
 import '../../ui/theme/colors.dart';
@@ -319,16 +318,6 @@ class ChatContent extends ScreenContent<ChatState> {
                   child: Column(
                     children: [
                       const ConnectionStatusBanner(),
-                      Obx(() {
-                        if (!state.isGroup.value) {
-                          return const SizedBox.shrink();
-                        }
-                        return GroupCatalogBar(
-                          onOpenSection: (section) => sendAction(
-                            OpenGroupCatalog(section: section),
-                          ),
-                        );
-                      }),
                       Obx(() {
                         final pins = state.pinnedMessages.toList();
                         if (pins.isEmpty) {

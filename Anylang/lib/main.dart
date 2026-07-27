@@ -12,6 +12,7 @@ import 'data/core/buildNetwork/api_config.dart';
 import 'data/core/buildNetwork/api_service.dart';
 import 'data/core/buildNetwork/token_refresher.dart';
 import 'data/local/offline_chat_store.dart';
+import 'data/local/public_profile_cache.dart';
 import 'data/local/session_store.dart';
 import 'data/network/offline_outbox_service.dart';
 import 'data/network/session_bootstrap.dart';
@@ -41,6 +42,7 @@ void main() async {
   await Hive.initFlutter();
   await Hive.openBox('user');
   await OfflineChatStore.open();
+  await PublicProfileCache.open();
   await SessionStore.init();
   await MainModule().initModule();
   runApp(const MyApp());

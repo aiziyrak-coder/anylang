@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/public_profile_cache.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
@@ -35,8 +36,95 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
     }
     state.data = payload;
     state.syncFriendshipFromPayload(payload);
+    state.profileRefreshing.value = false;
+    state.profileLoading.value = false;
+
+    Future.microtask(() => _bootstrap(payload));
+  }
+
+  Future<void> _bootstrap(UserProfilePayload payload) async {
+    final id = payload.id;
+    final existing = payload.existingChatId;
+    final other = id > 0 &&
+        (SessionStore.userId() == null || id != SessionStore.userId());
+
+    if (other) {
+      final cached = PublicProfileCache.get(id);
+      if (cached != null) {
+        final fromCache = UserProfilePayload.fromApi(
+          cached,
+          existingChatId: existing,
+        );
+        state.data = fromCache;
+        state.syncFriendshipFromPayload(fromCache);
+        state.profileLoading.value = false;
+        _loadListings();
+        // Cache bor — yuqorida “yangilanmoqda” badge bilan soft refresh.
+        await _refreshFromNetwork(
+          id: id,
+          existingChatId: existing,
+          showRefreshingBadge: true,
+          silentFailure: true,
+        );
+        return;
+      }
+    }
+
+    if (payload.loadFull) {
+      state.profileLoading.value = true;
+      await _refreshFromNetwork(
+        id: id,
+        existingChatId: existing,
+        showRefreshingBadge: false,
+        silentFailure: false,
+      );
+      state.profileLoading.value = false;
+      return;
+    }
+
+    // To‘liq payload bilan ochilgan (API dan kelgan) — listings + boshqa user uchun soft refresh.
     _loadListings();
-    _refreshFriendship();
+    if (other) {
+      await _refreshFromNetwork(
+        id: id,
+        existingChatId: existing,
+        showRefreshingBadge: true,
+        silentFailure: true,
+      );
+    }
+  }
+
+  Future<void> _refreshFromNetwork({
+    required int id,
+    required int? existingChatId,
+    required bool showRefreshingBadge,
+    required bool silentFailure,
+  }) async {
+    if (id <= 0) return;
+    final me = SessionStore.userId();
+    if (me != null && id == me) return;
+
+    if (showRefreshingBadge) {
+      state.profileRefreshing.value = true;
+    }
+    try {
+      final result = await Get.find<ProfileRepository>().getPublicUser(id);
+      final map = asMap(result.dataOrNull);
+      if (map != null) {
+        await PublicProfileCache.put(id, map);
+        final updated = UserProfilePayload.fromApi(
+          map,
+          existingChatId: existingChatId,
+        );
+        state.data = updated;
+        state.syncFriendshipFromPayload(updated);
+        _loadListings();
+      } else if (!silentFailure && result.errorOrNull != null) {
+        showAppError(result.errorOrNull);
+      }
+    } finally {
+      state.profileRefreshing.value = false;
+    }
   }
 
   Future<void> _loadListings() async {
@@ -62,29 +150,6 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
     }
   }
 
-  Future<void> _refreshFriendship() async {
-    final id = state.data?.id ?? 0;
-    if (id <= 0) return;
-    if (id == SessionStore.userId()) return;
-    final result = await Get.find<ProfileRepository>().getPublicUser(id);
-    result.when(
-      success: (raw) {
-        final map = asMap(raw);
-        if (map == null) return;
-        final existing = state.data?.existingChatId;
-        final updated = UserProfilePayload.fromApi(
-          map,
-          existingChatId: existing,
-        );
-        state.data = updated;
-        state.syncFriendshipFromPayload(updated);
-      },
-      failure: (_) {
-        showAppWarning('profile_friendship_refresh_failed'.tr);
-      },
-    );
-  }
-
   @override
   Future<void> actionHandler(UserProfileState state, MyAction action) async {
     switch (action) {
@@ -97,7 +162,6 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
           showAppWarning('chat_blocked'.tr);
           return;
         }
-        // Chat ichidan profil ochilgan — mavjud chatga orqaga (yangi screen yo'q).
         final existingId = data.existingChatId;
         if (existingId != null && existingId > 0) {
           popBackNavigate();
@@ -148,10 +212,18 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
         final uri = Uri.tryParse(url.startsWith('http') ? url : 'https://$url');
         if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
       case OpenListing a:
+        final data = state.data;
         showProductInfoBottomSheet(
           context,
           a.product,
           onOpenBusiness: () {},
+          existingPeerId: data?.id,
+          existingPeerChatId: data?.existingChatId,
+          onReturnToExistingChat: () {
+            if ((data?.existingChatId ?? 0) > 0) {
+              popBackNavigate();
+            }
+          },
         );
     }
   }
@@ -169,7 +241,6 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
       return;
     }
     state.friendBusy.value = true;
-    // Optimistic — add_friend ekrani bilan bir xil.
     state.friendshipStatus.value = 'pending';
     state.isRequestIncoming.value = false;
     final result = await Get.find<FriendsRepository>().sendRequest(data.id);
@@ -212,7 +283,7 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
     if (requestId == null) {
       state.friendshipStatus.value = 'none';
       state.isRequestIncoming.value = false;
-      await _refreshFriendship();
+      await _softRefreshFriendship();
       return;
     }
     state.friendBusy.value = true;
@@ -232,7 +303,7 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
     if (state.friendBusy.value) return;
     final requestId = state.friendshipRequestId.value;
     if (requestId == null) {
-      await _refreshFriendship();
+      await _softRefreshFriendship();
       return;
     }
     state.friendBusy.value = true;
@@ -246,5 +317,16 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
       failure: showAppError,
     );
     state.friendBusy.value = false;
+  }
+
+  Future<void> _softRefreshFriendship() async {
+    final id = state.data?.id ?? 0;
+    if (id <= 0) return;
+    await _refreshFromNetwork(
+      id: id,
+      existingChatId: state.data?.existingChatId,
+      showRefreshingBadge: true,
+      silentFailure: true,
+    );
   }
 }

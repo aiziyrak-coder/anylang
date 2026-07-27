@@ -46,7 +46,6 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
   void initState(AddProductPayload? payload) {
     state.images.clear();
     state.shippingCountries.clear();
-    state.capabilities.clear();
     state.productVideoUrl.value = null;
     state.videoUploading.value = false;
     state.category.value = kProductCategoryKeys.first;
@@ -95,12 +94,6 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
               .toList()
           : const <String>[],
     );
-    final caps = map['capabilities'];
-    if (caps is List) {
-      state.capabilities.assignAll(
-        caps.map((e) => e.toString()).where((e) => e.isNotEmpty),
-      );
-    }
     final images = <ProductImageDraft>[];
     final rawImages = map['images'];
     if (rawImages is List) {
@@ -203,12 +196,6 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
         }
       case ClearProductVideoRequested _:
         state.productVideoUrl.value = null;
-      case ToggleProductCapability a:
-        if (state.capabilities.contains(a.code)) {
-          state.capabilities.remove(a.code);
-        } else if (state.capabilities.length < 8) {
-          state.capabilities.add(a.code);
-        }
       case SaveDraftRequested a:
         await _submit(
           state,
@@ -335,7 +322,8 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
         if (imageIds.isNotEmpty) 'primary_image_id': imageIds.first,
         'status': status,
         'shipping_countries': state.shippingCountries.toList(),
-        'capabilities': state.capabilities.toList(),
+        // Imkoniyatlar olib tashlandi — eski qiymatlarni tozalash.
+        'capabilities': <String>[],
       };
       if (moq.isNotEmpty) body['moq'] = moq;
       if (shippingInfo.isNotEmpty) body['shipping_info'] = shippingInfo;

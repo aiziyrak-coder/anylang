@@ -392,7 +392,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
                                   imageUrl: p.imageUrl,
                                   hasVideo: (p.videoUrl ?? '').isNotEmpty,
                                   trustBadges: p.trustBadges,
-                                  capabilities: p.capabilities,
                                   onTap: () => sendAction(OpenProduct(p)),
                                   onVideoTap: (p.videoUrl ?? '').isEmpty
                                       ? null

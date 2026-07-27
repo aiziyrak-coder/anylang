@@ -34,122 +34,254 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
   @override
   Widget build(BuildContext context, UserProfileState state, FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
-    final d = state.data;
 
     return GradientBackground(
       child: SafeArea(
-        child: d == null
-            ? const SizedBox.shrink()
-            : Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(16.dp, 4.dp, 16.dp, 0),
-                    child: AppTopBar(title: 'profile_title'.tr, onBack: () => sendAction(Back())),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
-                      child: Column(
-                        children: [
-                          _avatar(c, d),
-                          SizedBox(height: 14.dp),
-                          _nameRow(c, d),
-                          SizedBox(height: 6.dp),
-                          _subtitle(c, d),
-                          if (d.networkingConnections > 0 ||
-                              d.networkingCountries > 0 ||
-                              d.networkingTrust != null) ...[
-                            SizedBox(height: 12.dp),
-                            NetworkingScoreBar(
-                              connections: d.networkingConnections,
-                              countries: d.networkingCountries,
-                              trust: d.networkingTrust ?? d.trustScore?.score,
-                            ),
-                          ],
-                          if (d.business) ...[
-                            SizedBox(height: 12.dp),
-                            Wrap(
-                              alignment: WrapAlignment.center,
-                              spacing: 8.dp,
-                              runSpacing: 8.dp,
-                              children: [
-                                _businessBadge(c),
-                                if (!d.factoryVerification.factoryVerified &&
-                                    d.verified)
-                                  PillBadge(
-                                    label: 'profile_verified'.tr,
-                                    icon: Icons.verified_rounded,
-                                    background: c.accent,
-                                    foreground: c.onAccent,
-                                    fontSize: 12,
-                                  ),
-                                if (d.trustScore != null)
-                                  TrustScoreBadge(
-                                    trust: d.trustScore!,
-                                    onTap: () => showTrustScoreBottomSheet(
-                                      context,
-                                      trust: d.trustScore!,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            if (d.factoryVerification.hasAny) ...[
-                              SizedBox(height: 10.dp),
-                              FactoryVerificationBadges(data: d.factoryVerification),
-                            ],
-                            if (d.scamRisk?.hasWarning == true) ...[
-                              SizedBox(height: 12.dp),
-                              ScamRiskBanner(
-                                risk: d.scamRisk!,
-                                onTap: () => showScamRiskBottomSheet(
-                                  context,
-                                  risk: d.scamRisk!,
+        child: Obx(() {
+          final d = state.dataRx.value;
+          final loading = state.profileLoading.value;
+          if (d == null) return const SizedBox.shrink();
+          return Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(16.dp, 4.dp, 16.dp, 0),
+                child: AppTopBar(
+                  title: 'profile_title'.tr,
+                  onBack: () => sendAction(Back()),
+                  trailing: state.profileRefreshing.value
+                      ? _refreshingBadge(c)
+                      : null,
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
+                  child: Column(
+                    children: [
+                      _avatar(c, d),
+                      SizedBox(height: 14.dp),
+                      _nameRow(c, d),
+                      if (loading) ...[
+                        SizedBox(height: 18.dp),
+                        _profileShimmer(c),
+                      ] else ...[
+                        SizedBox(height: 6.dp),
+                        _subtitle(c, d),
+                        if (d.networkingConnections > 0 ||
+                            d.networkingCountries > 0 ||
+                            d.networkingTrust != null) ...[
+                          SizedBox(height: 12.dp),
+                          NetworkingScoreBar(
+                            connections: d.networkingConnections,
+                            countries: d.networkingCountries,
+                            trust: d.networkingTrust ?? d.trustScore?.score,
+                          ),
+                        ],
+                        if (d.business) ...[
+                          SizedBox(height: 12.dp),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8.dp,
+                            runSpacing: 8.dp,
+                            children: [
+                              _businessBadge(c),
+                              if (!d.factoryVerification.factoryVerified &&
+                                  d.verified)
+                                PillBadge(
+                                  label: 'profile_verified'.tr,
+                                  icon: Icons.verified_rounded,
+                                  background: c.accent,
+                                  foreground: c.onAccent,
+                                  fontSize: 12,
                                 ),
-                              ),
+                              if (d.trustScore != null)
+                                TrustScoreBadge(
+                                  trust: d.trustScore!,
+                                  onTap: () => showTrustScoreBottomSheet(
+                                    context,
+                                    trust: d.trustScore!,
+                                  ),
+                                ),
                             ],
-                          ],
-                          SizedBox(height: 18.dp),
-                          _actions(c, state, d, sendAction),
-                          SizedBox(height: 18.dp),
-                          _infoCard(c, d, sendAction),
-                          if (d.business && _hasAbout(d)) ...[
-                            SizedBox(height: 18.dp),
-                            _sectionTitle(c, 'business_about_section'.tr),
+                          ),
+                          if (d.factoryVerification.hasAny) ...[
                             SizedBox(height: 10.dp),
-                            _aboutCard(c, d),
+                            FactoryVerificationBadges(data: d.factoryVerification),
                           ],
-                          if (d.business) ...[
-                            if (_hasTrade(d)) ...[
-                              SizedBox(height: 18.dp),
-                              _sectionTitle(c, 'business_trade_section'.tr),
-                              SizedBox(height: 10.dp),
-                              _tradeCard(c, d),
-                            ],
-                            SizedBox(height: 20.dp),
-                            _completeness(c, d),
-                            if (d.certificates.isNotEmpty) ...[
-                              SizedBox(height: 20.dp),
-                              _sectionTitle(c, 'profile_certificates'.tr),
-                              SizedBox(height: 10.dp),
-                              _certificates(c, d),
-                            ],
-                            if (d.factoryImageUrls.isNotEmpty) ...[
-                              SizedBox(height: 20.dp),
-                              _sectionTitle(c, 'profile_factory_images'.tr),
-                              SizedBox(height: 10.dp),
-                              _factoryImages(context, d),
-                            ],
-                            SizedBox(height: 20.dp),
-                            _sectionTitle(c, '${'profile_listings'.tr} · ${d.listings}'),
+                          if (d.scamRisk?.hasWarning == true) ...[
                             SizedBox(height: 12.dp),
-                            _listings(state, sendAction),
+                            ScamRiskBanner(
+                              risk: d.scamRisk!,
+                              onTap: () => showScamRiskBottomSheet(
+                                context,
+                                risk: d.scamRisk!,
+                              ),
+                            ),
                           ],
                         ],
-                      ),
-                    ),
+                        SizedBox(height: 18.dp),
+                        _actions(c, state, d, sendAction),
+                        SizedBox(height: 18.dp),
+                        _infoCard(c, d, sendAction),
+                        if (d.business && _hasAbout(d)) ...[
+                          SizedBox(height: 18.dp),
+                          _sectionTitle(c, 'business_about_section'.tr),
+                          SizedBox(height: 10.dp),
+                          _aboutCard(c, d),
+                        ],
+                        if (d.business && _hasTrade(d)) ...[
+                          SizedBox(height: 18.dp),
+                          _sectionTitle(c, 'business_trade_section'.tr),
+                          SizedBox(height: 10.dp),
+                          _tradeCard(c, d),
+                        ],
+                        if (d.business) ...[
+                          SizedBox(height: 20.dp),
+                          _completeness(c, d),
+                        ],
+                        if (d.business && d.certificates.isNotEmpty) ...[
+                          SizedBox(height: 20.dp),
+                          _sectionTitle(c, 'profile_certificates'.tr),
+                          SizedBox(height: 10.dp),
+                          _certificates(c, d),
+                        ],
+                        if (d.business && d.factoryImageUrls.isNotEmpty) ...[
+                          SizedBox(height: 20.dp),
+                          _sectionTitle(c, 'profile_factory_images'.tr),
+                          SizedBox(height: 10.dp),
+                          _factoryImages(context, d),
+                        ],
+                        if (d.business) ...[
+                          SizedBox(height: 20.dp),
+                          _sectionTitle(
+                            c,
+                            '${'profile_listings'.tr} · ${d.listings}',
+                          ),
+                          SizedBox(height: 12.dp),
+                          _listings(state, sendAction),
+                        ],
+                      ],
+                    ],
                   ),
-                ],
+                ),
               ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _profileShimmer(AppColors c) {
+    final base = c.textFaint.withValues(alpha: 0.22);
+    Widget bar({double width = double.infinity, double height = 12}) {
+      return _ShimmerBlock(
+        color: base,
+        width: width,
+        height: height.dp,
+        radius: 8.dp,
+      );
+    }
+
+    return Column(
+      children: [
+        bar(width: 180.dp, height: 14),
+        SizedBox(height: 16.dp),
+        Row(
+          children: [
+            Expanded(
+              child: _ShimmerBlock(
+                color: base,
+                height: 48.dp,
+                radius: 14.dp,
+              ),
+            ),
+            SizedBox(width: 10.dp),
+            _ShimmerBlock(
+              color: base,
+              width: 48.dp,
+              height: 48.dp,
+              radius: 14.dp,
+            ),
+          ],
+        ),
+        SizedBox(height: 18.dp),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(16.dp),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(16.dp),
+            border: Border.all(color: c.surfaceBorder, width: 0.7),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              bar(width: 120.dp),
+              SizedBox(height: 12.dp),
+              bar(),
+              SizedBox(height: 8.dp),
+              bar(width: 220.dp),
+              SizedBox(height: 8.dp),
+              bar(width: 160.dp),
+            ],
+          ),
+        ),
+        SizedBox(height: 18.dp),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(16.dp),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(16.dp),
+            border: Border.all(color: c.surfaceBorder, width: 0.7),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              bar(width: 100.dp),
+              SizedBox(height: 12.dp),
+              bar(),
+              SizedBox(height: 8.dp),
+              bar(),
+              SizedBox(height: 8.dp),
+              bar(width: 180.dp),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _refreshingBadge(AppColors c) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 6.dp),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: c.surfaceBorder, width: 0.7),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 14.dp,
+            height: 14.dp,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: c.accent,
+            ),
+          ),
+          SizedBox(width: 7.dp),
+          Text(
+            'profile_updating'.tr,
+            style: TextStyle(
+              color: c.textSecondary,
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -715,5 +847,60 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
         },
       );
     });
+  }
+}
+
+class _ShimmerBlock extends StatefulWidget {
+  final Color color;
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _ShimmerBlock({
+    required this.color,
+    required this.height,
+    required this.radius,
+    this.width,
+  });
+
+  @override
+  State<_ShimmerBlock> createState() => _ShimmerBlockState();
+}
+
+class _ShimmerBlockState extends State<_ShimmerBlock>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, _) {
+        final a = 0.45 + _c.value * 0.55;
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: widget.color.withValues(alpha: a),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        );
+      },
+    );
   }
 }

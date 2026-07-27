@@ -1014,38 +1014,62 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _openPeerProfile() async {
+    final backChatId =
+        state.isGroup.value ? null : state.chatId.value;
     await _openUserProfile(
       state.peerId.value,
-      returnToChatId: state.isGroup.value ? null : state.chatId.value,
+      preview: UserProfilePayload.preview(
+        id: state.peerId.value,
+        name: state.peerName.value,
+        initial: state.peerInitial.value,
+        avatarGradient: state.peerAvatar.value,
+        avatarUrl: state.peerAvatarUrl.value,
+        existingChatId: backChatId,
+      ),
     );
   }
 
-  Future<void> _openUserProfile(int userId, {int? returnToChatId}) async {
+  bool _openingProfile = false;
+
+  Future<void> _openUserProfile(
+    int userId, {
+    UserProfilePayload? preview,
+    String? previewName,
+  }) async {
     if (userId <= 0) {
       showAppWarning('chat_profile_unavailable'.tr);
       return;
     }
-    final result = await Get.find<ProfileRepository>().getPublicUser(userId);
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        if (map == null) return;
-        final backChatId = returnToChatId ??
-            (!state.isGroup.value &&
-                    userId == state.peerId.value &&
-                    state.chatId.value > 0
-                ? state.chatId.value
-                : null);
-        navigate(
-          UserProfileScreen(),
-          payload: UserProfilePayload.fromApi(
-            map,
+    if (_openingProfile) return;
+    _openingProfile = true;
+    try {
+      final backChatId = !state.isGroup.value &&
+              userId == state.peerId.value &&
+              state.chatId.value > 0
+          ? state.chatId.value
+          : preview?.existingChatId;
+      final payload = preview ??
+          UserProfilePayload.preview(
+            id: userId,
+            name: previewName ??
+                (userId == state.peerId.value
+                    ? state.peerName.value
+                    : 'User'),
+            initial: userId == state.peerId.value
+                ? state.peerInitial.value
+                : null,
+            avatarGradient: userId == state.peerId.value
+                ? state.peerAvatar.value
+                : null,
+            avatarUrl: userId == state.peerId.value
+                ? state.peerAvatarUrl.value
+                : null,
             existingChatId: backChatId,
-          ),
-        );
-      },
-      failure: showAppError,
-    );
+          );
+      await navigate(UserProfileScreen(), payload: payload);
+    } finally {
+      _openingProfile = false;
+    }
   }
 
   bool _isGroupAdmin() =>
@@ -2513,6 +2537,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     await showProductInfoBottomSheet(
       context,
       product,
+      existingPeerId: state.peerId.value,
+      existingPeerChatId: state.chatId.value,
+      onReturnToExistingChat: () {
+        // Allaqachon shu chatdamiz — faqat sheet yopiladi.
+      },
       onOpenBusiness: () async {
         if (product.sellerId <= 0) return;
         final profile =
@@ -2523,7 +2552,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             if (profileMap == null) return;
             navigate(
               UserProfileScreen(),
-              payload: UserProfilePayload.fromApi(profileMap),
+              payload: UserProfilePayload.fromApi(
+                profileMap,
+                existingChatId: product.sellerId == state.peerId.value
+                    ? state.chatId.value
+                    : null,
+              ),
             );
           },
           failure: showAppError,

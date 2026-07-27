@@ -53,11 +53,18 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
     final c = context.appColors;
 
     return ChatWallpaperBackground(
-      child: Column(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
         children: [
           _appBar(c, sendAction),
           Expanded(
             child: Obx(() {
+              if (state.loadingSession.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
               final items = state.messages.toList();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!_scroll.hasClients) return;
@@ -71,6 +78,10 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
               );
             }),
           ),
+          Obx(() {
+            if (!state.showRatingPrompt.value) return const SizedBox.shrink();
+            return _ratingBar(c, state, sendAction);
+          }),
           Obx(() {
             final err = state.error.value;
             if (err.isEmpty) return const SizedBox.shrink();
@@ -88,6 +99,7 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
           }),
           _composerBar(c, state, sendAction),
         ],
+        ),
       ),
     );
   }
@@ -140,6 +152,15 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
                     ),
                   ],
                 ),
+              ),
+              MyIconButton(
+                onClick: () => sendAction(SupportOpenHistory()),
+                icon: Icons.history_rounded,
+                iconColor: c.accentText,
+                iconSize: 22.dp,
+                backgroundColor: Colors.transparent,
+                borderRadius: 12.dp,
+                padding: EdgeInsets.all(8.dp),
               ),
             ],
           ),
@@ -276,5 +297,102 @@ class SupportChatContent extends ScreenContent<SupportChatState> {
     if (text.isEmpty || state.sending.value) return;
     HapticFeedback.lightImpact();
     sendAction(SupportSend(text));
+  }
+
+  Widget _ratingBar(
+    AppColors c,
+    SupportChatState state,
+    void Function(MyAction) sendAction,
+  ) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.dp, 0, 16.dp, 8.dp),
+      child: Container(
+        padding: EdgeInsets.all(14.dp),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(16.dp),
+          border: Border.all(color: c.surfaceBorder, width: 0.7),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'support_rating_title'.tr,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: 4.dp),
+            Text(
+              'support_rating_subtitle'.tr,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 10.dp),
+            Obx(() {
+              final selected = state.selectedRating.value;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  final star = i + 1;
+                  final on = star <= selected;
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: state.ratingSubmitting.value
+                          ? null
+                          : () => state.selectedRating.value = star,
+                      customBorder: const CircleBorder(),
+                      child: Padding(
+                        padding: EdgeInsets.all(4.dp),
+                        child: Icon(
+                          on ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: on ? c.accent : c.textFaint,
+                          size: 32.dp,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              );
+            }),
+            SizedBox(height: 8.dp),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: state.ratingSubmitting.value
+                        ? null
+                        : () => sendAction(SupportDismissRating()),
+                    child: Text('support_rating_skip'.tr),
+                  ),
+                ),
+                Expanded(
+                  child: Obx(() {
+                    final can = state.selectedRating.value >= 1 &&
+                        !state.ratingSubmitting.value;
+                    return TextButton(
+                      onPressed: can
+                          ? () => sendAction(
+                                SupportSubmitRating(state.selectedRating.value),
+                              )
+                          : null,
+                      child: Text('support_rating_submit'.tr),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

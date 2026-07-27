@@ -4,8 +4,15 @@ import '../products/product.dart';
 import 'user_profile_payload.dart';
 
 class UserProfileState extends GetxController {
-  /// Profil ma'lumoti (Screen.initState'da payload'dan o'rnatiladi).
-  UserProfilePayload? data;
+  /// Profil ma'lumoti — Rx, shimmer → to‘liq yuklashda UI yangilanadi.
+  final Rxn<UserProfilePayload> dataRx = Rxn<UserProfilePayload>();
+
+  UserProfilePayload? get data => dataRx.value;
+  set data(UserProfilePayload? value) => dataRx.value = value;
+
+  final RxBool profileLoading = false.obs;
+  /// Boshqa user: cache ko‘rsatilgan, API yangilanmoqda.
+  final RxBool profileRefreshing = false.obs;
 
   final RxList<Product> listings = <Product>[].obs;
   final RxBool listingsLoading = false.obs;

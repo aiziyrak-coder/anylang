@@ -42,41 +42,46 @@ class TradeAssistantContent extends ScreenContent<TradeAssistantState> {
     final c = context.appColors;
 
     return ChatWallpaperBackground(
-      child: Column(
-        children: [
-          _appBar(c, state, sendAction),
-          Expanded(
-            child: Obx(() {
-              final items = state.messages.toList();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!_scroll.hasClients) return;
-                _scroll.jumpTo(_scroll.position.maxScrollExtent);
-              });
-              return ListView.builder(
-                controller: _scroll,
-                padding: EdgeInsets.fromLTRB(14.dp, 12.dp, 14.dp, 12.dp),
-                itemCount: items.length,
-                itemBuilder: (_, i) => _bubble(c, items[i], sendAction),
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          children: [
+            _appBar(c, state, sendAction),
+            Expanded(
+              child: Obx(() {
+                final items = state.messages.toList();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!_scroll.hasClients) return;
+                  _scroll.jumpTo(_scroll.position.maxScrollExtent);
+                });
+                return ListView.builder(
+                  controller: _scroll,
+                  padding: EdgeInsets.fromLTRB(14.dp, 12.dp, 14.dp, 12.dp),
+                  itemCount: items.length,
+                  itemBuilder: (_, i) => _bubble(c, items[i], sendAction),
+                );
+              }),
+            ),
+            Obx(() {
+              final err = state.error.value;
+              if (err.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: EdgeInsets.fromLTRB(16.dp, 0, 16.dp, 6.dp),
+                child: Text(
+                  err,
+                  style: TextStyle(
+                    color: kListenRed,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               );
             }),
-          ),
-          Obx(() {
-            final err = state.error.value;
-            if (err.isEmpty) return const SizedBox.shrink();
-            return Padding(
-              padding: EdgeInsets.fromLTRB(16.dp, 0, 16.dp, 6.dp),
-              child: Text(
-                err,
-                style: TextStyle(
-                  color: kListenRed,
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            );
-          }),
-          _composerBar(c, state, sendAction),
-        ],
+            _composerBar(c, state, sendAction),
+          ],
+        ),
       ),
     );
   }

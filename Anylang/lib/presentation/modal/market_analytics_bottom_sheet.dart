@@ -123,6 +123,7 @@ class _MarketAnalyticsSheet extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(
                                     _trendIcon(item.trend),
@@ -133,6 +134,8 @@ class _MarketAnalyticsSheet extends StatelessWidget {
                                   Expanded(
                                     child: Text(
                                       formatCountryName(item.country),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: c.textPrimary,
                                         fontSize: 14.sp,
@@ -140,8 +143,13 @@ class _MarketAnalyticsSheet extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  if (item.topic.isNotEmpty)
-                                    Flexible(
+                                  if (item.topic.isNotEmpty) ...[
+                                    SizedBox(width: 8.dp),
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            SizeController.screenWidth * 0.36,
+                                      ),
                                       child: Text(
                                         item.topic,
                                         maxLines: 1,
@@ -154,6 +162,7 @@ class _MarketAnalyticsSheet extends StatelessWidget {
                                         ),
                                       ),
                                     ),
+                                  ],
                                 ],
                               ),
                               SizedBox(height: 10.dp),

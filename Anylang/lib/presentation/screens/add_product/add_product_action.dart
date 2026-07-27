@@ -31,11 +31,6 @@ class PickProductVideoRequested extends AddProductAction {}
 
 class ClearProductVideoRequested extends AddProductAction {}
 
-class ToggleProductCapability extends AddProductAction {
-  final String code;
-  ToggleProductCapability(this.code);
-}
-
 class SaveDraftRequested extends AddProductAction {
   final String name;
   final String price;

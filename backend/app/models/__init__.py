@@ -28,6 +28,7 @@ from app.models.product import (
     ProductTopRequest,
     ProductView,
 )
+from app.models.support import SupportMessage, SupportSession
 from app.models.user import (
     AccountRestoreRequest,
     AdminAuditLog,
@@ -81,4 +82,6 @@ __all__ = [
     "Friendship",
     "LiveSession",
     "LiveTurn",
+    "SupportSession",
+    "SupportMessage",
 ]

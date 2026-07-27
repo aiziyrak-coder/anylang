@@ -17,7 +17,6 @@ import '../../ui/factory_verification.dart';
 import '../../ui/factory_verification_badges.dart';
 import '../../ui/items/info_row.dart';
 import '../../ui/items/product_company_card.dart';
-import '../../ui/product_capabilities_view.dart';
 import '../../ui/product_trust_badges.dart';
 import '../../ui/product_trust_badges_view.dart';
 import '../../ui/product_video_badge.dart';
@@ -28,17 +27,29 @@ import 'product.dart';
 
 /// S11 — mahsulot ma'lumoti bottom sheet. Joriy oyna ustida ochiladi.
 /// `onOpenBusiness` — biznes kartasi bosilganda (sheet yopilib) chaqiriladi.
+/// `existingPeerId` + `existingPeerChatId` — shu seller bilan chat allaqachon
+/// orqada ochiq bo‘lsa (masalan chat → profil → mahsulot), yangi ChatScreen
+/// ochilmaydi; `onReturnToExistingChat` chaqiriladi.
 Future<void> showProductInfoBottomSheet(
   BuildContext context,
   Product product, {
   required VoidCallback onOpenBusiness,
+  int? existingPeerId,
+  int? existingPeerChatId,
+  VoidCallback? onReturnToExistingChat,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.45),
-    builder: (_) => _ProductInfoSheet(product: product, onOpenBusiness: onOpenBusiness),
+    builder: (_) => _ProductInfoSheet(
+      product: product,
+      onOpenBusiness: onOpenBusiness,
+      existingPeerId: existingPeerId,
+      existingPeerChatId: existingPeerChatId,
+      onReturnToExistingChat: onReturnToExistingChat,
+    ),
   );
 }
 
@@ -53,7 +64,17 @@ List<String> _galleryUrls(Product p) {
 class _ProductInfoSheet extends StatefulWidget {
   final Product product;
   final VoidCallback onOpenBusiness;
-  const _ProductInfoSheet({required this.product, required this.onOpenBusiness});
+  final int? existingPeerId;
+  final int? existingPeerChatId;
+  final VoidCallback? onReturnToExistingChat;
+
+  const _ProductInfoSheet({
+    required this.product,
+    required this.onOpenBusiness,
+    this.existingPeerId,
+    this.existingPeerChatId,
+    this.onReturnToExistingChat,
+  });
 
   @override
   State<_ProductInfoSheet> createState() => _ProductInfoSheetState();
@@ -68,7 +89,6 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   late Product _product;
   String _description = '';
   List<String> _attributes = const [];
-  List<String> _capabilities = const [];
   String? _sellerName;
   String? _sellerAvatar;
   bool _sellerVerified = false;
@@ -101,7 +121,6 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
         _description = (map['description'] as String?)?.trim().isNotEmpty == true
             ? map['description'] as String
             : (_product.subtitle ?? '');
-        _capabilities = _product.capabilities;
         final attrs = map['attributes'];
         if (attrs is List) {
           _attributes = attrs
@@ -212,6 +231,22 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       return;
     }
     _contacting = true;
+
+    final existingChatId = widget.existingPeerChatId;
+    final existingPeerId = widget.existingPeerId;
+    final alreadyOpen = existingChatId != null &&
+        existingChatId > 0 &&
+        existingPeerId != null &&
+        existingPeerId > 0 &&
+        sellerId == existingPeerId;
+
+    if (alreadyOpen) {
+      Navigator.of(context).pop();
+      widget.onReturnToExistingChat?.call();
+      _contacting = false;
+      return;
+    }
+
     Navigator.of(context).pop();
 
     final chatResult = await Get.find<ChatRepository>().createChat(sellerId);
@@ -379,27 +414,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                       SizedBox(height: 8.dp),
                       ProductTrustBadgesView(data: _product.trustBadges),
                     ],
-                    if (_capabilities.isNotEmpty) ...[
-                      SizedBox(height: 14.dp),
-                      Text(
-                        'product_capabilities_title'.tr,
-                        style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 4.dp),
-                      Text(
-                        'product_capabilities_hint'.tr,
-                        style: TextStyle(
-                          color: c.textSecondary,
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                      SizedBox(height: 10.dp),
-                      ProductCapabilitiesView(codes: _capabilities),
-                    ] else if (_attributes.isNotEmpty) ...[
+                    if (_attributes.isNotEmpty) ...[
                       SizedBox(height: 12.dp),
                       _chips(c),
                     ],
