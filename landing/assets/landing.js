@@ -417,3 +417,135 @@ setLang(resolveLang());
     sendMessage(input.value);
   });
 })();
+
+/* —— Motion / effects —— */
+(function initWow() {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) {
+    document.querySelectorAll(".reveal").forEach((el) => el.classList.add("is-in"));
+    return;
+  }
+
+  // Scroll reveal
+  const reveals = document.querySelectorAll("[data-reveal]");
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.14, rootMargin: "0px 0px -8% 0px" }
+    );
+    reveals.forEach((el, i) => {
+      el.style.transitionDelay = `${Math.min(i % 5, 4) * 0.07}s`;
+      io.observe(el);
+    });
+  } else {
+    reveals.forEach((el) => el.classList.add("is-in"));
+  }
+  // Hero already in view
+  document.querySelectorAll(".hero [data-reveal]").forEach((el) => {
+    el.classList.add("is-in");
+  });
+
+  // Cursor glow
+  const glow = document.getElementById("cursor-glow");
+  if (glow && window.matchMedia("(pointer: fine)").matches) {
+    let mx = window.innerWidth / 2;
+    let my = window.innerHeight / 2;
+    let gx = mx;
+    let gy = my;
+    document.body.classList.add("is-pointer");
+    window.addEventListener(
+      "pointermove",
+      (e) => {
+        mx = e.clientX;
+        my = e.clientY;
+      },
+      { passive: true }
+    );
+    function tickGlow() {
+      gx += (mx - gx) * 0.12;
+      gy += (my - gy) * 0.12;
+      glow.style.transform = `translate3d(${gx}px, ${gy}px, 0)`;
+      requestAnimationFrame(tickGlow);
+    }
+    requestAnimationFrame(tickGlow);
+  }
+
+  // Parallax tilt on demo phone
+  const phone = document.getElementById("demo-phone");
+  const demoWrap = phone && phone.closest(".hero-demo");
+  if (phone && demoWrap && window.matchMedia("(pointer: fine)").matches) {
+    demoWrap.addEventListener("pointermove", (e) => {
+      const r = demoWrap.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      phone.style.transform = `rotateY(${x * 14}deg) rotateX(${-y * 10}deg) translateY(-6px)`;
+    });
+    demoWrap.addEventListener("pointerleave", () => {
+      phone.style.transform = "";
+    });
+  }
+
+  // Magnetic buttons
+  document.querySelectorAll(".magnet").forEach((btn) => {
+    btn.addEventListener("pointermove", (e) => {
+      const r = btn.getBoundingClientRect();
+      const x = e.clientX - r.left - r.width / 2;
+      const y = e.clientY - r.top - r.height / 2;
+      btn.style.transform = `translate(${x * 0.18}px, ${y * 0.22}px)`;
+    });
+    btn.addEventListener("pointerleave", () => {
+      btn.style.transform = "";
+    });
+  });
+
+  // Spark particles
+  const canvas = document.getElementById("spark-canvas");
+  if (canvas && canvas.getContext) {
+    const ctx = canvas.getContext("2d");
+    let w = 0;
+    let h = 0;
+    /** @type {{x:number,y:number,vx:number,vy:number,r:number,a:number}[]} */
+    let parts = [];
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+      const count = Math.min(56, Math.floor((w * h) / 28000));
+      parts = Array.from({ length: count }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: -0.15 - Math.random() * 0.35,
+        r: 0.6 + Math.random() * 1.8,
+        a: 0.15 + Math.random() * 0.45,
+      }));
+    }
+
+    function frame() {
+      ctx.clearRect(0, 0, w, h);
+      for (const p of parts) {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.y < -10) p.y = h + 10;
+        if (p.x < -10) p.x = w + 10;
+        if (p.x > w + 10) p.x = -10;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(184, 242, 90, ${p.a})`;
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    resize();
+    window.addEventListener("resize", resize, { passive: true });
+    requestAnimationFrame(frame);
+  }
+})();
