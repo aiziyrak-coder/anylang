@@ -1,13 +1,13 @@
 {
-  "version": "1.0.73",
-  "build": 74,
-  "version_full": "1.0.73+74",
+  "version": "1.0.74",
+  "build": 75,
+  "version_full": "1.0.74+75",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.73+74.apk",
-  "size_bytes": 87295180,
-  "size_mb": 83.25,
-  "updated_at": "2026-07-29T11:20:09.708131+00:00",
+  "versioned_filename": "anylang-1.0.74+75.apk",
+  "size_bytes": 87335944,
+  "size_mb": 83.29,
+  "updated_at": "2026-07-29T11:29:40.909618+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.73+74 — mute timed, verified group info, filters, multi-account"
+  "notes": "Release 1.0.74+75 — Google Maps + Multicard + 2% soliq"
 }
