@@ -5,8 +5,43 @@ import { NextRequest, NextResponse } from "next/server";
 const COOKIE = "admin_token";
 const ALLOWED_PREFIX = "/api/v1/admin";
 
+/** Public browser origins allowed to call the BFF (CSRF). */
+const DEFAULT_PUBLIC_ORIGINS = [
+  "https://anylang.uz",
+  "https://www.anylang.uz",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
 function assertAdminPath(targetPath: string): boolean {
   return targetPath === ALLOWED_PREFIX || targetPath.startsWith(`${ALLOWED_PREFIX}/`);
+}
+
+function allowedOrigins(request: NextRequest): Set<string> {
+  const out = new Set<string>(DEFAULT_PUBLIC_ORIGINS);
+  try {
+    out.add(request.nextUrl.origin);
+  } catch {
+    /* ignore */
+  }
+  const proto = (request.headers.get("x-forwarded-proto") || "")
+    .split(",")[0]
+    ?.trim();
+  const host = (
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("host") ||
+    ""
+  )
+    .split(",")[0]
+    ?.trim();
+  if (proto && host) {
+    out.add(`${proto}://${host}`);
+  }
+  for (const raw of (process.env.ADMIN_PUBLIC_ORIGINS || "").split(",")) {
+    const o = raw.trim();
+    if (o) out.add(o.replace(/\/$/, ""));
+  }
+  return out;
 }
 
 function assertSameOrigin(request: NextRequest): boolean {
@@ -19,7 +54,8 @@ function assertSameOrigin(request: NextRequest): boolean {
     return site === null || site === "same-origin" || site === "same-site";
   }
   try {
-    return new URL(origin).origin === request.nextUrl.origin;
+    const normalized = new URL(origin).origin;
+    return allowedOrigins(request).has(normalized);
   } catch {
     return false;
   }
@@ -62,7 +98,9 @@ async function handle(request: NextRequest, params: Promise<{ path: string[] }>)
     token,
     headers: {
       Accept: request.headers.get("accept") ?? "application/json",
-      ...(body ? { "Content-Type": request.headers.get("content-type") ?? "application/json" } : {}),
+      ...(body
+        ? { "Content-Type": request.headers.get("content-type") ?? "application/json" }
+        : {}),
     },
   });
 
@@ -80,18 +118,30 @@ async function handle(request: NextRequest, params: Promise<{ path: string[] }>)
   });
 }
 
-export async function GET(request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+export async function GET(
+  request: NextRequest,
+  ctx: { params: Promise<{ path: string[] }> },
+) {
   return handle(request, ctx.params);
 }
 
-export async function POST(request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+export async function POST(
+  request: NextRequest,
+  ctx: { params: Promise<{ path: string[] }> },
+) {
   return handle(request, ctx.params);
 }
 
-export async function PATCH(request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+export async function PATCH(
+  request: NextRequest,
+  ctx: { params: Promise<{ path: string[] }> },
+) {
   return handle(request, ctx.params);
 }
 
-export async function DELETE(request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+export async function DELETE(
+  request: NextRequest,
+  ctx: { params: Promise<{ path: string[] }> },
+) {
   return handle(request, ctx.params);
 }

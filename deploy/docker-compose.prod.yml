@@ -157,6 +157,7 @@ services:
       NEXT_PUBLIC_API_URL: https://anylang.uz
       ADMIN_BASE_PATH: /admin
       NEXT_PUBLIC_BASE_PATH: /admin
+      ADMIN_PUBLIC_ORIGINS: https://anylang.uz,https://www.anylang.uz
     ports:
       - "127.0.0.1:3105:3000"
     depends_on:
