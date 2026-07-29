@@ -44,9 +44,12 @@ SYNC_FILES = [
 def sudo(c: paramiko.SSHClient, cmd: str, timeout: int = 1800) -> tuple[int, str]:
     full = f"echo {PASS!r} | sudo -S bash -lc {cmd!r}"
     _, out, err = c.exec_command(full, timeout=timeout)
-    text = (out.read() + err.read()).decode(errors="replace")
+    text = (out.read() + err.read()).decode("utf-8", errors="replace")
     code = out.channel.recv_exit_status()
-    print(text[-5000:])
+    try:
+        print(text[-5000:])
+    except UnicodeEncodeError:
+        print(text[-5000:].encode("ascii", "replace").decode("ascii"))
     print("exit", code)
     return code, text
 
