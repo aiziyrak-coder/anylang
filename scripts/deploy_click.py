@@ -21,6 +21,11 @@ ENV_KEYS: dict[str, str] = {
     "CLICK_PAY_BASE_URL": "https://my.click.uz/services/pay",
     "CLICK_MERCHANT_API_BASE": "https://api.click.uz/v2/merchant",
     "CLICK_OFD_UNITS": "1",
+    "CLICK_OFD_SPIC": "10305008003000000",
+    "CLICK_OFD_PACKAGE_CODE": "1545646",
+    "CLICK_OFD_ITEM_NAME": "AnyLang",
+    "CLICK_OFD_INN": "310682057",
+    "CLICK_OFD_VAT_PERCENT": "0",
     "PAYMENT_TEST_AMOUNT_UZS": "1000",
     "PUBLIC_API_BASE_URL": "https://anylang.uz",
 }
@@ -60,6 +65,9 @@ def main() -> int:
         "CLICK_MERCHANT_USER_ID",
         "CLICK_OFD_SPIC",
         "CLICK_OFD_PACKAGE_CODE",
+        "CLICK_OFD_ITEM_NAME",
+        "CLICK_OFD_INN",
+        "CLICK_OFD_VAT_PERCENT",
     ):
         val = (os.environ.get(key) or "").strip()
         if val:
@@ -107,6 +115,7 @@ print('env updated', sorted(keys))
         "payments/pricing.py",
         "payments/service.py",
         "payments/router.py",
+        "core/startup.py",
         "services/payments.py",
         "services/subscription.py",
     ]

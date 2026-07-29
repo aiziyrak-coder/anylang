@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     click_ofd_spic: str = ""  # IKPU / SPIC code
     click_ofd_package_code: str = ""
     click_ofd_units: int = 1
+    click_ofd_item_name: str = "AnyLang"
+    click_ofd_inn: str = ""  # merchant TIN (ИНН), informational / future OFD fields
+    click_ofd_vat_percent: int = 0
     # Temporary flat UZS charge while Click is being activated (e.g. "1000"). Empty = off.
     payment_test_amount_uzs: str = ""
     # Public backend URL used in return_url (set via env in prod).

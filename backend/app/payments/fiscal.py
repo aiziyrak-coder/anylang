@@ -36,7 +36,11 @@ def _som_to_tiyin(amount: Decimal | str | float) -> int:
     return int((Decimal(str(amount)) * Decimal("100")).quantize(Decimal("1")))
 
 
-def _item_name(payment: Payment) -> str:
+def _item_name(payment: Payment, settings: Settings | None = None) -> str:
+    s = settings or get_settings()
+    configured = (s.click_ofd_item_name or "").strip()
+    if configured:
+        return configured
     kind = payment.kind or "payment"
     if kind == "subscription" and payment.plan:
         months = payment.billing_cycle or "1"
@@ -82,15 +86,16 @@ async def submit_fiscal_items(
         return None
 
     price_tiyin = _som_to_tiyin(payment.amount)
+    vat_pct = int(getattr(s, "click_ofd_vat_percent", 0) or 0)
     item: dict[str, Any] = {
-        "Name": _item_name(payment),
+        "Name": _item_name(payment, s),
         "SPIC": spic,
         "PackageCode": (s.click_ofd_package_code or "").strip() or None,
         "GoodPrice": price_tiyin,
         "Price": price_tiyin,
         "Amount": 1000,  # 1.000 unit in milli-units (Click convention)
         "VAT": 0,
-        "VATPercent": 0,
+        "VATPercent": vat_pct,
         "Units": int(s.click_ofd_units or 1),
     }
     if not item["PackageCode"]:
@@ -104,6 +109,10 @@ async def submit_fiscal_items(
         "received_cash": 0,
         "received_ecash": 0,
     }
+    inn = (getattr(s, "click_ofd_inn", "") or "").strip()
+    if inn:
+        body["inn"] = inn
+
     url = f"{s.click_merchant_api_base.rstrip('/')}/payment/ofd_data/submit_items"
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
