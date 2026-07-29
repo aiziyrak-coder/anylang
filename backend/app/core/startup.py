@@ -47,9 +47,12 @@ def validate_settings(settings: Settings) -> None:
             and settings.click_service_id
             and settings.click_secret_key
         ):
-            errors.append(
-                "CLICK_MERCHANT_ID / CLICK_SERVICE_ID / CLICK_SECRET_KEY required "
-                "when PAYMENT_PROVIDER=click"
+            # Allow boot so Prepare/Complete URLs stay reachable while merchant
+            # fills CLICK_MERCHANT_ID / CLICK_SECRET_KEY from merchant.click.uz.
+            logger.warning(
+                "CLICK_MERCHANT_ID / CLICK_SERVICE_ID / CLICK_SECRET_KEY incomplete — "
+                "Click checkout disabled until credentials are set; "
+                "SHOP API Prepare/Complete still mounted"
             )
         if settings.payment_provider == "paddle" and not (
             settings.paddle_api_key and settings.paddle_webhook_secret

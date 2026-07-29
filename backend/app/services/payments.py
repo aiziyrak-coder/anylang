@@ -138,13 +138,20 @@ async def create_checkout(
         and settings.multicard_store_id > 0
     )
     # Prefer explicit PAYMENT_PROVIDER; Click overrides Multicard when both ready.
+    # While Click credentials are incomplete, fall back to Multicard so checkout stays live.
     if settings.payment_provider == "click" and click_ready:
         chosen = "click"
+    elif settings.payment_provider == "click" and not click_ready and multicard_ready:
+        if not chosen or chosen == "click":
+            chosen = "multicard"
     elif multicard_ready and settings.payment_provider == "multicard" and not chosen:
         chosen = "multicard"
     elif not chosen and kind == "subscription":
         if settings.payment_provider in {"click", "paddle", "multicard"}:
-            chosen = settings.payment_provider
+            if settings.payment_provider == "click" and not click_ready and multicard_ready:
+                chosen = "multicard"
+            else:
+                chosen = settings.payment_provider
         elif click_ready:
             chosen = "click"
         elif multicard_ready:
