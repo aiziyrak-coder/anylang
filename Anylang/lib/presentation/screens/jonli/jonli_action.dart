@@ -4,26 +4,17 @@ import '../select_language/select_language_option.dart';
 /// Faqat Jonli muloqot ekraniga xos action'lar.
 class JonliAction extends MyAction {}
 
-/// Tugma bosib turilganda — gapirish boshlandi. `isMe` true → siz, false → suhbatdosh.
-class StartSpeaking extends JonliAction {
-  final bool isMe;
-  StartSpeaking(this.isMe);
-}
-
 /// Tugma qo'yib yuborilganda — gapirish tugadi (idle).
 class StopSpeaking extends JonliAction {}
 
 /// Conversation Mode: navbat bilan suhbat (yoqish/o‘chirish).
 class ToggleConversation extends JonliAction {}
 
-/// Navbatni qo‘lda almashtirish (🔄).
+/// Navbatni qo‘lda almashtirish.
 class SwitchConversationTurn extends JonliAction {}
 
 /// Tillarni almashtirish.
 class SwapLanguages extends JonliAction {}
-
-/// Temani almashtirish (quyosh tugmasi).
-class ToggleTheme extends JonliAction {}
 
 /// AI ovoz sozlamalari (jins + tezlik).
 class OpenVoiceSettings extends JonliAction {}
@@ -51,3 +42,21 @@ class SelectOtherLanguage extends JonliAction {
   final LanguageOption language;
   SelectOtherLanguage(this.language);
 }
+
+/// Live tillar ro‘yxatini qayta yuklash.
+class ReloadLiveLanguages extends JonliAction {}
+
+/// Muvaffaqiyatsiz turnni qayta yuborish.
+class RetryTurn extends JonliAction {
+  final String clientTurnId;
+  RetryTurn(this.clientTurnId);
+}
+
+/// Turn matnini clipboardga nusxa.
+class CopyTurnText extends JonliAction {
+  final String text;
+  CopyTurnText(this.text);
+}
+
+/// Premium paywall — tariflar.
+class OpenJonliPlans extends JonliAction {}

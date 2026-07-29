@@ -4,6 +4,8 @@ import '../../ui/theme/gradients.dart';
 import 'chat_message.dart';
 import 'chat_payload.dart';
 
+enum ChatComposerMediaMode { voice, video }
+
 class ChatState extends GetxController {
   /// Har ochilishda oshadi — eski API javoblari / UI chalkashmasin.
   final RxInt sessionId = 0.obs;
@@ -37,6 +39,11 @@ class ChatState extends GetxController {
   final RxString input = ''.obs;
   final Rx<ChatMessage?> replyTo = Rx<ChatMessage?>(null);
   final RxBool recording = false.obs;
+  /// Telegram: mikrofon ↔ dumaloq video rejim.
+  final Rx<ChatComposerMediaMode> composerMediaMode =
+      ChatComposerMediaMode.voice.obs;
+  /// Yuqoriga surib "ushlab turish" (qo‘lni qo‘yib yuborsa ham yozish davom etadi).
+  final RxBool recordingLocked = false.obs;
   final RxBool loading = true.obs;
   final RxBool loadError = false.obs;
   final RxBool sending = false.obs;
@@ -101,6 +108,8 @@ class ChatState extends GetxController {
     input.value = '';
     replyTo.value = null;
     recording.value = false;
+    recordingLocked.value = false;
+    composerMediaMode.value = ChatComposerMediaMode.voice;
     sending.value = false;
     messages.clear();
     loading.value = true;

@@ -14,7 +14,6 @@ from app.schemas.product import (
     ManufacturersMapOut,
     ProductCreateIn,
     ProductDetailOut,
-    ProductForYouOut,
     ProductImageUploadOut,
     ProductListOut,
     ProductTopOut,
@@ -49,21 +48,6 @@ async def smart_search_products(
         limit=limit,
     )
     return SmartSearchOut.model_validate(data)
-
-
-@router.get("/for-you", response_model=ProductForYouOut)
-async def products_for_you(
-    db: DbSession,
-    current_user: CurrentUser,
-    limit: int = Query(default=12, ge=1, le=30),
-) -> ProductForYouOut:
-    """Avval ko‘rilgan mahsulotlar asosida AI tavsiya."""
-    data = await products_service.list_for_you(
-        db,
-        viewer=current_user,
-        limit=limit,
-    )
-    return ProductForYouOut.model_validate(data)
 
 
 @router.get("/manufacturers-map", response_model=ManufacturersMapOut)

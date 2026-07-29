@@ -11,10 +11,12 @@ import '../../../data/network/invite_deep_link_service.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../modal/product_video_dialog.dart';
 import '../../screens/chat/chat_message.dart';
+import '../../utils/app_snackbar.dart';
+import '../../utils/business_reactions.dart';
 import '../../utils/size_controller.dart';
 import '../chat_auto_business_card.dart';
+import '../chat_video_thumbnail.dart';
 import '../profile_avatar.dart';
-import '../../utils/business_reactions.dart';
 import '../theme/colors.dart';
 import '../theme/gradients.dart';
 import '../transcript_shimmer.dart';
@@ -134,7 +136,7 @@ class ChatMessageItem extends StatelessWidget {
             Padding(
               padding: EdgeInsets.only(top: 2.dp),
               child: Text(
-                'edited',
+                'chat_edited'.tr,
                 style: TextStyle(fontSize: 10.sp, color: c.textFaint),
               ),
             ),
@@ -650,8 +652,6 @@ class ChatMessageItem extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () => showFullScreenImage(context, url: url),
-                  splashFactory: NoSplash.splashFactory,
-                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                 ),
               ),
             ),
@@ -675,24 +675,31 @@ class ChatMessageItem extends StatelessWidget {
       ),
     );
 
-    if (!showName) return imageBubble;
+    if (!showName && message.reply == null) return imageBubble;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          _out ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: EdgeInsets.only(left: 4.dp, bottom: 4.dp),
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: nameColor,
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w700,
+        if (message.reply != null)
+          Padding(
+            padding: EdgeInsets.only(bottom: 6.dp),
+            child: _replyQuote(c, message.reply!),
+          ),
+        if (showName)
+          Padding(
+            padding: EdgeInsets.only(left: 4.dp, bottom: 4.dp),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: nameColor,
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
         imageBubble,
       ],
     );
@@ -706,6 +713,7 @@ class ChatMessageItem extends StatelessWidget {
     final openable = isNet || isFile;
     final round = message.isRoundNote;
     final size = round ? 180.dp : _kChatImageWidth.dp;
+    final height = round ? size : 160.dp;
     final metaColor = _out
         ? c.onAccent.withValues(alpha: 0.85)
         : c.textFaint;
@@ -722,9 +730,9 @@ class ChatMessageItem extends StatelessWidget {
         onTap: openable ? open : null,
         customBorder: round ? const CircleBorder() : null,
         borderRadius: round ? null : _bubbleRadius,
-        child: Ink(
+        child: Container(
           width: size,
-          height: round ? size : 160.dp,
+          height: height,
           decoration: BoxDecoration(
             color: c.isDark ? const Color(0xFF12263A) : const Color(0xFFE8EEF5),
             shape: round ? BoxShape.circle : BoxShape.rectangle,
@@ -733,13 +741,33 @@ class ChatMessageItem extends StatelessWidget {
                 ? Border.all(color: c.accent.withValues(alpha: 0.55), width: 3)
                 : null,
           ),
+          clipBehavior: Clip.antiAlias,
           child: Stack(
-            alignment: Alignment.center,
+            fit: StackFit.expand,
             children: [
-              Icon(
-                Icons.play_circle_fill_rounded,
-                size: round ? 56.dp : 48.dp,
-                color: c.accent,
+              if (url != null && url.isNotEmpty)
+                ChatVideoThumbnail(
+                  url: url,
+                  width: size,
+                  height: height,
+                  round: round,
+                ),
+              // O‘qish uchun engil qoraytirish + play.
+              ColoredBox(
+                color: Colors.black.withValues(alpha: 0.18),
+              ),
+              Center(
+                child: Icon(
+                  Icons.play_circle_fill_rounded,
+                  size: round ? 56.dp : 48.dp,
+                  color: Colors.white.withValues(alpha: 0.95),
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
               ),
               if ((message.videoDuration ?? '').isNotEmpty)
                 Positioned(
@@ -751,7 +779,7 @@ class ChatMessageItem extends StatelessWidget {
                       vertical: 3.dp,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
+                      color: Colors.black.withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(10.dp),
                     ),
                     child: Text(
@@ -787,6 +815,14 @@ class ChatMessageItem extends StatelessWidget {
           _out ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (message.reply != null)
+          Padding(
+            padding: EdgeInsets.only(bottom: 6.dp),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: size),
+              child: _replyQuote(c, message.reply!),
+            ),
+          ),
         thumb,
         if (showCaption)
           Padding(
@@ -922,7 +958,10 @@ class ChatMessageItem extends StatelessWidget {
 
         final playBtn = GestureDetector(
           onTap: () {
-            if (!canPlay || path == null) return;
+            if (!canPlay || path == null) {
+              showAppMessage('chat_voice_unavailable'.tr);
+              return;
+            }
             HapticFeedback.selectionClick();
             player.toggle(
               id: message.id,
@@ -1015,6 +1054,7 @@ class ChatMessageItem extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (message.reply != null) _replyQuote(c, message.reply!),
               Text(
                 'chat_product_label'.tr,
                 style: TextStyle(
@@ -1418,26 +1458,34 @@ class ChatMessageItem extends StatelessWidget {
     final mapW = 220.dp;
     final mapH = 140.dp;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: _bubbleRadius,
-        splashFactory: NoSplash.splashFactory,
-        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-        onTap: () async {
-          HapticFeedback.selectionClick();
-          final uri = hasCoords
-              ? Uri.parse(
-                  'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
-                )
-              : Uri.parse(
-                  'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(title)}',
-                );
-          if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-            Get.snackbar('error'.tr, 'maps_open_failed'.tr);
-          }
-        },
-        child: ClipRRect(
+    return Column(
+      crossAxisAlignment:
+          _out ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (message.reply != null)
+          Padding(
+            padding: EdgeInsets.only(bottom: 6.dp),
+            child: _replyQuote(c, message.reply!),
+          ),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: _bubbleRadius,
+            onTap: () async {
+              HapticFeedback.selectionClick();
+              final uri = hasCoords
+                  ? Uri.parse(
+                      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+                    )
+                  : Uri.parse(
+                      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(title)}',
+                    );
+              if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                showAppMessage('maps_open_failed'.tr);
+              }
+            },
+            child: ClipRRect(
           borderRadius: _bubbleRadius,
           child: SizedBox(
             width: mapW,
@@ -1565,6 +1613,8 @@ class ChatMessageItem extends StatelessWidget {
           ),
         ),
       ),
+        ),
+      ],
     );
   }
 
@@ -1572,12 +1622,19 @@ class ChatMessageItem extends StatelessWidget {
     return GestureDetector(
       onTap: () async {
         final url = message.fileUrl?.trim();
-        if (url == null || url.isEmpty) return;
+        if (url == null || url.isEmpty) {
+          showAppMessage(
+            message.status == ChatStatus.pending
+                ? 'chat_file_pending'.tr
+                : 'file_open_failed'.tr,
+          );
+          return;
+        }
         HapticFeedback.selectionClick();
         final uri = Uri.tryParse(url);
         if (uri == null ||
             !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-          Get.snackbar('error'.tr, 'file_open_failed'.tr);
+          showAppMessage('file_open_failed'.tr);
         }
       },
       child: _bubble(
@@ -1586,6 +1643,7 @@ class ChatMessageItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (message.reply != null) _replyQuote(c, message.reply!),
             Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -1659,6 +1717,7 @@ class ChatMessageItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (message.reply != null) _replyQuote(c, message.reply!),
             Row(
               children: [
                 ProfileAvatar(

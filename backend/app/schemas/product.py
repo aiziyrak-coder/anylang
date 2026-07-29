@@ -128,11 +128,6 @@ class ProductListOut(BaseModel):
     has_more: bool
 
 
-class ProductForYouOut(BaseModel):
-    items: list[ProductOut]
-    based_on_views: bool = False
-
-
 class ManufacturerMapCompanyOut(BaseModel):
     id: int
     company_name: str

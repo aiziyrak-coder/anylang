@@ -16,14 +16,15 @@ class JonliState extends GetxController {
   Rx<LanguageOption> otherLanguage = languageOptions[1].obs;
 
   final RxnInt sessionId = RxnInt();
-  final RxString lastOriginal = ''.obs;
-  final RxString lastTranslated = ''.obs;
   final RxBool busy = false.obs;
 
   /// Conversation Mode — navbat bilan avtomatik mikrofon.
   final RxBool conversationActive = false.obs;
   /// Keyingi (yoki joriy) navbat — sizmi.
   final RxBool nextIsMe = true.obs;
+
+  /// Premium talab qilinganda Live ichida paywall card.
+  final RxBool needsPremium = false.obs;
 
   /// Tab o‘zgarganda (IndexedStack) jonli sessiyani to‘xtatish.
   Future<void> Function()? pauseOnLeaveHandler;

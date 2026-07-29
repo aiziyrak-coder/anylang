@@ -680,7 +680,10 @@ class FriendsContent extends ScreenContent<FriendsState> {
         countriesCount: f.countriesCount,
         showMessage: false,
         showAdd: false,
-        showQuickActions: !f.isScammer,
+        showQuickActions: !f.isScammer &&
+            !f.verified &&
+            f.riskLevel != 'medium' &&
+            f.riskLevel != 'high',
         onTap: () => sendAction(OpenFriendProfile(f)),
         onMessage: () => sendAction(OpenChat(f)),
         onCall: null,

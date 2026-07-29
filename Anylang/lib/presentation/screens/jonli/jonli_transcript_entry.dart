@@ -9,6 +9,8 @@ class JonliTranscriptEntry {
   final bool pending;
   final bool failed;
   final bool fromCamera;
+  /// Fail bo‘lganda qayta yuborish uchun lokal audio.
+  final String? audioPath;
 
   const JonliTranscriptEntry({
     this.id,
@@ -20,6 +22,7 @@ class JonliTranscriptEntry {
     this.pending = false,
     this.failed = false,
     this.fromCamera = false,
+    this.audioPath,
   });
 
   JonliTranscriptEntry copyWith({
@@ -32,6 +35,8 @@ class JonliTranscriptEntry {
     bool? pending,
     bool? failed,
     bool? fromCamera,
+    String? audioPath,
+    bool clearAudioPath = false,
   }) {
     return JonliTranscriptEntry(
       id: id ?? this.id,
@@ -43,6 +48,7 @@ class JonliTranscriptEntry {
       pending: pending ?? this.pending,
       failed: failed ?? this.failed,
       fromCamera: fromCamera ?? this.fromCamera,
+      audioPath: clearAudioPath ? null : (audioPath ?? this.audioPath),
     );
   }
 }

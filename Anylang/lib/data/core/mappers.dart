@@ -226,9 +226,10 @@ String formatSubscriptionPlan(String? plan) {
     case 'business':
       return 'plan_business'.tr;
     case 'basic':
-      return 'plan_basic'.tr;
+    case 'free':
+      return 'subscription_free'.tr;
     default:
-      return plan?.trim().isNotEmpty == true ? plan! : 'plan_basic'.tr;
+      return plan?.trim().isNotEmpty == true ? plan! : 'subscription_free'.tr;
   }
 }
 

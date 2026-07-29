@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 
 import '../../../data/audio/voice_recorder_service.dart';
 import '../../modal/language_bottom_sheet.dart';
+import '../../ui/buttons/primary_button.dart';
 import '../../ui/items/jonli_transcript_item.dart';
 import '../../ui/language_flag.dart';
 import '../../ui/theme/colors.dart';
@@ -48,7 +49,6 @@ class JonliContent extends ScreenContent<JonliState> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final sc = _transcriptScroll;
       if (sc == null || !sc.hasClients) return;
-      // Foydalanuvchi tarix/footer tomonga scroll qilayotgan bo'lsa — majburan pastga tortmaymiz.
       final max = sc.position.maxScrollExtent;
       final cur = sc.position.pixels;
       if (max - cur > 120) return;
@@ -81,7 +81,7 @@ class JonliContent extends ScreenContent<JonliState> {
             padding: EdgeInsets.symmetric(horizontal: 14.dp),
             child: Row(
               children: [
-                Expanded(child: _voiceChip(context, c, state, sendAction)),
+                Expanded(child: _voiceChip(c, state, sendAction)),
                 SizedBox(width: 8.dp),
                 _cameraChip(c, sendAction),
                 SizedBox(width: 8.dp),
@@ -89,26 +89,111 @@ class JonliContent extends ScreenContent<JonliState> {
               ],
             ),
           ),
-          SizedBox(height: 10.dp),
-          Expanded(child: _transcriptPane(c, state, sendAction)),
           Obx(() {
-            final mode = state.mode.value;
-            if (mode == JonliMode.idle && !state.busy.value) {
+            if (!state.liveLanguagesLoadFailed.value) {
               return const SizedBox.shrink();
             }
             return Padding(
-              padding: EdgeInsets.fromLTRB(14.dp, 0, 14.dp, 8.dp),
-              child: _liveStrip(c, state, mode == JonliMode.other),
+              padding: EdgeInsets.fromLTRB(14.dp, 8.dp, 14.dp, 0),
+              child: _languagesBanner(c, sendAction),
             );
           }),
-          _bottom(c, state, sendAction),
+          Obx(() {
+            if (!state.needsPremium.value) return const SizedBox.shrink();
+            return Padding(
+              padding: EdgeInsets.fromLTRB(14.dp, 8.dp, 14.dp, 0),
+              child: _premiumCard(c, sendAction),
+            );
+          }),
+          SizedBox(height: 10.dp),
+          Expanded(child: _transcriptPane(c, state, sendAction)),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14.dp, 4.dp, 14.dp, 8.dp),
+            child: _sessionPanel(c, state, sendAction),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _languagesBanner(AppColors c, void Function(MyAction) sendAction) {
+    return Material(
+      color: c.danger.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(14.dp),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14.dp),
+        onTap: () => sendAction(ReloadLiveLanguages()),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
+          child: Row(
+            children: [
+              Icon(Icons.wifi_off_rounded, size: 18.dp, color: c.danger),
+              SizedBox(width: 10.dp),
+              Expanded(
+                child: Text(
+                  'jonli_languages_failed'.tr,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                'jonli_languages_retry'.tr,
+                style: TextStyle(
+                  color: c.danger,
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _premiumCard(AppColors c, void Function(MyAction) sendAction) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.dp),
+      decoration: BoxDecoration(
+        color: c.accentSoft,
+        borderRadius: BorderRadius.circular(16.dp),
+        border: Border.all(color: c.accent.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'jonli_premium_card_title'.tr,
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 15.sp,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 4.dp),
+          Text(
+            'jonli_premium_card_body'.tr,
+            style: TextStyle(
+              color: c.textSecondary,
+              fontSize: 12.sp,
+              height: 1.35,
+            ),
+          ),
+          SizedBox(height: 12.dp),
+          PrimaryButton(
+            text: 'jonli_premium_card_cta'.tr,
+            onTap: () => sendAction(OpenJonliPlans()),
+          ),
         ],
       ),
     );
   }
 
   Widget _voiceChip(
-    BuildContext context,
     AppColors c,
     JonliState state,
     void Function(MyAction) sendAction,
@@ -236,22 +321,50 @@ class JonliContent extends ScreenContent<JonliState> {
     void Function(MyAction) sendAction,
   ) {
     return Obx(() {
-      final turns = state.turns.toList();
-      if (turns.isEmpty &&
+      final turns = state.turns;
+      final empty = turns.isEmpty &&
           state.mode.value == JonliMode.idle &&
-          !state.busy.value) {
+          !state.busy.value &&
+          !state.conversationActive.value;
+
+      if (empty) {
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: 24.dp),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              Icon(Icons.graphic_eq_rounded, size: 42.dp, color: c.accent),
+              SizedBox(height: 14.dp),
               Text(
-                'jonli_transcript_empty'.tr,
+                'jonli_empty_title'.tr,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 17.sp,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 8.dp),
+              Text(
+                'jonli_hint_conversation'.tr,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: c.textSecondary,
-                  fontSize: 14.sp,
+                  fontSize: 13.sp,
                   height: 1.4,
+                ),
+              ),
+              SizedBox(height: 18.dp),
+              PrimaryButton(
+                text: 'jonli_conversation_start'.tr,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  sendAction(ToggleConversation());
+                },
+                startIcon: Icon(
+                  Icons.mic_rounded,
+                  size: 20.dp,
+                  color: c.onAccent,
                 ),
               ),
               SizedBox(height: 16.dp),
@@ -272,7 +385,20 @@ class JonliContent extends ScreenContent<JonliState> {
               child: _historyFooter(c, sendAction),
             );
           }
-          return JonliTranscriptItem(entry: turns[i]);
+          final e = turns[i];
+          return JonliTranscriptItem(
+            entry: e,
+            onRetry: e.failed && (e.audioPath ?? '').isNotEmpty
+                ? () => sendAction(RetryTurn(e.clientTurnId))
+                : null,
+            onCopy: () {
+              final text = [
+                if (e.original.isNotEmpty) e.original,
+                if (e.translated.isNotEmpty) e.translated,
+              ].join('\n');
+              if (text.isNotEmpty) sendAction(CopyTurnText(text));
+            },
+          );
         },
       );
     });
@@ -294,7 +420,8 @@ class JonliContent extends ScreenContent<JonliState> {
           ),
           child: Row(
             children: [
-              Icon(Icons.expand_more_rounded, color: c.textSecondary, size: 20.dp),
+              Icon(Icons.expand_more_rounded,
+                  color: c.textSecondary, size: 20.dp),
               SizedBox(width: 8.dp),
               Expanded(
                 child: Column(
@@ -319,63 +446,11 @@ class JonliContent extends ScreenContent<JonliState> {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: c.textFaint, size: 20.dp),
+              Icon(Icons.chevron_right_rounded,
+                  color: c.textFaint, size: 20.dp),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _liveStrip(AppColors c, JonliState state, bool isOther) {
-    final color = isOther ? kSpeakBlue : kLime;
-    final recording = state.mode.value != JonliMode.idle;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 14.dp, vertical: 10.dp),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(14.dp),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 8.dp,
-            height: 8.dp,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          SizedBox(width: 8.dp),
-          Expanded(
-            child: Text(
-              recording
-                  ? (isOther
-                      ? 'jonli_other_speaking'.tr
-                      : 'jonli_you_speaking'.tr)
-                  : 'jonli_translating'.tr,
-              style: TextStyle(
-                color: c.textPrimary,
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          if (recording) ...[
-            SizedBox(
-              width: 88.dp,
-              child: _waveform(color, barCount: 10, maxHeight: 18),
-            ),
-          ] else
-            SizedBox(
-              width: 16.dp,
-              height: 16.dp,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: color,
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -510,76 +585,56 @@ class JonliContent extends ScreenContent<JonliState> {
     if (picked != null) sendAction(SelectOtherLanguage(picked));
   }
 
-  Widget _waveform(Color color, {int barCount = 18, double maxHeight = 28}) {
+  /// Bitta waveform — level ValueNotifier orqali (RxList Obx emas).
+  Widget _waveform(Color color, {int barCount = 22, double maxHeight = 22}) {
     final recorder = Get.find<VoiceRecorderService>();
-    return Obx(() {
-      final samples = List<double>.of(recorder.liveSamples);
-      return WaveformBars(
-        color: color,
-        maxHeight: maxHeight,
-        barCount: barCount,
-        barWidth: 3,
-        gap: 3,
-        samples: samples,
-      );
-    });
-  }
-
-  Widget _bottom(
-    AppColors c,
-    JonliState state,
-    void Function(MyAction) sendAction,
-  ) {
-    return Column(
-      children: [
-        Obx(() {
-          final active = state.conversationActive.value;
-          final busy = state.busy.value;
-          final mode = state.mode.value;
-          final nextMe = state.nextIsMe.value;
-          String hint;
-          if (!active) {
-            hint = 'jonli_hint_conversation'.tr;
-          } else if (busy) {
-            hint = 'jonli_translating'.tr;
-          } else if (mode == JonliMode.me) {
-            hint = 'jonli_you_speaking'.tr;
-          } else if (mode == JonliMode.other) {
-            hint = 'jonli_other_speaking'.tr;
-          } else {
-            hint = nextMe
-                ? 'jonli_turn_you'.tr
-                : 'jonli_turn_other'.tr;
-          }
-          return Text(
-            hint,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: c.textSecondary, fontSize: 12.sp),
-          );
-        }),
-        SizedBox(height: 12.dp),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.dp),
-          child: _conversationBar(c, state, sendAction),
-        ),
-        SizedBox(height: 8.dp),
-      ],
+    return ValueListenableBuilder<double>(
+      valueListenable: recorder.level,
+      builder: (_, _, _) {
+        final samples = List<double>.of(recorder.liveSamples);
+        return WaveformBars(
+          color: color,
+          maxHeight: maxHeight,
+          barCount: barCount,
+          barWidth: 3,
+          gap: 3,
+          samples: samples,
+          scroll: recorder.liveScroll,
+        );
+      },
     );
   }
 
-  Widget _conversationBar(
+  /// Status + speaker pilllar + CTA + bitta waveform — bitta panel.
+  Widget _sessionPanel(
     AppColors c,
     JonliState state,
     void Function(MyAction) sendAction,
   ) {
     return Obx(() {
       final active = state.conversationActive.value;
+      final busy = state.busy.value;
       final mode = state.mode.value;
       final nextMe = state.nextIsMe.value;
       final meHot = mode == JonliMode.me || (mode == JonliMode.idle && nextMe);
       final otherHot =
           mode == JonliMode.other || (mode == JonliMode.idle && !nextMe);
       final recording = mode != JonliMode.idle;
+      final waveColor = mode == JonliMode.other ? kSpeakBlue : c.accent;
+
+      String status;
+      if (busy) {
+        status = 'jonli_translating'.tr;
+      } else if (mode == JonliMode.me) {
+        status = 'jonli_you_speaking'.tr;
+      } else if (mode == JonliMode.other) {
+        status = 'jonli_other_speaking'.tr;
+      } else if (active) {
+        status =
+            nextMe ? 'jonli_turn_you'.tr : 'jonli_turn_other'.tr;
+      } else {
+        status = 'jonli_hint_conversation'.tr;
+      }
 
       return Container(
         padding: EdgeInsets.fromLTRB(12.dp, 12.dp, 12.dp, 12.dp),
@@ -592,6 +647,45 @@ class JonliContent extends ScreenContent<JonliState> {
         ),
         child: Column(
           children: [
+            Row(
+              children: [
+                if (recording || busy)
+                  Container(
+                    width: 8.dp,
+                    height: 8.dp,
+                    margin: EdgeInsets.only(right: 8.dp),
+                    decoration: BoxDecoration(
+                      color: busy ? c.textFaint : waveColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    status,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: c.textSecondary,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (busy)
+                  SizedBox(
+                    width: 14.dp,
+                    height: 14.dp,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: c.accent,
+                    ),
+                  ),
+              ],
+            ),
+            if (recording) ...[
+              SizedBox(height: 10.dp),
+              _waveform(waveColor, barCount: 24, maxHeight: 24),
+            ],
+            SizedBox(height: 12.dp),
             Row(
               children: [
                 Expanded(
@@ -615,9 +709,10 @@ class JonliContent extends ScreenContent<JonliState> {
                     },
                     child: Padding(
                       padding: EdgeInsets.all(10.dp),
-                      child: Text(
-                        '🔄',
-                        style: TextStyle(fontSize: 16.sp),
+                      child: Icon(
+                        Icons.sync_alt_rounded,
+                        size: 18.dp,
+                        color: c.accent,
                       ),
                     ),
                   ),
@@ -644,7 +739,6 @@ class JonliContent extends ScreenContent<JonliState> {
                   if (!active) {
                     sendAction(ToggleConversation());
                   } else if (recording) {
-                    // Gapni darhol yakunla → tarjima → avtomatik navbat.
                     sendAction(StopSpeaking());
                   } else {
                     sendAction(ToggleConversation());
@@ -688,14 +782,6 @@ class JonliContent extends ScreenContent<JonliState> {
                 ),
               ),
             ),
-            if (recording) ...[
-              SizedBox(height: 10.dp),
-              _waveform(
-                mode == JonliMode.other ? kSpeakBlue : c.accent,
-                barCount: 22,
-                maxHeight: 22,
-              ),
-            ],
           ],
         ),
       );

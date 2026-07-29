@@ -277,9 +277,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
 
                   if (all.isEmpty &&
                       (!showSections ||
-                          (state.top.isEmpty &&
-                              state.newest.isEmpty &&
-                              state.recommended.isEmpty))) {
+                          (state.top.isEmpty && state.newest.isEmpty))) {
                     return AppEmptyState(
                       icon: searching
                           ? Icons.search_off_rounded
@@ -303,11 +301,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (showSections) ...[
-                            if (state.recommended.isNotEmpty ||
-                                state.forYouLoadFailed.value) ...[
-                              _forYouBlock(context, c, state, sendAction),
-                              SizedBox(height: 22.dp),
-                            ],
                             if (state.top.isNotEmpty) ...[
                               _sectionHeader(
                                 c,
@@ -446,7 +439,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
                     )
                   : const Icon(Icons.add_rounded),
               label: Text(
-                'add_product_title'.tr,
+                'common_add'.tr,
                 style: TextStyle(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w700,
@@ -512,100 +505,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
     }
     if (parts.isEmpty) return 'products_filters_title'.tr;
     return parts.join(' · ');
-  }
-
-  Widget _forYouBlock(
-    BuildContext context,
-    AppColors c,
-    ProductsState state,
-    void Function(MyAction) sendAction,
-  ) {
-    final basedOnViews = state.forYouBasedOnViews.value;
-    final loadFailed = state.forYouLoadFailed.value;
-    final empty = state.recommended.isEmpty;
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.dp),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(14.dp, 14.dp, 14.dp, 12.dp),
-        decoration: BoxDecoration(
-          color: c.accentSoft,
-          borderRadius: BorderRadius.circular(16.dp),
-          border: Border.all(color: c.accent.withValues(alpha: 0.35)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Text('🤖', style: TextStyle(fontSize: 18.sp)),
-                SizedBox(width: 8.dp),
-                Expanded(
-                  child: Text(
-                    'products_for_you_title'.tr,
-                    style: TextStyle(
-                      color: c.textPrimary,
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 4.dp),
-            Text(
-              basedOnViews
-                  ? 'products_for_you_subtitle'.tr
-                  : 'products_for_you_subtitle_fallback'.tr,
-              style: TextStyle(
-                color: c.textSecondary,
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w600,
-                height: 1.3,
-              ),
-            ),
-            SizedBox(height: 12.dp),
-            if (loadFailed && empty)
-              Text(
-                'products_for_you_failed'.tr,
-                style: TextStyle(
-                  color: c.textSecondary,
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            else if (!empty)
-              SizedBox(
-                height: 200.dp,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: state.recommended.length,
-                  separatorBuilder: (_, _) => SizedBox(width: 12.dp),
-                  itemBuilder: (_, i) {
-                    final p = state.recommended[i];
-                    final hasVideo = (p.videoUrl ?? '').isNotEmpty;
-                    return ProductTopCard(
-                      iconAsset: p.iconAsset,
-                      tileGradient: p.tileGradient,
-                      name: p.name,
-                      price: p.price,
-                      views: p.views,
-                      imageUrl: p.imageUrl,
-                      hasVideo: hasVideo,
-                      trustBadges: p.trustBadges,
-                      onTap: () => sendAction(OpenProduct(p)),
-                      onVideoTap: hasVideo
-                          ? () =>
-                              showProductVideoDialog(context, url: p.videoUrl!)
-                          : null,
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _sectionHeader(

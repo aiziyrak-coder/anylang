@@ -219,25 +219,8 @@ class ProductsScreen extends Screen<ProductsState, void> {
         success: (data) => state.newest.assignAll(_mapProducts(data)),
         failure: showAppError,
       );
-      final forYou = await repo.forYou(limit: 12);
-      forYou.when(
-        success: (data) {
-          state.forYouLoadFailed.value = false;
-          final map = asMap(data);
-          state.forYouBasedOnViews.value = map?['based_on_views'] == true;
-          state.recommended.assignAll(_mapProducts(data));
-        },
-        failure: (_) {
-          state.forYouLoadFailed.value = true;
-          state.forYouBasedOnViews.value = false;
-          state.recommended.clear();
-        },
-      );
     } else {
       state.newest.clear();
-      state.recommended.clear();
-      state.forYouBasedOnViews.value = false;
-      state.forYouLoadFailed.value = false;
     }
 
     if (q.isNotEmpty) {
@@ -314,7 +297,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         success: (data) {
           state.all.assignAll(_mapProducts(data));
           state.newest.clear();
-          state.recommended.clear();
         },
         failure: showAppError,
       );
@@ -356,7 +338,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         }
         state.all.assignAll(_mapProducts(data));
         state.newest.clear();
-        state.recommended.clear();
       },
       failure: (err) async {
         // Fallback: oddiy qidiruv
@@ -369,7 +350,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
           success: (data) {
             state.all.assignAll(_mapProducts(data));
             state.newest.clear();
-            state.recommended.clear();
           },
           failure: showAppError,
         );
@@ -393,7 +373,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         state.all.assignAll(_mapProducts(data));
         if (q.isNotEmpty || state.hasActiveFilters) {
           state.newest.clear();
-          state.recommended.clear();
         }
       },
       failure: showAppError,
@@ -438,7 +417,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
           success: (data) {
             state.all.assignAll(_mapProducts(data));
             state.newest.clear();
-            state.recommended.clear();
           },
           failure: showAppError,
         );
@@ -516,7 +494,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
           state.all.assignAll(_mapProducts(data));
           if (q.isNotEmpty) {
             state.newest.clear();
-            state.recommended.clear();
           }
         },
         failure: showAppError,
@@ -758,7 +735,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         final items = _mapProducts(data);
         state.top.clear();
         state.newest.clear();
-        state.recommended.clear();
         state.all.assignAll(items);
       },
       failure: showAppError,
@@ -940,7 +916,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
             final items = _mapProducts(data);
             state.top.clear();
             state.newest.clear();
-            state.recommended.clear();
             state.all.assignAll(items);
           },
           failure: showAppError,
@@ -1060,7 +1035,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
             state.all.assignAll(_mapProducts(data));
             if (q.isNotEmpty) {
               state.newest.clear();
-              state.recommended.clear();
             }
           },
           failure: showAppError,

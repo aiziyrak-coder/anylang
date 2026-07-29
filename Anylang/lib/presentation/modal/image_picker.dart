@@ -1,8 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../ui/theme/colors.dart';
 import '../utils/size_controller.dart';
 
@@ -10,6 +12,9 @@ import '../utils/size_controller.dart';
 /// Loyihada rasm tanlash HAR DOIM shu funksiya orqali bajariladi
 /// (`ImagePicker()` to'g'ridan-to'g'ri ishlatilmaydi).
 /// [source] berilsa (masalan attach menyudan), qayta sheet ochilmaydi.
+///
+/// Chiqish faylida EXIF orientation piksellarga "pishiriladi" (yonboshlash
+/// muammosi profil, business tasdiqlash va boshqa joylarda yo'qoladi).
 Future<File?> pickImage(BuildContext context, {ImageSource? source}) async {
   final resolved = source ??
       await showModalBottomSheet<ImageSource>(
@@ -19,10 +24,32 @@ Future<File?> pickImage(BuildContext context, {ImageSource? source}) async {
       );
   if (resolved == null) return null;
 
-  final picked =
-      await ImagePicker().pickImage(source: resolved, imageQuality: 85);
+  // imageQuality bermaymiz — orientation bake + compress keyinroq qilinadi.
+  final picked = await ImagePicker().pickImage(source: resolved);
   if (picked == null) return null;
-  return File(picked.path);
+  return _normalizeOrientation(File(picked.path));
+}
+
+/// EXIF Orientation ni piksellarga qo'llab, upright JPEG qaytaradi.
+Future<File> _normalizeOrientation(File source) async {
+  try {
+    final dir = await getTemporaryDirectory();
+    final targetPath =
+        '${dir.path}/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final result = await FlutterImageCompress.compressAndGetFile(
+      source.absolute.path,
+      targetPath,
+      quality: 85,
+      rotate: 0,
+      autoCorrectionAngle: true,
+      keepExif: false,
+      format: CompressFormat.jpeg,
+    );
+    if (result != null) return File(result.path);
+  } catch (_) {
+    // Compress fail bo'lsa asl faylni qaytaramiz.
+  }
+  return source;
 }
 
 class _ImageSourceSheet extends StatelessWidget {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/audio/video_note_recorder_service.dart';
 import '../../../data/audio/voice_recorder_service.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/network/forward_pending_store.dart';
@@ -23,6 +24,7 @@ import 'chat_app_bar.dart';
 import 'chat_composer.dart';
 import 'chat_message.dart';
 import 'chat_state.dart';
+import 'video_note_record_overlay.dart';
 
 class ChatContent extends ScreenContent<ChatState> {
   // UI resurslari — content darajasida (mobile↔tablet almashsa qayta yaratiladi).
@@ -70,6 +72,11 @@ class ChatContent extends ScreenContent<ChatState> {
     _scroll.dispose();
     if (Get.isRegistered<VoiceRecorderService>()) {
       Get.find<VoiceRecorderService>().cancel();
+    }
+    if (Get.isRegistered<VideoNoteRecorderService>()) {
+      final note = Get.find<VideoNoteRecorderService>();
+      note.cancel();
+      note.release();
     }
   }
 
@@ -243,7 +250,10 @@ class ChatContent extends ScreenContent<ChatState> {
 
   void _scrollToMessage(String messageId) {
     final ctx = _messageKeys[messageId]?.currentContext;
-    if (ctx == null) return;
+    if (ctx == null) {
+      showAppMessage('chat_message_not_found'.tr);
+      return;
+    }
     Scrollable.ensureVisible(
       ctx,
       duration: const Duration(milliseconds: 280),
@@ -314,6 +324,7 @@ class ChatContent extends ScreenContent<ChatState> {
       FutureOr<void> Function(MyAction action) sendAction) {
     final c = context.appColors;
     final recorder = Get.find<VoiceRecorderService>();
+    final videoNote = Get.find<VideoNoteRecorderService>();
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -333,8 +344,15 @@ class ChatContent extends ScreenContent<ChatState> {
             Positioned.fill(
               child: Obx(() {
                 final selecting = state.selecting.value;
-                final bottomPad =
-                    bottomInset + (selecting ? 12.dp : 72.dp);
+                final bottomPad = bottomInset +
+                    (selecting
+                        ? 12.dp
+                        : (state.replyTo.value != null ||
+                                (Get.isRegistered<ForwardPendingStore>() &&
+                                    Get.find<ForwardPendingStore>()
+                                        .hasPending)
+                            ? 128.dp
+                            : 88.dp));
                 return Padding(
                   padding: EdgeInsets.only(top: topPad, bottom: bottomPad),
                   child: Column(
@@ -405,6 +423,11 @@ class ChatContent extends ScreenContent<ChatState> {
                     return const SizedBox.shrink();
                   }
                   final samples = List<double>.of(recorder.liveSamples);
+                  final videoMode = state.composerMediaMode.value ==
+                      ChatComposerMediaMode.video;
+                  final elapsed = videoMode && state.recording.value
+                      ? videoNote.elapsedLabel.value
+                      : recorder.elapsedLabel.value;
                   final fwd = Get.isRegistered<ForwardPendingStore>()
                       ? Get.find<ForwardPendingStore>()
                       : null;
@@ -414,11 +437,14 @@ class ChatContent extends ScreenContent<ChatState> {
                   return ChatComposer(
                     controller: _input,
                     recording: state.recording.value,
+                    recordingLocked: state.recordingLocked.value,
+                    mediaMode: state.composerMediaMode.value,
+                    busy: state.sending.value,
                     showSend: !state.sending.value &&
                         (state.input.value.trim().isNotEmpty || hasFwd),
                     reply: state.replyTo.value,
                     peerName: state.peerName.value,
-                    recordElapsed: recorder.elapsedLabel.value,
+                    recordElapsed: elapsed,
                     recordSamples: samples,
                     forwardCount: fwdItems.length,
                     forwardPreview: fwdItems.isEmpty
@@ -433,7 +459,11 @@ class ChatContent extends ScreenContent<ChatState> {
                     onCancelForward: () => sendAction(CancelForwardDraft()),
                     onChanged: (v) => sendAction(InputChanged(v)),
                     onSend: () => sendAction(SendText()),
-                    onMic: () => sendAction(StartRecording()),
+                    onToggleMediaMode: () =>
+                        sendAction(ToggleComposerMediaMode()),
+                    onStartRecording: () => sendAction(StartRecording()),
+                    onLockRecording: () => sendAction(LockRecording()),
+                    onFinishRecording: () => sendAction(FinishRecording()),
                     onAttach: () => sendAction(OpenAttachMenu()),
                     onAiSuggest: () async {
                       final tone = await showAiReplyStylesBottomSheet(context);
@@ -444,12 +474,32 @@ class ChatContent extends ScreenContent<ChatState> {
                     aiLoading: state.aiSuggesting.value,
                     onCancelReply: () => sendAction(CancelReply()),
                     onCancelRecording: () => sendAction(CancelRecording()),
-                    onSendVoice: () => sendAction(SendVoice()),
-                    onMicTapHint: () => showAppMessage('chat_mic_hold_hint'.tr),
+                    onReplyTap: () {
+                      final id = state.replyTo.value?.id;
+                      if (id != null) _scrollToMessage(id);
+                    },
                   );
                 },
               ),
             ),
+            Obx(() {
+              final showVideo = state.recording.value &&
+                  state.composerMediaMode.value ==
+                      ChatComposerMediaMode.video;
+              if (!showVideo) return const SizedBox.shrink();
+              // Overlay composer ustida emas — composer pastda qolsin.
+              return Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: bottomInset +
+                    (state.recordingLocked.value ? 88.dp : 100.dp),
+                child: VideoNoteRecordOverlay(
+                  controller: videoNote.controller,
+                  elapsed: videoNote.elapsedLabel.value,
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -460,13 +510,26 @@ class ChatContent extends ScreenContent<ChatState> {
     if (!state.peerTyping.value && state.peerActivity.value.isEmpty) {
       return null;
     }
-    return switch (state.peerActivity.value) {
+    final activity = switch (state.peerActivity.value) {
       'photo' => 'chat_activity_photo'.tr,
       'file' => 'chat_activity_file'.tr,
       'voice' => 'chat_activity_voice'.tr,
       'video' => 'chat_activity_video'.tr,
-      _ => 'chat_typing'.tr,
+      _ => null,
     };
+    if (activity != null) return activity;
+    if (state.isGroup.value) {
+      final uid = state.typingUserId.value;
+      if (uid != null && uid > 0) {
+        for (final m in state.messages.reversed) {
+          if (m.senderId == uid && (m.senderName ?? '').trim().isNotEmpty) {
+            return 'chat_typing_named'
+                .trParams({'name': m.senderName!.trim()});
+          }
+        }
+      }
+    }
+    return 'chat_typing'.tr;
   }
 
   Widget _list(AppColors c, ChatState state,
@@ -478,6 +541,8 @@ class ChatContent extends ScreenContent<ChatState> {
           icon: Icons.cloud_off_outlined,
           title: 'chat_load_failed'.tr,
           subtitle: 'common_retry'.tr,
+          actionLabel: 'common_retry'.tr,
+          onAction: () => sendAction(ReloadChatMessages()),
         );
       }
       final selecting = state.selecting.value;

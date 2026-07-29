@@ -14,9 +14,6 @@ class ProductCategoryOption {
 class ProductsState extends GetxController {
   RxList<Product> top = <Product>[].obs;
   RxList<Product> newest = <Product>[].obs;
-  RxList<Product> recommended = <Product>[].obs;
-  /// for-you: ko‘rilganlarga asoslanganmi.
-  RxBool forYouBasedOnViews = false.obs;
   RxList<Product> all = <Product>[].obs;
   RxList<ProductCategoryOption> categories = <ProductCategoryOption>[].obs;
 
@@ -42,7 +39,6 @@ class ProductsState extends GetxController {
   final RxBool aiMatchingLoading = false.obs;
   final RxBool aiMatchingLoadFailed = false.obs;
   final RxBool categoriesLoadFailed = false.obs;
-  final RxBool forYouLoadFailed = false.obs;
 
   /// Search field sync (clear/load bilan UI bir xil bo‘lsin).
   final TextEditingController searchController = TextEditingController();

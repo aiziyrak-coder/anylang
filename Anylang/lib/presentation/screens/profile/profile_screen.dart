@@ -401,10 +401,7 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case CopyAnyLangId _:
         final copyAcc = state.account.value;
         if (copyAcc == null) return;
-        final text = [
-          if (copyAcc.handle.isNotEmpty) copyAcc.handle,
-          if (copyAcc.anylangNumber.isNotEmpty) copyAcc.anylangNumber,
-        ].join(' · ');
+        final text = (copyAcc.username ?? copyAcc.anylangNumber).trim();
         if (text.isEmpty) return;
         await Clipboard.setData(ClipboardData(text: text));
         showAppMessage('profile_id_copied'.tr);
@@ -412,8 +409,12 @@ class ProfileScreen extends Screen<ProfileState, void> {
         final shareAcc = state.account.value;
         if (shareAcc == null || shareAcc.id <= 0) return;
         final url = BusinessCardLinks.urlFor(shareAcc.id);
-        final body =
-            '${shareAcc.name}\n${shareAcc.handle}\n${shareAcc.username ?? shareAcc.anylangNumber}\n$url';
+        final idLine = (shareAcc.username ?? shareAcc.anylangNumber).trim();
+        final body = [
+          shareAcc.name,
+          if (idLine.isNotEmpty) idLine,
+          url,
+        ].join('\n');
         await Share.share(body, subject: shareAcc.name);
       case ShowBusinessBenefits _:
         break;

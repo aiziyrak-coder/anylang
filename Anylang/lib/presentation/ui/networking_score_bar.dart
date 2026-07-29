@@ -41,11 +41,17 @@ class NetworkingScoreBar extends StatelessWidget {
         ),
     ];
 
-    return Wrap(
-      alignment: compact ? WrapAlignment.start : WrapAlignment.center,
-      spacing: 8.dp,
-      runSpacing: 8.dp,
-      children: chips,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < chips.length; i++) ...[
+            if (i > 0) SizedBox(width: 8.dp),
+            chips[i],
+          ],
+        ],
+      ),
     );
   }
 

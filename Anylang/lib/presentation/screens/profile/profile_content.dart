@@ -95,8 +95,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
                     _verificationCta(d, sendAction),
                   ],
                   SizedBox(height: 8.dp),
-                  _idHandleRow(c, d, sendAction),
-                  SizedBox(height: 6.dp),
                   _subtitleRow(c, d),
                   SizedBox(height: 12.dp),
                   _bioSection(context, c, d, sendAction),
@@ -146,12 +144,11 @@ class ProfileContent extends ScreenContent<ProfileState> {
                   SizedBox(height: 18.dp),
                   _statsGrid(c, d),
                   SizedBox(height: 18.dp),
-                  _quickActions(c, d, sendAction),
+                  _activePlanCard(c, d, sendAction),
                   SizedBox(height: 18.dp),
                   ProfileAnyLangIdCard(
                     userId: d.id,
                     anylangId: d.username ?? d.anylangNumber,
-                    handle: d.handle,
                     sendAction: sendAction,
                   ),
                   SizedBox(height: 18.dp),
@@ -444,46 +441,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
     );
   }
 
-  Widget _idHandleRow(
-    AppColors c,
-    ProfileAccount d,
-    void Function(MyAction) sendAction,
-  ) {
-    final idText = d.username ?? d.anylangNumber;
-    final parts = <String>[
-      if (d.handle.isNotEmpty) d.handle,
-      if (idText.isNotEmpty) 'ID $idText',
-    ];
-    if (parts.isEmpty) return const SizedBox.shrink();
-
-    return ProfilePressable(
-      borderRadius: BorderRadius.circular(12.dp),
-      onTap: () => sendAction(CopyAnyLangId()),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 6.dp),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                parts.join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: c.textSecondary,
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            SizedBox(width: 6.dp),
-            Icon(Icons.copy_rounded, size: 16.dp, color: c.accentText),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _subtitleRow(AppColors c, ProfileAccount d) {
     final roleKey = d.roleLabel;
     final roleText = roleKey.isEmpty ? '' : roleKey.tr;
@@ -581,7 +538,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
   }
 
   Widget _infoCard(AppColors c, ProfileAccount d) {
-    final subLabel = d.subscriptionLabel ?? d.subscriptionPlan ?? '';
     final rows = <Widget>[
       InfoRow(
         icon: Icons.dialpad_rounded,
@@ -604,19 +560,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
         label: 'profile_member_since'.tr,
         value: d.memberSince ?? '',
       ),
-      if (subLabel.isNotEmpty)
-        InfoRow(
-          icon: Icons.workspace_premium_outlined,
-          label: 'profile_subscription'.tr,
-          value: subLabel,
-          valueColor: d.showPremiumBadge ? c.accentText : null,
-        ),
-      if (d.subscriptionExpiresAt != null && d.subscriptionActive)
-        InfoRow(
-          icon: Icons.event_available_outlined,
-          label: 'profile_subscription_expires'.tr,
-          value: formatDateDots(d.subscriptionExpiresAt!),
-        ),
     ];
 
     final children = <Widget>[];
@@ -765,46 +708,27 @@ class ProfileContent extends ScreenContent<ProfileState> {
     );
   }
 
-  Widget _quickActions(
+  Widget _activePlanCard(
     AppColors c,
     ProfileAccount d,
     void Function(MyAction) sendAction,
   ) {
-    final actions = <(IconData, String, VoidCallback)>[
-      (
-        Icons.workspace_premium_rounded,
-        'profile_plans'.tr,
-        () => sendAction(OpenSubscription()),
-      ),
-      if (d.isBusiness)
-        (
-          Icons.add_box_outlined,
-          'profile_post_listing'.tr,
-          () => sendAction(AddProductRequested()),
-        ),
-      (
-        Icons.ios_share_rounded,
-        'profile_share'.tr,
-        () => sendAction(ShareProfile()),
-      ),
-      (
-        Icons.qr_code_2_rounded,
-        'profile_qr'.tr,
-        () => sendAction(ShowBusinessCardQr()),
-      ),
-      if (!d.isBusiness)
-        (
-          Icons.business_center_outlined,
-          'profile_business_account'.tr,
-          () => sendAction(OpenBusinessAccount()),
-        ),
-    ];
+    final planName =
+        (d.subscriptionPlan ?? '').trim().isNotEmpty
+            ? d.subscriptionPlan!
+            : 'subscription_free'.tr;
+    final started = d.subscriptionStartedAt;
+    final expires = d.subscriptionExpiresAt;
+    final startedText =
+        started != null ? formatDateDots(started.toLocal()) : '—';
+    final expiresText =
+        expires != null ? formatDateDots(expires.toLocal()) : '—';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'profile_quick_actions'.tr.toUpperCase(),
+          'profile_active_plan'.tr.toUpperCase(),
           style: TextStyle(
             color: c.textSecondary,
             fontSize: 12.sp,
@@ -813,53 +737,121 @@ class ProfileContent extends ScreenContent<ProfileState> {
           ),
         ),
         SizedBox(height: 10.dp),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final w = (constraints.maxWidth - 8.dp) / 2;
-            return Wrap(
-              spacing: 8.dp,
-              runSpacing: 8.dp,
-              children: [
-                for (final a in actions)
-                  ProfilePressable(
-                    borderRadius: BorderRadius.circular(14.dp),
-                    onTap: a.$3,
-                    child: Container(
-                      width: w,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12.dp,
-                        vertical: 12.dp,
-                      ),
-                      decoration: BoxDecoration(
-                        color: c.isDark
-                            ? const Color(0x99152A42)
-                            : const Color(0xCCFFFFFF),
-                        borderRadius: BorderRadius.circular(14.dp),
-                        border: Border.all(color: c.surfaceBorder, width: 0.7),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(a.$1, size: 18.dp, color: c.accentText),
-                          SizedBox(width: 8.dp),
-                          Expanded(
-                            child: Text(
-                              a.$2,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: c.textPrimary,
-                                fontSize: 12.5.sp,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+        Container(
+          padding: EdgeInsets.all(16.dp),
+          decoration: BoxDecoration(
+            color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+            borderRadius: BorderRadius.circular(18.dp),
+            border: Border.all(color: c.surfaceBorder, width: 0.7),
+            boxShadow: c.glassShadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40.dp,
+                    height: 40.dp,
+                    decoration: BoxDecoration(
+                      color: c.accentSoft,
+                      borderRadius: BorderRadius.circular(12.dp),
+                    ),
+                    child: Icon(
+                      Icons.workspace_premium_rounded,
+                      color: c.accentText,
+                      size: 22.dp,
                     ),
                   ),
-              ],
-            );
-          },
+                  SizedBox(width: 12.dp),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          planName,
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (d.subscriptionPeriod != null &&
+                            d.subscriptionPeriod!.trim().isNotEmpty)
+                          Text(
+                            d.subscriptionPeriod!,
+                            style: TextStyle(
+                              color: c.textSecondary,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 14.dp),
+              _planMetaRow(
+                c,
+                Icons.event_available_outlined,
+                'profile_subscription_expires'.tr,
+                expiresText,
+              ),
+              SizedBox(height: 8.dp),
+              _planMetaRow(
+                c,
+                Icons.shopping_bag_outlined,
+                'profile_plan_started'.tr,
+                startedText,
+              ),
+              SizedBox(height: 14.dp),
+              SecondaryButton(
+                text: 'profile_view_plans'.tr,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  sendAction(OpenSubscription());
+                },
+                endIcon: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18.dp,
+                  color: c.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _planMetaRow(
+    AppColors c,
+    IconData icon,
+    String label,
+    String value,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, size: 16.dp, color: c.textFaint),
+        SizedBox(width: 8.dp),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: c.textSecondary,
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ],
     );

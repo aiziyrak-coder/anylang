@@ -9,18 +9,16 @@ import '../../utils/size_controller.dart';
 import 'profile_action.dart';
 import 'profile_pressable.dart';
 
-/// AnyLang raqami — digital vizitka kartasi (ID + QR + nusxa/ulash).
+/// AnyLang raqami — digital vizitka kartasi (7 xonali ID + QR + nusxa/ulash).
 class ProfileAnyLangIdCard extends StatelessWidget {
   final int userId;
   final String anylangId;
-  final String handle;
   final void Function(MyAction) sendAction;
 
   const ProfileAnyLangIdCard({
     super.key,
     required this.userId,
     required this.anylangId,
-    required this.handle,
     required this.sendAction,
   });
 
@@ -28,7 +26,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = userId > 0
         ? BusinessCardLinks.urlFor(userId)
-        : (anylangId.isNotEmpty ? anylangId : handle);
+        : (anylangId.isNotEmpty ? anylangId : '');
 
     return Container(
       width: double.infinity,
@@ -60,30 +58,14 @@ class ProfileAnyLangIdCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      anylangId.isEmpty ? '—' : anylangId,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22.sp,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    if (handle.isNotEmpty) ...[
-                      SizedBox(height: 4.dp),
-                      Text(
-                        handle,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  anylangId.isEmpty ? '—' : anylangId,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22.sp,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
               Container(
@@ -93,7 +75,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12.dp),
                 ),
                 child: QrImageView(
-                  data: url,
+                  data: url.isEmpty ? '—' : url,
                   size: 72.dp,
                   backgroundColor: Colors.white,
                   eyeStyle: const QrEyeStyle(

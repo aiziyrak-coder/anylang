@@ -3,21 +3,13 @@ import 'package:flutter/material.dart';
 import '../../utils/screen_options/my_action.dart';
 import 'chat_message.dart';
 
-/// Biriktirish menyusidagi variantlar (3b).
+/// Biriktirish menyusidagi variantlar.
 enum AttachKind {
-  gallery,
-  camera,
-  video,
-  roundVideo,
+  photo,
   file,
   product,
   location,
   contact,
-  invoice,
-  offer,
-  rfq,
-  catalog,
-  businessCard,
 }
 
 /// Faqat Chat (suhbat) ekraniga xos action'lar.
@@ -136,14 +128,23 @@ class OpenGroupStats extends ChatAction {}
 class OpenSharedMedia extends ChatAction {}
 
 
-/// Mikrofon — ovoz yozishni boshlash (composer record holatiga o'tadi).
+/// Mikrofon — ovoz/video yozishni boshlash (composer record holatiga o'tadi).
 class StartRecording extends ChatAction {}
+
+/// Bir marta bosish — mikrofon ↔ kamera.
+class ToggleComposerMediaMode extends ChatAction {}
+
+/// Yuqoriga surib yozishni "ushlab turish".
+class LockRecording extends ChatAction {}
 
 /// Yozishni bekor qilish (savat).
 class CancelRecording extends ChatAction {}
 
-/// Yozilgan ovozni yuborish.
-class SendVoice extends ChatAction {}
+/// Yozilgan ovoz yoki video-note yuborish (release yoki locked send).
+class FinishRecording extends ChatAction {}
+
+/// Xabarlar ro‘yxatini qayta yuklash.
+class ReloadChatMessages extends ChatAction {}
 
 /// App bar ⋮ — suhbat menyusi (anchor bilan oynacha).
 class OpenChatMenu extends ChatAction {

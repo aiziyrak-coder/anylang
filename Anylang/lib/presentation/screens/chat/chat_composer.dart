@@ -7,11 +7,16 @@ import '../../ui/theme/gradients.dart';
 import '../../ui/waveform_bars.dart';
 import '../../utils/size_controller.dart';
 import 'chat_message.dart';
+import 'chat_state.dart';
 
 /// Suhbat pastki paneli: reply / forward ko'rinishi + input/record.
-class ChatComposer extends StatelessWidget {
+/// Mikrofon tugmasi Telegram uslubida: tap = mic↔camera, hold = yozish,
+/// release = yuborish, swipe up = lock.
+class ChatComposer extends StatefulWidget {
   final TextEditingController controller;
   final bool recording;
+  final bool recordingLocked;
+  final ChatComposerMediaMode mediaMode;
   final bool showSend;
   final ChatMessage? reply;
   final String peerName;
@@ -28,14 +33,17 @@ class ChatComposer extends StatelessWidget {
 
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
-  final VoidCallback onMic;
+  final VoidCallback onToggleMediaMode;
+  final VoidCallback onStartRecording;
+  final VoidCallback onLockRecording;
+  final VoidCallback onFinishRecording;
   final VoidCallback onAttach;
   final VoidCallback? onAiSuggest;
   final bool aiLoading;
   final VoidCallback onCancelReply;
   final VoidCallback onCancelRecording;
-  final VoidCallback onSendVoice;
-  final VoidCallback? onMicTapHint;
+  final VoidCallback? onReplyTap;
+  final bool busy;
 
   const ChatComposer({
     super.key,
@@ -45,30 +53,46 @@ class ChatComposer extends StatelessWidget {
     required this.reply,
     required this.onChanged,
     required this.onSend,
-    required this.onMic,
+    required this.onToggleMediaMode,
+    required this.onStartRecording,
+    required this.onLockRecording,
+    required this.onFinishRecording,
     required this.onAttach,
     required this.onCancelReply,
     required this.onCancelRecording,
-    required this.onSendVoice,
+    this.recordingLocked = false,
+    this.mediaMode = ChatComposerMediaMode.voice,
     this.onAiSuggest,
     this.aiLoading = false,
     this.peerName = '',
     this.recordElapsed = '0:00',
     this.recordSamples = const [],
-    this.onMicTapHint,
     this.forwardCount = 0,
     this.forwardPreview,
     this.forwardSenderLabel,
     this.forwardShowSender = true,
     this.onToggleForwardSender,
     this.onCancelForward,
+    this.onReplyTap,
+    this.busy = false,
   });
 
-  bool get _hasForward => forwardCount > 0;
+  @override
+  State<ChatComposer> createState() => _ChatComposerState();
+}
+
+class _ChatComposerState extends State<ChatComposer> {
+  /// Hold tugmasi input↔record almashganda ham bir xil State saqlansin.
+  final GlobalKey _holdKey = GlobalKey();
+
+  bool get _hasForward => widget.forwardCount > 0;
+  bool get _isVideoMode =>
+      widget.mediaMode == ChatComposerMediaMode.video;
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final recording = widget.recording;
 
     return FrostedBar(
       child: SafeArea(
@@ -79,8 +103,9 @@ class ChatComposer extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_hasForward && !recording) _forwardPreview(c),
-              if (!_hasForward && reply != null && !recording) _replyPreview(c),
-              recording ? _recordRow(c) : _inputRow(c),
+              if (!_hasForward && widget.reply != null && !recording)
+                _replyPreview(c),
+              _mainRow(c),
             ],
           ),
         ),
@@ -88,24 +113,251 @@ class ChatComposer extends StatelessWidget {
     );
   }
 
+  Widget _trailing(AppColors c) {
+    if (widget.busy && !widget.recording) {
+      return SizedBox(
+        width: 44.dp,
+        height: 44.dp,
+        child: Center(
+          child: SizedBox(
+            width: 22.dp,
+            height: 22.dp,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.2,
+              color: c.accent,
+            ),
+          ),
+        ),
+      );
+    }
+    if (!widget.recording && widget.showSend) {
+      return _sendButton(c);
+    }
+    if (widget.recording && widget.recordingLocked) {
+      return MyIconButton(
+        onClick: widget.onFinishRecording,
+        icon: Icons.send_rounded,
+        iconColor: c.onAccent,
+        iconSize: 22.dp,
+        backgroundGradient: limeButtonGradient,
+        borderRadius: 22.dp,
+        padding: EdgeInsets.all(11.dp),
+      );
+    }
+    return _HoldMediaButton(
+      key: _holdKey,
+      mediaMode: widget.mediaMode,
+      recording: widget.recording,
+      locked: widget.recordingLocked,
+      onToggle: widget.busy ? () {} : widget.onToggleMediaMode,
+      onStart: widget.busy ? () {} : widget.onStartRecording,
+      onLock: widget.onLockRecording,
+      onReleaseSend: widget.onFinishRecording,
+      onCancel: widget.onCancelRecording,
+    );
+  }
+
+  Widget _mainRow(AppColors c) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (widget.recording) ..._recordLeading(c) else ..._inputLeading(c),
+        SizedBox(width: 8.dp),
+        _trailing(c),
+      ],
+    );
+  }
+
+  List<Widget> _inputLeading(AppColors c) {
+    return [
+      Opacity(
+        opacity: widget.busy ? 0.45 : 1,
+        child: MyIconButton(
+          onClick: widget.busy ? () {} : widget.onAttach,
+          icon: Icons.add_rounded,
+          iconColor: c.accentText,
+          iconSize: 22.dp,
+          backgroundColor: c.surface,
+          border: Border.all(color: c.surfaceBorder, width: 0.7),
+          borderRadius: 22.dp,
+          padding: EdgeInsets.all(10.dp),
+        ),
+      ),
+      if (widget.onAiSuggest != null) ...[
+        SizedBox(width: 6.dp),
+        Opacity(
+          opacity: widget.aiLoading || widget.busy ? 0.5 : 1,
+          child: MyIconButton(
+            onClick: (widget.aiLoading || widget.busy)
+                ? () {}
+                : widget.onAiSuggest!,
+            icon: widget.aiLoading
+                ? Icons.hourglass_top_rounded
+                : Icons.auto_awesome_rounded,
+            iconColor: c.accentText,
+            iconSize: 20.dp,
+            backgroundColor: c.accentSoft,
+            border: Border.all(
+              color: c.accent.withValues(alpha: 0.35),
+              width: 0.7,
+            ),
+            borderRadius: 22.dp,
+            padding: EdgeInsets.all(10.dp),
+          ),
+        ),
+      ],
+      SizedBox(width: 8.dp),
+      Expanded(
+        child: Container(
+          constraints: BoxConstraints(minHeight: 44.dp),
+          padding: EdgeInsets.symmetric(horizontal: 16.dp),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+            border: Border.all(color: c.surfaceBorder, width: 0.7),
+            borderRadius: BorderRadius.circular(22.dp),
+          ),
+          child: TextField(
+            controller: widget.controller,
+            onChanged: widget.onChanged,
+            enabled: !widget.busy,
+            minLines: 1,
+            maxLines: 4,
+            cursorColor: c.accent,
+            style: TextStyle(color: c.textPrimary, fontSize: 15.sp),
+            decoration: InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 11.dp),
+              hintText: 'chat_input_hint'.tr,
+              hintStyle: TextStyle(color: c.textFaint, fontSize: 15.sp),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _recordLeading(AppColors c) {
+    return [
+      if (widget.recordingLocked)
+        MyIconButton(
+          onClick: widget.onCancelRecording,
+          icon: Icons.delete_outline_rounded,
+          iconColor: kListenRed,
+          iconSize: 22.dp,
+          backgroundColor: c.surface,
+          border: Border.all(color: c.surfaceBorder, width: 0.7),
+          borderRadius: 22.dp,
+          padding: EdgeInsets.all(10.dp),
+        )
+      else
+        SizedBox(
+          width: 44.dp,
+          child: Center(
+            child: Icon(
+              Icons.keyboard_arrow_up_rounded,
+              size: 22.dp,
+              color: c.textFaint,
+            ),
+          ),
+        ),
+      SizedBox(width: 8.dp),
+      Expanded(
+        child: Container(
+          height: 44.dp,
+          padding: EdgeInsets.symmetric(horizontal: 14.dp),
+          decoration: BoxDecoration(
+            color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+            border: Border.all(color: c.surfaceBorder, width: 0.7),
+            borderRadius: BorderRadius.circular(22.dp),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 8.dp,
+                height: 8.dp,
+                decoration: const BoxDecoration(
+                  color: kListenRed,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              SizedBox(width: 8.dp),
+              Text(
+                widget.recordElapsed,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 14.sp,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              SizedBox(width: 10.dp),
+              Expanded(
+                child: widget.recordingLocked
+                    ? (_isVideoMode
+                        ? Text(
+                            'chat_media_locked_hint'.tr,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: c.textFaint,
+                              fontSize: 13.sp,
+                            ),
+                          )
+                        : ClipRect(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: WaveformBars(
+                                color: c.accent,
+                                maxHeight: 22,
+                                barCount: 30,
+                                samples: widget.recordSamples,
+                              ),
+                            ),
+                          ))
+                    : Text(
+                        'chat_media_slide_to_lock'.tr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: c.textFaint,
+                          fontSize: 13.sp,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
+  }
+
   Widget _forwardPreview(AppColors c) {
-    final title = forwardShowSender
-        ? (forwardCount > 1
-            ? 'chat_forward_n'.trParams({'n': '$forwardCount'})
+    final title = widget.forwardShowSender
+        ? (widget.forwardCount > 1
+            ? 'chat_forward_n'.trParams({'n': '${widget.forwardCount}'})
             : 'chat_forward_from'.trParams({
-                'name': forwardSenderLabel ?? '',
+                'name': widget.forwardSenderLabel ?? '',
               }))
-        : (forwardCount > 1
-            ? 'chat_forward_n_hidden'.trParams({'n': '$forwardCount'})
+        : (widget.forwardCount > 1
+            ? 'chat_forward_n_hidden'
+                .trParams({'n': '${widget.forwardCount}'})
             : 'chat_forward_hidden'.tr);
-    final subtitle = forwardShowSender
-        ? (forwardPreview ?? '')
+    final subtitle = widget.forwardShowSender
+        ? () {
+            final base = widget.forwardPreview ?? '';
+            if (widget.forwardCount <= 1) return base;
+            final more = 'chat_forward_more'
+                .trParams({'n': '${widget.forwardCount - 1}'});
+            return base.isEmpty ? more : '$base · $more';
+          }()
         : 'chat_forward_hide_hint'.tr;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onToggleForwardSender,
+        onTap: widget.onToggleForwardSender,
         borderRadius: BorderRadius.circular(12.dp),
         child: Container(
           margin: EdgeInsets.only(bottom: 8.dp),
@@ -157,7 +409,7 @@ class ChatComposer extends StatelessWidget {
                 ),
               ),
               MyIconButton(
-                onClick: onCancelForward ?? () {},
+                onClick: widget.onCancelForward ?? () {},
                 icon: Icons.close_rounded,
                 iconColor: c.textSecondary,
                 iconSize: 18.dp,
@@ -173,131 +425,75 @@ class ChatComposer extends StatelessWidget {
   }
 
   Widget _replyPreview(AppColors c) {
-    final target = reply!;
-    final author = target.isOutgoing ? 'chat_you'.tr : peerName;
-    return Container(
-      margin: EdgeInsets.only(bottom: 8.dp),
-      padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 8.dp),
-      decoration: BoxDecoration(
-        color: c.surface,
+    final target = widget.reply!;
+    final author = target.isOutgoing ? 'chat_you'.tr : widget.peerName;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onReplyTap,
         borderRadius: BorderRadius.circular(12.dp),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 3.dp,
-            height: 36.dp,
-            decoration: BoxDecoration(
-              color: c.accentText,
-              borderRadius: BorderRadius.circular(2.dp),
-            ),
+        child: Container(
+          margin: EdgeInsets.only(bottom: 8.dp),
+          padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 8.dp),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(12.dp),
           ),
-          SizedBox(width: 10.dp),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  author.isEmpty ? 'chat_reply_to'.tr : author,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: c.accentText,
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 3.dp,
+                height: 36.dp,
+                decoration: BoxDecoration(
+                  color: c.accentText,
+                  borderRadius: BorderRadius.circular(2.dp),
                 ),
-                SizedBox(height: 2.dp),
-                Text(
-                  target.previewText(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: c.textFaint, fontSize: 13.sp),
-                ),
-              ],
-            ),
-          ),
-          MyIconButton(
-            onClick: onCancelReply,
-            icon: Icons.close_rounded,
-            iconColor: c.textSecondary,
-            iconSize: 18.dp,
-            backgroundColor: Colors.transparent,
-            borderRadius: 12.dp,
-            padding: EdgeInsets.all(4.dp),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _inputRow(AppColors c) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        MyIconButton(
-          onClick: onAttach,
-          icon: Icons.add_rounded,
-          iconColor: c.accentText,
-          iconSize: 22.dp,
-          backgroundColor: c.surface,
-          border: Border.all(color: c.surfaceBorder, width: 0.7),
-          borderRadius: 22.dp,
-          padding: EdgeInsets.all(10.dp),
-        ),
-        if (onAiSuggest != null) ...[
-          SizedBox(width: 6.dp),
-          MyIconButton(
-            onClick: aiLoading ? () {} : onAiSuggest!,
-            icon: aiLoading
-                ? Icons.hourglass_top_rounded
-                : Icons.auto_awesome_rounded,
-            iconColor: c.accentText,
-            iconSize: 20.dp,
-            backgroundColor: c.accentSoft,
-            border: Border.all(color: c.accent.withValues(alpha: 0.35), width: 0.7),
-            borderRadius: 22.dp,
-            padding: EdgeInsets.all(10.dp),
-          ),
-        ],
-        SizedBox(width: 8.dp),
-        Expanded(
-          child: Container(
-            constraints: BoxConstraints(minHeight: 44.dp),
-            padding: EdgeInsets.symmetric(horizontal: 16.dp),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
-              border: Border.all(color: c.surfaceBorder, width: 0.7),
-              borderRadius: BorderRadius.circular(22.dp),
-            ),
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              minLines: 1,
-              maxLines: 4,
-              cursorColor: c.accent,
-              style: TextStyle(color: c.textPrimary, fontSize: 15.sp),
-              decoration: InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 11.dp),
-                hintText: 'chat_input_hint'.tr,
-                hintStyle: TextStyle(color: c.textFaint, fontSize: 15.sp),
               ),
-            ),
+              SizedBox(width: 10.dp),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      author.isEmpty ? 'chat_reply_to'.tr : author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: c.accentText,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 2.dp),
+                    Text(
+                      target.previewText(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: c.textFaint, fontSize: 13.sp),
+                    ),
+                  ],
+                ),
+              ),
+              MyIconButton(
+                onClick: widget.onCancelReply,
+                icon: Icons.close_rounded,
+                iconColor: c.textSecondary,
+                iconSize: 18.dp,
+                backgroundColor: Colors.transparent,
+                borderRadius: 12.dp,
+                padding: EdgeInsets.all(4.dp),
+              ),
+            ],
           ),
         ),
-        SizedBox(width: 8.dp),
-        showSend ? _sendButton(c) : _micButton(c),
-      ],
+      ),
     );
   }
 
   Widget _sendButton(AppColors c) {
     return MyIconButton(
-      onClick: onSend,
+      onClick: widget.onSend,
       icon: Icons.send_rounded,
       iconColor: c.onAccent,
       iconSize: 22.dp,
@@ -306,92 +502,143 @@ class ChatComposer extends StatelessWidget {
       padding: EdgeInsets.all(11.dp),
     );
   }
+}
 
-  Widget _micButton(AppColors c) {
+/// Telegram uslubidagi hold/tap/swipe-up media tugmasi.
+class _HoldMediaButton extends StatefulWidget {
+  final ChatComposerMediaMode mediaMode;
+  final bool recording;
+  final bool locked;
+  final VoidCallback onToggle;
+  final VoidCallback onStart;
+  final VoidCallback onLock;
+  final VoidCallback onReleaseSend;
+  final VoidCallback onCancel;
+
+  const _HoldMediaButton({
+    super.key,
+    required this.mediaMode,
+    required this.recording,
+    required this.locked,
+    required this.onToggle,
+    required this.onStart,
+    required this.onLock,
+    required this.onReleaseSend,
+    required this.onCancel,
+  });
+
+  @override
+  State<_HoldMediaButton> createState() => _HoldMediaButtonState();
+}
+
+class _HoldMediaButtonState extends State<_HoldMediaButton> {
+  bool _holding = false;
+  bool _lockedLocal = false;
+  bool _cancelledLocal = false;
+  static const double _lockThreshold = -48;
+  static const double _cancelThreshold = -56;
+
+  bool get _isVideo => widget.mediaMode == ChatComposerMediaMode.video;
+
+  @override
+  void didUpdateWidget(covariant _HoldMediaButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.recording) {
+      _holding = false;
+      _lockedLocal = false;
+      _cancelledLocal = false;
+    }
+    if (widget.locked) {
+      _lockedLocal = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final enlarged = _holding && !widget.locked && !_cancelledLocal;
+    final pad = enlarged ? 16.dp : 11.dp;
+    final iconSize = enlarged ? 26.dp : 22.dp;
+
     return Semantics(
-      label: 'chat_mic_hold'.tr,
+      label: _isVideo ? 'chat_cam_hold'.tr : 'chat_mic_hold'.tr,
       button: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22.dp),
-          onLongPress: onMic,
-          onTap: onMicTapHint,
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: limeButtonGradient,
-              borderRadius: BorderRadius.circular(22.dp),
-            ),
-            padding: EdgeInsets.all(11.dp),
-            child: Icon(Icons.mic_rounded, color: c.onAccent, size: 22.dp),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          if (widget.recording || _holding) return;
+          widget.onToggle();
+        },
+        onLongPressStart: (_) {
+          if (widget.locked) return;
+          setState(() {
+            _holding = true;
+            _lockedLocal = false;
+            _cancelledLocal = false;
+          });
+          if (!widget.recording) {
+            widget.onStart();
+          }
+        },
+        onLongPressMoveUpdate: (details) {
+          if (!_holding || widget.locked) return;
+          if (!_cancelledLocal &&
+              details.offsetFromOrigin.dx <= _cancelThreshold) {
+            _cancelledLocal = true;
+            _lockedLocal = false;
+            widget.onCancel();
+            setState(() {});
+            return;
+          }
+          if (_cancelledLocal) return;
+          if (!_lockedLocal &&
+              details.offsetFromOrigin.dy <= _lockThreshold) {
+            _lockedLocal = true;
+            widget.onLock();
+            setState(() {});
+          }
+        },
+        onLongPressEnd: (_) {
+          final wasHolding = _holding;
+          final wasLocked = _lockedLocal || widget.locked;
+          final wasCancelled = _cancelledLocal;
+          setState(() => _holding = false);
+          if (!wasHolding || wasCancelled) return;
+          if (wasLocked) return;
+          widget.onReleaseSend();
+        },
+        onLongPressCancel: () {
+          final shouldCancel = _holding && !_lockedLocal && !_cancelledLocal;
+          setState(() {
+            _holding = false;
+            _cancelledLocal = true;
+          });
+          if (shouldCancel) widget.onCancel();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            gradient: limeButtonGradient,
+            borderRadius: BorderRadius.circular(enlarged ? 28.dp : 22.dp),
+            boxShadow: enlarged
+                ? [
+                    BoxShadow(
+                      color: c.accent.withValues(alpha: 0.45),
+                      blurRadius: 16.dp,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          padding: EdgeInsets.all(pad),
+          child: Icon(
+            _isVideo ? Icons.videocam_rounded : Icons.mic_rounded,
+            color: c.onAccent,
+            size: iconSize,
           ),
         ),
       ),
-    );
-  }
-
-  Widget _recordRow(AppColors c) {
-    return Row(
-      children: [
-        MyIconButton(
-          onClick: onCancelRecording,
-          icon: Icons.delete_outline_rounded,
-          iconColor: kListenRed,
-          iconSize: 22.dp,
-          backgroundColor: c.surface,
-          border: Border.all(color: c.surfaceBorder, width: 0.7),
-          borderRadius: 22.dp,
-          padding: EdgeInsets.all(10.dp),
-        ),
-        SizedBox(width: 8.dp),
-        Expanded(
-          child: Container(
-            height: 44.dp,
-            padding: EdgeInsets.symmetric(horizontal: 14.dp),
-            decoration: BoxDecoration(
-              color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
-              border: Border.all(color: c.surfaceBorder, width: 0.7),
-              borderRadius: BorderRadius.circular(22.dp),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ClipRect(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: WaveformBars(
-                        color: c.accent,
-                        maxHeight: 22,
-                        barCount: 30,
-                        samples: recordSamples,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 10.dp),
-                Text(
-                  recordElapsed,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 14.sp,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        SizedBox(width: 8.dp),
-        MyIconButton(
-          onClick: onSendVoice,
-          icon: Icons.send_rounded,
-          iconColor: c.onAccent,
-          iconSize: 22.dp,
-          backgroundGradient: limeButtonGradient,
-          borderRadius: 22.dp,
-          padding: EdgeInsets.all(11.dp),
-        ),
-      ],
     );
   }
 }

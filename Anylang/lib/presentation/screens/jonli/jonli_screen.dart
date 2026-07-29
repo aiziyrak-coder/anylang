@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -12,7 +13,6 @@ import '../../../data/network/live_repository.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/jonli_history_bottom_sheet.dart';
 import '../../modal/jonli_voice_settings_bottom_sheet.dart';
-import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/formatters/time_formatter.dart';
@@ -49,8 +49,8 @@ class JonliScreen extends Screen<JonliState, void> {
     if (Get.isRegistered<VoicePlayerService>()) {
       Get.find<VoicePlayerService>().setPlaybackRate(state.ttsSpeed.value);
     }
+    // Sessiya Start/Camera/History da ochiladi — tab peek tezlashadi.
     _loadLiveLanguages();
-    _ensureSession();
   }
 
   Future<void> _pauseLiveSession() async {
@@ -90,6 +90,8 @@ class JonliScreen extends Screen<JonliState, void> {
       state.liveLanguagesLoadFailed.value = true;
       showAppWarning('jonli_languages_failed'.tr);
       codes.addAll(const ['uz', 'en', 'ru', 'de', 'ja', 'zh', 'tr']);
+    } else {
+      state.liveLanguagesLoadFailed.value = false;
     }
     state.liveLangCodes.assignAll(codes);
     if (!codes.contains(state.myLanguage.value.langCode)) {
@@ -146,6 +148,7 @@ class JonliScreen extends Screen<JonliState, void> {
   }
 
   Future<void> _offerPlans() async {
+    state.needsPremium.value = true;
     showAppMessage('jonli_premium_required'.tr);
     await navigate(SubscriptionScreen());
   }
@@ -160,6 +163,7 @@ class JonliScreen extends Screen<JonliState, void> {
     final id = (map?['id'] as num?)?.toInt();
     if (id != null) {
       state.sessionId.value = id;
+      state.needsPremium.value = false;
       await _loadTurns(id);
     } else if (result.errorOrNull != null) {
       final err = result.errorOrNull;
@@ -183,11 +187,6 @@ class JonliScreen extends Screen<JonliState, void> {
     }
     parsed.sort((a, b) => a.at.compareTo(b.at));
     state.turns.assignAll(parsed);
-    if (parsed.isNotEmpty) {
-      final last = parsed.last;
-      state.lastOriginal.value = last.original;
-      state.lastTranslated.value = last.translated;
-    }
   }
 
   JonliTranscriptEntry? _entryFromMap(Map<String, dynamic>? map) {
@@ -227,8 +226,6 @@ class JonliScreen extends Screen<JonliState, void> {
     }
     state.sessionId.value = null;
     state.turns.clear();
-    state.lastOriginal.value = '';
-    state.lastTranslated.value = '';
     await _ensureSession();
   }
 
@@ -328,13 +325,33 @@ class JonliScreen extends Screen<JonliState, void> {
   }) async {
     if (!Get.isRegistered<VoicePlayerService>()) return;
     final player = Get.find<VoicePlayerService>();
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    final deadline = DateTime.now().add(max);
-    while (player.isPlaying.value &&
-        DateTime.now().isBefore(deadline) &&
-        gen == _conversationGen &&
-        state.conversationActive.value) {
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    if (!player.isPlaying.value) return;
+    if (gen != _conversationGen || !state.conversationActive.value) return;
+
+    final done = Completer<void>();
+    late final Worker worker;
+    worker = ever<bool>(player.isPlaying, (playing) {
+      if (!playing && !done.isCompleted) {
+        done.complete();
+      }
+    });
+
+    try {
+      await Future.any<void>([
+        done.future,
+        Future<void>.delayed(max),
+        Future<void>(() async {
+          while (gen == _conversationGen &&
+              state.conversationActive.value &&
+              !done.isCompleted) {
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+          }
+          if (!done.isCompleted) done.complete();
+        }),
+      ]);
+    } finally {
+      worker.dispose();
     }
   }
 
@@ -345,7 +362,6 @@ class JonliScreen extends Screen<JonliState, void> {
   }) async {
     if (gen != _conversationGen || !state.conversationActive.value) return;
     if (!hadSpeech) {
-      // Qayta tinglash — xuddi shu navbat.
       await Future<void>.delayed(const Duration(milliseconds: 350));
       if (gen != _conversationGen || !state.conversationActive.value) return;
       await _beginSpeaking(justSpokeIsMe);
@@ -380,62 +396,19 @@ class JonliScreen extends Screen<JonliState, void> {
     }
   }
 
-  Future<void> _processStopSpeaking({required bool advanceConversation}) async {
-    if (state.mode.value == JonliMode.idle &&
-        !Get.find<VoiceRecorderService>().isRecording.value) {
-      return;
-    }
-    final speaker = state.mode.value == JonliMode.other ? 'other' : 'me';
-    final isMe = speaker == 'me';
-    final gen = _conversationGen;
-    _stopSilenceWatch();
-
-    final recorded = await Get.find<VoiceRecorderService>().stop();
-    state.mode.value = JonliMode.idle;
-    final clientTurnId = _pendingClientTurnId;
-    _pendingClientTurnId = null;
-
-    if (recorded == null) {
-      if (clientTurnId != null) {
-        state.turns.removeWhere((t) => t.clientTurnId == clientTurnId);
-      }
-      if (advanceConversation && state.conversationActive.value) {
-        await _continueConversationAfter(
-          justSpokeIsMe: isMe,
-          hadSpeech: false,
-          gen: gen,
-        );
-      }
-      return;
-    }
-
-    // Lokal energiya tekshiruvi — bo'sh/juda past audio serverga ketmasin.
-    final energy = recorded.samples.isEmpty
-        ? 0.0
-        : recorded.samples.reduce((a, b) => a + b) / recorded.samples.length;
-    if (energy < 0.035 || recorded.duration.inMilliseconds < 600) {
-      if (clientTurnId != null) {
-        state.turns.removeWhere((t) => t.clientTurnId == clientTurnId);
-      }
-      showAppMessage('jonli_speak_louder'.tr);
-      if (advanceConversation && state.conversationActive.value) {
-        await _continueConversationAfter(
-          justSpokeIsMe: isMe,
-          hadSpeech: false,
-          gen: gen,
-        );
-      }
-      return;
-    }
-
+  Future<void> _uploadTurn({
+    required String turnId,
+    required bool isMe,
+    required String filePath,
+    required bool advanceConversation,
+    required int gen,
+  }) async {
     final sessionId = state.sessionId.value;
     if (sessionId == null) {
       showAppError('jonli_session_failed'.tr);
       return;
     }
 
-    final turnId =
-        clientTurnId ?? 't${DateTime.now().microsecondsSinceEpoch}_${_turnSeq++}';
     _upsertTurn(
       JonliTranscriptEntry(
         clientTurnId: turnId,
@@ -444,6 +417,7 @@ class JonliScreen extends Screen<JonliState, void> {
         translated: '',
         at: DateTime.now(),
         pending: true,
+        audioPath: filePath,
       ),
     );
 
@@ -452,8 +426,8 @@ class JonliScreen extends Screen<JonliState, void> {
     try {
       final result = await Get.find<LiveRepository>().createTurn(
         sessionId: sessionId,
-        filePath: recorded.path,
-        speaker: speaker,
+        filePath: filePath,
+        speaker: isMe ? 'me' : 'other',
         clientTurnId: turnId,
         ttsVoice: state.ttsVoice.value,
         ttsSpeed: state.ttsSpeed.value,
@@ -469,6 +443,7 @@ class JonliScreen extends Screen<JonliState, void> {
             at: DateTime.now(),
             pending: false,
             failed: true,
+            audioPath: filePath,
           ),
         );
         final err = result.errorOrNull ?? 'jonli_translate_failed'.tr;
@@ -491,8 +466,6 @@ class JonliScreen extends Screen<JonliState, void> {
       final original = map['text_original']?.toString() ?? '';
       final translated = map['text_translated']?.toString() ?? '';
       final at = parseApiDateTime(map['created_at']) ?? DateTime.now();
-      state.lastOriginal.value = original;
-      state.lastTranslated.value = translated;
       _upsertTurn(
         JonliTranscriptEntry(
           id: (map['id'] as num?)?.toInt(),
@@ -501,6 +474,7 @@ class JonliScreen extends Screen<JonliState, void> {
           original: original,
           translated: translated,
           at: at,
+          audioPath: filePath,
         ),
       );
       translatedOk = original.isNotEmpty || translated.isNotEmpty;
@@ -532,8 +506,87 @@ class JonliScreen extends Screen<JonliState, void> {
     }
   }
 
+  Future<void> _processStopSpeaking({required bool advanceConversation}) async {
+    if (state.mode.value == JonliMode.idle &&
+        !Get.find<VoiceRecorderService>().isRecording.value) {
+      return;
+    }
+    final speaker = state.mode.value == JonliMode.other ? 'other' : 'me';
+    final isMe = speaker == 'me';
+    final gen = _conversationGen;
+    _stopSilenceWatch();
+
+    final recorded = await Get.find<VoiceRecorderService>().stop();
+    state.mode.value = JonliMode.idle;
+    final clientTurnId = _pendingClientTurnId;
+    _pendingClientTurnId = null;
+
+    if (recorded == null) {
+      if (clientTurnId != null) {
+        state.turns.removeWhere((t) => t.clientTurnId == clientTurnId);
+      }
+      if (advanceConversation && state.conversationActive.value) {
+        await _continueConversationAfter(
+          justSpokeIsMe: isMe,
+          hadSpeech: false,
+          gen: gen,
+        );
+      }
+      return;
+    }
+
+    final energy = recorded.samples.isEmpty
+        ? 0.0
+        : recorded.samples.reduce((a, b) => a + b) / recorded.samples.length;
+    if (energy < 0.035 || recorded.duration.inMilliseconds < 600) {
+      if (clientTurnId != null) {
+        state.turns.removeWhere((t) => t.clientTurnId == clientTurnId);
+      }
+      showAppMessage('jonli_speak_louder'.tr);
+      if (advanceConversation && state.conversationActive.value) {
+        await _continueConversationAfter(
+          justSpokeIsMe: isMe,
+          hadSpeech: false,
+          gen: gen,
+        );
+      }
+      return;
+    }
+
+    final turnId = clientTurnId ??
+        't${DateTime.now().microsecondsSinceEpoch}_${_turnSeq++}';
+    await _uploadTurn(
+      turnId: turnId,
+      isMe: isMe,
+      filePath: recorded.path,
+      advanceConversation: advanceConversation,
+      gen: gen,
+    );
+  }
+
+  Future<void> _retryTurn(String clientTurnId) async {
+    final i = state.turns.indexWhere((t) => t.clientTurnId == clientTurnId);
+    if (i < 0) return;
+    final entry = state.turns[i];
+    final path = entry.audioPath;
+    if (path == null || path.isEmpty) return;
+    if (state.busy.value) return;
+    await _ensureSession();
+    if (state.sessionId.value == null) return;
+    await _uploadTurn(
+      turnId: clientTurnId,
+      isMe: entry.isMe,
+      filePath: path,
+      advanceConversation: false,
+      gen: _conversationGen,
+    );
+  }
+
   Future<void> _runCameraTranslate() async {
     if (state.busy.value) return;
+    if (state.conversationActive.value) {
+      await _stopConversation(discardRecording: true);
+    }
     await _ensureSession();
     if (state.sessionId.value == null) return;
 
@@ -589,8 +642,6 @@ class JonliScreen extends Screen<JonliState, void> {
       final original = map['text_original']?.toString() ?? '';
       final translated = map['text_translated']?.toString() ?? '';
       final at = parseApiDateTime(map['created_at']) ?? DateTime.now();
-      state.lastOriginal.value = original;
-      state.lastTranslated.value = translated;
       _upsertTurn(
         JonliTranscriptEntry(
           id: (map['turn_id'] as num?)?.toInt(),
@@ -633,7 +684,6 @@ class JonliScreen extends Screen<JonliState, void> {
       case SwitchConversationTurn _:
         if (state.busy.value) return;
         if (state.mode.value != JonliMode.idle) {
-          // Joriy gapni yakunlab, navbatni almashtiramiz.
           await _finishCurrentUtterance();
           return;
         }
@@ -641,13 +691,8 @@ class JonliScreen extends Screen<JonliState, void> {
         if (state.conversationActive.value) {
           await _beginSpeaking(state.nextIsMe.value);
         }
-      case StartSpeaking a:
-        // Legacy hold-to-talk — Conversation Mode ichida ham ishlaydi.
-        if (state.conversationActive.value) return;
-        await _beginSpeaking(a.isMe);
       case StopSpeaking _:
         if (state.conversationActive.value) {
-          // Suhbatda: qo‘lda tugatish = gap yakun + tarjima + navbat.
           await _finishCurrentUtterance();
           return;
         }
@@ -657,10 +702,6 @@ class JonliScreen extends Screen<JonliState, void> {
         state.myLanguage.value = state.otherLanguage.value;
         state.otherLanguage.value = my;
         await _resetSession();
-      case ToggleTheme _:
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        Get.find<ThemeController>()
-            .setMode(isDark ? ThemeMode.light : ThemeMode.dark);
       case OpenVoiceSettings _:
         final picked = await showJonliVoiceSettingsBottomSheet(
           context,
@@ -678,6 +719,7 @@ class JonliScreen extends Screen<JonliState, void> {
           await Get.find<VoicePlayerService>().setPlaybackRate(speed);
         }
       case OpenHistory _:
+        await _ensureSession();
         await showJonliHistoryBottomSheet(context);
       case OpenCameraTranslate _:
         await _runCameraTranslate();
@@ -697,6 +739,16 @@ class JonliScreen extends Screen<JonliState, void> {
       case SelectOtherLanguage a:
         state.otherLanguage.value = a.language;
         await _resetSession();
+      case ReloadLiveLanguages _:
+        await _loadLiveLanguages();
+      case RetryTurn a:
+        await _retryTurn(a.clientTurnId);
+      case CopyTurnText a:
+        await Clipboard.setData(ClipboardData(text: a.text));
+        showAppMessage('jonli_copied'.tr);
+      case OpenJonliPlans _:
+        await navigate(SubscriptionScreen());
+        state.needsPremium.value = false;
     }
   }
 }

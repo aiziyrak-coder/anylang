@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../data/audio/message_alert_sound_service.dart';
+import '../data/audio/video_note_recorder_service.dart';
 import '../data/audio/voice_player_service.dart';
 import '../data/audio/voice_recorder_service.dart';
 import '../data/core/buildNetwork/api_service.dart';
@@ -126,6 +127,10 @@ class DataModule {
     Get.put<RealtimeSyncService>(RealtimeSyncService(), permanent: true);
     Get.put<ForwardPendingStore>(ForwardPendingStore(), permanent: true);
     Get.put<VoiceRecorderService>(VoiceRecorderService(), permanent: true);
+    Get.put<VideoNoteRecorderService>(
+      VideoNoteRecorderService(),
+      permanent: true,
+    );
     Get.put<VoicePlayerService>(VoicePlayerService(), permanent: true);
     Get.put<MessageAlertSoundService>(MessageAlertSoundService(), permanent: true);
     await OfflineChatStore.open();

@@ -72,7 +72,7 @@ class OpenProfileAvatar extends ProfileAction {}
 /// Kameradan tez avatar almashtirish.
 class ChangeAvatarQuick extends ProfileAction {}
 
-/// @username / AnyLang ID nusxalash.
+/// 7 xonali AnyLang ID nusxalash.
 class CopyAnyLangId extends ProfileAction {}
 
 /// Profilni ulashish.

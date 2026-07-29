@@ -76,6 +76,7 @@ class ProfileAccount {
   final String? subscriptionPlan;
   final String? subscriptionPeriod;
   final String? subscriptionLabel;
+  final DateTime? subscriptionStartedAt;
   final DateTime? subscriptionExpiresAt;
   final bool subscriptionActive;
   final bool showPremiumBadge;
@@ -129,6 +130,7 @@ class ProfileAccount {
     this.subscriptionPlan,
     this.subscriptionPeriod,
     this.subscriptionLabel,
+    this.subscriptionStartedAt,
     this.subscriptionExpiresAt,
     this.subscriptionActive = false,
     this.showPremiumBadge = false,
@@ -257,7 +259,7 @@ class ProfileAccount {
       country: formatCountryName(countryCode),
       username: formattedId,
       anylangNumber: number,
-      handle: number.isEmpty ? '' : '@$number',
+      handle: '',
       nativeLanguage: formatLanguagesBadge(languageCodesFromApi(json)),
       memberSince: formatMonthYear(created),
       subscriptionPlan: formatSubscriptionPlan(plan),
@@ -272,6 +274,7 @@ class ProfileAccount {
         startedAt: started,
         expiresAt: expires,
       ),
+      subscriptionStartedAt: started,
       subscriptionExpiresAt: expires,
       subscriptionActive: isActive,
       showPremiumBadge: showPremium,
@@ -361,6 +364,7 @@ class ProfileAccount {
       subscriptionPlan: subscriptionPlan,
       subscriptionPeriod: subscriptionPeriod,
       subscriptionLabel: subscriptionLabel,
+      subscriptionStartedAt: subscriptionStartedAt,
       subscriptionExpiresAt: subscriptionExpiresAt,
       subscriptionActive: subscriptionActive,
       showPremiumBadge: showPremiumBadge,

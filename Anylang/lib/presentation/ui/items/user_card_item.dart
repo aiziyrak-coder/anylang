@@ -196,13 +196,13 @@ class UserCardItem extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (showQuickActions) ...[
+                if (showQuickActions && !_danger && !_warn && !verified) ...[
                   Divider(height: 1, thickness: 1, color: c.surfaceBorder),
                   Padding(
                     padding: EdgeInsets.fromLTRB(8.dp, 6.dp, 8.dp, 8.dp),
                     child: _quickActionsRow(c),
                   ),
-                ] else if (showMessage || showAdd) ...[
+                ] else if (!_danger && !_warn && !verified && (showMessage || showAdd)) ...[
                   Padding(
                     padding: EdgeInsets.fromLTRB(12.dp, 0, 12.dp, 12.dp),
                     child: Row(

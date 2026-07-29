@@ -44,14 +44,6 @@ class ProductsRepository {
     );
   }
 
-  /// Avval ko‘rilgan mahsulotlar asosida shaxsiy tavsiyalar.
-  Future<BaseResult> forYou({int limit = 12}) {
-    return _client.get(
-      api: 'api/v1/products/for-you',
-      queryParameters: {'limit': limit},
-    );
-  }
-
   /// Xarita: ishlab chiqaruvchilar davlatlar bo‘yicha.
   Future<BaseResult> manufacturersMap() {
     return _client.get(api: 'api/v1/products/manufacturers-map');
