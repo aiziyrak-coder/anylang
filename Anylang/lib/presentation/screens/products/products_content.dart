@@ -276,8 +276,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
                   final all = state.all.toList();
 
                   if (all.isEmpty &&
-                      (!showSections ||
-                          (state.top.isEmpty && state.newest.isEmpty))) {
+                      (!showSections || state.top.isEmpty)) {
                     return AppEmptyState(
                       icon: searching
                           ? Icons.search_off_rounded
@@ -311,20 +310,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
                               _horizontalProducts(
                                 context,
                                 state.top,
-                                sendAction,
-                              ),
-                              SizedBox(height: 22.dp),
-                            ],
-                            if (state.newest.isNotEmpty) ...[
-                              _sectionHeader(
-                                c,
-                                icon: Icons.fiber_new_rounded,
-                                title: 'products_newest'.tr,
-                              ),
-                              SizedBox(height: 12.dp),
-                              _horizontalProducts(
-                                context,
-                                state.newest,
                                 sendAction,
                               ),
                               SizedBox(height: 22.dp),
@@ -392,7 +377,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
                                   views: p.views,
                                   imageUrl: p.imageUrl,
                                   hasVideo: (p.videoUrl ?? '').isNotEmpty,
-                                  trustBadges: p.trustBadges,
                                   onTap: () => sendAction(OpenProduct(p)),
                                   onVideoTap: (p.videoUrl ?? '').isEmpty
                                       ? null
@@ -555,7 +539,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
             views: p.views,
             imageUrl: p.imageUrl,
             hasVideo: hasVideo,
-            trustBadges: p.trustBadges,
             onTap: () => sendAction(OpenProduct(p)),
             onVideoTap: hasVideo
                 ? () => showProductVideoDialog(context, url: p.videoUrl!)

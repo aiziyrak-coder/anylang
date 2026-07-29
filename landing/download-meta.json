@@ -1,13 +1,13 @@
 {
-  "version": "1.0.77",
-  "build": 78,
-  "version_full": "1.0.77+78",
+  "version": "1.0.81",
+  "build": 82,
+  "version_full": "1.0.81+82",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.77+78.apk",
-  "size_bytes": 87339105,
-  "size_mb": 83.29,
-  "updated_at": "2026-07-29T13:36:36.379247+00:00",
+  "versioned_filename": "anylang-1.0.81+82.apk",
+  "size_bytes": 88436376,
+  "size_mb": 84.34,
+  "updated_at": "2026-07-29T15:57:04.911265+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.77+78 — for-you olib tashlandi, verified kartada quick actions yo‘q"
+  "notes": "Release 1.0.81+82 — brighter app icon, TOP $30/week queue"
 }

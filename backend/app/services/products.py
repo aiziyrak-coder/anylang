@@ -26,7 +26,8 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_VIDEO_BYTES = 25 * 1024 * 1024
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/x-m4v"}
 MAX_PENDING_TOP_REQUESTS = 3
-PRODUCT_TOP_BOOST_DAYS = 30
+PRODUCT_TOP_BOOST_DAYS = 7
+PRODUCT_TOP_SLOTS = 10
 
 
 def _aware(dt: datetime | None) -> datetime | None:
@@ -47,18 +48,152 @@ def is_effectively_top_pinned(product: Product) -> bool:
     return until > datetime.now(UTC)
 
 
-async def expire_stale_top_pins(db: AsyncSession) -> int:
+async def count_active_top_slots(db: AsyncSession) -> int:
     now = datetime.now(UTC)
     result = await db.execute(
-        update(Product)
+        select(func.count())
+        .select_from(Product)
         .where(
+            Product.is_top_pinned.is_(True),
+            or_(
+                Product.top_pinned_until.is_(None),
+                Product.top_pinned_until > now,
+            ),
+        )
+    )
+    return int(result.scalar() or 0)
+
+
+async def _activate_top_slot(
+    db: AsyncSession,
+    *,
+    product: Product,
+    req: ProductTopRequest,
+    days: int,
+    now: datetime | None = None,
+) -> None:
+    now = now or datetime.now(UTC)
+    until = now + timedelta(days=max(1, days))
+    product.is_top_pinned = True
+    product.top_pinned_until = until
+    if product.status != "published":
+        product.status = "published"
+    req.status = "active"
+    req.activated_at = now
+    req.expires_at = until
+
+
+async def _extend_top_slot(
+    db: AsyncSession,
+    *,
+    product: Product,
+    days: int,
+    payment_id: int | None = None,
+    seller_id: int | None = None,
+    now: datetime | None = None,
+) -> ProductTopRequest:
+    """Uzaytirish — navbatsiz, joriy muddatga +N kun."""
+    now = now or datetime.now(UTC)
+    until = _aware(product.top_pinned_until)
+    base = until if (product.is_top_pinned and until and until > now) else now
+    new_until = base + timedelta(days=max(1, days))
+    product.is_top_pinned = True
+    product.top_pinned_until = new_until
+    if product.status != "published":
+        product.status = "published"
+
+    result = await db.execute(
+        select(ProductTopRequest)
+        .where(
+            ProductTopRequest.product_id == product.id,
+            ProductTopRequest.status == "active",
+        )
+        .order_by(ProductTopRequest.created_at.desc())
+        .limit(1)
+    )
+    req = result.scalar_one_or_none()
+    if req is None:
+        req = ProductTopRequest(
+            product_id=product.id,
+            seller_id=seller_id or product.seller_id,
+            status="active",
+            note="extend",
+            payment_id=payment_id,
+            paid_at=now,
+            activated_at=now,
+            expires_at=new_until,
+        )
+        db.add(req)
+    else:
+        req.expires_at = new_until
+        if payment_id is not None:
+            req.payment_id = payment_id
+            req.paid_at = now
+    await db.flush()
+    return req
+
+
+async def promote_top_queue(db: AsyncSession) -> int:
+    """Bo'sh slot bo'lsa — to'langan navbatdan FIFO bo'yicha chiqaradi."""
+    now = datetime.now(UTC)
+    promoted = 0
+    while await count_active_top_slots(db) < PRODUCT_TOP_SLOTS:
+        result = await db.execute(
+            select(ProductTopRequest, Product)
+            .join(Product, Product.id == ProductTopRequest.product_id)
+            .where(ProductTopRequest.status == "queued")
+            .order_by(
+                ProductTopRequest.paid_at.asc().nullslast(),
+                ProductTopRequest.id.asc(),
+            )
+            .limit(1)
+        )
+        row = result.one_or_none()
+        if row is None:
+            break
+        req, product = row
+        if product.status == "archived":
+            req.status = "cancelled"
+            req.reviewed_at = now
+            await db.flush()
+            continue
+        await _activate_top_slot(
+            db,
+            product=product,
+            req=req,
+            days=PRODUCT_TOP_BOOST_DAYS,
+            now=now,
+        )
+        promoted += 1
+        await db.flush()
+    return promoted
+
+
+async def expire_stale_top_pins(db: AsyncSession) -> int:
+    """Muddati o'tgan Top ni yechadi va navbatdan keyingisini chiqaradi."""
+    now = datetime.now(UTC)
+    expired_result = await db.execute(
+        select(Product).where(
             Product.is_top_pinned.is_(True),
             Product.top_pinned_until.is_not(None),
             Product.top_pinned_until <= now,
         )
-        .values(is_top_pinned=False)
     )
-    return int(result.rowcount or 0)
+    expired_products = list(expired_result.scalars().all())
+    for product in expired_products:
+        product.is_top_pinned = False
+        await db.execute(
+            update(ProductTopRequest)
+            .where(
+                ProductTopRequest.product_id == product.id,
+                ProductTopRequest.status == "active",
+            )
+            .values(status="expired", expires_at=product.top_pinned_until or now)
+        )
+    if expired_products:
+        await db.flush()
+    promoted = await promote_top_queue(db)
+    return len(expired_products) + promoted
 
 PRODUCT_CATEGORIES: dict[str, dict[str, str]] = {
     "clothing_accessories": {
@@ -205,6 +340,9 @@ async def _favorite_ids(db: AsyncSession, user_id: int, product_ids: list[int]) 
 
 
 async def _top_product_ids(db: AsyncSession, *, limit: int = 10) -> list[int]:
+    """Faqat boost qilingan (is_top_pinned) mahsulotlar — max 10.
+    Yangi e'lon avtomatik Topga tushmasin.
+    """
     await expire_stale_top_pins(db)
     now = datetime.now(UTC)
     pinned_result = await db.execute(
@@ -221,54 +359,9 @@ async def _top_product_ids(db: AsyncSession, *, limit: int = 10) -> list[int]:
             _seller_filter(),
         )
         .order_by(Product.top_pinned_until.desc().nullslast(), Product.created_at.desc())
+        .limit(max(1, min(limit, 10)))
     )
-    pinned_ids = list(pinned_result.scalars().all())
-
-    remaining = max(limit - len(pinned_ids), 0)
-    if remaining == 0:
-        return pinned_ids[:limit]
-
-    cutoff = (datetime.now(UTC) - timedelta(days=30)).strftime("%Y-%m-%d")
-    views_subq = (
-        select(
-            ProductView.product_id.label("product_id"),
-            func.count(ProductView.id).label("recent_views"),
-        )
-        .where(ProductView.day_bucket >= cutoff)
-        .group_by(ProductView.product_id)
-        .subquery()
-    )
-
-    popular_result = await db.execute(
-        select(
-            Product.id,
-            Product.seller_id,
-            func.coalesce(views_subq.c.recent_views, 0).label("rv"),
-        )
-        .join(User, User.id == Product.seller_id)
-        .join(Subscription, Subscription.user_id == User.id)
-        .outerjoin(views_subq, views_subq.c.product_id == Product.id)
-        .where(
-            Product.status == "published",
-            _seller_filter(),
-            Product.id.notin_(pinned_ids) if pinned_ids else True,
-        )
-        .order_by(func.coalesce(views_subq.c.recent_views, 0).desc(), Product.created_at.desc())
-    )
-
-    selected: list[int] = list(pinned_ids)
-    seller_counts: dict[int, int] = {}
-    for row in popular_result:
-        pid = int(row.id)
-        sid = int(row.seller_id)
-        if seller_counts.get(sid, 0) >= 2:
-            continue
-        selected.append(pid)
-        seller_counts[sid] = seller_counts.get(sid, 0) + 1
-        if len(selected) >= limit:
-            break
-
-    return selected[:limit]
+    return list(pinned_result.scalars().all())
 
 
 def _sniff_image_content_type(data: bytes, declared: str | None) -> str:
@@ -592,17 +685,73 @@ async def _serialize_detail(
     if viewer is not None and viewer.id == product.seller_id:
         result = await db.execute(
             select(ProductTopRequest)
-            .where(ProductTopRequest.product_id == product.id)
+            .where(
+                ProductTopRequest.product_id == product.id,
+                ProductTopRequest.status.in_(("queued", "active", "pending")),
+            )
             .order_by(ProductTopRequest.created_at.desc())
             .limit(1)
         )
         req = result.scalar_one_or_none()
+        if req is None:
+            # Eng so'nggi yopilgan so'rov (UI uchun)
+            result = await db.execute(
+                select(ProductTopRequest)
+                .where(ProductTopRequest.product_id == product.id)
+                .order_by(ProductTopRequest.created_at.desc())
+                .limit(1)
+            )
+            req = result.scalar_one_or_none()
         if req is not None:
-            base["top_request"] = _serialize_top_request(req, product=product)
+            base["top_request"] = await _serialize_top_request(db, req, product=product)
     return base
 
 
-def _serialize_top_request(req: ProductTopRequest, *, product: Product | None = None) -> dict:
+def _seconds_until(dt: datetime | None) -> int | None:
+    until = _aware(dt)
+    if until is None:
+        return None
+    return max(0, int((until - datetime.now(UTC)).total_seconds()))
+
+
+async def _queue_position(db: AsyncSession, req: ProductTopRequest) -> int | None:
+    if req.status != "queued":
+        return None
+    paid_at = _aware(req.paid_at) or _aware(req.created_at)
+    earlier = await db.execute(
+        select(func.count())
+        .select_from(ProductTopRequest)
+        .where(
+            ProductTopRequest.status == "queued",
+            or_(
+                and_(
+                    ProductTopRequest.paid_at.is_not(None),
+                    ProductTopRequest.paid_at < (paid_at or datetime.now(UTC)),
+                ),
+                and_(
+                    ProductTopRequest.paid_at.is_(None),
+                    ProductTopRequest.created_at < (paid_at or datetime.now(UTC)),
+                ),
+                and_(
+                    ProductTopRequest.paid_at == paid_at,
+                    ProductTopRequest.id < req.id,
+                ),
+            ),
+        )
+    )
+    return int(earlier.scalar() or 0) + 1
+
+
+async def _serialize_top_request(
+    db: AsyncSession,
+    req: ProductTopRequest,
+    *,
+    product: Product | None = None,
+) -> dict:
+    expires_at = req.expires_at
+    if req.status == "active" and product is not None and product.top_pinned_until is not None:
+        expires_at = product.top_pinned_until
+    effectively = is_effectively_top_pinned(product) if product is not None else False
     return {
         "id": req.id,
         "product_id": req.product_id,
@@ -612,8 +761,17 @@ def _serialize_top_request(req: ProductTopRequest, *, product: Product | None = 
         "admin_note": req.admin_note or "",
         "created_at": req.created_at,
         "reviewed_at": req.reviewed_at,
+        "paid_at": req.paid_at,
+        "activated_at": req.activated_at,
+        "expires_at": expires_at,
+        "seconds_left": _seconds_until(expires_at) if req.status == "active" else None,
+        "queue_position": await _queue_position(db, req),
+        "can_extend": effectively and req.status == "active",
         "product_name": product.name if product is not None else None,
-        "is_top_pinned": product.is_top_pinned if product is not None else None,
+        "is_top_pinned": effectively if product is not None else None,
+        "price_usd": "30.00",
+        "period_days": PRODUCT_TOP_BOOST_DAYS,
+        "max_slots": PRODUCT_TOP_SLOTS,
     }
 
 
@@ -1388,15 +1546,33 @@ async def list_my_products(
 
     count_query = select(func.count()).select_from(query.subquery())
     total = int((await db.execute(count_query)).scalar() or 0)
-    result = await db.execute(query.offset(params.offset).limit(params.limit))
+    result = await db.execute(query.offset(params.offset).limit(params.page_size))
     products = list(result.scalars().unique().all())
     fav_ids = await _favorite_ids(db, user.id, [p.id for p in products])
     top_ids = set(await _top_product_ids(db))
 
-    items = [
-        await _serialize_product(p, favorite_ids=fav_ids, top_ids=top_ids)
-        for p in products
-    ]
+    open_reqs: dict[int, ProductTopRequest] = {}
+    if products:
+        req_rows = await db.execute(
+            select(ProductTopRequest)
+            .where(
+                ProductTopRequest.product_id.in_([p.id for p in products]),
+                ProductTopRequest.status.in_(("queued", "active", "pending")),
+            )
+            .order_by(ProductTopRequest.created_at.desc())
+        )
+        for req in req_rows.scalars().all():
+            open_reqs.setdefault(req.product_id, req)
+
+    items = []
+    for p in products:
+        row = await _serialize_product(p, favorite_ids=fav_ids, top_ids=top_ids)
+        req = open_reqs.get(p.id)
+        if req is not None:
+            row["top_request"] = await _serialize_top_request(db, req, product=p)
+        else:
+            row["top_request"] = None
+        items.append(row)
     return {
         "items": items,
         "page": params.page,
@@ -1535,70 +1711,13 @@ async def request_top_promotion(
     product_id: int,
     note: str = "",
 ) -> dict:
-    await _require_business_account(user)
-    product = await _get_product_or_404(db, product_id, viewer=user, allow_owner_draft=True)
-    if product.seller_id != user.id:
-        raise AppError(
-            message="Bu mahsulot sizga tegishli emas",
-            error_code="NOT_PRODUCT_OWNER",
-            status_code=403,
-        )
-    if product.status != "published":
-        raise AppError(
-            message="Faqat e'lon qilingan mahsulot uchun TOP so'rov yuboriladi",
-            error_code="PRODUCT_NOT_PUBLISHED",
-            status_code=400,
-        )
-    if product.is_top_pinned:
-        raise AppError(
-            message="Mahsulot allaqachon TOP'da",
-            error_code="ALREADY_TOP_PINNED",
-            status_code=400,
-        )
-
-    pending = await db.execute(
-        select(ProductTopRequest).where(
-            ProductTopRequest.product_id == product_id,
-            ProductTopRequest.status == "pending",
-        )
+    """Eski bepul so'rov o'chirildi — faqat $30/hafta to'lov."""
+    del db, user, product_id, note
+    raise AppError(
+        message="TOP uchun to'lov kerak: $30 / 1 hafta. Bo'sh joy bo'lmasa navbatga yozilasiz.",
+        error_code="PRODUCT_TOP_PAYMENT_REQUIRED",
+        status_code=400,
     )
-    if pending.scalar_one_or_none() is not None:
-        raise AppError(
-            message="Bu mahsulot uchun so'rov allaqachon yuborilgan",
-            error_code="TOP_REQUEST_ALREADY_PENDING",
-            status_code=409,
-        )
-
-    seller_pending_count = int(
-        (
-            await db.execute(
-                select(func.count())
-                .select_from(ProductTopRequest)
-                .where(
-                    ProductTopRequest.seller_id == user.id,
-                    ProductTopRequest.status == "pending",
-                )
-            )
-        ).scalar()
-        or 0
-    )
-    if seller_pending_count >= MAX_PENDING_TOP_REQUESTS:
-        raise AppError(
-            message=f"Bir vaqtda maksimal {MAX_PENDING_TOP_REQUESTS} ta TOP so'rov",
-            error_code="TOP_REQUEST_LIMIT",
-            status_code=400,
-        )
-
-    req = ProductTopRequest(
-        product_id=product.id,
-        seller_id=user.id,
-        status="pending",
-        note=(note or "").strip()[:300],
-    )
-    db.add(req)
-    await db.flush()
-    await db.refresh(req)
-    return _serialize_top_request(req, product=product)
 
 
 async def cancel_top_request(db: AsyncSession, *, user: User, product_id: int) -> dict:
@@ -1613,7 +1732,7 @@ async def cancel_top_request(db: AsyncSession, *, user: User, product_id: int) -
         select(ProductTopRequest)
         .where(
             ProductTopRequest.product_id == product_id,
-            ProductTopRequest.status == "pending",
+            ProductTopRequest.status.in_(("pending", "queued")),
         )
         .order_by(ProductTopRequest.created_at.desc())
         .limit(1)
@@ -1625,10 +1744,16 @@ async def cancel_top_request(db: AsyncSession, *, user: User, product_id: int) -
             error_code="TOP_REQUEST_NOT_FOUND",
             status_code=404,
         )
+    if req.status == "queued" and req.payment_id is not None:
+        raise AppError(
+            message="To'langan navbatni bekor qilib bo'lmaydi — navbat kelganda Topga chiqadi",
+            error_code="TOP_QUEUE_PAID",
+            status_code=400,
+        )
     req.status = "cancelled"
     req.reviewed_at = datetime.now(UTC)
     await db.flush()
-    return _serialize_top_request(req, product=product)
+    return await _serialize_top_request(db, req, product=product)
 
 
 async def list_top_requests(
@@ -1638,26 +1763,50 @@ async def list_top_requests(
     page: int | None = None,
     limit: int | None = None,
 ) -> dict:
+    await expire_stale_top_pins(db)
     params = normalize_page(page, limit, default_size=50, max_size=100)
     query = select(ProductTopRequest, Product).join(
         Product, Product.id == ProductTopRequest.product_id
     )
-    if status in {"pending", "approved", "rejected", "cancelled"}:
+    allowed = {
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
+        "queued",
+        "active",
+        "expired",
+    }
+    if status in allowed:
         query = query.where(ProductTopRequest.status == status)
-    query = query.order_by(ProductTopRequest.created_at.desc())
+    if status == "queued":
+        query = query.order_by(
+            ProductTopRequest.paid_at.asc().nullslast(),
+            ProductTopRequest.id.asc(),
+        )
+    elif status == "active":
+        query = query.order_by(ProductTopRequest.expires_at.asc().nullslast())
+    else:
+        query = query.order_by(ProductTopRequest.created_at.desc())
 
     count_query = select(func.count()).select_from(query.order_by(None).subquery())
     total = int((await db.execute(count_query)).scalar() or 0)
     rows = list(
         (await db.execute(query.offset(params.offset).limit(params.page_size))).all()
     )
-    items = [_serialize_top_request(req, product=product) for req, product in rows]
+    items = [
+        await _serialize_top_request(db, req, product=product) for req, product in rows
+    ]
     return {
         "items": items,
         "page": params.page,
         "limit": params.page_size,
         "total": total,
         "has_more": params.offset + len(items) < total,
+        "slots_used": await count_active_top_slots(db),
+        "max_slots": PRODUCT_TOP_SLOTS,
+        "price_usd": "30.00",
+        "period_days": PRODUCT_TOP_BOOST_DAYS,
     }
 
 
@@ -1694,13 +1843,20 @@ async def review_top_request(
     req.reviewed_by = admin_id
     req.reviewed_at = datetime.now(UTC)
     if approve:
-        product.is_top_pinned = True
-        # Admin pin: no expiry (permanent until manually cleared).
-        product.top_pinned_until = None
-        if product.status != "published":
-            product.status = "published"
+        slots = await count_active_top_slots(db)
+        if slots >= PRODUCT_TOP_SLOTS:
+            req.status = "queued"
+            req.paid_at = datetime.now(UTC)
+        else:
+            await _activate_top_slot(
+                db,
+                product=product,
+                req=req,
+                days=PRODUCT_TOP_BOOST_DAYS,
+            )
+            req.status = "active"
     await db.flush()
-    return _serialize_top_request(req, product=product)
+    return await _serialize_top_request(db, req, product=product)
 
 
 async def prepare_product_top_checkout(
@@ -1708,8 +1864,13 @@ async def prepare_product_top_checkout(
     *,
     user: User,
     product_id: int,
-) -> Product:
-    """Validate ownership before creating a $5/mo TOP boost payment."""
+    mode: str = "boost",
+) -> tuple[Product, str]:
+    """Validate ownership before creating a $30/week TOP boost payment.
+
+    Returns (product, resolved_mode) where mode is 'boost' | 'extend'.
+    """
+    await expire_stale_top_pins(db)
     await _require_business_account(user)
     product = await _get_product_or_404(
         db, product_id, viewer=user, allow_owner_draft=True
@@ -1726,11 +1887,49 @@ async def prepare_product_top_checkout(
             error_code="PRODUCT_NOT_PUBLISHED",
             status_code=400,
         )
-    return product
+
+    resolved = (mode or "boost").strip().lower()
+    if resolved not in {"boost", "extend"}:
+        resolved = "boost"
+
+    open_req = (
+        await db.execute(
+            select(ProductTopRequest)
+            .where(
+                ProductTopRequest.product_id == product.id,
+                ProductTopRequest.status.in_(("queued", "active", "pending")),
+            )
+            .order_by(ProductTopRequest.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    if is_effectively_top_pinned(product) or (
+        open_req is not None and open_req.status == "active"
+    ):
+        # Topda turgan mahsulot — faqat uzaytirish.
+        return product, "extend"
+
+    if open_req is not None and open_req.status == "queued":
+        raise AppError(
+            message="Mahsulot allaqachon Top navbatida — navbat kelganda avtomatik chiqadi",
+            error_code="TOP_ALREADY_QUEUED",
+            status_code=409,
+        )
+
+    if resolved == "extend":
+        raise AppError(
+            message="Mahsulot hozir Topda emas — avval Topga chiqaring",
+            error_code="NOT_TOP_PINNED",
+            status_code=400,
+        )
+
+    return product, "boost"
 
 
 async def activate_product_top_from_payment(db: AsyncSession, payment) -> Product:
-    """Apply paid TOP boost (stacks remaining time)."""
+    """To'lovdan keyin: slot bo'sh → Top; to'liq → navbat; Topda → uzaytirish."""
+    await expire_stale_top_pins(db)
     meta = payment.meta or {}
     try:
         product_id = int(meta.get("product_id"))
@@ -1745,6 +1944,7 @@ async def activate_product_top_from_payment(db: AsyncSession, payment) -> Produc
     except (TypeError, ValueError):
         days = PRODUCT_TOP_BOOST_DAYS
     days = max(1, min(days, 366))
+    mode = str(meta.get("mode") or "boost").strip().lower()
 
     product = await db.get(Product, product_id)
     if product is None:
@@ -1761,12 +1961,70 @@ async def activate_product_top_from_payment(db: AsyncSession, payment) -> Produc
         )
 
     now = datetime.now(UTC)
-    until = _aware(product.top_pinned_until)
-    base = until if (product.is_top_pinned and until and until > now) else now
-    product.is_top_pinned = True
-    product.top_pinned_until = base + timedelta(days=days)
-    if product.status != "published":
-        product.status = "published"
+
+    if mode == "extend" or is_effectively_top_pinned(product):
+        await _extend_top_slot(
+            db,
+            product=product,
+            days=days,
+            payment_id=payment.id,
+            seller_id=payment.user_id,
+            now=now,
+        )
+        await db.flush()
+        return product
+
+    open_req = (
+        await db.execute(
+            select(ProductTopRequest)
+            .where(
+                ProductTopRequest.product_id == product.id,
+                ProductTopRequest.status.in_(("queued", "active")),
+            )
+            .order_by(ProductTopRequest.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    if open_req is not None and open_req.status == "active":
+        await _extend_top_slot(
+            db,
+            product=product,
+            days=days,
+            payment_id=payment.id,
+            seller_id=payment.user_id,
+            now=now,
+        )
+        await db.flush()
+        return product
+
+    if open_req is not None and open_req.status == "queued":
+        open_req.payment_id = payment.id
+        open_req.paid_at = now
+        await db.flush()
+        await promote_top_queue(db)
+        return product
+
+    slots = await count_active_top_slots(db)
+    req = ProductTopRequest(
+        product_id=product.id,
+        seller_id=product.seller_id,
+        status="queued",
+        note="paid",
+        payment_id=payment.id,
+        paid_at=now,
+    )
+    db.add(req)
+    await db.flush()
+
+    if slots < PRODUCT_TOP_SLOTS:
+        await _activate_top_slot(
+            db,
+            product=product,
+            req=req,
+            days=days,
+            now=now,
+        )
     await db.flush()
     return product
 

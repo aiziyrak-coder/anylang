@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../product_video_badge.dart';
-import '../product_trust_badges.dart';
-import '../product_trust_badges_view.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 
-/// "Top mahsulotlar" gorizontal ro'yxatining kartasi (TOP badge bilan).
+/// "Top mahsulotlar" gorizontal ro'yxatining kartasi.
 class ProductTopCard extends StatelessWidget {
   final String iconAsset;
   final LinearGradient tileGradient;
@@ -15,7 +13,6 @@ class ProductTopCard extends StatelessWidget {
   final String views;
   final String? imageUrl;
   final bool hasVideo;
-  final ProductTrustBadges trustBadges;
   final VoidCallback onTap;
   final VoidCallback? onVideoTap;
 
@@ -29,7 +26,6 @@ class ProductTopCard extends StatelessWidget {
     required this.onTap,
     this.imageUrl,
     this.hasVideo = false,
-    this.trustBadges = const ProductTrustBadges(),
     this.onVideoTap,
   });
 
@@ -56,7 +52,9 @@ class ProductTopCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: DecoratedBox(decoration: BoxDecoration(gradient: tileGradient)),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(gradient: tileGradient),
+                      ),
                     ),
                     if (url != null && url.isNotEmpty)
                       Positioned.fill(
@@ -64,31 +62,22 @@ class ProductTopCard extends StatelessWidget {
                           url,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => Center(
-                            child: SvgPicture.asset(iconAsset, width: 34.dp, height: 34.dp),
+                            child: SvgPicture.asset(
+                              iconAsset,
+                              width: 34.dp,
+                              height: 34.dp,
+                            ),
                           ),
                         ),
                       )
                     else
-                      Center(child: SvgPicture.asset(iconAsset, width: 34.dp, height: 34.dp)),
-                    Positioned(
-                      top: 10.dp,
-                      left: 10.dp,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 9.dp, vertical: 3.dp),
-                        decoration: BoxDecoration(
-                          color: c.accent,
-                          borderRadius: BorderRadius.circular(99.dp),
-                        ),
-                        child: Text(
-                          'TOP',
-                          style: TextStyle(
-                            color: c.onAccent,
-                            fontSize: 10.sp,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      Center(
+                        child: SvgPicture.asset(
+                          iconAsset,
+                          width: 34.dp,
+                          height: 34.dp,
                         ),
                       ),
-                    ),
                     if (hasVideo)
                       Positioned(
                         left: 10.dp,
@@ -96,16 +85,6 @@ class ProductTopCard extends StatelessWidget {
                         child: ProductVideoBadge(
                           compact: true,
                           onTap: onVideoTap,
-                        ),
-                      ),
-                    if (trustBadges.hasAny)
-                      Positioned(
-                        left: 8.dp,
-                        right: 8.dp,
-                        top: 36.dp,
-                        child: ProductTrustBadgesView(
-                          data: trustBadges,
-                          compact: true,
                         ),
                       ),
                   ],
@@ -142,12 +121,18 @@ class ProductTopCard extends StatelessWidget {
                           'assets/icons/ic_eye.svg',
                           width: 13.dp,
                           height: 13.dp,
-                          colorFilter: ColorFilter.mode(c.textFaint, BlendMode.srcIn),
+                          colorFilter: ColorFilter.mode(
+                            c.textFaint,
+                            BlendMode.srcIn,
+                          ),
                         ),
                         SizedBox(width: 4.dp),
                         Text(
                           views,
-                          style: TextStyle(color: c.textFaint, fontSize: 11.sp),
+                          style: TextStyle(
+                            color: c.textFaint,
+                            fontSize: 11.sp,
+                          ),
                         ),
                       ],
                     ),

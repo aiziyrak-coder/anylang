@@ -209,23 +209,15 @@ class ProductsScreen extends Screen<ProductsState, void> {
     final q = keepQuery ? state.query.value.trim() : '';
     final filters = _filterParams(q: q.isEmpty ? null : q);
 
-    final top = await repo.top();
+    final top = await repo.top(limit: 10);
     if (gen != _loadGen) return;
     top.when(
-      success: (data) => state.top.assignAll(_mapProducts(data)),
+      success: (data) =>
+          state.top.assignAll(_mapProducts(data).take(10).toList()),
       failure: showAppError,
     );
 
-    if (q.isEmpty && !state.hasActiveFilters) {
-      final newest = await repo.list(limit: 12, sort: 'newest');
-      if (gen != _loadGen) return;
-      newest.when(
-        success: (data) => state.newest.assignAll(_mapProducts(data)),
-        failure: showAppError,
-      );
-    } else {
-      state.newest.clear();
-    }
+    state.newest.clear();
 
     if (q.isNotEmpty) {
       await _runSmartSearch(q);
@@ -815,8 +807,11 @@ class ProductsScreen extends Screen<ProductsState, void> {
 
   Future<void> _boostProductTop(Product product) async {
     final payments = Get.find<PaymentRepository>();
-    final checkout =
-        await payments.checkoutProductTop(productId: product.id);
+    final extend = product.isTop || product.topCanExtend;
+    final checkout = await payments.checkoutProductTop(
+      productId: product.id,
+      extend: extend,
+    );
     await checkout.when(
       success: (data) async {
         if (data is! Map) return;
@@ -833,15 +828,17 @@ class ProductsScreen extends Screen<ProductsState, void> {
 
         final confirmed = await showPaymentConfirmBottomSheet(
           context,
-          title: 'my_products_boost_title'.tr,
-          subtitle: 'payment_confirm_subtitle'.tr,
+          title: extend
+              ? 'my_products_boost_extend'.tr
+              : 'my_products_boost_title'.tr,
+          subtitle: 'my_products_boost_body'.tr,
           amount: amount,
           currency: currency,
           amountBeforeTax: data['amount_before_tax']?.toString(),
           taxAmount: data['tax_amount']?.toString(),
           taxPercent: taxPct,
           planLabel: product.name,
-          periodLabel: 'my_products_boost_period'.tr,
+          periodLabel: 'my_products_boost_period'.trParams({'days': '7'}),
           ctaText: 'my_products_boost_pay'.tr,
         );
         if (confirmed != true) {
@@ -865,7 +862,11 @@ class ProductsScreen extends Screen<ProductsState, void> {
             showAppError(confirmPay.errorOrNull);
             return;
           }
-          showAppMessage('my_products_boost_success'.tr);
+          showAppMessage(
+            extend
+                ? 'my_products_boost_extend_success'.tr
+                : 'my_products_boost_success'.tr,
+          );
           await _loadMyProducts();
         } else {
           showAppMessage('my_products_boost_checkout_opened'.tr);

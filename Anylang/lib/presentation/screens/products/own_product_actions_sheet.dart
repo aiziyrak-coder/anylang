@@ -13,6 +13,26 @@ enum OwnProductAction {
   delete,
 }
 
+String formatTopCountdown(int? seconds) {
+  if (seconds == null || seconds <= 0) return '—';
+  final d = seconds ~/ 86400;
+  final h = (seconds % 86400) ~/ 3600;
+  final m = (seconds % 3600) ~/ 60;
+  if (d > 0) {
+    return 'my_products_top_left_dh'.trParams({
+      'days': '$d',
+      'hours': '$h',
+    });
+  }
+  if (h > 0) {
+    return 'my_products_top_left_hm'.trParams({
+      'hours': '$h',
+      'mins': '$m',
+    });
+  }
+  return 'my_products_top_left_m'.trParams({'mins': '$m'});
+}
+
 /// Egasi uchun mahsulot amallar sheet'i.
 Future<OwnProductAction?> showOwnProductActionsSheet(
   BuildContext context, {
@@ -21,6 +41,7 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
   final c = context.appColors;
   final published = product.status == 'published';
   final isTop = product.isTop;
+  final isQueued = product.isTopQueued;
 
   return showModalBottomSheet<OwnProductAction>(
     context: context,
@@ -66,15 +87,27 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (isTop && (product.topPinnedUntil ?? '').isNotEmpty) ...[
-                SizedBox(height: 6.dp),
+              if (isTop) ...[
+                SizedBox(height: 8.dp),
                 Text(
-                  'my_products_top_until'.trParams({
-                    'date': product.topPinnedUntil!,
+                  'my_products_top_countdown'.trParams({
+                    'time': formatTopCountdown(product.topSecondsLeft),
                   }),
                   style: TextStyle(
                     color: c.accentText,
-                    fontSize: 12.sp,
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ] else if (isQueued) ...[
+                SizedBox(height: 8.dp),
+                Text(
+                  'my_products_top_queue_pos'.trParams({
+                    'pos': '${product.topQueuePosition ?? '—'}',
+                  }),
+                  style: TextStyle(
+                    color: c.accentText,
+                    fontSize: 13.sp,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -86,15 +119,28 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
                 label: 'my_products_edit'.tr,
                 onTap: () => Navigator.pop(ctx, OwnProductAction.edit),
               ),
-              _tile(
-                c,
-                icon: Icons.vertical_align_top_rounded,
-                label: isTop
-                    ? 'my_products_boost_extend'.tr
-                    : 'my_products_boost_top'.tr,
-                subtitle: 'my_products_boost_price'.tr,
-                onTap: () => Navigator.pop(ctx, OwnProductAction.boostTop),
-              ),
+              if (!isQueued)
+                _tile(
+                  c,
+                  icon: Icons.vertical_align_top_rounded,
+                  label: isTop
+                      ? 'my_products_boost_extend'.tr
+                      : 'my_products_boost_top'.tr,
+                  subtitle: isTop
+                      ? 'my_products_boost_extend_hint'.tr
+                      : 'my_products_boost_price'.tr,
+                  onTap: () => Navigator.pop(ctx, OwnProductAction.boostTop),
+                ),
+              if (isQueued)
+                _tile(
+                  c,
+                  icon: Icons.hourglass_top_rounded,
+                  label: 'my_products_top_queued'.tr,
+                  subtitle: 'my_products_top_queue_pos'.trParams({
+                    'pos': '${product.topQueuePosition ?? '—'}',
+                  }),
+                  onTap: () {},
+                ),
               _tile(
                 c,
                 icon: published

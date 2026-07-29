@@ -469,8 +469,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       case PickAttachment a:
         if (state.chatId.value <= 0 || state.sending.value) return;
         switch (a.kind) {
-          case AttachKind.photo:
-            await _attachImage();
+          case AttachKind.gallery:
+            await _attachImage(ImageSource.gallery);
+          case AttachKind.camera:
+            await _attachImage(ImageSource.camera);
           case AttachKind.file:
             await _attachFile();
           case AttachKind.product:

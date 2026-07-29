@@ -8,7 +8,6 @@ import '../../modal/business_benefits_bottom_sheet.dart';
 import '../../modal/scam_risk_bottom_sheet.dart';
 import '../../ui/ai_matching_card.dart';
 import '../../ui/market_analytics_card.dart';
-import '../../ui/factory_verification_badges.dart';
 import '../../ui/app_empty_state.dart';
 import '../../ui/app_loading.dart';
 import '../../ui/buttons/secondary_button.dart';
@@ -16,8 +15,9 @@ import '../../ui/items/info_row.dart';
 import '../../ui/items/pill_badge.dart';
 import '../../ui/items/profile_stat_card.dart';
 import '../../ui/language_flag.dart';
-import '../../ui/networking_score_bar.dart';
 import '../../ui/profile_avatar.dart';
+import '../../ui/profile_badges_carousel.dart';
+import '../../ui/factory_verification.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../ui/verification_cta_button.dart';
@@ -98,48 +98,42 @@ class ProfileContent extends ScreenContent<ProfileState> {
                   _subtitleRow(c, d),
                   SizedBox(height: 12.dp),
                   _bioSection(context, c, d, sendAction),
-                  if (d.networkingConnections > 0 ||
-                      d.networkingCountries > 0 ||
-                      d.networkingTrust != null) ...[
+                  Builder(
+                    builder: (_) {
+                      final showTrusted =
+                          d.isBusiness && (d.documentsVerified || d.verified);
+                      final showVerifiedPill = d.isBusiness &&
+                          !d.factoryVerification.factoryVerified &&
+                          d.verified &&
+                          !d.documentsVerified;
+                      final carousel = ProfileBadgesCarousel(
+                        connections: d.networkingConnections,
+                        countries: d.networkingCountries,
+                        trust: d.networkingTrust ?? d.trustScore?.score,
+                        showTrustedMark: showTrusted,
+                        showVerifiedPill: showVerifiedPill,
+                        factoryVerification: d.isBusiness
+                            ? d.factoryVerification
+                            : const FactoryVerification(),
+                      );
+                      if (!carousel.hasAny) return const SizedBox.shrink();
+                      return Padding(
+                        padding: EdgeInsets.only(top: 12.dp),
+                        child: carousel,
+                      );
+                    },
+                  ),
+                  if (d.isBusiness &&
+                      d.scamRisk?.hasWarning == true &&
+                      !d.documentsVerified) ...[
                     SizedBox(height: 12.dp),
-                    NetworkingScoreBar(
-                      connections: d.networkingConnections,
-                      countries: d.networkingCountries,
-                      trust: d.networkingTrust ?? d.trustScore?.score,
-                    ),
-                  ],
-                  if (d.isBusiness) ...[
-                    if (d.documentsVerified || d.verified) ...[
-                      SizedBox(height: 12.dp),
-                      const TrustVerifiedMark(),
-                    ],
-                    if (!d.factoryVerification.factoryVerified &&
-                        d.verified &&
-                        !d.documentsVerified) ...[
-                      SizedBox(height: 12.dp),
-                      PillBadge(
-                        label: 'profile_verified'.tr,
-                        icon: Icons.verified_rounded,
-                        background: c.accent,
-                        foreground: c.onAccent,
-                        fontSize: 12,
-                      ),
-                    ],
-                    if (d.factoryVerification.hasAny) ...[
-                      SizedBox(height: 10.dp),
-                      FactoryVerificationBadges(data: d.factoryVerification),
-                    ],
-                    if (d.scamRisk?.hasWarning == true &&
-                        !d.documentsVerified) ...[
-                      SizedBox(height: 12.dp),
-                      ScamRiskBanner(
+                    ScamRiskBanner(
+                      risk: d.scamRisk!,
+                      onTap: () => showScamRiskBottomSheet(
+                        context,
                         risk: d.scamRisk!,
-                        onTap: () => showScamRiskBottomSheet(
-                          context,
-                          risk: d.scamRisk!,
-                        ),
                       ),
-                    ],
+                    ),
                   ],
                   SizedBox(height: 18.dp),
                   _statsGrid(c, d),
@@ -612,12 +606,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
         '${ins.likes}',
         'profile_likes'.tr,
         grads[0],
-      ),
-      (
-        Icons.translate_rounded,
-        '${ins.translationsCount}',
-        'profile_translations'.tr,
-        grads[1],
       ),
       (
         Icons.verified_user_outlined,

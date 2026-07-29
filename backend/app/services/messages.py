@@ -44,8 +44,8 @@ logger = logging.getLogger(__name__)
 def _translation_timeout_seconds() -> float:
     provider = (get_settings().translation_provider or "mock").strip().lower()
     if provider == "openai":
-        # Translate + grammar proofread (2 OpenAI calls).
-        return 55.0
+        # Single-pass OpenAI translate (no proofread round-trip).
+        return 22.0
     if provider == "deepl":
         return 10.0
     return 3.0
@@ -1255,17 +1255,22 @@ async def finish_voice_transcription_job(
                 sender_language=sender_language,
                 recipients=recipients,
             )
-            for job in jobs:
-                await finish_message_translation_job(
-                    message_id=job["message_id"],
-                    chat_id=job["chat_id"],
-                    text=job["text"],
-                    target_lang=job["target_lang"],
-                    source_lang=job.get("source_lang"),
-                    sender_id=job["sender_id"],
-                    sender_language=job["sender_language"],
-                    recipient_ids=job.get("recipient_ids"),
-                    domain=job.get("domain"),
+            if jobs:
+                await asyncio.gather(
+                    *[
+                        finish_message_translation_job(
+                            message_id=job["message_id"],
+                            chat_id=job["chat_id"],
+                            text=job["text"],
+                            target_lang=job["target_lang"],
+                            source_lang=job.get("source_lang"),
+                            sender_id=job["sender_id"],
+                            sender_language=job["sender_language"],
+                            recipient_ids=job.get("recipient_ids"),
+                            domain=job.get("domain"),
+                        )
+                        for job in jobs
+                    ]
                 )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
