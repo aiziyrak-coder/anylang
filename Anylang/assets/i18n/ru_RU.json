@@ -1502,5 +1502,14 @@
   "marketplace_verified_upload_docs": "Загрузить документы",
   "marketplace_verified_join": "Вступить в группу",
   "marketplace_verified_open_chat": "Открыть чат",
-  "marketplace_verified_join_hint": "После проверки документов вы сможете вступить здесь."
+  "marketplace_verified_join_hint": "После проверки документов вы сможете вступить здесь.",
+  "group_settings_copy_link": "Копировать ссылку",
+  "group_settings_tab_members": "Участники",
+  "group_settings_tab_media": "Медиа",
+  "group_settings_tab_products": "Products",
+  "group_settings_tab_documents": "Documents",
+  "group_settings_tab_companies": "Companies",
+  "group_settings_media_empty": "Нет медиа",
+  "group_settings_media_empty_hint": "Фото и видео группы появятся здесь",
+  "group_settings_invite_missing": "Нет ссылки-приглашения"
 }

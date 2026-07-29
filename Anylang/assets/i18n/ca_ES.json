@@ -1463,5 +1463,14 @@
   "marketplace_verified_upload_docs": "Upload documents",
   "marketplace_verified_join": "Join group",
   "marketplace_verified_open_chat": "Open chat",
-  "marketplace_verified_join_hint": "After documents are approved, you can join from here."
+  "marketplace_verified_join_hint": "After documents are approved, you can join from here.",
+  "group_settings_copy_link": "Copy link",
+  "group_settings_tab_members": "Members",
+  "group_settings_tab_media": "Media",
+  "group_settings_tab_products": "Products",
+  "group_settings_tab_documents": "Documents",
+  "group_settings_tab_companies": "Companies",
+  "group_settings_media_empty": "No media yet",
+  "group_settings_media_empty_hint": "Photos and videos from this group appear here",
+  "group_settings_invite_missing": "No invite link"
 }

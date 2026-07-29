@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 
+import '../group_catalog/group_catalog_models.dart';
+
 class GroupMemberVm {
   final int userId;
   final String fullName;
@@ -29,6 +31,7 @@ class GroupMemberVm {
   }
 }
 
+/// 0 Azolar · 1 Media · 2 Products · 3 Documents · 4 Companies
 class GroupSettingsState extends GetxController {
   int chatId = 0;
   final RxString title = ''.obs;
@@ -40,4 +43,17 @@ class GroupSettingsState extends GetxController {
   final RxList<GroupMemberVm> members = <GroupMemberVm>[].obs;
   final RxBool loading = true.obs;
   final RxBool saving = false.obs;
+
+  final RxInt tabIndex = 0.obs;
+
+  final RxList<GroupCatalogProduct> products = <GroupCatalogProduct>[].obs;
+  final RxList<GroupCatalogDocument> documents = <GroupCatalogDocument>[].obs;
+  final RxList<GroupCatalogCompany> companies = <GroupCatalogCompany>[].obs;
+  final RxBool catalogLoading = false.obs;
+  final RxBool catalogLoaded = false.obs;
+
+  final RxList<Map<String, dynamic>> mediaItems = <Map<String, dynamic>>[].obs;
+  final RxMap<String, int> mediaCounts = <String, int>{}.obs;
+  final RxBool mediaLoading = false.obs;
+  final RxBool mediaLoaded = false.obs;
 }

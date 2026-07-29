@@ -1,4 +1,5 @@
 import '../../utils/screen_options/my_action.dart';
+import '../group_catalog/group_catalog_models.dart';
 
 class GroupSettingsAction extends MyAction {}
 
@@ -48,3 +49,32 @@ class UpgradeSuperGroup extends GroupSettingsAction {}
 class OpenGroupCatalogFromSettings extends GroupSettingsAction {}
 
 class OpenGroupStatsFromSettings extends GroupSettingsAction {}
+
+class SelectGroupSettingsTab extends GroupSettingsAction {
+  final int index;
+  SelectGroupSettingsTab(this.index);
+}
+
+class EditGroupNameTap extends GroupSettingsAction {}
+
+class OpenGroupSettingsMediaItem extends GroupSettingsAction {
+  final Map<String, dynamic> item;
+  OpenGroupSettingsMediaItem(this.item);
+}
+
+class OpenGroupSettingsCatalogProduct extends GroupSettingsAction {
+  final GroupCatalogProduct item;
+  OpenGroupSettingsCatalogProduct(this.item);
+}
+
+class OpenGroupSettingsCatalogDocument extends GroupSettingsAction {
+  final GroupCatalogDocument item;
+  OpenGroupSettingsCatalogDocument(this.item);
+}
+
+class OpenGroupSettingsCatalogCompany extends GroupSettingsAction {
+  final GroupCatalogCompany item;
+  OpenGroupSettingsCatalogCompany(this.item);
+}
+
+class OpenFullSharedMedia extends GroupSettingsAction {}

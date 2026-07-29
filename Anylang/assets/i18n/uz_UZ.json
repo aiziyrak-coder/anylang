@@ -1502,5 +1502,14 @@
   "marketplace_verified_upload_docs": "Hujjatlarni yuklash",
   "marketplace_verified_join": "Guruhga qoʻshilish",
   "marketplace_verified_open_chat": "Chatni ochish",
-  "marketplace_verified_join_hint": "Hujjatlar tasdiqlangach, shu yerda guruhga qoʻshila olasiz."
+  "marketplace_verified_join_hint": "Hujjatlar tasdiqlangach, shu yerda guruhga qoʻshila olasiz.",
+  "group_settings_copy_link": "Havolani nusxalash",
+  "group_settings_tab_members": "Azolar",
+  "group_settings_tab_media": "Media",
+  "group_settings_tab_products": "Products",
+  "group_settings_tab_documents": "Documents",
+  "group_settings_tab_companies": "Companies",
+  "group_settings_media_empty": "Media yoʻq",
+  "group_settings_media_empty_hint": "Guruhdagi rasmlar va videolar shu yerda chiqadi",
+  "group_settings_invite_missing": "Taklif havolasi yoʻq"
 }

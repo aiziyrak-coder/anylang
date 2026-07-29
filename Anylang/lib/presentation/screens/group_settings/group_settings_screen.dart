@@ -7,19 +7,29 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/payment_repository.dart';
+import '../../../data/network/products_repository.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../modal/add_group_members_bottom_sheet.dart';
+import '../../modal/full_screen_image_dialog.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/payment_confirm_bottom_sheet.dart';
+import '../../modal/product_video_dialog.dart';
+import '../../modal/shared_media_bottom_sheet.dart';
 import '../../modal/telegram_action_sheet.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../messages/conversation.dart';
+import '../group_catalog/group_catalog_models.dart';
 import '../group_catalog/group_catalog_payload.dart';
 import '../group_catalog/group_catalog_screen.dart';
 import '../group_stats/group_stats_payload.dart';
 import '../group_stats/group_stats_screen.dart';
+import '../products/product.dart';
+import '../products/product_info_bottom_sheet.dart';
+import '../user_profile/user_profile_payload.dart';
+import '../user_profile/user_profile_screen.dart';
 import 'group_settings_action.dart';
 import 'group_settings_content.dart';
 import 'group_settings_payload.dart';
@@ -235,7 +245,10 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
 
       case CopyInviteLink _:
         final link = state.inviteLink.value;
-        if (link == null || link.isEmpty) return;
+        if (link == null || link.isEmpty) {
+          showAppMessage('group_settings_invite_missing'.tr);
+          return;
+        }
         await Clipboard.setData(ClipboardData(text: link));
         showAppMessage('group_settings_invite_copied'.tr);
 
@@ -266,9 +279,221 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
         if (!_isOwner || state.isSuper.value) return;
         await _upgradeSuper();
 
-      default:
-        break;
+      case SelectGroupSettingsTab a:
+        final i = a.index.clamp(0, 4);
+        if (state.tabIndex.value != i) {
+          state.tabIndex.value = i;
+        }
+        await _ensureTabData(i);
+
+      case EditGroupNameTap _:
+        await _editGroupName();
+
+      case OpenFullSharedMedia _:
+        if (!context.mounted) return;
+        await showSharedMediaBottomSheet(
+          context,
+          chatId: state.chatId,
+          title: state.title.value,
+        );
+
+      case OpenGroupSettingsMediaItem a:
+        await _openMediaItem(a.item);
+
+      case OpenGroupSettingsCatalogProduct a:
+        await _openCatalogProduct(a.item);
+
+      case OpenGroupSettingsCatalogDocument a:
+        await _openCatalogDocument(a.item);
+
+      case OpenGroupSettingsCatalogCompany a:
+        await _openCatalogCompany(a.item);
     }
+  }
+
+  Future<void> _ensureTabData(int index) async {
+    if (index == 1) {
+      await _loadMedia();
+    } else if (index >= 2) {
+      await _loadCatalog();
+    }
+  }
+
+  Future<void> _loadCatalog() async {
+    if (state.catalogLoaded.value || state.catalogLoading.value) return;
+    state.catalogLoading.value = true;
+    try {
+      final result = await Get.find<ChatRepository>().groupCatalog(
+        state.chatId,
+        section: 'all',
+      );
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          if (map == null) return;
+          final catalog = GroupCatalogData.fromApi(map);
+          state.products.assignAll(catalog.products);
+          state.documents.assignAll(catalog.documents);
+          state.companies.assignAll(catalog.companies);
+          state.catalogLoaded.value = true;
+        },
+        failure: showAppError,
+      );
+    } finally {
+      state.catalogLoading.value = false;
+    }
+  }
+
+  Future<void> _loadMedia() async {
+    if (state.mediaLoaded.value || state.mediaLoading.value) return;
+    state.mediaLoading.value = true;
+    try {
+      final repo = Get.find<ChatRepository>();
+      final summary = await repo.sharedMedia(state.chatId, section: 'summary');
+      summary.when(
+        success: (data) {
+          final map = asMap(data) ?? {};
+          final countsRaw = asMap(map['counts']) ?? {};
+          state.mediaCounts.assignAll({
+            for (final e in countsRaw.entries)
+              e.key: (e.value as num?)?.toInt() ?? 0,
+          });
+        },
+        failure: (_) {},
+      );
+      final photos = await repo.sharedMedia(state.chatId, section: 'photos');
+      final videos = await repo.sharedMedia(state.chatId, section: 'videos');
+      final items = <Map<String, dynamic>>[];
+      photos.when(
+        success: (data) {
+          final map = asMap(data) ?? {};
+          for (final e in asList(map['items']).whereType<Map>()) {
+            items.add(Map<String, dynamic>.from(e)..['type'] = 'image');
+          }
+        },
+        failure: (_) {},
+      );
+      videos.when(
+        success: (data) {
+          final map = asMap(data) ?? {};
+          for (final e in asList(map['items']).whereType<Map>()) {
+            items.add(Map<String, dynamic>.from(e)..['type'] = 'video');
+          }
+        },
+        failure: (_) {},
+      );
+      state.mediaItems.assignAll(items);
+      state.mediaLoaded.value = true;
+    } finally {
+      state.mediaLoading.value = false;
+    }
+  }
+
+  Future<void> _editGroupName() async {
+    if (!_isAdmin) return;
+    final ctrl = TextEditingController(text: state.title.value);
+    final next = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('group_settings_name'.tr),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: InputDecoration(hintText: 'group_settings_name'.tr),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (v) => Navigator.pop(ctx, v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('cancel'.tr),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text),
+              child: Text('common_save'.tr),
+            ),
+          ],
+        );
+      },
+    );
+    ctrl.dispose();
+    if (next == null) return;
+    await actionHandler(state, SaveGroupTitle(next));
+  }
+
+  Future<void> _openMediaItem(Map<String, dynamic> item) async {
+    final type = item['type']?.toString() ?? '';
+    final url = item['url']?.toString() ?? item['thumb_url']?.toString() ?? '';
+    if (url.isEmpty) return;
+    if (!context.mounted) return;
+    if (type == 'video') {
+      await showProductVideoDialog(context, url: url, maxPlay: null);
+      return;
+    }
+    await showFullScreenImage(context, url: url);
+  }
+
+  Future<void> _openCatalogProduct(GroupCatalogProduct item) async {
+    final id = item.productId;
+    if (id == null || id <= 0) {
+      showAppMessage('group_catalog_product_no_detail'.tr);
+      return;
+    }
+    final result = await Get.find<ProductsRepository>().detail(id);
+    final map = asMap(result.dataOrNull);
+    if (map == null) {
+      showAppError(result.errorOrNull ?? 'error'.tr);
+      return;
+    }
+    if (!context.mounted) return;
+    final product = Product.fromApi(map);
+    await showProductInfoBottomSheet(
+      context,
+      product,
+      onOpenBusiness: () async {
+        final sellerId = product.sellerId;
+        if (sellerId <= 0) return;
+        final profile =
+            await Get.find<ProfileRepository>().getPublicUser(sellerId);
+        final pmap = asMap(profile.dataOrNull);
+        if (pmap == null) return;
+        await navigate(
+          UserProfileScreen(),
+          payload: UserProfilePayload.fromApi(pmap),
+        );
+      },
+    );
+  }
+
+  Future<void> _openCatalogDocument(GroupCatalogDocument item) async {
+    final url = (item.url ?? '').trim();
+    if (url.isEmpty) {
+      showAppMessage('group_catalog_document_no_url'.tr);
+      return;
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      showAppMessage('group_catalog_document_no_url'.tr);
+      return;
+    }
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) showAppError('error'.tr);
+  }
+
+  Future<void> _openCatalogCompany(GroupCatalogCompany item) async {
+    if (item.userId <= 0) return;
+    final profile =
+        await Get.find<ProfileRepository>().getPublicUser(item.userId);
+    final map = asMap(profile.dataOrNull);
+    if (map == null) {
+      showAppError(profile.errorOrNull ?? 'error'.tr);
+      return;
+    }
+    await navigate(
+      UserProfileScreen(),
+      payload: UserProfilePayload.fromApi(map),
+    );
   }
 
   Future<void> _addMembers() async {
