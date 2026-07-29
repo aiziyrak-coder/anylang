@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
+from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import JSONResponse
@@ -15,10 +17,11 @@ from app.payments import multicard as multicard_mod
 from app.payments import paddle as paddle_mod
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 async def _parse_click_payload(request: Request) -> dict[str, Any]:
-    """Click may send form-urlencoded or JSON."""
+    """Click may send form-urlencoded, multipart, or JSON."""
     content_type = (request.headers.get("content-type") or "").lower()
     if "application/json" in content_type:
         try:
@@ -26,28 +29,91 @@ async def _parse_click_payload(request: Request) -> dict[str, Any]:
             return data if isinstance(data, dict) else {}
         except Exception:
             return {}
-    form = await request.form()
-    return {k: form.get(k) for k in form.keys()}
+
+    # Prefer Starlette form parser (urlencoded / multipart).
+    try:
+        form = await request.form()
+        if form:
+            return {k: form.get(k) for k in form.keys()}
+    except Exception:
+        pass
+
+    # Fallback: raw body as query-string (some Click clients omit Content-Type).
+    try:
+        raw = await request.body()
+        if raw:
+            parsed = parse_qs(raw.decode("utf-8", errors="replace"), keep_blank_values=True)
+            return {k: (v[0] if v else "") for k, v in parsed.items()}
+    except Exception:
+        pass
+    return {}
 
 
-@router.post("/click/prepare")
-async def click_prepare(request: Request, db: DbSession) -> JSONResponse:
+def _client_ip(request: Request) -> str:
+    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if forwarded:
+        return forwarded
+    if request.client:
+        return request.client.host
+    return ""
+
+
+async def _handle_prepare(request: Request, db: DbSession) -> JSONResponse:
     payload = await _parse_click_payload(request)
+    logger.info(
+        "Click PREPARE ip=%s keys=%s merchant_trans_id=%s amount=%s service_id=%s",
+        _client_ip(request),
+        sorted(payload.keys()),
+        payload.get("merchant_trans_id"),
+        payload.get("amount"),
+        payload.get("service_id"),
+    )
     result = await click_mod.handle_prepare(db, payload)
     await db.commit()
+    logger.info(
+        "Click PREPARE result error=%s merchant_trans_id=%s",
+        result.get("error"),
+        result.get("merchant_trans_id"),
+    )
     return JSONResponse(result)
+
+
+async def _handle_complete(request: Request, db: DbSession) -> JSONResponse:
+    payload = await _parse_click_payload(request)
+    logger.info(
+        "Click COMPLETE ip=%s keys=%s merchant_trans_id=%s amount=%s error=%s",
+        _client_ip(request),
+        sorted(payload.keys()),
+        payload.get("merchant_trans_id"),
+        payload.get("amount"),
+        payload.get("error"),
+    )
+    result = await click_mod.handle_complete(db, payload)
+    await db.commit()
+    logger.info(
+        "Click COMPLETE result error=%s merchant_trans_id=%s",
+        result.get("error"),
+        result.get("merchant_trans_id"),
+    )
+    return JSONResponse(result)
+
+
+# With and without trailing slash — Click must not hit a 307 redirect on POST.
+@router.post("/click/prepare")
+@router.post("/click/prepare/")
+async def click_prepare(request: Request, db: DbSession) -> JSONResponse:
+    return await _handle_prepare(request, db)
 
 
 @router.post("/click/complete")
+@router.post("/click/complete/")
 async def click_complete(request: Request, db: DbSession) -> JSONResponse:
-    payload = await _parse_click_payload(request)
-    result = await click_mod.handle_complete(db, payload)
-    await db.commit()
-    return JSONResponse(result)
+    return await _handle_complete(request, db)
 
 
 # Optional form-only aliases (some Click setups POST as form fields).
 @router.post("/click/prepare-form")
+@router.post("/click/prepare-form/")
 async def click_prepare_form(
     db: DbSession,
     click_trans_id: str = Form(...),
@@ -72,8 +138,8 @@ async def click_prepare_form(
     return JSONResponse(result)
 
 
-# Optional form-only aliases (some Click setups POST as form fields).
 @router.post("/click/complete-form")
+@router.post("/click/complete-form/")
 async def click_complete_form(
     db: DbSession,
     click_trans_id: str = Form(...),
