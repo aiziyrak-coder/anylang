@@ -439,7 +439,7 @@ async def list_messages(
     missing_jobs: list[dict] = []
     viewer_lang = user_preferred_lang(user)
     for m in visible:
-        if (m.type not in {"text", "voice", "video"} or m.sender_id == user.id:
+        if m.type not in {"text", "voice", "video"} or m.sender_id == user.id:
             continue
         src_text = (m.text_original or "").strip()
         if not src_text:
