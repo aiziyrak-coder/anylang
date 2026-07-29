@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -125,12 +126,16 @@ class VideoNoteRecorderService extends GetxService {
     if (ctrl != null && ctrl.value.isRecordingVideo) {
       try {
         final file = await ctrl.stopVideoRecording();
-        // Discard temp file path — OS cleans cache; we ignore it.
-        debugPrint('VideoNoteRecorder.cancel discarded ${file.path}');
+        try {
+          final f = File(file.path);
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
       } catch (_) {}
     }
     recording.value = false;
     elapsedLabel.value = '0:00';
+    hitMaxDuration.value = false;
+    onHitMaxDuration = null;
   }
 
   Future<void> release() async {

@@ -155,10 +155,12 @@ class FriendsContent extends ScreenContent<FriendsState> {
               final viewers = state.profileViewers.toList();
               final viewersTotal = state.profileViewersTotal.value;
               final viewersLocked = state.profileViewersLocked.value;
+              final viewersFailed = state.profileViewersLoadFailed.value;
               final showViewers = q.isEmpty &&
                   !state.hasActiveFilters &&
                   (viewers.isNotEmpty ||
-                      (viewersLocked && viewersTotal > 0));
+                      (viewersLocked && viewersTotal > 0) ||
+                      viewersFailed);
 
               if (onlineVisible.isEmpty &&
                   others.isEmpty &&
@@ -266,12 +268,22 @@ class FriendsContent extends ScreenContent<FriendsState> {
                 children.add(
                   Padding(
                     padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 8.dp),
-                    child: Text(
-                      'friends_recommendations_failed'.tr,
-                      style: TextStyle(
-                        color: c.textSecondary,
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w600,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => sendAction(RetryFriendsExtras()),
+                        borderRadius: BorderRadius.circular(8.dp),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6.dp),
+                          child: Text(
+                            'friends_recommendations_failed'.tr,
+                            style: TextStyle(
+                              color: c.accentText,
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -291,6 +303,31 @@ class FriendsContent extends ScreenContent<FriendsState> {
                     ),
                   ),
                 );
+                if (viewersFailed && viewers.isEmpty && !viewersLocked) {
+                  children.add(
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(20.dp, 0, 20.dp, 8.dp),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => sendAction(RetryFriendsExtras()),
+                          borderRadius: BorderRadius.circular(8.dp),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 6.dp),
+                            child: Text(
+                              'profile_viewers_failed'.tr,
+                              style: TextStyle(
+                                color: c.accentText,
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
                 if (viewersLocked) {
                   children.add(
                     Padding(

@@ -1539,5 +1539,11 @@
   "chat_file_pending": "File uploading…",
   "chat_forward_more": "+@n more",
   "chat_typing_named": "@name is typing…",
-  "chat_products_loading": "Loading products…"
+  "chat_products_loading": "Loading products…",
+  "common_user": "User",
+  "chat_voice_play": "Voice message",
+  "settings_language_sync_failed": "Could not sync language to server",
+  "device_fallback_mobile": "Mobile",
+  "outbox_file_missing": "Local file missing; message kept pending",
+  "profile_viewers_failed": "Could not load profile viewers. Tap to retry"
 }

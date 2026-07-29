@@ -86,6 +86,7 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
   void dispose() {
     _chatLangReloadTimer?.cancel();
     _chatLangReloadTimer = null;
+    super.dispose();
   }
 
   @override
@@ -130,7 +131,7 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
             await SessionStore.saveUser(map);
           }
         } catch (_) {
-          // Lokal til saqlangan; keyingi so'rovda sync bo'ladi.
+          showAppWarning('settings_language_sync_failed'.tr);
         }
         // Ochiq chat tarixini yangi til bilan qayta yuklash.
         if (ChatStateScope.isRegistered) {

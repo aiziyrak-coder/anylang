@@ -1539,5 +1539,11 @@
   "chat_file_pending": "Файл загружается…",
   "chat_forward_more": "+ещё @n",
   "chat_typing_named": "@name печатает…",
-  "chat_products_loading": "Загрузка товаров…"
+  "chat_products_loading": "Загрузка товаров…",
+  "common_user": "Пользователь",
+  "chat_voice_play": "Голосовое сообщение",
+  "settings_language_sync_failed": "Не удалось сохранить язык на сервере",
+  "device_fallback_mobile": "Мобильный",
+  "outbox_file_missing": "Локальный файл не найден, сообщение ожидает",
+  "profile_viewers_failed": "Не удалось загрузить просмотры. Нажмите, чтобы повторить"
 }

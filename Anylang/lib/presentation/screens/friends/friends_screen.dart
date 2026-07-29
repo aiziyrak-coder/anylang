@@ -146,14 +146,13 @@ class FriendsScreen extends Screen<FriendsState, void> {
             .map((e) => ProfileViewer.fromApi(Map<String, dynamic>.from(e)))
             .where((e) => e.userId > 0)
             .toList();
+        state.profileViewersLoadFailed.value = false;
         state.profileViewersLocked.value = locked;
         state.profileViewersTotal.value = total;
         state.profileViewers.assignAll(items);
       },
       failure: (_) {
-        state.profileViewers.clear();
-        state.profileViewersTotal.value = 0;
-        state.profileViewersLocked.value = false;
+        state.profileViewersLoadFailed.value = true;
       },
     );
   }
@@ -468,6 +467,11 @@ class FriendsScreen extends Screen<FriendsState, void> {
         state.query.value = a.text;
       case RefreshFriends _:
         await _load();
+      case RetryFriendsExtras _:
+        await Future.wait([
+          _loadRecommendations(),
+          _loadProfileViewers(),
+        ]);
       case OpenFriendRequests _:
         await _openRequestsSheet();
       case AddRecommendedFriend a:

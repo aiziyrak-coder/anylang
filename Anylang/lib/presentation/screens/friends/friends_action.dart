@@ -104,3 +104,6 @@ class FriendsToggleVerified extends FriendsAction {}
 class FriendsToggleOnline extends FriendsAction {}
 
 class FriendsClearFilters extends FriendsAction {}
+
+/// Tavsiyalar / profil ko‘ruvchilarini qayta yuklash.
+class RetryFriendsExtras extends FriendsAction {}

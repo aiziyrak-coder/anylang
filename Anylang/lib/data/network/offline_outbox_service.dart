@@ -20,6 +20,7 @@ class OfflineOutboxService extends GetxService {
   StreamSubscription<bool>? _sub;
   bool _flushing = false;
   bool _queued = false;
+  bool _missingFileWarned = false;
 
   Future<OfflineOutboxService> init() async {
     await OfflineChatStore.open();
@@ -104,7 +105,12 @@ class OfflineOutboxService extends GetxService {
             kind == 'video') {
           final path = item['file_path']?.toString();
           if (path == null || path.isEmpty || !File(path).existsSync()) {
-            permanentFail = true;
+            // Fayl yo‘q — outboxdan o‘chirmaymiz (qayta urinish uchun).
+            if (!_missingFileWarned) {
+              _missingFileWarned = true;
+              showAppWarning('outbox_file_missing'.tr);
+            }
+            continue;
           } else {
             final mediaType = item['media_type']?.toString() ??
                 (kind == 'voice' ? 'voice' : kind);

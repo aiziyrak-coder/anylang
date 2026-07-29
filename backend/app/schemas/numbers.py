@@ -46,6 +46,7 @@ class RandomNumberOut(BaseModel):
 
 class ReserveIn(BaseModel):
     number: str = Field(min_length=7, max_length=7)
+    minutes: int | None = None
 
 
 class ReserveOut(BaseModel):

@@ -13,6 +13,7 @@ import '../../../data/network/profile_repository.dart';
 import '../../modal/payment_confirm_bottom_sheet.dart';
 import '../../ui/items/plan_card.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/money_format.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../products/products_state.dart';
@@ -53,9 +54,13 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
   }
 
   String _money(String amount) {
-    final prefix = state.priceCurrencyPrefix.value;
-    if (amount.startsWith(prefix) || amount.startsWith('\$')) return amount;
-    return '$prefix$amount';
+    final prefix = state.priceCurrencyPrefix.value.trim();
+    final currency = prefix == '\$'
+        ? 'USD'
+        : (prefix.isEmpty ? 'UZS' : prefix.toUpperCase());
+    final cleaned = amount.replaceAll(RegExp(r'[^0-9.\-]'), '');
+    if (cleaned.isEmpty) return amount;
+    return formatMoneyAmount(cleaned, currency: currency);
   }
 
   Future<void> _loadAll() async {

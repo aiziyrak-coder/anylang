@@ -579,6 +579,14 @@ async def reserve_number(
     assignment = result.scalar_one_or_none()
     now = datetime.now(UTC)
 
+    # minutes <= 0 — o'z rezervini yechish (checkout bekor).
+    if minutes is not None and minutes <= 0:
+        if assignment is not None and assignment.reserved_by_user_id == user.id:
+            assignment.reserved_until = None
+            assignment.reserved_by_user_id = None
+            await db.flush()
+        return {"number": number, "reserved_until": now}
+
     if assignment is not None:
         if assignment.user_id is not None:
             raise AppError(message="Raqam band", error_code="NUMBER_TAKEN", status_code=409)

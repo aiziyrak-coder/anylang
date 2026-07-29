@@ -71,12 +71,15 @@ class ChatContent extends ScreenContent<ChatState> {
     _search.dispose();
     _scroll.dispose();
     if (Get.isRegistered<VoiceRecorderService>()) {
-      Get.find<VoiceRecorderService>().cancel();
+      unawaited(Get.find<VoiceRecorderService>().cancel());
     }
     if (Get.isRegistered<VideoNoteRecorderService>()) {
       final note = Get.find<VideoNoteRecorderService>();
-      note.cancel();
-      note.release();
+      note.onHitMaxDuration = null;
+      unawaited(() async {
+        await note.cancel();
+        await note.release();
+      }());
     }
   }
 
@@ -128,6 +131,11 @@ class ChatContent extends ScreenContent<ChatState> {
     _lastKeyboardInset = 0;
     // Faqat yangi xabar qo'shilganda pastga — status yangilanishida sakramasin.
     _messagesWorker = ever(state.messages, (list) {
+      final keep = list.map((m) => m.id).toSet();
+      for (final id in state.pinnedMessages.map((m) => m.id)) {
+        keep.add(id);
+      }
+      _messageKeys.removeWhere((k, _) => !keep.contains(k));
       final n = list.length;
       if (n > _lastMessageCount) {
         final newest = n > 0 ? list.last : null;
@@ -248,9 +256,15 @@ class ChatContent extends ScreenContent<ChatState> {
     });
   }
 
-  void _scrollToMessage(String messageId) {
+  void _scrollToMessage(String messageId, {int attempt = 0}) {
     final ctx = _messageKeys[messageId]?.currentContext;
     if (ctx == null) {
+      if (attempt < 4) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToMessage(messageId, attempt: attempt + 1);
+        });
+        return;
+      }
       showAppMessage('chat_message_not_found'.tr);
       return;
     }

@@ -383,6 +383,7 @@ class ProductsContent extends ScreenContent<ProductsState> {
                               itemBuilder: (_, i) {
                                 final p = all[i];
                                 return ProductGridCard(
+                                  key: ValueKey(p.id),
                                   iconAsset: p.iconAsset,
                                   tileGradient: p.tileGradient,
                                   name: p.name,

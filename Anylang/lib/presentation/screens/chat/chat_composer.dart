@@ -493,7 +493,7 @@ class _ChatComposerState extends State<ChatComposer> {
 
   Widget _sendButton(AppColors c) {
     return MyIconButton(
-      onClick: widget.onSend,
+      onClick: widget.busy ? () {} : widget.onSend,
       icon: Icons.send_rounded,
       iconColor: c.onAccent,
       iconSize: 22.dp,

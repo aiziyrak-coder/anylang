@@ -23,6 +23,7 @@ class FriendsState extends GetxController {
   RxList<ProfileViewer> profileViewers = <ProfileViewer>[].obs;
   RxInt profileViewersTotal = 0.obs;
   RxBool profileViewersLocked = false.obs;
+  RxBool profileViewersLoadFailed = false.obs;
 
   /// Networking Score (profil yonida).
   RxInt networkingConnections = 0.obs;

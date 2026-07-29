@@ -555,7 +555,12 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
     );
   }
 
+  bool _upgradeInFlight = false;
+
   Future<void> _upgradeSuper() async {
+    if (_upgradeInFlight) return;
+    _upgradeInFlight = true;
+    try {
     final pay = Get.find<PaymentRepository>();
     final checkout = await pay.checkoutSuperGroup(chatId: state.chatId);
     final data = checkout.dataOrNull;
@@ -612,16 +617,27 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
       await Future.delayed(const Duration(seconds: 2));
       final st = await pay.getPayment(id);
       final p = asMap(st.dataOrNull) ?? {};
-      if (p['status'] == 'succeeded') {
+      final status = p['status']?.toString().toLowerCase();
+      if (status == 'succeeded' ||
+          status == 'paid' ||
+          status == 'completed') {
         state.isSuper.value = true;
         state.memberLimit.value = null;
         showAppMessage('group_settings_super_ok'.tr);
         succeeded = true;
         break;
       }
+      if (status == 'canceled' ||
+          status == 'cancelled' ||
+          status == 'failed') {
+        break;
+      }
     }
     if (!succeeded) {
       showAppWarning('group_settings_payment_timeout'.tr);
+    }
+    } finally {
+      _upgradeInFlight = false;
     }
   }
 

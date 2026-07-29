@@ -51,6 +51,7 @@ class NumbersScreen extends Screen<NumbersState, void> {
     _lifecycle?.dispose();
     _pendingPaymentId = null;
     state.awaitingPayment.value = false;
+    super.dispose();
   }
 
   Future<void> _loadAll() async {
@@ -379,6 +380,7 @@ class NumbersScreen extends Screen<NumbersState, void> {
             ctaText: 'subscription_pay_confirm_cta'.tr,
           );
           if (confirmed != true) {
+            unawaited(Get.find<NumbersRepository>().releaseReserve(item.number));
             showAppMessage('payment_confirm_later_hint'.tr);
             return;
           }

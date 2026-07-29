@@ -1539,5 +1539,11 @@
   "chat_file_pending": "Fayl yuklanmoqda…",
   "chat_forward_more": "+@n ta yana",
   "chat_typing_named": "@name yozmoqda…",
-  "chat_products_loading": "Mahsulotlar yuklanmoqda…"
+  "chat_products_loading": "Mahsulotlar yuklanmoqda…",
+  "common_user": "Foydalanuvchi",
+  "chat_voice_play": "Ovozli xabar",
+  "settings_language_sync_failed": "Til serverga saqlanmadi",
+  "device_fallback_mobile": "Mobil",
+  "outbox_file_missing": "Lokal fayl topilmadi, xabar kutmoqda",
+  "profile_viewers_failed": "Ko‘ruvchilarni yuklab bo‘lmadi. Qayta urinish uchun bosing"
 }

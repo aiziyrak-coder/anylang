@@ -46,6 +46,14 @@ class NumbersRepository {
     );
   }
 
+  /// Buyurtma bekor — rezervni yechish (minutes: 0).
+  Future<BaseResult> releaseReserve(String number) {
+    return _client.post(
+      api: 'api/v1/numbers/reserve',
+      data: {'number': number, 'minutes': 0},
+    );
+  }
+
   Future<BaseResult> purchaseFree(String number) {
     return _client.post(
       api: 'api/v1/numbers/purchase',

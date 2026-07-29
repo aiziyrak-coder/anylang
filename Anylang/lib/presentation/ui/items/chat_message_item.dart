@@ -956,37 +956,41 @@ class ChatMessageItem extends StatelessWidget {
           );
         }
 
-        final playBtn = GestureDetector(
-          onTap: () {
-            if (!canPlay || path == null) {
-              showAppMessage('chat_voice_unavailable'.tr);
-              return;
-            }
-            HapticFeedback.selectionClick();
-            player.toggle(
-              id: message.id,
-              path: path,
-              duration: duration.inMilliseconds > 0
-                  ? duration
-                  : const Duration(seconds: 1),
-              samples: message.voiceSamples,
-              barCount: expandToTranscript ? 36 : 22,
-            );
-          },
-          child: Container(
-            width: 40.dp,
-            height: 40.dp,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _out ? c.onAccent.withValues(alpha: 0.18) : c.accent,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              !canPlay
-                  ? Icons.file_download_outlined
-                  : (playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-              size: 20.dp,
-              color: c.onAccent,
+        final playBtn = Semantics(
+          label: 'chat_voice_play'.tr,
+          button: true,
+          child: GestureDetector(
+            onTap: () {
+              if (!canPlay || path == null) {
+                showAppMessage('chat_voice_unavailable'.tr);
+                return;
+              }
+              HapticFeedback.selectionClick();
+              player.toggle(
+                id: message.id,
+                path: path,
+                duration: duration.inMilliseconds > 0
+                    ? duration
+                    : const Duration(seconds: 1),
+                samples: message.voiceSamples,
+                barCount: expandToTranscript ? 36 : 22,
+              );
+            },
+            child: Container(
+              width: 40.dp,
+              height: 40.dp,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _out ? c.onAccent.withValues(alpha: 0.18) : c.accent,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                !canPlay
+                    ? Icons.file_download_outlined
+                    : (playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                size: 20.dp,
+                color: c.onAccent,
+              ),
             ),
           ),
         );

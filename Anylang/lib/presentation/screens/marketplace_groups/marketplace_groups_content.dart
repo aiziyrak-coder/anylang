@@ -49,8 +49,18 @@ class MarketplaceGroupsContent extends ScreenContent<MarketplaceGroupsState> {
                 if (state.loading.value) {
                   return const Center(child: AppLoading());
                 }
+                final err = state.loadError.value;
                 final open = state.groups.where((g) => !g.verifiedOnly).toList();
                 final verified = state.groups.where((g) => g.verifiedOnly).toList();
+                if (err != null && open.isEmpty && verified.isEmpty) {
+                  return AppEmptyState(
+                    icon: Icons.wifi_off_rounded,
+                    title: 'marketplace_groups_load_failed'.tr,
+                    subtitle: err,
+                    actionLabel: 'common_retry'.tr,
+                    onAction: () => sendAction(MarketplaceGroupsRefresh()),
+                  );
+                }
                 if (open.isEmpty && verified.isEmpty) {
                   return AppEmptyState(
                     icon: Icons.storefront_outlined,

@@ -27,6 +27,7 @@ class RealtimeSyncService extends GetxService {
   StreamSubscription<Map<String, dynamic>>? _sub;
   int? _activeChatId;
   Timer? _typingClearTimer;
+  Timer? _rebindDebounce;
 
   int? get activeChatId => _activeChatId;
 
@@ -43,7 +44,11 @@ class RealtimeSyncService extends GetxService {
     _sub?.cancel();
     _sub = Get.find<SocketService>().messages.listen(
       _onEvent,
-      onError: (e) => debugPrint('RealtimeSync error: $e'),
+      onError: (e) {
+        debugPrint('RealtimeSync error: $e');
+        _rebindDebounce?.cancel();
+        _rebindDebounce = Timer(const Duration(seconds: 2), rebind);
+      },
     );
   }
 
@@ -93,7 +98,8 @@ class RealtimeSyncService extends GetxService {
       return;
     }
     final name = (data['device_name']?.toString() ?? '').trim();
-    final deviceName = name.isEmpty ? 'Mobile' : name;
+    final deviceName =
+        name.isEmpty ? 'device_fallback_mobile'.tr : name;
     Future.microtask(() async {
       final ctx = Get.overlayContext;
       if (ctx == null || !ctx.mounted) return;

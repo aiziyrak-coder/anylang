@@ -70,6 +70,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         );
 
   int _seq = 0;
+  /// StartRecording async tayyorligini bekor qilish (release/cancel race).
+  int _recordStartGen = 0;
+  bool _finishingRecord = false;
   Timer? _typingDebounce;
   bool _lastTypingSent = false;
   int? _boundChatId;
@@ -321,6 +324,24 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               status: ChatStatus.pending,
             ),
           );
+        } else if (kind == 'video') {
+          final extra = e['extra_meta'];
+          final round = extra is Map && extra['is_round_note'] == true;
+          out.add(
+            ChatMessage.video(
+              id: id,
+              dir: ChatDir.outgoing,
+              time: formatMessageClock(created),
+              createdAt: created,
+              url: path,
+              isRoundNote: round,
+              duration: extra is Map
+                  ? extra['duration_label']?.toString()
+                  : null,
+              status: ChatStatus.pending,
+              transcriptPending: true,
+            ),
+          );
         } else {
           out.add(
             ChatMessage.file(
@@ -435,6 +456,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         await _sendComposer(state);
 
       case OpenAttachMenu _:
+        if (state.sending.value || state.recording.value) return;
+        FocusManager.instance.primaryFocus?.unfocus();
         final me = SessionStore.user() ?? {};
         final showProduct = me['is_business'] == true;
         final kind = await showAttachmentBottomSheet(
@@ -852,10 +875,15 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         await _openChatProduct(a.message);
 
       case StartRecording _:
-        if (state.recording.value || state.sending.value) return;
+        if (state.recording.value ||
+            state.sending.value ||
+            _finishingRecord) {
+          return;
+        }
         FocusManager.instance.primaryFocus?.unfocus();
         final player = Get.find<VoicePlayerService>();
         if (player.isPlaying.value) await player.stop(save: true);
+        final startGen = ++_recordStartGen;
         final videoMode =
             state.composerMediaMode.value == ChatComposerMediaMode.video;
         if (videoMode) {
@@ -867,7 +895,17 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
               return;
             }
           }
+          if (startGen != _recordStartGen) {
+            await note.cancel();
+            unawaited(note.release());
+            return;
+          }
           final ok = await note.start();
+          if (startGen != _recordStartGen) {
+            await note.cancel();
+            unawaited(note.release());
+            return;
+          }
           if (!ok) {
             showAppMessage('chat_video_permission_denied'.tr);
             return;
@@ -876,12 +914,16 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           state.recordingLocked.value = false;
           _sendTyping(state, isTyping: true, activity: 'video');
           note.onHitMaxDuration = () {
-            if (state.recording.value) {
+            if (state.recording.value && !_finishingRecord) {
               sendAction(FinishRecording());
             }
           };
         } else {
           final ok = await Get.find<VoiceRecorderService>().start();
+          if (startGen != _recordStartGen) {
+            await Get.find<VoiceRecorderService>().cancel();
+            return;
+          }
           if (!ok) {
             showAppMessage('mic_permission_denied'.tr);
             return;
@@ -892,7 +934,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         }
 
       case ToggleComposerMediaMode _:
-        if (state.recording.value) return;
+        if (state.recording.value || _finishingRecord) return;
         final next = state.composerMediaMode.value == ChatComposerMediaMode.voice
             ? ChatComposerMediaMode.video
             : ChatComposerMediaMode.voice;
@@ -909,6 +951,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         }
 
       case CancelRecording _:
+        _recordStartGen++;
         if (state.composerMediaMode.value == ChatComposerMediaMode.video) {
           final note = Get.find<VideoNoteRecorderService>();
           note.onHitMaxDuration = null;
@@ -922,6 +965,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         _sendTyping(state, isTyping: false);
 
       case FinishRecording _:
+        if (!state.recording.value || _finishingRecord) return;
         if (state.composerMediaMode.value == ChatComposerMediaMode.video) {
           await _finishVideoNote();
         } else {
@@ -936,6 +980,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
 
       case Back _:
         _typingDebounce?.cancel();
+        _recordStartGen++;
         _sendTyping(state, isTyping: false);
         if (state.selecting.value) {
           sendAction(ExitSelectMode());
@@ -963,8 +1008,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         }
         await Get.find<VoiceRecorderService>().cancel();
         if (Get.isRegistered<VideoNoteRecorderService>()) {
-          await Get.find<VideoNoteRecorderService>().cancel();
-          await Get.find<VideoNoteRecorderService>().release();
+          final note = Get.find<VideoNoteRecorderService>();
+          note.onHitMaxDuration = null;
+          await note.cancel();
+          await note.release();
         }
         await Get.find<VoicePlayerService>().stop(save: true);
         popBackNavigate();
@@ -972,19 +1019,56 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _finishVoice() async {
-    if (state.sending.value) return;
-    final recorded = await Get.find<VoiceRecorderService>().stop();
-    state.recording.value = false;
-    state.recordingLocked.value = false;
-    if (recorded == null || state.chatId.value <= 0) {
-      if (recorded == null && state.chatId.value > 0) {
-        showAppMessage('chat_recording_too_short'.tr);
+    if (_finishingRecord) return;
+    _finishingRecord = true;
+    try {
+      final recorded = await Get.find<VoiceRecorderService>().stop();
+      state.recording.value = false;
+      state.recordingLocked.value = false;
+      if (recorded == null || state.chatId.value <= 0) {
+        if (recorded == null && state.chatId.value > 0) {
+          showAppMessage('chat_recording_too_short'.tr);
+        }
+        _sendTyping(state, isTyping: false);
+        return;
       }
-      _sendTyping(state, isTyping: false);
-      return;
-    }
+      if (state.sending.value) {
+        final clientId = 'v${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
+        final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
+        final replyUi = _replyFor(state);
+        state.replyTo.value = null;
+        state.messages.add(
+          ChatMessage.voice(
+            id: clientId,
+            dir: ChatDir.outgoing,
+            time: formatMessageClock(DateTime.now()),
+            createdAt: DateTime.now(),
+            duration: WaveformUtils.formatDuration(recorded.duration),
+            durationMs: recorded.duration.inMilliseconds,
+            path: recorded.path,
+            samples: recorded.samples,
+            status: ChatStatus.pending,
+            reply: replyUi,
+            transcriptPending: true,
+          ),
+        );
+        await OfflineChatStore.tryEnqueueOutbox({
+          'kind': 'voice',
+          'chat_id': state.chatId.value,
+          'client_message_id': clientId,
+          'file_path': recorded.path,
+          'duration_ms': recorded.duration.inMilliseconds,
+          'samples': WaveformUtils.resampleBars(recorded.samples, 40),
+          'reply_to_id': replyToId,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        _bumpConversationPreview('chat_preview_voice'.tr);
+        _sendTyping(state, isTyping: false);
+        _scheduleOutboxFlush();
+        return;
+      }
 
-    state.sending.value = true;
+      state.sending.value = true;
     _sendTyping(state, isTyping: true, activity: 'voice');
     final clientId = 'v${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
     final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
@@ -1157,47 +1241,55 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     );
     _sendTyping(state, isTyping: false);
     state.sending.value = false;
+    } finally {
+      _finishingRecord = false;
+    }
   }
 
   Future<void> _finishVideoNote() async {
-    if (state.sending.value) return;
-    final note = Get.find<VideoNoteRecorderService>();
-    note.onHitMaxDuration = null;
-    final elapsedLabel = note.elapsedLabel.value;
-    final file = await note.stop();
-    state.recording.value = false;
-    state.recordingLocked.value = false;
-    unawaited(note.release());
-    if (file == null || state.chatId.value <= 0) {
-      if (file == null && state.chatId.value > 0) {
-        showAppMessage('chat_recording_too_short'.tr);
+    if (_finishingRecord) return;
+    _finishingRecord = true;
+    try {
+      final note = Get.find<VideoNoteRecorderService>();
+      note.onHitMaxDuration = null;
+      final elapsedLabel = note.elapsedLabel.value;
+      final file = await note.stop();
+      state.recording.value = false;
+      state.recordingLocked.value = false;
+      unawaited(note.release());
+      if (file == null || state.chatId.value <= 0) {
+        if (file == null && state.chatId.value > 0) {
+          showAppMessage('chat_recording_too_short'.tr);
+        }
+        _sendTyping(state, isTyping: false);
+        return;
       }
+      final optimistic = ChatMessage.video(
+        id: _nextId(),
+        dir: ChatDir.outgoing,
+        time: formatMessageClock(DateTime.now()),
+        createdAt: DateTime.now(),
+        url: file.path,
+        isRoundNote: true,
+        duration: elapsedLabel,
+        status: ChatStatus.pending,
+        reply: _replyFor(state),
+        transcriptPending: true,
+      );
+      await _uploadAndSendMedia(
+        filePath: file.path,
+        mediaType: 'video',
+        messageType: 'video',
+        optimistic: optimistic,
+        extraMeta: {
+          'is_round_note': true,
+          'duration_label': elapsedLabel,
+        },
+      );
       _sendTyping(state, isTyping: false);
-      return;
+    } finally {
+      _finishingRecord = false;
     }
-    final optimistic = ChatMessage.video(
-      id: _nextId(),
-      dir: ChatDir.outgoing,
-      time: formatMessageClock(DateTime.now()),
-      createdAt: DateTime.now(),
-      url: file.path,
-      isRoundNote: true,
-      duration: elapsedLabel,
-      status: ChatStatus.sent,
-      reply: _replyFor(state),
-      transcriptPending: true,
-    );
-    await _uploadAndSendMedia(
-      filePath: file.path,
-      mediaType: 'video',
-      messageType: 'video',
-      optimistic: optimistic,
-      extraMeta: {
-        'is_round_note': true,
-        'duration_label': elapsedLabel,
-      },
-    );
-    _sendTyping(state, isTyping: false);
   }
 
   Future<void> _openPeerProfile() async {
@@ -1241,7 +1333,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             name: previewName ??
                 (userId == state.peerId.value
                     ? state.peerName.value
-                    : 'User'),
+                    : 'common_user'.tr),
             initial: userId == state.peerId.value
                 ? state.peerInitial.value
                 : null,
@@ -1654,7 +1746,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final repo = Get.find<ChatRepository>();
     for (final msg in toDelete) {
       final id = int.tryParse(msg.id);
-      if (id == null) continue;
+      if (id == null) {
+        await OfflineChatStore.removeOutbox(msg.id);
+        continue;
+      }
       final result = await repo.deleteMessage(id, forEveryone: forEveryone);
       result.when(
         success: (_) {},
@@ -1681,56 +1776,62 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     if (state.replyTo.value?.id == msg.id) {
       state.replyTo.value = null;
     }
-    if (id != null) {
-      final result = await Get.find<ChatRepository>().deleteMessage(
-        id,
-        forEveryone: forEveryone,
-      );
-      result.when(
-        success: (_) {},
-        failure: (err) {
-          final insertAt =
-              idx >= 0 ? idx.clamp(0, state.messages.length) : state.messages.length;
-          state.messages.insert(insertAt, msg);
-          showAppError(err);
-        },
-      );
+    if (id == null) {
+      await OfflineChatStore.removeOutbox(msg.id);
+      return;
     }
+    final result = await Get.find<ChatRepository>().deleteMessage(
+      id,
+      forEveryone: forEveryone,
+    );
+    result.when(
+      success: (_) {},
+      failure: (err) {
+        final insertAt =
+            idx >= 0 ? idx.clamp(0, state.messages.length) : state.messages.length;
+        state.messages.insert(insertAt, msg);
+        showAppError(err);
+      },
+    );
   }
 
   Future<void> _editMessageFlow(ChatMessage msg) async {
     final ctrl = TextEditingController(text: msg.displayText);
-    final next = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('chat_menu_edit'.tr),
-        content: TextField(controller: ctrl, maxLines: 4, autofocus: true),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('common_cancel'.tr),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: Text('common_save'.tr),
-          ),
-        ],
-      ),
-    );
-    if (next == null || next.isEmpty) return;
-    final id = int.tryParse(msg.id);
-    if (id == null) return;
-    final result =
-        await Get.find<ChatRepository>().editMessage(id, text: next);
-    result.when(
-      success: (_) {
-        final idx = state.messages.indexWhere((m) => m.id == msg.id);
-        if (idx >= 0) {
-          state.messages[idx] = msg.withEditedText(next);
-        }
-      },
-      failure: showAppError,
-    );
+    try {
+      final next = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('chat_menu_edit'.tr),
+          content: TextField(controller: ctrl, maxLines: 4, autofocus: true),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('common_cancel'.tr),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: Text('common_save'.tr),
+            ),
+          ],
+        ),
+      );
+      if (next == null || next.isEmpty) return;
+      final id = int.tryParse(msg.id);
+      if (id == null) return;
+      final result =
+          await Get.find<ChatRepository>().editMessage(id, text: next);
+      result.when(
+        success: (_) {
+          final idx = state.messages.indexWhere((m) => m.id == msg.id);
+          if (idx >= 0) {
+            state.messages[idx] = msg.withEditedText(next);
+          }
+        },
+        failure: showAppError,
+      );
+    } finally {
+      ctrl.dispose();
+    }
   }
 
   Future<void> _togglePin(ChatMessage msg) async {
@@ -2162,7 +2263,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       }
       final chatId = (map['id'] as num?)?.toInt() ?? 0;
       if (chatId <= 0) return;
-      final name = msg.contactName ?? 'User';
+      final name = msg.contactName ?? 'common_user'.tr;
       await navigate(
         ChatScreen(),
         payload: ChatPayload(
@@ -2215,22 +2316,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     required ChatMessage optimistic,
     Map<String, dynamic>? extraMeta,
   }) async {
-    if (state.sending.value || state.chatId.value <= 0) return;
-    state.sending.value = true;
-    final activity = switch (messageType) {
-      'image' => 'photo',
-      'voice' || 'audio' => 'voice',
-      'video' => 'video',
-      _ => 'file',
-    };
-    _sendTyping(state, isTyping: true, activity: activity);
+    if (state.chatId.value <= 0) return;
     final clientId = 'a${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
     final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
     final replyUi = optimistic.reply ?? _replyFor(state);
     state.replyTo.value = null;
-    final online = Get.isRegistered<ConnectivityService>()
-        ? Get.find<ConnectivityService>().online.value
-        : true;
     final status = ChatStatus.pending;
     // Optimistic id = clientId — WS echo bilan merge ishlasin.
     final optimisticRow = switch (optimistic.type) {
@@ -2267,9 +2357,46 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           ext: optimistic.fileExt ?? 'FILE',
           url: optimistic.fileUrl,
           status: status,
+          reply: replyUi,
         ),
       _ => optimistic.withStatus(status),
     };
+
+    if (state.sending.value) {
+      state.messages.add(optimisticRow);
+      await OfflineChatStore.tryEnqueueOutbox({
+        'kind': messageType,
+        'chat_id': state.chatId.value,
+        'client_message_id': clientId,
+        'file_path': filePath,
+        'media_type': mediaType,
+        'file_name': optimistic.fileName,
+        'file_size': optimistic.fileSize,
+        'file_ext': optimistic.fileExt,
+        'reply_to_id': replyToId,
+        'extra_meta': extraMeta,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      _bumpConversationPreview(switch (messageType) {
+        'image' => 'chat_preview_photo'.tr,
+        'video' => 'chat_preview_video'.tr,
+        'voice' => 'chat_preview_voice'.tr,
+        _ => 'chat_preview_file'.tr,
+      });
+      _scheduleOutboxFlush();
+      return;
+    }
+    state.sending.value = true;
+    final activity = switch (messageType) {
+      'image' => 'photo',
+      'voice' || 'audio' => 'voice',
+      'video' => 'video',
+      _ => 'file',
+    };
+    _sendTyping(state, isTyping: true, activity: activity);
+    final online = Get.isRegistered<ConnectivityService>()
+        ? Get.find<ConnectivityService>().online.value
+        : true;
     state.messages.add(optimisticRow);
 
     if (!online) {
@@ -2450,7 +2577,58 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final clientId = 'a${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
     final replyToId = int.tryParse(state.replyTo.value?.id ?? '');
     state.replyTo.value = null;
-    state.messages.add(optimistic);
+    // clientId = optimistic id — WS merge ishlashi uchun.
+    final pending = switch (optimistic.type) {
+      ChatMsgType.product => ChatMessage.product(
+          id: clientId,
+          dir: optimistic.dir,
+          time: optimistic.time,
+          createdAt: optimistic.createdAt,
+          title: optimistic.productTitle ?? '',
+          price: optimistic.productPrice ?? '',
+          productId: optimistic.productId,
+          status: ChatStatus.pending,
+          reply: optimistic.reply,
+        ),
+      ChatMsgType.location => ChatMessage.location(
+          id: clientId,
+          dir: optimistic.dir,
+          time: optimistic.time,
+          createdAt: optimistic.createdAt,
+          label: optimistic.locationLabel ?? '',
+          distance: optimistic.locationDistance ?? '',
+          latitude: optimistic.latitude,
+          longitude: optimistic.longitude,
+          status: ChatStatus.pending,
+          reply: optimistic.reply,
+        ),
+      ChatMsgType.contact => ChatMessage.contact(
+          id: clientId,
+          dir: optimistic.dir,
+          time: optimistic.time,
+          createdAt: optimistic.createdAt,
+          name: optimistic.contactName ?? '',
+          phone: optimistic.contactPhone ?? '',
+          initial: optimistic.contactInitial ??
+              initialsOf(optimistic.contactName ?? ''),
+          userId: optimistic.contactUserId,
+          avatarUrl: optimistic.contactAvatarUrl,
+          number: optimistic.contactNumber,
+          status: ChatStatus.pending,
+          reply: optimistic.reply,
+        ),
+      _ => ChatMessage(
+          id: clientId,
+          type: optimistic.type,
+          dir: optimistic.dir,
+          time: optimistic.time,
+          createdAt: optimistic.createdAt,
+          status: ChatStatus.pending,
+          text: optimistic.text,
+          reply: optimistic.reply,
+        ),
+    };
+    state.messages.add(pending);
 
     final send = await Get.find<ChatRepository>().sendMessage(
       chatId: state.chatId.value,
@@ -2465,11 +2643,11 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         final map = asMap(data);
         if (map == null) return;
         final real = _fromApi(map, SessionStore.userId());
-        final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+        final idx = state.messages.indexWhere((m) => m.id == clientId);
         if (idx >= 0) state.messages[idx] = real;
       },
       failure: (err) {
-        state.messages.removeWhere((m) => m.id == optimistic.id);
+        state.messages.removeWhere((m) => m.id == clientId);
         showAppError(err);
       },
     );
@@ -2512,8 +2690,14 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         );
       },
     );
-    final result = await Get.find<ProductsRepository>().listMine(limit: 40);
-    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    late final dynamic result;
+    try {
+      result = await Get.find<ProductsRepository>().listMine(limit: 40);
+    } finally {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
     final items = asList(result.dataOrNull)
         .whereType<Map>()
         .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))

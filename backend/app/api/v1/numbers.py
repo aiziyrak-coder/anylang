@@ -71,7 +71,9 @@ async def reserve_number(
     current_user: CurrentUser,
     db: DbSession,
 ) -> ReserveOut:
-    data = await numbers_service.reserve_number(db, current_user, body.number)
+    data = await numbers_service.reserve_number(
+        db, current_user, body.number, minutes=body.minutes
+    )
     await db.commit()
     return ReserveOut.model_validate(data)
 

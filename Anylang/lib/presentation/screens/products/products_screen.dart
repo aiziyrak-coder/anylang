@@ -44,6 +44,7 @@ const _roleCodes = ['manufacturer', 'distributor', 'retail', 'service'];
 class ProductsScreen extends Screen<ProductsState, void> {
   ProductsScreen() : super(mobileContent: ProductsContent());
 
+  int _loadGen = 0;
   Timer? _searchDebounce;
   int _searchSeq = 0;
 
@@ -191,6 +192,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
   }
 
   Future<void> _load({bool keepQuery = false}) async {
+    final gen = ++_loadGen;
     state.loading.value = true;
     state.showingFavorites.value = false;
     if (!keepQuery) {
@@ -208,6 +210,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
     final filters = _filterParams(q: q.isEmpty ? null : q);
 
     final top = await repo.top();
+    if (gen != _loadGen) return;
     top.when(
       success: (data) => state.top.assignAll(_mapProducts(data)),
       failure: showAppError,
@@ -215,6 +218,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
 
     if (q.isEmpty && !state.hasActiveFilters) {
       final newest = await repo.list(limit: 12, sort: 'newest');
+      if (gen != _loadGen) return;
       newest.when(
         success: (data) => state.newest.assignAll(_mapProducts(data)),
         failure: showAppError,
@@ -225,18 +229,20 @@ class ProductsScreen extends Screen<ProductsState, void> {
 
     if (q.isNotEmpty) {
       await _runSmartSearch(q);
+      if (gen != _loadGen) return;
     } else {
       final all = await _listWithState(
         q: filters['q'] as String?,
         sort: (filters['sort'] as String?) ?? 'newest',
         limit: 40,
       );
+      if (gen != _loadGen) return;
       all.when(
         success: (data) => state.all.assignAll(_mapProducts(data)),
         failure: showAppError,
       );
     }
-    state.loading.value = false;
+    if (gen == _loadGen) state.loading.value = false;
   }
 
   bool _looksLikeSmartQuery(String q) {

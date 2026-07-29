@@ -106,13 +106,14 @@ class _ChatVideoThumbnailState extends State<ChatVideoThumbnail> {
         await ctrl.dispose();
         return;
       }
-      _readyUrls.add(path);
+      _rememberReady(path);
       setState(() {
         _ready = true;
         _failed = false;
       });
     } catch (e, st) {
       debugPrint('ChatVideoThumbnail: $e\n$st');
+      _disposeCtrl();
       if (!mounted || gen != _gen) return;
       setState(() {
         _ready = false;
@@ -124,6 +125,13 @@ class _ChatVideoThumbnailState extends State<ChatVideoThumbnail> {
   void _disposeCtrl() {
     _ctrl?.dispose();
     _ctrl = null;
+  }
+
+  void _rememberReady(String path) {
+    _readyUrls.add(path);
+    while (_readyUrls.length > 40) {
+      _readyUrls.remove(_readyUrls.first);
+    }
   }
 
   @override
