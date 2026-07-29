@@ -127,25 +127,31 @@ async def create_checkout(
     # Multicard / Click / Paddle subscription path — preferred when requested or configured.
     chosen = (provider or "").strip().lower()
     settings = get_settings()
+    click_ready = bool(
+        settings.click_merchant_id
+        and settings.click_service_id
+        and settings.click_secret_key
+    )
     multicard_ready = bool(
         settings.multicard_application_id
         and settings.multicard_secret
         and settings.multicard_store_id > 0
     )
-    # When Multicard is the active provider, ignore client click/paddle so all
-    # methods (card/Payme/Click/Uzum/Visa/MC) go through hosted Rahmat checkout.
-    if multicard_ready and settings.payment_provider == "multicard":
+    # Prefer explicit PAYMENT_PROVIDER; Click overrides Multicard when both ready.
+    if settings.payment_provider == "click" and click_ready:
+        chosen = "click"
+    elif multicard_ready and settings.payment_provider == "multicard" and not chosen:
         chosen = "multicard"
     elif not chosen and kind == "subscription":
         if settings.payment_provider in {"click", "paddle", "multicard"}:
             chosen = settings.payment_provider
+        elif click_ready:
+            chosen = "click"
         elif multicard_ready:
             chosen = "multicard"
         else:
             country = (getattr(user, "country", None) or "").strip().upper()
-            if country == "UZ" and (
-                settings.click_merchant_id and settings.click_service_id and settings.click_secret_key
-            ):
+            if country == "UZ" and click_ready:
                 chosen = "click"
             elif settings.paddle_api_key and settings.paddle_webhook_secret:
                 chosen = "paddle"
@@ -317,12 +323,23 @@ async def create_checkout(
             currency = "UZS"
             meta = {**meta, "amount_usd_original": True}
 
-    # 2% to'lov solig'i — foydalanuvchi to'laydigan itogo.
+    # Click non-subscription UZS path.
+    if resolved == "click" and kind != "subscription" and currency.upper() == "USD":
+        from app.payments.fx import usd_to_uzs
+
+        amount = usd_to_uzs(amount)
+        currency = "UZS"
+        meta = {**meta, "amount_usd_original": True}
+
+    from app.payments.pricing import resolve_uzs_charge
     from app.payments.tax import apply_payment_tax, tax_meta
 
-    whole = currency.upper() == "UZS"
-    base_amount, tax_amount, amount = apply_payment_tax(amount, whole=whole)
-    meta = {**meta, **tax_meta(base_amount, tax_amount, amount)}
+    if currency.upper() == "UZS":
+        base_amount, tax_amount, amount, tax_fields = resolve_uzs_charge(amount)
+        meta = {**meta, **tax_fields}
+    else:
+        base_amount, tax_amount, amount = apply_payment_tax(amount)
+        meta = {**meta, **tax_meta(base_amount, tax_amount, amount)}
 
     payment = Payment(
         user_id=user.id,

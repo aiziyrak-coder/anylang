@@ -201,14 +201,18 @@ async def create_subscription_checkout(
         # Default (ideal): cancel_and_recreate — yangi checkout eski pendingni yopadi.
         await _cancel_pending_for_user(db, user.id, provider=provider_name)
 
-    from app.payments.tax import apply_payment_tax, tax_meta
+    from app.payments.pricing import resolve_uzs_charge
+    from app.payments.tax import PAYMENT_TAX_PERCENT
 
     if provider_name in {"click", "multicard"}:
-        base_amount = usd_to_uzs(amount_usd)
+        catalog = usd_to_uzs(amount_usd)
         currency = "UZS"
-        base_amount, tax_amount, amount = apply_payment_tax(base_amount, whole=True)
+        base_amount, tax_amount, amount, tax_fields = resolve_uzs_charge(catalog)
     else:
+        from app.payments.tax import apply_payment_tax, tax_meta
+
         base_amount, tax_amount, amount = apply_payment_tax(amount_usd)
+        tax_fields = tax_meta(base_amount, tax_amount, amount)
         currency = "USD"
 
     if amount <= 0:
@@ -229,7 +233,7 @@ async def create_subscription_checkout(
         billing_cycle=cycle,
         meta={
             "amount_usd": f"{amount_usd:.2f}",
-            **tax_meta(base_amount, tax_amount, amount),
+            **tax_fields,
         },
         raw_payload={},
     )

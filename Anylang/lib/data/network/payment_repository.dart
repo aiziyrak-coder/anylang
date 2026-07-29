@@ -17,7 +17,7 @@ class PaymentRepository {
       data: {
         'plan': plan,
         'billing_cycle': billingCycle,
-        'provider': provider ?? 'multicard',
+        'provider': provider ?? 'click',
         if (promoCode != null && promoCode.trim().isNotEmpty)
           'promo_code': promoCode.trim(),
       },

@@ -110,27 +110,47 @@ def compute_period_price(plan: str, months: int) -> tuple[Decimal, Decimal, int]
 
 
 def period_catalog_for_plan(plan: str) -> list[dict]:
+    from app.payments.fx import usd_to_uzs
+    from app.payments.pricing import resolve_uzs_charge, test_amount_uzs
     from app.payments.tax import PAYMENT_TAX_PERCENT, apply_payment_tax
 
     base = PLAN_MONTHLY_BASE.get(plan)
     if base is None:
         return []
+    flat = test_amount_uzs()
     out: list[dict] = []
     for months in (1, 3, 6, 12):
         total, per_month, savings = compute_period_price(plan, months)
-        _, tax, total_with_tax = apply_payment_tax(total)
-        out.append(
-            {
-                "months": months,
-                "code": billing_cycle_code(months),
-                "total": f"{total:.2f}",
-                "tax": f"{tax:.2f}",
-                "tax_percent": PAYMENT_TAX_PERCENT,
-                "total_with_tax": f"{total_with_tax:.2f}",
-                "per_month": f"{per_month:.2f}",
-                "savings_percent": savings if savings > 0 else None,
-            }
-        )
+        if flat is not None:
+            # Temporary Click onboarding: every period costs the flat UZS amount.
+            _, tax, total_with_tax, _meta = resolve_uzs_charge(usd_to_uzs(total))
+            out.append(
+                {
+                    "months": months,
+                    "code": billing_cycle_code(months),
+                    "total": f"{total_with_tax:.0f}",
+                    "tax": f"{tax:.0f}",
+                    "tax_percent": PAYMENT_TAX_PERCENT if tax > 0 else 0,
+                    "total_with_tax": f"{total_with_tax:.0f}",
+                    "per_month": f"{(total_with_tax / months):.0f}",
+                    "savings_percent": None,
+                    "currency": "UZS",
+                }
+            )
+        else:
+            _, tax, total_with_tax = apply_payment_tax(total)
+            out.append(
+                {
+                    "months": months,
+                    "code": billing_cycle_code(months),
+                    "total": f"{total:.2f}",
+                    "tax": f"{tax:.2f}",
+                    "tax_percent": PAYMENT_TAX_PERCENT,
+                    "total_with_tax": f"{total_with_tax:.2f}",
+                    "per_month": f"{per_month:.2f}",
+                    "savings_percent": savings if savings > 0 else None,
+                }
+            )
     return out
 
 
@@ -247,6 +267,10 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
         normalize_billing_months(billing_cycle) if billing_cycle else None
     )
 
+    from app.payments.pricing import test_amount_uzs
+    from app.payments.tax import PAYMENT_TAX_PERCENT
+
+    currency = "UZS" if test_amount_uzs() is not None else "USD"
     plans: list[dict[str, Any]] = []
     for code in ("basic", "premium", "business"):
         base = PLAN_MONTHLY_BASE[code]
@@ -261,7 +285,7 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
             "yearly_price": yearly["per_month"] if yearly else None,
             "yearly_total": yearly["total"] if yearly else None,
             "savings_percent": yearly["savings_percent"] if yearly else None,
-            "currency": "USD",
+            "currency": periods[0].get("currency", currency) if periods else currency,
             "badge": badges.get(code),
             "periods": periods,
             "features": [
@@ -273,8 +297,6 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
             if match:
                 plan["selected_period"] = match
         plans.append(plan)
-
-    from app.payments.tax import PAYMENT_TAX_PERCENT
 
     return {
         "plans": plans,

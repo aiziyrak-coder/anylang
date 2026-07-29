@@ -76,6 +76,13 @@ class Settings(BaseSettings):
     click_secret_key: str = ""
     click_merchant_user_id: str = ""
     click_pay_base_url: str = "https://my.click.uz/services/pay"
+    click_merchant_api_base: str = "https://api.click.uz/v2/merchant"
+    # OFD / fiscalization (single IKPU). Required when >1 IKPU; still recommended always.
+    click_ofd_spic: str = ""  # IKPU / SPIC code
+    click_ofd_package_code: str = ""
+    click_ofd_units: int = 1
+    # Temporary flat UZS charge while Click is being activated (e.g. "1000"). Empty = off.
+    payment_test_amount_uzs: str = ""
     # Public backend URL used in return_url (set via env in prod).
     public_api_base_url: str = "https://anylang.uz"
 

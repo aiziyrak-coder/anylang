@@ -449,7 +449,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
             ? null
             : state.promoInput.value.trim());
 
-    final provider = 'multicard';
+    final provider = 'click';
     final checkout = await payments.checkoutSubscription(
       plan: plan.code,
       billingCycle: cycle,

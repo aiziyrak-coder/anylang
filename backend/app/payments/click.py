@@ -261,6 +261,9 @@ async def handle_prepare(db: AsyncSession, payload: dict[str, Any]) -> dict[str,
     meta = dict(payment.meta or {})
     meta["click_prepare_id"] = str(payment.id)
     meta["click_trans_id"] = click_trans_id
+    paydoc = payload.get("click_paydoc_id")
+    if paydoc is not None:
+        meta["click_paydoc_id"] = str(paydoc)
     payment.meta = meta
     await db.flush()
 
@@ -448,6 +451,13 @@ async def handle_complete(db: AsyncSession, payload: dict[str, Any]) -> dict[str
         raw_event=payload,
     )
 
+    meta = dict(payment.meta or {})
+    meta["click_trans_id"] = click_trans_id
+    paydoc = payload.get("click_paydoc_id")
+    if paydoc is not None:
+        meta["click_paydoc_id"] = str(paydoc)
+    payment.meta = meta
+
     if payment.kind == "subscription" and payment.plan and payment.billing_cycle:
         await activate_subscription(
             db,
@@ -483,6 +493,18 @@ async def handle_complete(db: AsyncSession, payload: dict[str, Any]) -> dict[str
                 if max_purchasable_account_slots(is_business=True, extra_account_slots=extras) > 0:
                     user.extra_account_slots = extras + 1
                     await db.flush()
+
+    try:
+        from app.payments.fiscal import submit_fiscal_items
+
+        fiscal = await submit_fiscal_items(payment, click_payment_id=click_trans_id)
+        if fiscal is not None:
+            meta = dict(payment.meta or {})
+            meta["fiscal"] = fiscal
+            payment.meta = meta
+            await db.flush()
+    except Exception:
+        logger.exception("Click fiscalization hook failed payment=%s", payment.id)
 
     return _click_response(
         click_trans_id=click_trans_id,
