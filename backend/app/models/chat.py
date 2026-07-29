@@ -69,6 +69,10 @@ class ChatParticipant(Base, TimestampMixin):
     role: Mapped[str] = mapped_column(String(16), default="member", nullable=False)
     pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     muted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # None + muted=True → forever; muted_until > now → timed mute.
+    muted_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     chat: Mapped[Chat] = relationship(back_populates="participants")
 
@@ -241,27 +245,3 @@ class LiveTurn(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(16), default="done", nullable=False)
 
     session: Mapped[LiveSession] = relationship(back_populates="turns")
-
-
-class ChatDeal(Base, TimestampMixin):
-    """Deal Mode — bitta chatdagi jamlangan bitim shartlari."""
-
-    __tablename__ = "chat_deals"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(
-        ForeignKey("chats.id", ondelete="CASCADE"), index=True, nullable=False
-    )
-    created_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    updated_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    product: Mapped[str] = mapped_column(String(240), default="", nullable=False)
-    price: Mapped[str] = mapped_column(String(64), default="", nullable=False)
-    currency: Mapped[str] = mapped_column(String(8), default="USD", nullable=False)
-    quantity: Mapped[str] = mapped_column(String(64), default="", nullable=False)
-    unit: Mapped[str] = mapped_column(String(32), default="", nullable=False)
-    delivery: Mapped[str] = mapped_column(String(240), default="", nullable=False)
-    payment: Mapped[str] = mapped_column(String(240), default="", nullable=False)
-    status: Mapped[str] = mapped_column(String(16), default="open", nullable=False, index=True)
-    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    documents: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
-    accepted_by: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)

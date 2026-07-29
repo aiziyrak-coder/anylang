@@ -275,7 +275,13 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       success: (profileData) {
         final profile = asMap(profileData);
         if (profile == null) return;
-        name = profile['full_name']?.toString() ?? name;
+        // Some API responses use `name` instead of `full_name`.
+        final rawName = profile['full_name'] ??
+            profile['name'] ??
+            profile['company_name'];
+        name = rawName?.toString().trim().isNotEmpty == true
+            ? rawName.toString().trim()
+            : name;
         initial = initialsOf(name);
         online = profile['is_online'] == true;
         avatarUrl = profile['avatar_url']?.toString();

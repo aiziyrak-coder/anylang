@@ -747,15 +747,27 @@ async def summarize_chat_thread(
         "You summarize AnyLang B2B chat threads for busy traders.\n"
         "Hard rules:\n"
         "1) Output ONLY valid JSON: "
-        '{"title":"...","bullets":["...","..."]}\n'
+        '{"title":"...","bullets":["...","..."],'
+        '"latest_topic":"...","latest_topic_is_greeting_only":false,'
+        '"previous_topic":"..." or null}\n'
         "2) title must be a short heading in the requested language "
         '(e.g. Uzbek "Qisqacha", Russian "Кратко", English "Summary").\n'
         "3) bullets: 3–8 short factual lines (no numbering, no markdown).\n"
         "4) Prefer deal facts: quantity, price/agreed terms, Incoterms (FOB/CIF…), "
         "delivery/ship date, MOQ, payment, open questions.\n"
         "5) Do NOT invent facts that are not in the transcript.\n"
-        "6) Write bullets in the requested language.\n"
-        "7) Skip greetings and small talk.\n"
+        "6) Write title, bullets, and topic summaries in the requested language.\n"
+        "7) Skip greetings and small talk in bullets.\n"
+        "8) Split the transcript into distinct conversation TOPICS "
+        "(topic change = new subject, not just a new message). "
+        "From newest to oldest:\n"
+        "   - latest_topic: 1–2 short sentences about what the MOST RECENT topic was about.\n"
+        "   - previous_topic: 1–2 short sentences about the topic BEFORE that, "
+        "or null if there is no earlier distinct topic.\n"
+        "9) If the latest topic is ONLY greetings / how-are-you / small talk "
+        "with no business substance, set latest_topic_is_greeting_only=true "
+        "and put a brief note in latest_topic (client may replace the text).\n"
+        "10) previous_topic must be null (not empty string) when absent.\n"
     )
     user_prompt = (
         f"Summary language (ISO): {lang}\n"
@@ -799,6 +811,11 @@ def _parse_summary_json(raw: str, *, lang: str) -> dict:
         "ru": "Кратко",
         "en": "Summary",
     }.get(lang[:2], "Qisqacha")
+    empty_topics = {
+        "latest_topic": None,
+        "latest_topic_is_greeting_only": False,
+        "previous_topic": None,
+    }
     try:
         data = json.loads(text)
     except Exception:
@@ -807,9 +824,9 @@ def _parse_summary_json(raw: str, *, lang: str) -> dict:
             for ln in text.splitlines()
             if ln.strip() and not ln.strip().lower().startswith(("qisqacha", "кратко", "summary"))
         ]
-        return {"title": title_default, "bullets": bullets[:8]}
+        return {"title": title_default, "bullets": bullets[:8], **empty_topics}
     if not isinstance(data, dict):
-        return {"title": title_default, "bullets": []}
+        return {"title": title_default, "bullets": [], **empty_topics}
     title = str(data.get("title") or title_default).strip() or title_default
     raw_bullets = data.get("bullets") or data.get("points") or []
     bullets: list[str] = []
@@ -818,7 +835,41 @@ def _parse_summary_json(raw: str, *, lang: str) -> dict:
             s = str(b).strip()
             if s:
                 bullets.append(s[:240])
-    return {"title": title[:80], "bullets": bullets[:8]}
+    latest = data.get("latest_topic")
+    latest_s = str(latest).strip()[:400] if latest is not None else ""
+    greeting_only = bool(data.get("latest_topic_is_greeting_only"))
+    prev = data.get("previous_topic")
+    prev_s = None
+    if prev is not None:
+        p = str(prev).strip()[:400]
+        if p and p.lower() not in {"null", "none", "-"}:
+            prev_s = p
+    return {
+        "title": title[:80],
+        "bullets": bullets[:8],
+        "latest_topic": latest_s or None,
+        "latest_topic_is_greeting_only": greeting_only,
+        "previous_topic": prev_s,
+    }
+
+
+def _greeting_like(text: str) -> bool:
+    low = (text or "").lower()
+    keys = (
+        "salom",
+        "assalom",
+        "hello",
+        "hi ",
+        "hey",
+        "привет",
+        "здравствуй",
+        "qalaysiz",
+        "qalesiz",
+        "how are you",
+        "yahshimisiz",
+        "добрый",
+    )
+    return any(k in low for k in keys)
 
 
 def _mock_chat_summary(lines: list[str], *, lang: str) -> dict:
@@ -870,4 +921,29 @@ def _mock_chat_summary(lines: list[str], *, lang: str) -> dict:
         bullets = ["Ключевые пункты появятся, когда в чате будет больше деталей сделки."]
     elif not bullets:
         bullets = ["Bitim tafsilotlari ko‘proq bo‘lganda xulosa aniqroq bo‘ladi."]
-    return {"title": title, "bullets": bullets[:8]}
+
+    recent = lines[-4:] if lines else []
+    older = lines[-8:-4] if len(lines) > 4 else []
+    latest_bodies = [
+        (ln.split(":", 1)[-1].strip() if ":" in ln[:12] else ln)[:160]
+        for ln in recent
+        if ln.strip()
+    ]
+    older_bodies = [
+        (ln.split(":", 1)[-1].strip() if ":" in ln[:12] else ln)[:160]
+        for ln in older
+        if ln.strip()
+    ]
+    greeting_only = bool(latest_bodies) and all(
+        _greeting_like(b) for b in latest_bodies
+    )
+    latest = "; ".join(latest_bodies[:2]) if latest_bodies else None
+    previous = "; ".join(older_bodies[:2]) if older_bodies else None
+
+    return {
+        "title": title,
+        "bullets": bullets[:8],
+        "latest_topic": latest,
+        "latest_topic_is_greeting_only": greeting_only,
+        "previous_topic": previous,
+    }

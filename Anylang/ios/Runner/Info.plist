@@ -74,6 +74,8 @@
 	<string>Joylashuvni chatda ulashish uchun GPS kerak</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Joylashuvni chatda ulashish uchun GPS kerak</string>
+	<key>GMSApiKey</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

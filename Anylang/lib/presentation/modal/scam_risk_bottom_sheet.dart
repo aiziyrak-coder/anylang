@@ -70,9 +70,7 @@ class _ScamRiskSheet extends StatelessWidget {
               ),
               SizedBox(height: 10.dp),
               Text(
-                risk.message.isNotEmpty
-                    ? risk.message
-                    : 'scam_detection_high'.tr,
+                risk.localizedMessage,
                 style: TextStyle(
                   color: c.danger,
                   fontSize: 15.sp,
@@ -127,7 +125,7 @@ class _ScamRiskSheet extends StatelessWidget {
                             SizedBox(width: 10.dp),
                             Expanded(
                               child: Text(
-                                r.label,
+                                r.localizedLabel,
                                 style: TextStyle(
                                   color: c.textPrimary,
                                   fontSize: 13.sp,
@@ -204,7 +202,7 @@ class ScamRiskBanner extends StatelessWidget {
                     ),
                     SizedBox(height: 4.dp),
                     Text(
-                      risk.message,
+                      risk.localizedMessage,
                       style: TextStyle(
                         color: c.textPrimary,
                         fontSize: 14.sp,
@@ -215,7 +213,10 @@ class ScamRiskBanner extends StatelessWidget {
                     if (risk.reasons.isNotEmpty) ...[
                       SizedBox(height: 6.dp),
                       Text(
-                        risk.reasons.map((e) => e.label).take(3).join(' · '),
+                        risk.reasons
+                            .map((e) => e.localizedLabel)
+                            .take(3)
+                            .join(' · '),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

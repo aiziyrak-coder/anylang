@@ -25,6 +25,7 @@ class BusinessUpdateIn(BaseModel):
     country: str | None = Field(default=None, min_length=2, max_length=2)
     business_role: BusinessRole | None = None
     website: str | None = Field(default=None, max_length=255)
+    bio: str | None = Field(default=None, max_length=300)
     description: str | None = None
     seo_text: str | None = None
     keywords: list[str] | None = None
@@ -73,6 +74,7 @@ class PublicBusinessOut(BaseModel):
     business_role: BusinessRole | None = None
     founded_year: int | None = None
     website: str | None = None
+    bio: str | None = None
     description: str | None = None
     seo_text: str | None = None
     keywords: list[str] = Field(default_factory=list)
@@ -88,6 +90,7 @@ class PublicBusinessOut(BaseModel):
     successful_deals: int = 0
     complaints_count: int = 0
     documents_verified: bool = False
+    verification_status: str = "none"
     factory_verified: bool = False
     inspection_passed: bool = False
     audit_report_url: str | None = None

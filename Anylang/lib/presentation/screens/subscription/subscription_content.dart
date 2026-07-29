@@ -152,6 +152,41 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                       ),
                     ),
                     SizedBox(height: 16.dp),
+                    Obx(() {
+                      final pct = state.paymentTaxPercent.value;
+                      return Container(
+                        padding: EdgeInsets.all(12.dp),
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(12.dp),
+                          border: Border.all(color: c.surfaceBorder),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 18.dp,
+                              color: c.textSecondary,
+                            ),
+                            SizedBox(width: 8.dp),
+                            Expanded(
+                              child: Text(
+                                'subscription_tax_notice'.trParams({
+                                  'percent': '$pct',
+                                }),
+                                style: TextStyle(
+                                  color: c.textSecondary,
+                                  fontSize: 12.sp,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    SizedBox(height: 16.dp),
                     _promoBlock(context, state, sendAction),
                     SizedBox(height: 20.dp),
                     Obx(() {
@@ -314,15 +349,34 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
     void Function(MyAction) sendAction,
   ) {
     String? note;
+    Widget? breakdown;
     if (!plan.isFree) {
-      final total = plan.totalFor(months);
-      if (total != null && months > 1) {
+      final base = plan.totalFor(months);
+      final tax = plan.taxFor(months);
+      final itogo = plan.totalWithTaxFor(months);
+      final pct = plan.periodFor(months)?.taxPercent ??
+          state.paymentTaxPercent.value;
+      final savings = plan.savingsFor(months);
+
+      if (base != null && itogo != null && tax != null) {
+        breakdown = _PriceBreakdown(
+          base: base,
+          tax: tax,
+          total: itogo,
+          taxPercent: pct,
+        );
+        if (months > 1) {
+          note = 'subscription_billed_period'.trParams({
+            'months': '$months',
+            'total': base,
+          });
+        }
+      } else if (base != null && months > 1) {
         note = 'subscription_billed_period'.trParams({
           'months': '$months',
-          'total': total,
+          'total': base,
         });
       }
-      final savings = plan.savingsFor(months);
       if (savings != null && savings > 0) {
         final saveNote = 'subscription_save_percent'.trParams({
           'percent': '$savings',
@@ -335,6 +389,7 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
       price: plan.isFree ? 'subscription_free'.tr : plan.priceFor(months),
       priceSuffix: plan.isFree ? null : 'subscription_per_month'.tr,
       priceNote: note,
+      priceBreakdown: breakdown,
       features: plan.features,
       highlighted: plan.isCurrent,
       badgeText: plan.badgeText,
@@ -361,5 +416,75 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
     } catch (_) {
       return iso;
     }
+  }
+}
+
+class _PriceBreakdown extends StatelessWidget {
+  final String base;
+  final String tax;
+  final String total;
+  final int taxPercent;
+
+  const _PriceBreakdown({
+    required this.base,
+    required this.tax,
+    required this.total,
+    required this.taxPercent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.dp),
+      decoration: BoxDecoration(
+        color: c.isDark ? c.surface : Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(12.dp),
+        border: Border.all(color: c.surfaceBorder),
+      ),
+      child: Column(
+        children: [
+          _row(c, 'payment_subtotal'.tr, base, false),
+          SizedBox(height: 6.dp),
+          _row(
+            c,
+            'payment_tax_line'.trParams({'percent': '$taxPercent'}),
+            tax,
+            false,
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.dp),
+            child: Divider(height: 1, color: c.surfaceBorder),
+          ),
+          _row(c, 'payment_total'.tr, total, true),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(AppColors c, String label, String value, bool bold) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: bold ? c.textPrimary : c.textSecondary,
+              fontSize: bold ? 13.sp : 12.sp,
+              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: bold ? c.accentText : c.textPrimary,
+            fontSize: bold ? 14.sp : 12.sp,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
   }
 }

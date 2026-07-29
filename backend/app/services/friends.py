@@ -11,6 +11,13 @@ from app.core.errors import AppError
 from app.core.pagination import normalize_page
 from app.models.chat import Friendship
 from app.models.user import BusinessProfile, User
+from app.services.trust_score import (
+    _score_certificates,
+    _score_complaints,
+    _score_deals,
+    _score_documents,
+    _score_response,
+)
 
 COOLDOWN_AFTER_DECLINE_HOURS = 24
 EXTENDED_COOLDOWN_DAYS = 7
@@ -40,25 +47,28 @@ def _spoken_languages(user: User) -> list[str]:
 
 
 def _lite_trust(user: User, biz: BusinessProfile | None) -> int | None:
-    """Ro‘yxat uchun engil trust (DB so‘rovsiz)."""
+    """Profil Trust Score bilan bir xil formula (javob tezligi/invoices DB'siz).
+
+    Ro‘yxat uchun async reply/invoice o‘rniga neytral default ishlatiladi —
+    shu sababli profil (61%) va tarmoq (25%) farqi yo‘qoladi.
+    """
     if biz is None:
         return None
-    score = 25
-    if biz.documents_verified:
-        score += 22
-    if user.verified_badge:
-        score += 8
-    if biz.factory_verified:
-        score += 12
-    if biz.inspection_passed:
-        score += 8
-    deals = int(biz.successful_deals or 0)
-    score += min(18, deals * 2)
-    complaints = int(biz.complaints_count or 0)
-    score -= min(45, complaints * 12)
-    if biz.rating is not None:
-        score += int((float(biz.rating) - 3.0) * 10)
-    return max(0, min(100, score))
+    parts = [
+        _score_certificates(list(biz.certificates or [])),
+        # Ma'lumot yo‘q — compute_trust_score bilan bir xil neytral baza
+        _score_response(None, 0),
+        _score_complaints(int(biz.complaints_count or 0)),
+        _score_deals(int(biz.successful_deals or 0), 0),
+        _score_documents(
+            verified_badge=bool(user.verified_badge),
+            documents_verified=bool(biz.documents_verified),
+            factory_verified=bool(biz.factory_verified),
+            inspection_passed=bool(biz.inspection_passed),
+        ),
+    ]
+    total = int(sum(int(p["score"]) for p in parts))
+    return max(0, min(100, total))
 
 
 def _lite_risk(
@@ -66,34 +76,43 @@ def _lite_risk(
     biz: BusinessProfile | None,
     trust: int | None,
 ) -> tuple[str, bool]:
-    """(risk_level, is_scammer) — list uchun tez qoida."""
+    """(risk_level, is_scammer) — faqat jiddiy signallar; trust foizi bilan chalkashtirmaslik.
+
+    Eslatma: past trust yoki tasdiqlanmagan hujjat → medium ogohlantirish,
+    lekin avtomatik «Scammer» emas (profil Trust Score bilan ziddiyat bo‘lmasin).
+    """
     if biz is None:
         return "none", False
     complaints = int(biz.complaints_count or 0)
     rating = float(biz.rating) if biz.rating is not None else None
+    docs_ok = bool(biz.documents_verified or user.verified_badge)
     scammer = False
     level = "none"
+
+    # Aniq scammer: ko‘p shikoyat yoki juda past reyting + shikoyat
     if complaints >= 3 or (
         rating is not None and rating <= 1.8 and complaints >= 1
     ):
         level = "high"
         scammer = True
-    elif complaints >= 2 or (trust is not None and trust < 30):
+    elif complaints >= 2:
         level = "high"
         scammer = True
-    elif complaints >= 1 or (trust is not None and trust < 40):
+    elif complaints >= 1:
         level = "medium"
     elif rating is not None and rating < 2.5:
         level = "medium"
-    # Yangi business + shikoyat
-    if complaints >= 1 and not bool(biz.documents_verified):
+
+    # Tasdiqlanmagan hujjat / past trust — ogohlantirish, lekin scammer flag emas
+    if not docs_ok:
         if level == "none":
             level = "medium"
-        if complaints >= 2:
+        elif level == "medium" and complaints >= 1:
             level = "high"
-            scammer = True
-    return level, scammer
+    elif trust is not None and trust < 40 and level == "none":
+        level = "medium"
 
+    return level, scammer
 
 def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> dict:
     is_business = bool(

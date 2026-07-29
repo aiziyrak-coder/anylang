@@ -30,12 +30,14 @@ const int kMainProductsTabIndex = 2;
 class MainBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback? onProfileLongPress;
   final List<int>? badgeCounts;
 
   const MainBottomNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.onProfileLongPress,
     this.badgeCounts,
   });
 
@@ -79,6 +81,7 @@ class MainBottomNav extends StatelessWidget {
                               selected: currentIndex == i,
                               badgeCount: _badge(i),
                               onTap: () => onTap(i),
+                              onLongPress: i == 4 ? onProfileLongPress : null,
                             ),
                           ),
                     ],

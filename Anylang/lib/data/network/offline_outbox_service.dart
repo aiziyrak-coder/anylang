@@ -8,7 +8,7 @@ import '../core/mappers.dart';
 import '../local/offline_chat_store.dart';
 import '../local/session_store.dart';
 import '../../presentation/screens/chat/chat_message.dart';
-import '../../presentation/screens/chat/chat_state.dart';
+import '../../presentation/screens/chat/chat_state_scope.dart';
 import '../../presentation/screens/messages/messages_state.dart';
 import 'chat_repository.dart';
 import 'connectivity_service.dart';
@@ -191,10 +191,9 @@ class OfflineOutboxService extends GetxService {
   }
 
   void _dropLocalPending(int chatId, String clientId) {
-    if (!Get.isRegistered<ChatState>()) return;
-    final chat = Get.find<ChatState>();
-    if (chat.chatId.value != chatId) return;
-    chat.messages.removeWhere((m) => m.id == clientId);
+    ChatStateScope.forChatId(chatId, (chat) {
+      chat.messages.removeWhere((m) => m.id == clientId);
+    });
   }
 
   void _applySentToUi({
@@ -203,9 +202,7 @@ class OfflineOutboxService extends GetxService {
     required Map<String, dynamic>? responseMap,
     required String kind,
   }) {
-    if (Get.isRegistered<ChatState>()) {
-      final chat = Get.find<ChatState>();
-      if (chat.chatId.value == chatId) {
+    ChatStateScope.forChatId(chatId, (chat) {
         final idx = chat.messages.indexWhere((m) => m.id == clientId);
         if (responseMap != null) {
           final mapped = mapChatMessageFromApi(
@@ -290,8 +287,7 @@ class OfflineOutboxService extends GetxService {
         } else if (idx >= 0) {
           chat.messages[idx] = chat.messages[idx].withStatus(ChatStatus.sent);
         }
-      }
-    }
+    });
 
     if (Get.isRegistered<MessagesState>()) {
       final messages = Get.find<MessagesState>();

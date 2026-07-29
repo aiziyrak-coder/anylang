@@ -69,6 +69,9 @@ def _guess_ext(content_type: str | None, filename: str | None) -> str:
         "audio/webm": "webm",
         "audio/ogg": "ogg",
         "application/octet-stream": "m4a",
+        "video/mp4": "mp4",
+        "video/webm": "webm",
+        "video/quicktime": "mp4",
     }.get(mime, "m4a")
 
 

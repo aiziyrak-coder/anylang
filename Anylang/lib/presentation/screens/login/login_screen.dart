@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../../data/local/account_store.dart';
 import '../../../data/network/auth_repository.dart';
 import '../../../data/network/google_auth_service.dart';
 import '../../../data/network/session_bootstrap.dart';
@@ -17,14 +18,46 @@ import '../verify/verify_payload.dart';
 import '../verify/verify_screen.dart';
 import 'login_action.dart';
 import 'login_content.dart';
+import 'login_payload.dart';
 import 'login_state.dart';
 
-class LoginScreen extends Screen<LoginState, void> {
+class LoginScreen extends Screen<LoginState, LoginPayload?> {
   LoginScreen() : super(mobileContent: LoginContent());
+
+  @override
+  void initState(LoginPayload? payload) {
+    state.isAddAccount.value = payload?.addAccount == true;
+  }
+
+  Future<void> _enterApp() async {
+    try {
+      await AccountStore.syncActiveFromSessionStore();
+    } catch (_) {}
+    await connectRealtimeIfNeeded();
+    navigateAndRemoveUntil(MainScreen());
+  }
+
+  Future<void> _restoreParkedIfNeeded() async {
+    final p = payload;
+    if (p == null || !p.addAccount) return;
+    final id = p.restoreUserId;
+    if (id == null) return;
+    final ok = await AccountStore.activate(id);
+    if (ok) {
+      await connectRealtimeIfNeeded();
+      navigateAndRemoveUntil(MainScreen());
+    }
+  }
 
   @override
   Future<void> actionHandler(LoginState state, MyAction action) async {
     switch (action) {
+      case Back _:
+        if (payload?.addAccount == true) {
+          await _restoreParkedIfNeeded();
+          return;
+        }
+        popBackNavigate();
       case LoginSubmit a:
         if (state.isLoading.value || state.isGoogleLoading.value) return;
         state.email = a.email;
@@ -37,6 +70,24 @@ class LoginScreen extends Screen<LoginState, void> {
         if (passErr != null) {
           showAppError(passErr);
           return;
+        }
+        // Allaqachon shu hisob slotda bo‘lsa — faqat aktivlashtirish.
+        final existing = AccountStore.slots()
+            .where((s) => s.email.toLowerCase() == a.email.trim().toLowerCase())
+            .toList();
+        if (existing.isNotEmpty &&
+            await AccountStore.hasTokens(existing.first.userId)) {
+          state.isLoading.value = true;
+          try {
+            final ok = await AccountStore.activate(existing.first.userId);
+            if (ok) {
+              MySnackBar.dismiss();
+              await _enterApp();
+              return;
+            }
+          } finally {
+            state.isLoading.value = false;
+          }
         }
         state.isLoading.value = true;
         try {
@@ -66,8 +117,7 @@ class LoginScreen extends Screen<LoginState, void> {
             success: (_) async {
               state.password = '';
               MySnackBar.dismiss();
-              await connectRealtimeIfNeeded();
-              navigateAndRemoveUntil(MainScreen());
+              await _enterApp();
             },
             failure: (err) async => showAppError(
               AuthValidators.safeError(err, fallbackKey: 'error_generic'),
@@ -112,8 +162,7 @@ class LoginScreen extends Screen<LoginState, void> {
           await outcome.result.when(
             success: (_) async {
               MySnackBar.dismiss();
-              await connectRealtimeIfNeeded();
-              navigateAndRemoveUntil(MainScreen());
+              await _enterApp();
             },
             failure: (err) async => showAppError(
               AuthValidators.safeError(err, fallbackKey: 'google_failed'),

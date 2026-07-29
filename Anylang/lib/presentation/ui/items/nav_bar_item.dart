@@ -11,6 +11,7 @@ class NavBarItem extends StatelessWidget {
   final bool selected;
   final int? badgeCount;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const NavBarItem({
     super.key,
@@ -19,6 +20,7 @@ class NavBarItem extends StatelessWidget {
     required this.selected,
     this.badgeCount,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -33,6 +35,12 @@ class NavBarItem extends StatelessWidget {
         HapticFeedback.selectionClick();
         onTap();
       },
+      onLongPress: onLongPress == null
+          ? null
+          : () {
+              HapticFeedback.mediumImpact();
+              onLongPress!();
+            },
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 2.dp, horizontal: 2.dp),
         child: Column(

@@ -37,20 +37,36 @@ def read_version() -> tuple[str, int]:
     return m.group(1), int(m.group(2))
 
 
+def read_maps_key() -> str:
+    env_key = (os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
+    if env_key:
+        return env_key
+    props = APP / "android" / "local.properties"
+    if props.exists():
+        for line in props.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            if s.startswith("GOOGLE_MAPS_API_KEY="):
+                return s.split("=", 1)[1].strip()
+    return ""
+
+
 def build_apk() -> Path:
     env = os.environ.copy()
     env["PUB_CACHE"] = str(Path.home() / "AppData" / "Local" / "Pub" / "Cache")
-    subprocess.check_call(
-        [
-            str(FLUTTER),
-            "build",
-            "apk",
-            "--release",
-            f"--dart-define=API_BASE_URL={API_BASE}",
-        ],
-        cwd=str(APP),
-        env=env,
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from flutter_release_build import flutter_release_apk_args, read_maps_key
+
+    args = flutter_release_apk_args(
+        api_base=API_BASE,
+        flutter=FLUTTER,
+        obfuscate=True,
     )
+    if read_maps_key():
+        print("Maps API key: configured")
+    else:
+        print("WARNING: GOOGLE_MAPS_API_KEY empty")
+    print("Flutter args: obfuscate + split-debug-info enabled")
+    subprocess.check_call(args, cwd=str(APP), env=env)
     apk = APP / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk"
     if not apk.exists():
         raise SystemExit(f"APK missing: {apk}")
@@ -84,7 +100,7 @@ def main() -> int:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
         "package": "com.izodev.anylang",
-        "notes": "Play Market chiqquncha test release",
+        "notes": f"Release {ver}+{build} — obfuscated + R8 minify + release signing",
     }
     meta_path = ROOT / "landing" / "download-meta.json"
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

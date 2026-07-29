@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from redis.asyncio import Redis
 from sqlalchemy import func, nullslast, or_, select
@@ -23,6 +23,10 @@ def _is_group(chat: Chat) -> bool:
     return (chat.type or "direct") == "group"
 
 
+def _is_saved(chat: Chat) -> bool:
+    return (chat.type or "") == "saved"
+
+
 def _other_user_id(chat: Chat, viewer_id: int) -> int:
     if _is_group(chat):
         raise AppError(
@@ -32,6 +36,9 @@ def _other_user_id(chat: Chat, viewer_id: int) -> int:
         )
     if chat.user_low_id is None or chat.user_high_id is None:
         raise AppError(message="Chat topilmadi", error_code="CHAT_NOT_FOUND", status_code=404)
+    # Saved Messages: low == high == viewer
+    if chat.user_low_id == chat.user_high_id:
+        return int(chat.user_low_id)
     return chat.user_high_id if chat.user_low_id == viewer_id else chat.user_low_id
 
 
@@ -247,8 +254,13 @@ async def _serialize_chat(
     if participant is None:
         participant = await _get_participant(db, chat.id, viewer.id)
 
-    muted = bool(participant.muted) if participant else False
-    if redis is not None and not muted:
+    muted = False
+    muted_until: datetime | None = None
+    if participant is not None:
+        muted, muted_until = await _resolve_participant_mute(
+            db, participant=participant, redis=redis, user_id=viewer.id
+        )
+    elif redis is not None:
         muted = bool(await redis.sismember(f"chat_muted:{viewer.id}", chat.id))
 
     pinned = bool(participant and participant.pinned_at is not None)
@@ -280,8 +292,16 @@ async def _serialize_chat(
         "unread_count": unread,
         "last_message_at": chat.last_message_at,
         "muted": muted,
-        "pinned": pinned,
+        "muted_until": muted_until,
+        "pinned": pinned or _is_saved(chat),
+        "is_saved": _is_saved(chat),
     }
+
+    if _is_saved(chat):
+        base["title"] = chat.title or "Saved Messages"
+        base["interlocutor"] = await _serialize_interlocutor(viewer, redis=redis)
+        base["participant_count"] = 1
+        return base
 
     if not _is_group(chat):
         other_id = _other_user_id(chat, viewer.id)
@@ -289,6 +309,47 @@ async def _serialize_chat(
         base["interlocutor"] = await _serialize_interlocutor(other, redis=redis)
         base["participant_count"] = max(participant_count, 2)
     return base
+
+
+async def get_or_create_saved_messages(
+    db: AsyncSession,
+    *,
+    user: User,
+    redis: Redis | None = None,
+) -> dict:
+    """Telegram Saved Messages — o‘ziga yozish (type=saved)."""
+    result = await db.execute(
+        select(Chat).where(
+            Chat.type == "saved",
+            Chat.user_low_id == user.id,
+            Chat.user_high_id == user.id,
+        )
+    )
+    chat = result.scalar_one_or_none()
+    if chat is None:
+        chat = Chat(
+            type="saved",
+            user_low_id=user.id,
+            user_high_id=user.id,
+            has_messages=False,
+            created_by=user.id,
+            title="Saved Messages",
+        )
+        db.add(chat)
+        await db.flush()
+        await _ensure_participant(db, chat_id=chat.id, user_id=user.id, role="owner")
+        part = await _get_participant(db, chat.id, user.id)
+        if part is not None and part.pinned_at is None:
+            part.pinned_at = datetime.now(UTC)
+        await db.flush()
+        await db.refresh(chat)
+    else:
+        await _ensure_participant(db, chat_id=chat.id, user_id=user.id, role="owner")
+        part = await _get_participant(db, chat.id, user.id)
+        if part is not None and part.pinned_at is None:
+            part.pinned_at = datetime.now(UTC)
+            await db.flush()
+    return await _serialize_chat(db, chat=chat, viewer=user, redis=redis)
 
 
 async def get_or_create_chat(
@@ -440,6 +501,8 @@ async def list_chats(
     chat_type: str | None = None,
 ) -> dict:
     params = normalize_page(page, limit, default_size=50, max_size=100)
+    # Har doim Saved Messages mavjud bo‘lsin (Telegram uslubi).
+    await get_or_create_saved_messages(db, user=user, redis=redis)
 
     query = (
         select(Chat, ChatParticipant)
@@ -448,11 +511,12 @@ async def list_chats(
         .where(
             or_(
                 Chat.type == "group",
+                Chat.type == "saved",
                 Chat.has_messages.is_(True),
             )
         )
     )
-    if chat_type in {"direct", "group"}:
+    if chat_type in {"direct", "group", "saved"}:
         query = query.where(Chat.type == chat_type)
 
     if sort == "unread":
@@ -654,6 +718,40 @@ async def hide_chat(
     return {"id": chat_id, "hidden": True}
 
 
+async def _resolve_participant_mute(
+    db: AsyncSession,
+    *,
+    participant: ChatParticipant,
+    redis: Redis | None,
+    user_id: int,
+) -> tuple[bool, datetime | None]:
+    """Lazy-expire timed mute; return (muted, muted_until)."""
+    if not participant.muted:
+        if redis is not None:
+            forever = bool(
+                await redis.sismember(f"chat_muted:{user_id}", participant.chat_id)
+            )
+            if forever:
+                return True, None
+            ttl_key = f"chat_muted_until:{user_id}:{participant.chat_id}"
+            if await redis.exists(ttl_key):
+                return True, None
+        return False, None
+
+    until = participant.muted_until
+    if until is not None and until.tzinfo is None:
+        until = until.replace(tzinfo=UTC)
+    if until is not None and until <= datetime.now(UTC):
+        participant.muted = False
+        participant.muted_until = None
+        if redis is not None:
+            await redis.srem(f"chat_muted:{user_id}", participant.chat_id)
+            await redis.delete(f"chat_muted_until:{user_id}:{participant.chat_id}")
+        await db.flush()
+        return False, None
+    return True, until
+
+
 async def set_chat_muted(
     db: AsyncSession,
     *,
@@ -661,22 +759,47 @@ async def set_chat_muted(
     chat_id: int,
     muted: bool,
     redis: Redis,
+    duration_seconds: int | None = None,
 ) -> dict:
     await _get_chat_for_user(db, chat_id, user.id)
     part = await _get_participant(db, chat_id, user.id)
-    if part is not None:
-        part.muted = muted
-    key = f"chat_muted:{user.id}"
+    forever_key = f"chat_muted:{user.id}"
+    timed_key = f"chat_muted_until:{user.id}:{chat_id}"
+
+    muted_until: datetime | None = None
     if muted:
-        await redis.sadd(key, chat_id)
+        if duration_seconds is not None and duration_seconds > 0:
+            muted_until = datetime.now(UTC) + timedelta(seconds=int(duration_seconds))
+            if part is not None:
+                part.muted = True
+                part.muted_until = muted_until
+            await redis.srem(forever_key, chat_id)
+            await redis.setex(timed_key, int(duration_seconds), "1")
+        else:
+            if part is not None:
+                part.muted = True
+                part.muted_until = None
+            await redis.delete(timed_key)
+            await redis.sadd(forever_key, chat_id)
     else:
-        await redis.srem(key, chat_id)
+        if part is not None:
+            part.muted = False
+            part.muted_until = None
+        await redis.srem(forever_key, chat_id)
+        await redis.delete(timed_key)
+
     await db.flush()
-    return {"id": chat_id, "muted": muted}
+    return {
+        "id": chat_id,
+        "muted": muted,
+        "muted_until": muted_until,
+    }
 
 
 async def is_chat_muted(redis: Redis, *, user_id: int, chat_id: int) -> bool:
-    return bool(await redis.sismember(f"chat_muted:{user_id}", chat_id))
+    if await redis.sismember(f"chat_muted:{user_id}", chat_id):
+        return True
+    return bool(await redis.exists(f"chat_muted_until:{user_id}:{chat_id}"))
 
 
 async def block_user(redis: Redis, *, user_id: int, peer_id: int) -> dict:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 
 /// Bitta suhbat (Xabarlar ro'yxati elementi) — direct yoki group.
@@ -18,6 +19,7 @@ class Conversation {
   final bool isGroup;
   final bool pinned;
   final bool muted;
+  final DateTime? mutedUntil;
   final DateTime? lastMessageAt;
   final String? myRole;
   final bool isSuper;
@@ -25,6 +27,7 @@ class Conversation {
   final int? memberLimit;
   final bool isMarketplace;
   final String? marketplaceSlug;
+  final bool isSaved;
 
   const Conversation({
     required this.id,
@@ -42,6 +45,7 @@ class Conversation {
     this.isGroup = false,
     this.pinned = false,
     this.muted = false,
+    this.mutedUntil,
     this.lastMessageAt,
     this.myRole,
     this.isSuper = false,
@@ -49,50 +53,66 @@ class Conversation {
     this.memberLimit,
     this.isMarketplace = false,
     this.marketplaceSlug,
+    this.isSaved = false,
   });
 
   factory Conversation.fromApi(Map<String, dynamic> json) {
-    final isGroup = json['type']?.toString() == 'group';
+    final type = json['type']?.toString();
+    final isGroup = type == 'group';
+    final isSaved = type == 'saved' || json['is_saved'] == true;
     final peer = Map<String, dynamic>.from(json['interlocutor'] as Map? ?? {});
     final peerId = (peer['id'] as num?)?.toInt() ?? 0;
     final groupTitle = (json['title'] as String?)?.trim();
-    final name = isGroup
-        ? (groupTitle?.isNotEmpty == true ? groupTitle! : 'Guruh')
-        : (peer['full_name'] as String?)?.trim().isNotEmpty == true
-            ? peer['full_name'] as String
-            : 'User';
+    final name = isSaved
+        ? 'saved_messages_title'.tr
+        : isGroup
+            ? (groupTitle?.isNotEmpty == true ? groupTitle! : 'Guruh')
+            : (peer['full_name'] as String?)?.trim().isNotEmpty == true
+                ? peer['full_name'] as String
+                : 'User';
     final last = json['last_message'] as Map?;
+    final lastType = last?['type']?.toString();
     final lastText = last == null
-        ? ''
+        ? (isSaved ? 'saved_messages_hint'.tr : '')
         : (last['text'] as String?) ??
-            (last['type'] == 'voice'
-                ? 'Ovozli xabar'
-                : (last['type']?.toString() ?? ''));
+            (lastType == 'voice'
+                ? 'chat_preview_voice'.tr
+                : lastType == 'video'
+                    ? ((last['meta'] is Map &&
+                            (last['meta'] as Map)['is_round_note'] == true)
+                        ? 'chat_preview_round_video'.tr
+                        : 'chat_preview_video'.tr)
+                    : lastType == 'image'
+                        ? 'chat_preview_photo'.tr
+                        : (lastType ?? ''));
     final lastAt = json['last_message_at'] != null
         ? DateTime.tryParse(json['last_message_at'].toString())
         : null;
     final unread = (json['unread_count'] as num?)?.toInt() ?? 0;
-    final idForGradient = isGroup
+    final idForGradient = isGroup || isSaved
         ? ((json['id'] as num?)?.toInt() ?? 0)
         : peerId;
     return Conversation(
       id: (json['id'] as num?)?.toInt() ?? 0,
       peerId: peerId,
-      initial: initialsOf(name),
+      initial: isSaved ? 'S' : initialsOf(name),
       avatarGradient: avatarGradientFor(idForGradient),
       initialColor: initialColorFor(idForGradient),
       name: name,
       lastMessage: lastText,
       time: formatChatTime(lastAt),
-      online: !isGroup && peer['is_online'] == true,
+      online: !isGroup && !isSaved && peer['is_online'] == true,
       unread: unread,
       highlighted: unread > 0,
       avatarUrl: isGroup
           ? json['avatar_url'] as String?
-          : peer['avatar_url'] as String?,
+          : (isSaved ? null : peer['avatar_url'] as String?),
       isGroup: isGroup,
-      pinned: json['pinned'] == true,
+      pinned: json['pinned'] == true || isSaved,
       muted: json['muted'] == true,
+      mutedUntil: json['muted_until'] != null
+          ? DateTime.tryParse(json['muted_until'].toString())
+          : null,
       lastMessageAt: lastAt,
       myRole: json['my_role']?.toString(),
       isSuper: json['is_super'] == true,
@@ -101,6 +121,7 @@ class Conversation {
       isMarketplace: json['is_marketplace'] == true ||
           (json['marketplace_slug']?.toString().isNotEmpty == true),
       marketplaceSlug: json['marketplace_slug']?.toString(),
+      isSaved: isSaved,
     );
   }
 
@@ -112,6 +133,8 @@ class Conversation {
     bool? highlighted,
     bool? pinned,
     bool? muted,
+    DateTime? mutedUntil,
+    bool clearMutedUntil = false,
   }) {
     return Conversation(
       id: id,
@@ -129,6 +152,7 @@ class Conversation {
       isGroup: isGroup,
       pinned: pinned ?? this.pinned,
       muted: muted ?? this.muted,
+      mutedUntil: clearMutedUntil ? null : (mutedUntil ?? this.mutedUntil),
       lastMessageAt: lastMessageAt,
       myRole: myRole,
       isSuper: isSuper,
@@ -136,6 +160,7 @@ class Conversation {
       memberLimit: memberLimit,
       isMarketplace: isMarketplace,
       marketplaceSlug: marketplaceSlug,
+      isSaved: isSaved,
     );
   }
 }

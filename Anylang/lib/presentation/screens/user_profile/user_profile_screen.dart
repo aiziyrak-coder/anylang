@@ -8,6 +8,7 @@ import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../modal/business_verification_bottom_sheet.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -34,8 +35,22 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
       });
       return;
     }
-    state.data = payload;
-    state.syncFriendshipFromPayload(payload);
+    // Birinchi frame’dayoq local preview / Hive cache — network kutmasin.
+    var initial = payload;
+    final id = payload.id;
+    final other = id > 0 &&
+        (SessionStore.userId() == null || id != SessionStore.userId());
+    if (other) {
+      final cached = PublicProfileCache.get(id);
+      if (cached != null) {
+        initial = UserProfilePayload.fromApi(
+          cached,
+          existingChatId: payload.existingChatId,
+        );
+      }
+    }
+    state.data = initial;
+    state.syncFriendshipFromPayload(initial);
     state.profileRefreshing.value = false;
     state.profileLoading.value = false;
 
@@ -48,50 +63,23 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
     final other = id > 0 &&
         (SessionStore.userId() == null || id != SessionStore.userId());
 
-    if (other) {
-      final cached = PublicProfileCache.get(id);
-      if (cached != null) {
-        final fromCache = UserProfilePayload.fromApi(
-          cached,
-          existingChatId: existing,
-        );
-        state.data = fromCache;
-        state.syncFriendshipFromPayload(fromCache);
-        state.profileLoading.value = false;
-        _loadListings();
-        // Cache bor — yuqorida “yangilanmoqda” badge bilan soft refresh.
-        await _refreshFromNetwork(
-          id: id,
-          existingChatId: existing,
-          showRefreshingBadge: true,
-          silentFailure: true,
-        );
-        return;
-      }
+    final data = state.data;
+    if (data != null && data.business) {
+      _loadListings();
+    } else if (payload.business) {
+      _loadListings();
     }
 
-    if (payload.loadFull) {
-      state.profileLoading.value = true;
-      await _refreshFromNetwork(
-        id: id,
-        existingChatId: existing,
-        showRefreshingBadge: false,
-        silentFailure: false,
-      );
-      state.profileLoading.value = false;
-      return;
-    }
+    if (!other) return;
 
-    // To‘liq payload bilan ochilgan (API dan kelgan) — listings + boshqa user uchun soft refresh.
-    _loadListings();
-    if (other) {
-      await _refreshFromNetwork(
-        id: id,
-        existingChatId: existing,
-        showRefreshingBadge: true,
-        silentFailure: true,
-      );
-    }
+    // Soft refresh fonida — ochilishni bloklamaydi.
+    // ignore: unawaited_futures
+    _refreshFromNetwork(
+      id: id,
+      existingChatId: existing,
+      showRefreshingBadge: true,
+      silentFailure: true,
+    );
   }
 
   Future<void> _refreshFromNetwork({
@@ -225,6 +213,24 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
             }
           },
         );
+      case OpenOwnBusinessVerification _:
+        final data = state.data;
+        if (data == null || !data.business) return;
+        final me = SessionStore.userId();
+        if (me == null || data.id != me) return;
+        if (!context.mounted) return;
+        final snap = await showBusinessVerificationBottomSheet(context);
+        if (snap == null) return;
+        final result = await Get.find<ProfileRepository>().getMe();
+        final map = asMap(result.dataOrNull);
+        if (map != null) {
+          final updated = UserProfilePayload.fromApi(
+            map,
+            existingChatId: data.existingChatId,
+          );
+          state.data = updated;
+          state.syncFriendshipFromPayload(updated);
+        }
     }
   }
 

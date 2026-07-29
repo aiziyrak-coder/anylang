@@ -22,9 +22,10 @@ from app.services.subscription import (
 )
 from app.services.users import load_user_for_response, serialize_user
 
-PaymentKind = Literal["subscription", "number", "super_group", "product_top"]
+PaymentKind = Literal["subscription", "number", "super_group", "product_top", "account_slot"]
 
 SUPER_GROUP_PRICE = Decimal("10.00")
+ACCOUNT_SLOT_PRICE = Decimal("10.00")
 PRODUCT_TOP_PRICE_USD = Decimal("5.00")
 PRODUCT_TOP_DAYS = 30
 
@@ -36,8 +37,20 @@ def _compute_subscription_amount(plan: str, billing_cycle: str) -> tuple[Decimal
 
 def _resolve_provider() -> str:
     settings = get_settings()
+    if settings.payment_provider == "multicard" or (
+        settings.multicard_application_id
+        and settings.multicard_secret
+        and settings.multicard_store_id > 0
+    ):
+        return "multicard"
     if settings.payment_provider == "stripe" and settings.stripe_secret_key:
         return "stripe"
+    if settings.payment_provider == "click" and (
+        settings.click_merchant_id and settings.click_service_id and settings.click_secret_key
+    ):
+        return "click"
+    if settings.payment_provider == "paddle" and settings.paddle_api_key:
+        return "paddle"
     if settings.is_production and not settings.allow_mock_payments:
         raise AppError(
             message="To'lov provayderi sozlanmagan",
@@ -48,7 +61,8 @@ def _resolve_provider() -> str:
 
 
 def _serialize_payment(payment: Payment) -> dict[str, Any]:
-    return {
+    meta = payment.meta or {}
+    out: dict[str, Any] = {
         "id": payment.id,
         "status": payment.status,
         "provider": payment.provider,
@@ -61,6 +75,17 @@ def _serialize_payment(payment: Payment) -> dict[str, Any]:
         "paid_at": payment.paid_at,
         "created_at": payment.created_at,
     }
+    for key in ("amount_before_tax", "tax_amount", "amount_with_tax"):
+        val = meta.get(key)
+        if val is not None and str(val).strip():
+            out[key] = str(val)
+    tax_pct = meta.get("tax_percent")
+    if tax_pct is not None:
+        try:
+            out["tax_percent"] = int(tax_pct)
+        except (TypeError, ValueError):
+            out["tax_percent"] = 2
+    return out
 
 
 def _checkout_description(payment: Payment) -> str:
@@ -68,6 +93,8 @@ def _checkout_description(payment: Payment) -> str:
         return f"AnyLang {payment.plan} ({payment.billing_cycle})"
     if payment.kind == "super_group":
         return f"AnyLang Super Group #{(payment.meta or {}).get('chat_id')}"
+    if payment.kind == "account_slot":
+        return "AnyLang extra account slot"
     if payment.kind == "product_top":
         return f"AnyLang TOP boost #{(payment.meta or {}).get('product_id')}"
     return f"AnyLang number {payment.number}"
@@ -97,12 +124,23 @@ async def create_checkout(
     promo_code: str | None = None,
     provider: str | None = None,
 ) -> dict[str, Any]:
-    # Click / Paddle subscription path (TZ 5.7) — preferred when requested or configured.
+    # Multicard / Click / Paddle subscription path — preferred when requested or configured.
     chosen = (provider or "").strip().lower()
     settings = get_settings()
-    if not chosen and kind == "subscription":
-        if settings.payment_provider in {"click", "paddle"}:
+    multicard_ready = bool(
+        settings.multicard_application_id
+        and settings.multicard_secret
+        and settings.multicard_store_id > 0
+    )
+    # When Multicard is the active provider, ignore client click/paddle so all
+    # methods (card/Payme/Click/Uzum/Visa/MC) go through hosted Rahmat checkout.
+    if multicard_ready and settings.payment_provider == "multicard":
+        chosen = "multicard"
+    elif not chosen and kind == "subscription":
+        if settings.payment_provider in {"click", "paddle", "multicard"}:
             chosen = settings.payment_provider
+        elif multicard_ready:
+            chosen = "multicard"
         else:
             country = (getattr(user, "country", None) or "").strip().upper()
             if country == "UZ" and (
@@ -112,7 +150,7 @@ async def create_checkout(
             elif settings.paddle_api_key and settings.paddle_webhook_secret:
                 chosen = "paddle"
 
-    if kind == "subscription" and chosen in {"click", "paddle"}:
+    if kind == "subscription" and chosen in {"click", "paddle", "multicard"}:
         from app.payments.service import create_subscription_checkout
 
         if not plan or plan == "basic":
@@ -200,6 +238,24 @@ async def create_checkout(
             )
         amount = SUPER_GROUP_PRICE
         meta = {"chat_id": chat_id}
+    elif kind == "account_slot":
+        from app.services.users import max_purchasable_account_slots
+
+        if not user.is_business:
+            raise AppError(
+                message="Qo'shimcha hisob slotlari faqat biznes akkaunt uchun",
+                error_code="BUSINESS_REQUIRED",
+                status_code=403,
+            )
+        extras = int(getattr(user, "extra_account_slots", 0) or 0)
+        if max_purchasable_account_slots(is_business=True, extra_account_slots=extras) <= 0:
+            raise AppError(
+                message="Maksimal 10 ta hisob — boshqa slot sotib olib bo'lmaydi",
+                error_code="ACCOUNT_SLOTS_MAX",
+                status_code=400,
+            )
+        amount = ACCOUNT_SLOT_PRICE
+        meta = {"extra_before": extras}
     elif kind == "product_top":
         if product_id is None:
             raise AppError(
@@ -207,21 +263,30 @@ async def create_checkout(
                 error_code="VALIDATION_ERROR",
                 status_code=400,
             )
-        from app.payments.click import ClickProvider
         from app.payments.fx import usd_to_uzs
         from app.services.products import prepare_product_top_checkout
 
         await prepare_product_top_checkout(db, user=user, product_id=product_id)
         amount_usd = PRODUCT_TOP_PRICE_USD
-        country = (getattr(user, "country", None) or "").strip().upper()
-        click = ClickProvider()
-        prefer_click = chosen == "click" or (
-            not chosen and country == "UZ" and click.is_configured()
-        )
-        if prefer_click and click.is_configured():
+        # Multicard hosts card/Payme/Click/Visa/MC — prefer it when configured.
+        if multicard_ready and (not chosen or chosen == "multicard"):
             amount = usd_to_uzs(amount_usd)
             currency = "UZS"
-            resolved = "click"
+            resolved = "multicard"
+        elif chosen == "click" or (
+            not chosen
+            and (getattr(user, "country", None) or "").strip().upper() == "UZ"
+        ):
+            from app.payments.click import ClickProvider
+
+            click = ClickProvider()
+            if click.is_configured():
+                amount = usd_to_uzs(amount_usd)
+                currency = "UZS"
+                resolved = "click"
+            else:
+                amount = amount_usd
+                currency = "USD"
         else:
             amount = amount_usd
             currency = "USD"
@@ -242,6 +307,23 @@ async def create_checkout(
 
     if resolved is None:
         resolved = _resolve_provider()
+
+    # Multicard hosted checkout for non-subscription kinds (UZS).
+    if resolved == "multicard" and kind != "subscription":
+        from app.payments.fx import usd_to_uzs
+
+        if currency.upper() == "USD":
+            amount = usd_to_uzs(amount)
+            currency = "UZS"
+            meta = {**meta, "amount_usd_original": True}
+
+    # 2% to'lov solig'i — foydalanuvchi to'laydigan itogo.
+    from app.payments.tax import apply_payment_tax, tax_meta
+
+    whole = currency.upper() == "UZS"
+    base_amount, tax_amount, amount = apply_payment_tax(amount, whole=whole)
+    meta = {**meta, **tax_meta(base_amount, tax_amount, amount)}
+
     payment = Payment(
         user_id=user.id,
         kind=kind,
@@ -263,6 +345,15 @@ async def create_checkout(
         base["amount_before"] = f"{amount_before:.2f}"
         base["discount_amount"] = f"{discount_amount:.2f}"
         base["promo_code"] = applied_promo
+
+    if resolved == "multicard":
+        from app.payments.multicard import MulticardProvider
+
+        data = await MulticardProvider().create_checkout(payment)
+        base["checkout_url"] = data.get("checkout_url")
+        base["mock_confirm"] = False
+        base["stripe_session_id"] = None
+        return base
 
     if resolved == "click":
         from app.payments.click import ClickProvider
@@ -320,6 +411,10 @@ async def create_checkout(
 
 async def get_payment(db: AsyncSession, user: User, payment_id: int) -> dict[str, Any]:
     payment = await _get_owned_payment(db, user, payment_id)
+    if payment.provider == "multicard" and payment.status == "pending":
+        from app.payments.multicard import sync_payment_status
+
+        payment = await sync_payment_status(db, payment)
     return _serialize_payment(payment)
 
 
@@ -415,6 +510,24 @@ async def apply_payment(db: AsyncSession, payment: Payment) -> dict[str, Any]:
             from app.services.group_admin import mark_chat_super
 
             await mark_chat_super(db, chat_id=int(chat_id), payment_id=payment.id)
+        elif payment.kind == "account_slot":
+            from app.services.users import max_purchasable_account_slots
+
+            if not user.is_business:
+                raise AppError(
+                    message="Qo'shimcha hisob slotlari faqat biznes akkaunt uchun",
+                    error_code="BUSINESS_REQUIRED",
+                    status_code=403,
+                )
+            extras = int(getattr(user, "extra_account_slots", 0) or 0)
+            if max_purchasable_account_slots(is_business=True, extra_account_slots=extras) <= 0:
+                raise AppError(
+                    message="Maksimal 10 ta hisob",
+                    error_code="ACCOUNT_SLOTS_MAX",
+                    status_code=400,
+                )
+            user.extra_account_slots = extras + 1
+            await db.flush()
         elif payment.kind == "product_top":
             from app.services.products import activate_product_top_from_payment
 

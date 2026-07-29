@@ -29,6 +29,8 @@ class PlanCard extends StatelessWidget {
   final bool ctaEnabled;
   /// Optional line under price (e.g. yearly billed total).
   final String? priceNote;
+  /// Premium receipt block (subtotal / tax / itogo).
+  final Widget? priceBreakdown;
 
   const PlanCard({
     super.key,
@@ -43,6 +45,7 @@ class PlanCard extends StatelessWidget {
     this.onCta,
     this.ctaEnabled = true,
     this.priceNote,
+    this.priceBreakdown,
   });
 
   @override
@@ -114,6 +117,10 @@ class PlanCard extends StatelessWidget {
                   priceNote!,
                   style: TextStyle(color: c.textFaint, fontSize: 12.sp),
                 ),
+              ],
+              if (priceBreakdown != null) ...[
+                SizedBox(height: 10.dp),
+                priceBreakdown!,
               ],
               SizedBox(height: 14.dp),
               for (final f in features) _featureRow(c, f),

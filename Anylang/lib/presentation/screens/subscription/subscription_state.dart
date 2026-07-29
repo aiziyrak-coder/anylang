@@ -37,4 +37,6 @@ class SubscriptionState extends GetxController {
   RxnString promoPlanCode = RxnString();
   /// Serverdan kelgan valyuta belgisi (masalan $, so‘m).
   RxString priceCurrencyPrefix = '\$'.obs;
+  /// To'lov solig'i foizi (default 2%) — plans API dan keladi.
+  RxInt paymentTaxPercent = 2.obs;
 }

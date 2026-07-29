@@ -87,6 +87,8 @@ class MainContent extends ScreenContent<MainState> {
                   currentIndex: state.currentTab.value,
                   badgeCounts: [messagesBadge, friendsBadge, 0, 0, 0],
                   onTap: (i) => sendAction(TabSelected(i)),
+                  onProfileLongPress: () =>
+                      sendAction(ProfileTabLongPressed()),
                 );
               }),
             ],

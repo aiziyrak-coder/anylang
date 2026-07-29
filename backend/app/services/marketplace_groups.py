@@ -247,6 +247,118 @@ async def join_marketplace_group(
     return await enrich_chat_dict(db, data, viewer=viewer, chat=chat)
 
 
+async def preview_marketplace_group(
+    db: AsyncSession,
+    *,
+    viewer: User,
+    slug: str,
+    redis=None,
+    members_limit: int = 12,
+) -> dict:
+    """Verified Group preview — a'zo bo‘lmasdan info + sample members + trust %."""
+    from app.services import trust_score as trust_score_service
+    from app.services.chats import _serialize_interlocutor
+
+    await ensure_marketplace_groups(db)
+    cleaned = (slug or "").strip().lower()
+    result = await db.execute(
+        select(Chat).where(Chat.marketplace_slug == cleaned, Chat.type == "group")
+    )
+    chat = result.scalar_one_or_none()
+    if chat is None:
+        raise AppError(
+            message="Marketplace guruh topilmadi",
+            error_code="NOT_FOUND",
+            status_code=404,
+        )
+
+    if getattr(viewer, "business", None) is None:
+        loaded = await db.execute(
+            select(User)
+            .where(User.id == viewer.id)
+            .options(selectinload(User.business))
+        )
+        u = loaded.scalar_one_or_none()
+        if u is not None:
+            viewer = u
+
+    viewer_verified = user_is_verified_business(viewer)
+    part = await _get_participant(db, chat.id, viewer.id)
+    joined = part is not None
+    verified_only = bool(getattr(chat, "verified_only", False))
+    can_join = (not verified_only) or viewer_verified or joined
+
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(ChatParticipant)
+        .where(ChatParticipant.chat_id == chat.id)
+    )
+    member_count = int(count_result.scalar() or 0)
+
+    since = datetime.now(UTC) - timedelta(hours=24)
+    rfq_result = await db.execute(
+        select(func.count())
+        .select_from(Message)
+        .where(
+            Message.chat_id == chat.id,
+            Message.type == "rfq",
+            Message.deleted_for_everyone.is_(False),
+            Message.created_at >= since,
+        )
+    )
+    rfq_today = int(rfq_result.scalar() or 0)
+
+    members_result = await db.execute(
+        select(ChatParticipant, User)
+        .join(User, User.id == ChatParticipant.user_id)
+        .where(ChatParticipant.chat_id == chat.id)
+        .options(selectinload(User.business), selectinload(User.subscription))
+        .order_by(ChatParticipant.id.asc())
+        .limit(max(1, min(members_limit, 30)))
+    )
+    members = []
+    for p, member in members_result.all():
+        profile = await _serialize_interlocutor(member, redis=redis)
+        members.append(
+            {
+                "user_id": member.id,
+                "full_name": profile.get("full_name") or "User",
+                "avatar_url": profile.get("avatar_url"),
+                "is_online": bool(profile.get("is_online")),
+                "verified_badge": bool(getattr(member, "verified_badge", False)),
+                "role": p.role,
+            }
+        )
+
+    trust = await trust_score_service.compute_trust_score(
+        db, viewer, getattr(viewer, "business", None)
+    )
+    biz = getattr(viewer, "business", None)
+    docs_ok = bool(
+        getattr(viewer, "verified_badge", False)
+        or (biz is not None and getattr(biz, "documents_verified", False))
+    )
+
+    return {
+        "id": chat.id,
+        "slug": chat.marketplace_slug,
+        "emoji": chat.marketplace_emoji or "🏪",
+        "title": chat.title or chat.marketplace_slug,
+        "blurb": chat.marketplace_blurb or "",
+        "member_count": member_count,
+        "rfq_today": rfq_today,
+        "verified_only": verified_only,
+        "joined": joined,
+        "can_join": can_join,
+        "viewer_verified": viewer_verified,
+        "trust_score": int(trust.get("score") or 0),
+        "trust_level": str(trust.get("level") or "low"),
+        "documents_verified": docs_ok,
+        "members": members,
+        "members_shown": len(members),
+    }
+
+
 async def get_marketplace_group(
     db: AsyncSession,
     *,

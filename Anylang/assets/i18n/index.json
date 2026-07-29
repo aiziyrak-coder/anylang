@@ -1,0 +1,732 @@
+{
+  "locales": [
+    {
+      "lang": "uz",
+      "code": "uz_UZ",
+      "language": "uz",
+      "country": "UZ",
+      "aliases": [
+        "uz"
+      ]
+    },
+    {
+      "lang": "en",
+      "code": "us_US",
+      "language": "en",
+      "country": "US",
+      "aliases": [
+        "en",
+        "en_US",
+        "en_GB"
+      ]
+    },
+    {
+      "lang": "ru",
+      "code": "ru_RU",
+      "language": "ru",
+      "country": "RU",
+      "aliases": [
+        "ru"
+      ]
+    },
+    {
+      "lang": "tr",
+      "code": "tr_TR",
+      "language": "tr",
+      "country": "TR",
+      "aliases": [
+        "tr"
+      ]
+    },
+    {
+      "lang": "kk",
+      "code": "kk_KZ",
+      "language": "kk",
+      "country": "KZ",
+      "aliases": [
+        "kk"
+      ]
+    },
+    {
+      "lang": "ky",
+      "code": "ky_KG",
+      "language": "ky",
+      "country": "KG",
+      "aliases": [
+        "ky"
+      ]
+    },
+    {
+      "lang": "tg",
+      "code": "tg_TJ",
+      "language": "tg",
+      "country": "TJ",
+      "aliases": [
+        "tg"
+      ]
+    },
+    {
+      "lang": "az",
+      "code": "az_AZ",
+      "language": "az",
+      "country": "AZ",
+      "aliases": [
+        "az"
+      ]
+    },
+    {
+      "lang": "tk",
+      "code": "tk_TM",
+      "language": "tk",
+      "country": "TM",
+      "aliases": [
+        "tk"
+      ]
+    },
+    {
+      "lang": "de",
+      "code": "de_DE",
+      "language": "de",
+      "country": "DE",
+      "aliases": [
+        "de"
+      ]
+    },
+    {
+      "lang": "fr",
+      "code": "fr_FR",
+      "language": "fr",
+      "country": "FR",
+      "aliases": [
+        "fr"
+      ]
+    },
+    {
+      "lang": "es",
+      "code": "es_ES",
+      "language": "es",
+      "country": "ES",
+      "aliases": [
+        "es"
+      ]
+    },
+    {
+      "lang": "pt",
+      "code": "pt_PT",
+      "language": "pt",
+      "country": "PT",
+      "aliases": [
+        "pt"
+      ]
+    },
+    {
+      "lang": "it",
+      "code": "it_IT",
+      "language": "it",
+      "country": "IT",
+      "aliases": [
+        "it"
+      ]
+    },
+    {
+      "lang": "pl",
+      "code": "pl_PL",
+      "language": "pl",
+      "country": "PL",
+      "aliases": [
+        "pl"
+      ]
+    },
+    {
+      "lang": "uk",
+      "code": "uk_UA",
+      "language": "uk",
+      "country": "UA",
+      "aliases": [
+        "uk"
+      ]
+    },
+    {
+      "lang": "nl",
+      "code": "nl_NL",
+      "language": "nl",
+      "country": "NL",
+      "aliases": [
+        "nl"
+      ]
+    },
+    {
+      "lang": "sv",
+      "code": "sv_SE",
+      "language": "sv",
+      "country": "SE",
+      "aliases": [
+        "sv"
+      ]
+    },
+    {
+      "lang": "no",
+      "code": "no_NO",
+      "language": "no",
+      "country": "NO",
+      "aliases": [
+        "no",
+        "nb",
+        "nb_NO"
+      ]
+    },
+    {
+      "lang": "da",
+      "code": "da_DK",
+      "language": "da",
+      "country": "DK",
+      "aliases": [
+        "da"
+      ]
+    },
+    {
+      "lang": "fi",
+      "code": "fi_FI",
+      "language": "fi",
+      "country": "FI",
+      "aliases": [
+        "fi"
+      ]
+    },
+    {
+      "lang": "el",
+      "code": "el_GR",
+      "language": "el",
+      "country": "GR",
+      "aliases": [
+        "el"
+      ]
+    },
+    {
+      "lang": "cs",
+      "code": "cs_CZ",
+      "language": "cs",
+      "country": "CZ",
+      "aliases": [
+        "cs"
+      ]
+    },
+    {
+      "lang": "sk",
+      "code": "sk_SK",
+      "language": "sk",
+      "country": "SK",
+      "aliases": [
+        "sk"
+      ]
+    },
+    {
+      "lang": "ro",
+      "code": "ro_RO",
+      "language": "ro",
+      "country": "RO",
+      "aliases": [
+        "ro"
+      ]
+    },
+    {
+      "lang": "hu",
+      "code": "hu_HU",
+      "language": "hu",
+      "country": "HU",
+      "aliases": [
+        "hu"
+      ]
+    },
+    {
+      "lang": "bg",
+      "code": "bg_BG",
+      "language": "bg",
+      "country": "BG",
+      "aliases": [
+        "bg"
+      ]
+    },
+    {
+      "lang": "sr",
+      "code": "sr_RS",
+      "language": "sr",
+      "country": "RS",
+      "aliases": [
+        "sr"
+      ]
+    },
+    {
+      "lang": "hr",
+      "code": "hr_HR",
+      "language": "hr",
+      "country": "HR",
+      "aliases": [
+        "hr"
+      ]
+    },
+    {
+      "lang": "bs",
+      "code": "bs_BA",
+      "language": "bs",
+      "country": "BA",
+      "aliases": [
+        "bs"
+      ]
+    },
+    {
+      "lang": "ar",
+      "code": "ar_SA",
+      "language": "ar",
+      "country": "SA",
+      "aliases": [
+        "ar"
+      ]
+    },
+    {
+      "lang": "fa",
+      "code": "fa_IR",
+      "language": "fa",
+      "country": "IR",
+      "aliases": [
+        "fa"
+      ]
+    },
+    {
+      "lang": "he",
+      "code": "he_IL",
+      "language": "he",
+      "country": "IL",
+      "aliases": [
+        "he"
+      ]
+    },
+    {
+      "lang": "ka",
+      "code": "ka_GE",
+      "language": "ka",
+      "country": "GE",
+      "aliases": [
+        "ka"
+      ]
+    },
+    {
+      "lang": "hy",
+      "code": "hy_AM",
+      "language": "hy",
+      "country": "AM",
+      "aliases": [
+        "hy"
+      ]
+    },
+    {
+      "lang": "zh",
+      "code": "zh_CN",
+      "language": "zh",
+      "country": "CN",
+      "aliases": [
+        "zh",
+        "zh_Hans",
+        "zh_Hans_CN"
+      ]
+    },
+    {
+      "lang": "ja",
+      "code": "ja_JP",
+      "language": "ja",
+      "country": "JP",
+      "aliases": [
+        "ja"
+      ]
+    },
+    {
+      "lang": "ko",
+      "code": "ko_KR",
+      "language": "ko",
+      "country": "KR",
+      "aliases": [
+        "ko"
+      ]
+    },
+    {
+      "lang": "hi",
+      "code": "hi_IN",
+      "language": "hi",
+      "country": "IN",
+      "aliases": [
+        "hi"
+      ]
+    },
+    {
+      "lang": "bn",
+      "code": "bn_BD",
+      "language": "bn",
+      "country": "BD",
+      "aliases": [
+        "bn"
+      ]
+    },
+    {
+      "lang": "ur",
+      "code": "ur_PK",
+      "language": "ur",
+      "country": "PK",
+      "aliases": [
+        "ur"
+      ]
+    },
+    {
+      "lang": "pa",
+      "code": "pa_IN",
+      "language": "pa",
+      "country": "IN",
+      "aliases": [
+        "pa"
+      ]
+    },
+    {
+      "lang": "ta",
+      "code": "ta_IN",
+      "language": "ta",
+      "country": "IN",
+      "aliases": [
+        "ta"
+      ]
+    },
+    {
+      "lang": "te",
+      "code": "te_IN",
+      "language": "te",
+      "country": "IN",
+      "aliases": [
+        "te"
+      ]
+    },
+    {
+      "lang": "mr",
+      "code": "mr_IN",
+      "language": "mr",
+      "country": "IN",
+      "aliases": [
+        "mr"
+      ]
+    },
+    {
+      "lang": "gu",
+      "code": "gu_IN",
+      "language": "gu",
+      "country": "IN",
+      "aliases": [
+        "gu"
+      ]
+    },
+    {
+      "lang": "kn",
+      "code": "kn_IN",
+      "language": "kn",
+      "country": "IN",
+      "aliases": [
+        "kn"
+      ]
+    },
+    {
+      "lang": "ml",
+      "code": "ml_IN",
+      "language": "ml",
+      "country": "IN",
+      "aliases": [
+        "ml"
+      ]
+    },
+    {
+      "lang": "si",
+      "code": "si_LK",
+      "language": "si",
+      "country": "LK",
+      "aliases": [
+        "si"
+      ]
+    },
+    {
+      "lang": "ne",
+      "code": "ne_NP",
+      "language": "ne",
+      "country": "NP",
+      "aliases": [
+        "ne"
+      ]
+    },
+    {
+      "lang": "th",
+      "code": "th_TH",
+      "language": "th",
+      "country": "TH",
+      "aliases": [
+        "th"
+      ]
+    },
+    {
+      "lang": "vi",
+      "code": "vi_VN",
+      "language": "vi",
+      "country": "VN",
+      "aliases": [
+        "vi"
+      ]
+    },
+    {
+      "lang": "id",
+      "code": "id_ID",
+      "language": "id",
+      "country": "ID",
+      "aliases": [
+        "id"
+      ]
+    },
+    {
+      "lang": "ms",
+      "code": "ms_MY",
+      "language": "ms",
+      "country": "MY",
+      "aliases": [
+        "ms"
+      ]
+    },
+    {
+      "lang": "tl",
+      "code": "tl_PH",
+      "language": "tl",
+      "country": "PH",
+      "aliases": [
+        "tl",
+        "fil",
+        "fil_PH"
+      ]
+    },
+    {
+      "lang": "my",
+      "code": "my_MM",
+      "language": "my",
+      "country": "MM",
+      "aliases": [
+        "my"
+      ]
+    },
+    {
+      "lang": "km",
+      "code": "km_KH",
+      "language": "km",
+      "country": "KH",
+      "aliases": [
+        "km"
+      ]
+    },
+    {
+      "lang": "sw",
+      "code": "sw_KE",
+      "language": "sw",
+      "country": "KE",
+      "aliases": [
+        "sw"
+      ]
+    },
+    {
+      "lang": "am",
+      "code": "am_ET",
+      "language": "am",
+      "country": "ET",
+      "aliases": [
+        "am"
+      ]
+    },
+    {
+      "lang": "ha",
+      "code": "ha_NG",
+      "language": "ha",
+      "country": "NG",
+      "aliases": [
+        "ha"
+      ]
+    },
+    {
+      "lang": "yo",
+      "code": "yo_NG",
+      "language": "yo",
+      "country": "NG",
+      "aliases": [
+        "yo"
+      ]
+    },
+    {
+      "lang": "mn",
+      "code": "mn_MN",
+      "language": "mn",
+      "country": "MN",
+      "aliases": [
+        "mn"
+      ]
+    },
+    {
+      "lang": "sq",
+      "code": "sq_AL",
+      "language": "sq",
+      "country": "AL",
+      "aliases": [
+        "sq"
+      ]
+    },
+    {
+      "lang": "lt",
+      "code": "lt_LT",
+      "language": "lt",
+      "country": "LT",
+      "aliases": [
+        "lt"
+      ]
+    },
+    {
+      "lang": "lv",
+      "code": "lv_LV",
+      "language": "lv",
+      "country": "LV",
+      "aliases": [
+        "lv"
+      ]
+    },
+    {
+      "lang": "et",
+      "code": "et_EE",
+      "language": "et",
+      "country": "EE",
+      "aliases": [
+        "et"
+      ]
+    },
+    {
+      "lang": "sl",
+      "code": "sl_SI",
+      "language": "sl",
+      "country": "SI",
+      "aliases": [
+        "sl"
+      ]
+    },
+    {
+      "lang": "mk",
+      "code": "mk_MK",
+      "language": "mk",
+      "country": "MK",
+      "aliases": [
+        "mk"
+      ]
+    },
+    {
+      "lang": "be",
+      "code": "be_BY",
+      "language": "be",
+      "country": "BY",
+      "aliases": [
+        "be"
+      ]
+    },
+    {
+      "lang": "af",
+      "code": "af_ZA",
+      "language": "af",
+      "country": "ZA",
+      "aliases": [
+        "af"
+      ]
+    },
+    {
+      "lang": "ca",
+      "code": "ca_ES",
+      "language": "ca",
+      "country": "ES",
+      "aliases": [
+        "ca"
+      ]
+    },
+    {
+      "lang": "is",
+      "code": "is_IS",
+      "language": "is",
+      "country": "IS",
+      "aliases": [
+        "is"
+      ]
+    },
+    {
+      "lang": "ga",
+      "code": "ga_IE",
+      "language": "ga",
+      "country": "IE",
+      "aliases": [
+        "ga"
+      ]
+    },
+    {
+      "lang": "mt",
+      "code": "mt_MT",
+      "language": "mt",
+      "country": "MT",
+      "aliases": [
+        "mt"
+      ]
+    },
+    {
+      "lang": "cy",
+      "code": "cy_GB",
+      "language": "cy",
+      "country": "GB",
+      "aliases": [
+        "cy"
+      ]
+    },
+    {
+      "lang": "ps",
+      "code": "ps_AF",
+      "language": "ps",
+      "country": "AF",
+      "aliases": [
+        "ps"
+      ]
+    },
+    {
+      "lang": "ku",
+      "code": "ku_TR",
+      "language": "ku",
+      "country": "TR",
+      "aliases": [
+        "ku"
+      ]
+    },
+    {
+      "lang": "so",
+      "code": "so_SO",
+      "language": "so",
+      "country": "SO",
+      "aliases": [
+        "so"
+      ]
+    },
+    {
+      "lang": "zu",
+      "code": "zu_ZA",
+      "language": "zu",
+      "country": "ZA",
+      "aliases": [
+        "zu"
+      ]
+    },
+    {
+      "lang": "ig",
+      "code": "ig_NG",
+      "language": "ig",
+      "country": "NG",
+      "aliases": [
+        "ig"
+      ]
+    }
+  ]
+}

@@ -97,6 +97,7 @@ class BusinessOut(BaseModel):
     country: str | None = None
     business_role: BusinessRole | None = None
     website: str | None = None
+    bio: str | None = None
     description: str | None = None
     seo_text: str | None = None
     keywords: list[str] = Field(default_factory=list)
@@ -112,6 +113,7 @@ class BusinessOut(BaseModel):
     successful_deals: int = 0
     complaints_count: int = 0
     documents_verified: bool = False
+    verification_status: str = "none"
     factory_verified: bool = False
     inspection_passed: bool = False
     audit_report_url: str | None = None
@@ -153,3 +155,6 @@ class UserOut(BaseModel):
     is_business: bool
     business: BusinessOut | None = None
     networking: NetworkingScoreOut | None = None
+    # Bir qurilmada multi-account: free=3, business=5, +$10 extras → max 10.
+    extra_account_slots: int = Field(default=0, ge=0, le=7)
+    max_local_accounts: int = Field(default=3, ge=3, le=10)

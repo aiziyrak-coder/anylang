@@ -59,6 +59,8 @@ class User(Base, TimestampMixin):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     deletion_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     scheduled_purge_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    # Bir qurilmada qo'shimcha hisob slotlari ($10 / dona, biznes bazasiga qo'shiladi).
+    extra_account_slots: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     subscription: Mapped[Subscription | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
@@ -89,6 +91,16 @@ class RefreshToken(Base, TimestampMixin):
     token_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Qurilma / faol seans meta (Telegram-uslubi).
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    device_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    device_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    app_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Birinchi login vaqti — refresh rotate qilganda saqlanadi (1 hafta himoya).
+    session_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="refresh_tokens")
 
@@ -131,6 +143,7 @@ class BusinessProfile(Base, TimestampMixin):
     country: Mapped[str | None] = mapped_column(String(2), nullable=True)
     business_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    bio: Mapped[str | None] = mapped_column(String(300), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     seo_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     keywords: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)

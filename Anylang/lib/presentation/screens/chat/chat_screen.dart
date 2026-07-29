@@ -32,10 +32,13 @@ import '../../modal/rfq_compose_bottom_sheet.dart';
 import '../../modal/location_picker_bottom_sheet.dart';
 import '../../modal/chat_overflow_dialog.dart';
 import '../../modal/chat_overflow_sheet.dart';
+import '../../modal/chat_mute_duration_bottom_sheet.dart';
 import '../../modal/chat_summary_bottom_sheet.dart';
+import '../../modal/chat_video_picker.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/message_actions_dialog.dart';
 import '../../modal/share_contact_bottom_sheet.dart';
+import '../../modal/shared_media_bottom_sheet.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/app_snackbar.dart';
@@ -48,8 +51,6 @@ import '../group_catalog/group_catalog_payload.dart';
 import '../group_catalog/group_catalog_screen.dart';
 import '../group_stats/group_stats_payload.dart';
 import '../group_stats/group_stats_screen.dart';
-import '../deal_mode/deal_mode_payload.dart';
-import '../deal_mode/deal_mode_screen.dart';
 import '../main/main_state.dart';
 import '../messages/messages_state.dart';
 import '../products/product.dart';
@@ -61,9 +62,14 @@ import 'chat_content.dart';
 import 'chat_message.dart';
 import 'chat_payload.dart';
 import 'chat_state.dart';
+import 'chat_state_scope.dart';
 
 class ChatScreen extends Screen<ChatState, ChatPayload> {
-  ChatScreen() : super(mobileContent: ChatContent());
+  ChatScreen()
+      : super(
+          mobileContent: ChatContent(),
+          createState: ChatState.new,
+        );
 
   int _seq = 0;
   Timer? _typingDebounce;
@@ -77,6 +83,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       popBackNavigate();
       return;
     }
+    ChatStateScope.attach(state);
     state.bindPayload(p);
     _boundChatId = p.chatId;
     state.muted.value = SessionStore.isChatMuted(p.chatId);
@@ -96,12 +103,16 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   void dispose() {
     _typingDebounce?.cancel();
     final bound = _boundChatId;
-    if (bound != null && Get.isRegistered<RealtimeSyncService>()) {
+    ChatStateScope.pop(state);
+    if (Get.isRegistered<RealtimeSyncService>()) {
       final sync = Get.find<RealtimeSyncService>();
       // Keyingi chat ochilganda dispose keyinroq kelishi mumkin —
-      // faqat hali shu chat active bo'lsa tozalaymiz.
-      if (sync.activeChatId == bound) {
-        sync.setActiveChat(null);
+      // faqat hali shu chat active bo'lsa tozalaymiz / pastdagini tiklaymiz.
+      if (bound != null && sync.activeChatId == bound) {
+        final below = ChatStateScope.currentOrNull;
+        sync.setActiveChat(
+          below != null && below.chatId.value > 0 ? below.chatId.value : null,
+        );
       }
     }
     super.dispose();
@@ -140,6 +151,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           });
         state.messages.assignAll(merged);
         state.loadError.value = false;
+        if (state.searching.value &&
+            state.searchQuery.value.trim().isNotEmpty) {
+          _recomputeSearchMatches(state);
+        }
         final pinned = merged.where((m) => m.pinned).toList();
         state.pinnedMessages.assignAll(pinned);
         state.pinnedBanner.value = pinned.isNotEmpty ? pinned.last : null;
@@ -352,6 +367,28 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         transcriptFailed: msg.transcriptFailed,
       );
     }
+    if (msg.type == ChatMsgType.video) {
+      return ChatMessage.video(
+        id: msg.id,
+        dir: msg.dir,
+        time: msg.time,
+        createdAt: msg.createdAt,
+        url: msg.videoUrl,
+        isRoundNote: msg.isRoundNote,
+        duration: msg.videoDuration,
+        durationMs: msg.videoDurationMs,
+        status: msg.status,
+        reply: reply,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        senderAvatarUrl: msg.senderAvatarUrl,
+        text: msg.text,
+        textOriginal: msg.textOriginal,
+        showingOriginal: msg.showingOriginal,
+        transcriptPending: msg.transcriptPending,
+        transcriptFailed: msg.transcriptFailed,
+      );
+    }
     return ChatMessage.text(
       id: msg.id,
       dir: msg.dir,
@@ -413,6 +450,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             await _attachImage(ImageSource.gallery);
           case AttachKind.camera:
             await _attachImage(ImageSource.camera);
+          case AttachKind.video:
+            await _attachVideo(roundNote: false);
+          case AttachKind.roundVideo:
+            await _attachVideo(roundNote: true);
           case AttachKind.file:
             await _attachFile();
           case AttachKind.product:
@@ -573,10 +614,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             sendAction(OpenGroupCatalog());
           case ChatOverflowAction.groupStats:
             sendAction(OpenGroupStats());
-          case ChatOverflowAction.dealMode:
-            sendAction(OpenDealMode());
+          case ChatOverflowAction.sharedMedia:
+            sendAction(OpenSharedMedia());
           case ChatOverflowAction.search:
-            break;
+            sendAction(ToggleChatSearch());
           case ChatOverflowAction.mute:
             sendAction(ToggleChatMute());
           case ChatOverflowAction.pin:
@@ -594,6 +635,10 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         }
 
       case OpenPeerProfile _:
+        if (state.isSaved.value) {
+          sendAction(OpenSharedMedia());
+          return;
+        }
         if (state.isGroup.value) {
           sendAction(OpenGroupSettings());
           return;
@@ -658,41 +703,75 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           ),
         );
 
-      case OpenDealMode _:
+      case OpenSharedMedia _:
         if (state.chatId.value <= 0) return;
-        await navigate(
-          DealModeScreen(),
-          payload: DealModePayload(
-            chatId: state.chatId.value,
-            title: state.peerName.value,
-          ),
+        await showSharedMediaBottomSheet(
+          context,
+          chatId: state.chatId.value,
+          title: state.isSaved.value
+              ? 'saved_messages_title'.tr
+              : state.peerName.value,
         );
 
       case ToggleChatSearch _:
         final next = !state.searching.value;
         state.searching.value = next;
-        if (!next) state.searchQuery.value = '';
+        if (!next) {
+          state.searchQuery.value = '';
+          state.searchMatchIds.clear();
+          state.searchMatchIndex.value = 0;
+        }
 
       case ChatSearchChanged a:
         state.searchQuery.value = a.text;
+        _recomputeSearchMatches(state);
+
+      case ChatSearchPrev _:
+        _moveSearchMatch(state, -1);
+
+      case ChatSearchNext _:
+        _moveSearchMatch(state, 1);
 
       case ToggleChatMute _:
-        final next = !state.muted.value;
-        state.muted.value = next;
-        await SessionStore.setChatMuted(state.chatId.value, next);
-        if (state.chatId.value > 0) {
-          final repo = Get.find<ChatRepository>();
-          final result = next
-              ? await repo.muteChat(state.chatId.value)
-              : await repo.unmuteChat(state.chatId.value);
-          if (result.errorOrNull != null) {
-            state.muted.value = !next;
-            await SessionStore.setChatMuted(state.chatId.value, !next);
-            showAppError(result.errorOrNull);
-            return;
+        if (state.muted.value) {
+          state.muted.value = false;
+          await SessionStore.setChatMuted(state.chatId.value, false);
+          if (state.chatId.value > 0) {
+            final result =
+                await Get.find<ChatRepository>().unmuteChat(state.chatId.value);
+            if (result.errorOrNull != null) {
+              state.muted.value = true;
+              await SessionStore.setChatMuted(state.chatId.value, true);
+              showAppError(result.errorOrNull);
+              return;
+            }
           }
+          _toast('chat_unmuted'.tr);
+        } else {
+          if (!context.mounted) return;
+          final choice = await showChatMuteDurationBottomSheet(context);
+          if (choice == null) return;
+          final dur = choice.asDuration;
+          state.muted.value = true;
+          await SessionStore.setChatMuted(
+            state.chatId.value,
+            true,
+            duration: dur,
+          );
+          if (state.chatId.value > 0) {
+            final result = await Get.find<ChatRepository>().muteChat(
+              state.chatId.value,
+              durationSeconds: choice.durationSeconds,
+            );
+            if (result.errorOrNull != null) {
+              state.muted.value = false;
+              await SessionStore.setChatMuted(state.chatId.value, false);
+              showAppError(result.errorOrNull);
+              return;
+            }
+          }
+          _toast(choice.toastKey.tr);
         }
-        _toast(next ? 'chat_muted'.tr : 'chat_unmuted'.tr);
 
       case ToggleChatPin _:
         if (state.chatId.value <= 0) return;
@@ -992,6 +1071,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         if (state.searching.value) {
           state.searching.value = false;
           state.searchQuery.value = '';
+          state.searchMatchIds.clear();
+          state.searchMatchIndex.value = 0;
           return;
         }
         if (Get.isRegistered<RealtimeSyncService>()) {
@@ -1663,6 +1744,35 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     );
   }
 
+  Future<void> _attachVideo({required bool roundNote}) async {
+    final file = await pickChatVideo(
+      context,
+      maxSeconds: roundNote ? 60 : 120,
+      roundNote: roundNote,
+    );
+    if (file == null) return;
+    final optimistic = ChatMessage.video(
+      id: _nextId(),
+      dir: ChatDir.outgoing,
+      time: formatMessageClock(DateTime.now()),
+      createdAt: DateTime.now(),
+      url: file.path,
+      isRoundNote: roundNote,
+      status: ChatStatus.sent,
+      reply: _replyFor(state),
+      transcriptPending: true,
+    );
+    await _uploadAndSendMedia(
+      filePath: file.path,
+      mediaType: 'video',
+      messageType: 'video',
+      optimistic: optimistic,
+      extraMeta: {
+        if (roundNote) 'is_round_note': true,
+      },
+    );
+  }
+
   Future<void> _attachFile() async {
     final picked = await FilePicker.platform.pickFiles(withData: false);
     if (picked == null || picked.files.isEmpty) return;
@@ -1798,7 +1908,9 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     } else {
       for (final m in state.messages.reversed) {
         if (!m.isOutgoing &&
-            (m.type == ChatMsgType.text || m.type == ChatMsgType.voice) &&
+            (m.type == ChatMsgType.text ||
+                m.type == ChatMsgType.voice ||
+                m.type == ChatMsgType.video) &&
             m.displayText.trim().isNotEmpty) {
           messageId = int.tryParse(m.id);
           break;
@@ -2211,6 +2323,19 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           status: status,
           reply: replyUi,
         ),
+      ChatMsgType.video => ChatMessage.video(
+          id: clientId,
+          dir: optimistic.dir,
+          time: optimistic.time,
+          createdAt: optimistic.createdAt,
+          url: optimistic.videoUrl,
+          isRoundNote: optimistic.isRoundNote,
+          duration: optimistic.videoDuration,
+          durationMs: optimistic.videoDurationMs,
+          status: status,
+          reply: replyUi,
+          transcriptPending: optimistic.transcriptPending,
+        ),
       ChatMsgType.file => ChatMessage.file(
           id: clientId,
           dir: optimistic.dir,
@@ -2564,6 +2689,54 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         );
       },
     );
+  }
+
+  void _recomputeSearchMatches(ChatState state) {
+    final q = state.searchQuery.value.trim().toLowerCase();
+    if (q.isEmpty) {
+      state.searchMatchIds.clear();
+      state.searchMatchIndex.value = 0;
+      return;
+    }
+    final ids = <String>[];
+    for (final m in state.messages) {
+      if (_messageMatchesSearch(m, q)) {
+        ids.add(m.id);
+      }
+    }
+    state.searchMatchIds.assignAll(ids);
+    if (ids.isEmpty) {
+      state.searchMatchIndex.value = 0;
+      return;
+    }
+    // Eng yangi topilmadan boshlash (Telegram uslubi).
+    state.searchMatchIndex.value = ids.length - 1;
+  }
+
+  bool _messageMatchesSearch(ChatMessage m, String qLower) {
+    final parts = <String>[
+      m.displayText,
+      m.previewText(),
+      m.textOriginal ?? '',
+      m.text ?? '',
+      m.fileName ?? '',
+      m.cardTitle ?? '',
+      m.cardSubtitle ?? '',
+      m.productTitle ?? '',
+      m.locationLabel ?? '',
+      m.contactName ?? '',
+    ];
+    for (final p in parts) {
+      if (p.toLowerCase().contains(qLower)) return true;
+    }
+    return false;
+  }
+
+  void _moveSearchMatch(ChatState state, int delta) {
+    final ids = state.searchMatchIds;
+    if (ids.isEmpty) return;
+    final next = (state.searchMatchIndex.value + delta).clamp(0, ids.length - 1);
+    state.searchMatchIndex.value = next;
   }
 
   void _toast(String msg) => showAppMessage(msg);

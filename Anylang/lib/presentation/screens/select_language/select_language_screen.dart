@@ -24,10 +24,11 @@ class SelectLanguageScreen extends Screen<SelectLanguageState, void> {
     final locale = Get.locale;
     if (locale != null) {
       final code = '${locale.languageCode}_${locale.countryCode}';
-      final match = languageOptions.firstWhere(
-        (o) => o.localeCode == code,
-        orElse: () => languageOptions.first,
-      );
+      final match = languageOptionByLocale(code) ??
+          languageOptions.firstWhere(
+            (o) => o.langCode == locale.languageCode,
+            orElse: () => languageOptions.first,
+          );
       state.selectedKey.value = match.key;
     }
   }
@@ -44,8 +45,9 @@ class SelectLanguageScreen extends Screen<SelectLanguageState, void> {
         } catch (_) {
           showAppError('select_language_hive_error'.tr);
         }
-        if (a.localeCode != null) {
-          LanguageLocalizations.changeLocale(a.localeCode!);
+        final localeCode = a.localeCode ?? uiLocaleCodeFor(a.langCode);
+        if (localeCode != null) {
+          LanguageLocalizations.changeLocale(localeCode);
         }
       case SearchLang a:
         state.query.value = a.query;
@@ -65,8 +67,14 @@ class SelectLanguageScreen extends Screen<SelectLanguageState, void> {
           showAppError('select_language_hive_error'.tr);
           return;
         }
-        if (selected.localeCode != null) {
-          LanguageLocalizations.changeLocale(selected.localeCode!);
+        final localeCode =
+            selected.localeCode ?? uiLocaleCodeFor(selected.langCode);
+        if (localeCode != null) {
+          LanguageLocalizations.changeLocale(localeCode);
+          await SessionStore.applyAppLanguage(
+            localeCode: localeCode,
+            isoCode: selected.langCode,
+          );
         }
         if (SessionStore.onboardingCompleted) {
           navigate(LoginScreen());

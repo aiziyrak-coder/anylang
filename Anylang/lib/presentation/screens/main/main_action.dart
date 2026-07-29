@@ -11,3 +11,6 @@ class TabSelected extends MainAction {
 
 /// Android/iOS tizim orqaga tugmasi (asosiy shell).
 class HandleSystemBack extends MainAction {}
+
+/// Profil tabini bosib turish — hisoblar almashtirish.
+class ProfileTabLongPressed extends MainAction {}

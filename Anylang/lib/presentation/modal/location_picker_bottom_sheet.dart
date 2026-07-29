@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../data/core/maps_config.dart';
 import '../../data/network/places_service.dart';
 import '../ui/theme/colors.dart';
 import '../utils/app_snackbar.dart';
@@ -28,7 +27,7 @@ class LocationPickResult {
   });
 }
 
-/// Telegram uslubidagi joylashuv tanlash sheet'i.
+/// Telegram uslubidagi joylashuv tanlash sheet'i (Google Maps).
 Future<LocationPickResult?> showLocationPickerBottomSheet(
   BuildContext context,
 ) {
@@ -49,20 +48,46 @@ class _LocationPickerSheet extends StatefulWidget {
 }
 
 class _LocationPickerSheetState extends State<_LocationPickerSheet> {
-  final _map = MapController();
   final _places = PlacesService();
   final _searchCtrl = TextEditingController();
+  final Completer<GoogleMapController> _mapReady =
+      Completer<GoogleMapController>();
 
+  GoogleMapController? _map;
   LatLng? _myPos;
   double? _accuracy;
   LatLng _center = const LatLng(41.3111, 69.2797);
   bool _loadingGps = true;
   bool _loadingPlaces = false;
   bool _searching = false;
+  bool _cameraMoving = false;
   List<NearbyPlace> _nearby = const [];
   List<NearbyPlace> _searchHits = const [];
   String? _pinLabel;
   Timer? _moveDebounce;
+
+  static const _darkMapStyle = '''
+[
+  {"elementType":"geometry","stylers":[{"color":"#242f3e"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},
+  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},
+  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},
+  {"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},
+  {"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},
+  {"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263c"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},
+  {"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263c"}]}
+]
+''';
 
   @override
   void initState() {
@@ -74,8 +99,18 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   void dispose() {
     _moveDebounce?.cancel();
     _searchCtrl.dispose();
-    _map.dispose();
+    _map?.dispose();
     super.dispose();
+  }
+
+  Future<void> _onMapCreated(GoogleMapController controller) async {
+    _map = controller;
+    if (!_mapReady.isCompleted) _mapReady.complete(controller);
+    if (_myPos != null) {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(_myPos!, 16),
+      );
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -110,7 +145,12 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
         _accuracy = pos.accuracy;
         _loadingGps = false;
       });
-      _map.move(ll, 16);
+      final map = _map ??
+          await _mapReady.future.timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw TimeoutException('map'),
+          );
+      await map.animateCamera(CameraUpdate.newLatLngZoom(ll, 16));
       unawaited(_refreshPlaces(ll));
       unawaited(_refreshPinLabel(ll));
     } catch (_) {
@@ -142,19 +182,28 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     });
   }
 
-  void _onMapMoved(MapCamera cam, bool hasGesture) {
-    _center = cam.center;
-    if (!hasGesture) return;
+  void _onCameraMove(CameraPosition pos) {
+    _center = pos.target;
+    _cameraMoving = true;
+  }
+
+  void _onCameraIdle() {
+    if (!_cameraMoving) return;
+    _cameraMoving = false;
+    final target = _center;
     _moveDebounce?.cancel();
     _moveDebounce = Timer(const Duration(milliseconds: 450), () {
-      unawaited(_refreshPinLabel(cam.center));
-      unawaited(_refreshPlaces(cam.center));
+      unawaited(_refreshPinLabel(target));
+      unawaited(_refreshPlaces(target));
     });
   }
 
   Future<void> _recenter() async {
     if (_myPos != null) {
-      _map.move(_myPos!, 16);
+      final map = _map;
+      if (map != null) {
+        await map.animateCamera(CameraUpdate.newLatLngZoom(_myPos!, 16));
+      }
       setState(() => _center = _myPos!);
       return;
     }
@@ -211,7 +260,11 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     }
     setState(() => _searching = true);
     try {
-      final res = await _nominatimSearch(query: q, near: _center);
+      final res = await _places.searchPlaces(
+        query: q,
+        nearLat: _center.latitude,
+        nearLng: _center.longitude,
+      );
       if (!mounted) return;
       setState(() {
         _searchHits = res;
@@ -226,48 +279,6 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     }
   }
 
-  Future<List<NearbyPlace>> _nominatimSearch({
-    required String query,
-    required LatLng near,
-  }) async {
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 12),
-        receiveTimeout: const Duration(seconds: 12),
-        headers: const {
-          'User-Agent': 'AnyLang/1.0 (https://anylang.uz; support@anylang.uz)',
-          'Accept-Language': 'uz,ru,en',
-        },
-      ),
-    );
-    const delta = 0.08;
-    final res = await dio.get(
-      'https://nominatim.openstreetmap.org/search',
-      queryParameters: {
-        'q': query,
-        'format': 'jsonv2',
-        'limit': 15,
-        'addressdetails': 1,
-        'viewbox':
-            '${near.longitude - delta},${near.latitude + delta},${near.longitude + delta},${near.latitude - delta}',
-        'bounded': 0,
-      },
-    );
-    final list = res.data;
-    if (list is! List) return const [];
-    return list.whereType<Map>().map((e) {
-      final name = e['display_name']?.toString() ?? e['name']?.toString() ?? '';
-      final short = name.split(',').first.trim();
-      return NearbyPlace(
-        name: short.isNotEmpty ? short : name,
-        address: name,
-        latitude: double.tryParse('${e['lat']}') ?? near.latitude,
-        longitude: double.tryParse('${e['lon']}') ?? near.longitude,
-        kind: e['type']?.toString() ?? 'place',
-      );
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -275,10 +286,6 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
     final isDark = c.isDark;
     final sheetBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
-    final mapUrl = isDark
-        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-    final mapSubs = isDark ? const ['a', 'b', 'c', 'd'] : const <String>[];
 
     return Container(
       height: h * 0.92,
@@ -356,90 +363,77 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
               ],
             ),
           ),
+          if (!MapsConfig.isConfigured)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.dp, vertical: 4.dp),
+              child: Text(
+                'location_maps_key_missing'.tr,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 11.sp,
+                ),
+              ),
+            ),
           Expanded(
             flex: 5,
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _map,
-                  options: MapOptions(
-                    initialCenter: _center,
-                    initialZoom: 15,
-                    onPositionChanged: _onMapMoved,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(0),
+              child: Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _center,
+                      zoom: 15,
                     ),
+                    onMapCreated: _onMapCreated,
+                    onCameraMove: _onCameraMove,
+                    onCameraIdle: _onCameraIdle,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    compassEnabled: false,
+                    mapToolbarEnabled: false,
+                    mapType: MapType.normal,
+                    style: isDark ? _darkMapStyle : null,
                   ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: mapUrl,
-                      subdomains: mapSubs,
-                      userAgentPackageName: 'com.izodev.anylang',
-                    ),
-                    if (_myPos != null)
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: _myPos!,
-                            width: 22,
-                            height: 22,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF3390EC),
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF3390EC)
-                                        .withValues(alpha: 0.35),
-                                    blurRadius: 10,
-                                    spreadRadius: 4,
-                                  ),
-                                ],
-                              ),
+                  IgnorePointer(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 28.dp),
+                        child: Icon(
+                          Icons.location_on_rounded,
+                          size: 44.dp,
+                          color: const Color(0xFFE53935),
+                          shadows: const [
+                            Shadow(
+                              color: Color(0x66000000),
+                              blurRadius: 8,
+                              offset: Offset(0, 3),
                             ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-                IgnorePointer(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 28.dp),
-                      child: Icon(
-                        Icons.location_on_rounded,
-                        size: 44.dp,
-                        color: const Color(0xFFE53935),
-                        shadows: const [
-                          Shadow(
-                            color: Color(0x66000000),
-                            blurRadius: 8,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 12.dp,
-                  bottom: 12.dp,
-                  child: _mapFab(
-                    c,
-                    icon: Icons.my_location_rounded,
-                    onTap: _recenter,
-                  ),
-                ),
-                if (_loadingGps)
-                  Positioned.fill(
-                    child: ColoredBox(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      child: const Center(child: CircularProgressIndicator()),
+                  Positioned(
+                    right: 12.dp,
+                    bottom: 12.dp,
+                    child: _mapFab(
+                      c,
+                      icon: Icons.my_location_rounded,
+                      onTap: _recenter,
                     ),
                   ),
-              ],
+                  if (_loadingGps)
+                    Positioned.fill(
+                      child: ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           Expanded(
@@ -531,13 +525,6 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                       onTap: () => _sendPlace(p),
                     ),
                   ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(12.dp, 8.dp, 12.dp, 4.dp),
-                  child: Text(
-                    '© OpenStreetMap',
-                    style: TextStyle(color: c.textFaint, fontSize: 10.sp),
-                  ),
-                ),
               ],
             ),
           ),
@@ -631,31 +618,78 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   }
 
   IconData _iconForKind(String kind) {
-    return switch (kind) {
-      'restaurant' || 'cafe' || 'fast_food' || 'bar' || 'pub' =>
-        Icons.restaurant_rounded,
-      'hospital' || 'clinic' || 'pharmacy' => Icons.local_hospital_rounded,
-      'school' || 'university' || 'college' => Icons.school_rounded,
-      'hotel' || 'motel' || 'hostel' => Icons.hotel_rounded,
-      'fuel' => Icons.local_gas_station_rounded,
-      'bank' || 'atm' => Icons.account_balance_rounded,
-      'park' || 'garden' => Icons.park_rounded,
-      'supermarket' || 'convenience' || 'mall' => Icons.storefront_rounded,
-      _ => Icons.place_rounded,
-    };
+    final k = kind.toLowerCase();
+    if (k.contains('restaurant') ||
+        k.contains('cafe') ||
+        k.contains('food') ||
+        k.contains('bar') ||
+        k.contains('meal')) {
+      return Icons.restaurant_rounded;
+    }
+    if (k.contains('hospital') ||
+        k.contains('clinic') ||
+        k.contains('pharmacy') ||
+        k.contains('health') ||
+        k.contains('doctor')) {
+      return Icons.local_hospital_rounded;
+    }
+    if (k.contains('school') ||
+        k.contains('university') ||
+        k.contains('college')) {
+      return Icons.school_rounded;
+    }
+    if (k.contains('hotel') || k.contains('lodging') || k.contains('motel')) {
+      return Icons.hotel_rounded;
+    }
+    if (k.contains('gas') || k.contains('fuel')) {
+      return Icons.local_gas_station_rounded;
+    }
+    if (k.contains('bank') || k.contains('atm') || k.contains('finance')) {
+      return Icons.account_balance_rounded;
+    }
+    if (k.contains('park') || k.contains('garden')) {
+      return Icons.park_rounded;
+    }
+    if (k.contains('store') ||
+        k.contains('shop') ||
+        k.contains('mall') ||
+        k.contains('supermarket')) {
+      return Icons.storefront_rounded;
+    }
+    return Icons.place_rounded;
   }
 
   Color _colorForKind(String kind) {
-    return switch (kind) {
-      'restaurant' || 'cafe' || 'fast_food' || 'bar' || 'pub' =>
-        const Color(0xFFFF9500),
-      'hospital' || 'clinic' || 'pharmacy' => const Color(0xFFFF3B30),
-      'school' || 'university' || 'college' => const Color(0xFFAF52DE),
-      'hotel' || 'motel' || 'hostel' => const Color(0xFF5856D6),
-      'fuel' => const Color(0xFF8E8E93),
-      'bank' || 'atm' => const Color(0xFF34C759),
-      'park' || 'garden' => const Color(0xFF30D158),
-      _ => const Color(0xFFFF9500),
-    };
+    final k = kind.toLowerCase();
+    if (k.contains('restaurant') ||
+        k.contains('cafe') ||
+        k.contains('food') ||
+        k.contains('bar')) {
+      return const Color(0xFFFF9500);
+    }
+    if (k.contains('hospital') ||
+        k.contains('clinic') ||
+        k.contains('pharmacy') ||
+        k.contains('health')) {
+      return const Color(0xFFFF3B30);
+    }
+    if (k.contains('school') ||
+        k.contains('university') ||
+        k.contains('college')) {
+      return const Color(0xFFAF52DE);
+    }
+    if (k.contains('hotel') || k.contains('lodging')) {
+      return const Color(0xFF5856D6);
+    }
+    if (k.contains('gas') || k.contains('fuel')) {
+      return const Color(0xFF8E8E93);
+    }
+    if (k.contains('bank') || k.contains('atm')) {
+      return const Color(0xFF34C759);
+    }
+    if (k.contains('park') || k.contains('garden')) {
+      return const Color(0xFF30D158);
+    }
+    return const Color(0xFFFF9500);
   }
 }

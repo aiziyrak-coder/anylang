@@ -80,8 +80,8 @@ class UserCardItem extends StatelessWidget {
     this.addEnabled = true,
   });
 
-  bool get _danger => isScammer || riskLevel == 'high';
-  bool get _warn => !_danger && riskLevel == 'medium';
+  bool get _danger => isScammer;
+  bool get _warn => !isScammer && (riskLevel == 'medium' || riskLevel == 'high');
 
   @override
   Widget build(BuildContext context) {

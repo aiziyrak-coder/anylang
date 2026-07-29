@@ -31,13 +31,12 @@ class ProductsState extends GetxController {
   RxBool newOnly = false.obs;
   RxBool freeShippingOnly = false.obs;
   RxBool premiumSellerOnly = false.obs;
+  /// Filter sheetdagi tanlangan promo kolleksiya (pager o‘rniga).
+  final RxnString selectedPromoId = RxnString();
 
   RxBool loading = true.obs;
   RxBool searching = false.obs;
   RxBool showingFavorites = false.obs;
-  /// Biznes: o‘z e’lonlari (edit/delete/boost).
-  RxBool showingMyProducts = false.obs;
-
   RxBool isBusiness = false.obs;
   final Rxn<AiMatchingResult> aiMatching = Rxn<AiMatchingResult>();
   final RxBool aiMatchingLoading = false.obs;
@@ -57,6 +56,9 @@ class ProductsState extends GetxController {
   /// Main tab soft-refresh (IndexedStack).
   Future<void> Function()? softRefreshHandler;
 
+  /// Mahsulot qo‘shish / edit — ikki marta bosishni bloklash.
+  RxBool addProductBusy = false.obs;
+
   @override
   void onClose() {
     searchController.dispose();
@@ -72,7 +74,8 @@ class ProductsState extends GetxController {
       readyStockOnly.value ||
       newOnly.value ||
       freeShippingOnly.value ||
-      premiumSellerOnly.value;
+      premiumSellerOnly.value ||
+      (selectedPromoId.value != null && selectedPromoId.value!.isNotEmpty);
 
   bool get isFactoryFilter => businessRole.value == 'manufacturer';
 

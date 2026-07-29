@@ -11,12 +11,18 @@ class ChatSummaryData {
   final List<String> bullets;
   final int messageCount;
   final int coveredCount;
+  final String? latestTopic;
+  final bool latestTopicIsGreetingOnly;
+  final String? previousTopic;
 
   const ChatSummaryData({
     required this.title,
     required this.bullets,
     this.messageCount = 0,
     this.coveredCount = 0,
+    this.latestTopic,
+    this.latestTopicIsGreetingOnly = false,
+    this.previousTopic,
   });
 
   factory ChatSummaryData.fromApi(Map<String, dynamic> map) {
@@ -24,6 +30,8 @@ class ChatSummaryData {
     final bullets = raw is List
         ? raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList()
         : <String>[];
+    final latest = map['latest_topic']?.toString().trim();
+    final previous = map['previous_topic']?.toString().trim();
     return ChatSummaryData(
       title: (map['title']?.toString().trim().isNotEmpty == true)
           ? map['title'].toString().trim()
@@ -31,14 +39,45 @@ class ChatSummaryData {
       bullets: bullets,
       messageCount: (map['message_count'] as num?)?.toInt() ?? 0,
       coveredCount: (map['covered_count'] as num?)?.toInt() ?? 0,
+      latestTopic: (latest != null && latest.isNotEmpty) ? latest : null,
+      latestTopicIsGreetingOnly:
+          map['latest_topic_is_greeting_only'] == true,
+      previousTopic:
+          (previous != null && previous.isNotEmpty) ? previous : null,
     );
   }
+
+  String get latestTopicDisplay {
+    if (latestTopicIsGreetingOnly) {
+      return 'chat_summary_no_important_topic'.tr;
+    }
+    return latestTopic ?? '';
+  }
+
+  bool get hasLatestTopic =>
+      latestTopicIsGreetingOnly ||
+      (latestTopic != null && latestTopic!.trim().isNotEmpty);
+
+  bool get hasPreviousTopic =>
+      previousTopic != null && previousTopic!.trim().isNotEmpty;
 
   String get copyText {
     final buf = StringBuffer(title);
     for (final b in bullets) {
       buf.writeln();
       buf.write('• $b');
+    }
+    if (hasLatestTopic) {
+      buf.writeln();
+      buf.writeln();
+      buf.writeln('chat_summary_latest_topic'.tr);
+      buf.write(latestTopicDisplay);
+    }
+    if (hasPreviousTopic) {
+      buf.writeln();
+      buf.writeln();
+      buf.writeln('chat_summary_previous_topic'.tr);
+      buf.write(previousTopic);
     }
     return buf.toString();
   }
@@ -202,54 +241,113 @@ class _ChatSummarySheetState extends State<_ChatSummarySheet> {
                 ),
               )
             else ...[
-              Text(
-                _data!.title,
-                style: TextStyle(
-                  color: c.textPrimary,
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 12.dp),
               Flexible(
-                child: ListView.separated(
+                child: ListView(
                   shrinkWrap: true,
-                  itemCount: _data!.bullets.length,
-                  separatorBuilder: (_, _) => SizedBox(height: 10.dp),
-                  itemBuilder: (_, i) {
-                    final bullet = _data!.bullets[i];
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          margin: EdgeInsets.only(top: 6.dp),
-                          width: 7.dp,
-                          height: 7.dp,
-                          decoration: BoxDecoration(
-                            color: c.accent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 10.dp),
-                        Expanded(
-                          child: Text(
-                            bullet,
-                            style: TextStyle(
-                              color: c.textPrimary,
-                              fontSize: 14.sp,
-                              height: 1.35,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                  children: [
+                    Text(
+                      _data!.title,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 12.dp),
+                    for (var i = 0; i < _data!.bullets.length; i++) ...[
+                      if (i > 0) SizedBox(height: 10.dp),
+                      _bulletRow(c, _data!.bullets[i]),
+                    ],
+                    if (_data!.hasLatestTopic) ...[
+                      SizedBox(height: 20.dp),
+                      _topicBlock(
+                        c,
+                        title: 'chat_summary_latest_topic'.tr,
+                        body: _data!.latestTopicDisplay,
+                      ),
+                    ],
+                    if (_data!.hasPreviousTopic) ...[
+                      SizedBox(height: 16.dp),
+                      _topicBlock(
+                        c,
+                        title: 'chat_summary_previous_topic'.tr,
+                        body: _data!.previousTopic!,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _bulletRow(AppColors c, String bullet) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: EdgeInsets.only(top: 6.dp),
+          width: 7.dp,
+          height: 7.dp,
+          decoration: BoxDecoration(
+            color: c.accent,
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: 10.dp),
+        Expanded(
+          child: Text(
+            bullet,
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 14.sp,
+              height: 1.35,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _topicBlock(
+    AppColors c, {
+    required String title,
+    required String body,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.dp),
+      decoration: BoxDecoration(
+        color: c.background,
+        borderRadius: BorderRadius.circular(14.dp),
+        border: Border.all(color: c.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 8.dp),
+          Text(
+            body,
+            style: TextStyle(
+              color: c.textSecondary,
+              fontSize: 13.sp,
+              height: 1.4,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }

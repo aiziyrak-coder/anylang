@@ -12,6 +12,7 @@ from sqlalchemy import func, inspect as sa_inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -419,13 +420,6 @@ async def list_messages(
     sender_map = await _load_sender_public_map(
         db, {m.sender_id for m in visible}
     )
-    from app.services.auto_business_card import build_auto_business_cards
-
-    auto_cards = await build_auto_business_cards(
-        db,
-        viewer_id=user.id,
-        sender_ids={m.sender_id for m in visible},
-    )
 
     items = []
     for m in visible:
@@ -439,16 +433,13 @@ async def list_messages(
             sender_name=s_name,
             sender_avatar_url=s_avatar,
         )
-        card = auto_cards.get(m.sender_id)
-        if card is not None and m.sender_id != user.id:
-            payload["auto_business_card"] = card
         items.append(payload)
 
     # Tarix ochilganda yetishmayotgan tarjimalarni backgroundda to'ldirish.
     missing_jobs: list[dict] = []
     viewer_lang = user_preferred_lang(user)
     for m in visible:
-        if m.type not in {"text", "voice"} or m.sender_id == user.id:
+        if (m.type not in {"text", "voice", "video"} or m.sender_id == user.id:
             continue
         src_text = (m.text_original or "").strip()
         if not src_text:
@@ -637,6 +628,9 @@ async def create_message(
         )
 
     now = datetime.now(UTC)
+    if msg_type in {"voice", "video"} and isinstance(meta_payload, dict):
+        meta_payload = dict(meta_payload)
+        meta_payload.setdefault("transcription_status", "pending")
     message = Message(
         chat_id=chat_id,
         sender_id=user.id,
@@ -694,8 +688,6 @@ async def create_message(
     hub = get_hub()
 
     async def _publish(msg: Message) -> dict:
-        from app.services.auto_business_card import build_auto_business_cards
-
         s_name, s_avatar = _sender_public_fields(user)
         sender_payload = _serialize_message(
             msg,
@@ -726,12 +718,6 @@ async def create_message(
                     sender_name=s_name,
                     sender_avatar_url=s_avatar,
                 )
-                cards = await build_auto_business_cards(
-                    db, viewer_id=peer.id, sender_ids={user.id}
-                )
-                card = cards.get(user.id)
-                if card is not None:
-                    peer_payload["auto_business_card"] = card
                 await hub.publish(
                     peer.id, "new_message", {**event_data, "message": peer_payload}
                 )
@@ -766,24 +752,27 @@ async def create_message(
                     "asker_id": user.id,
                 }
             ]
-    elif msg_type == "voice":
-        audio_url = (meta_payload or {}).get("url")
-        if audio_url:
+    elif msg_type in {"voice", "video"}:
+        media_url = (meta_payload or {}).get("url")
+        if media_url:
+            default_ct = "video/mp4" if msg_type == "video" else "audio/mp4"
+            default_name = "video.mp4" if msg_type == "video" else "voice.m4a"
             payload["_voice_jobs"] = [
                 {
                     "message_id": message.id,
                     "chat_id": chat_id,
-                    "audio_url": audio_url,
+                    "audio_url": media_url,
                     "content_type": (meta_payload or {}).get("content_type")
                     or (meta_payload or {}).get("mime")
-                    or "audio/mp4",
+                    or default_ct,
                     "filename": (meta_payload or {}).get("filename")
                     or (meta_payload or {}).get("name")
-                    or "voice.m4a",
+                    or default_name,
                     "source_lang": user_preferred_lang(user),
                     "sender_id": user.id,
                     "sender_language": user_preferred_lang(user),
                     "recipient_ids": [p.id for p in recipients],
+                    "message_type": msg_type,
                 }
             ]
 
@@ -981,6 +970,39 @@ async def _download_audio_bytes(url: str) -> tuple[bytes, str | None]:
         return response.content, ctype
 
 
+def _set_transcription_status(message: Message, status: str) -> None:
+    meta = dict(message.meta or {})
+    meta["transcription_status"] = status
+    message.meta = meta
+    flag_modified(message, "meta")
+
+
+async def _mark_voice_transcription_failed(
+    db: AsyncSession,
+    *,
+    message: Message,
+    chat_id: int,
+    sender_id: int,
+    recipient_ids: list[int] | None,
+) -> None:
+    _set_transcription_status(message, "failed")
+    await db.flush()
+    member_ids = [sender_id, *(recipient_ids or [])]
+    if not recipient_ids:
+        try:
+            member_ids = await list_chat_member_ids(db, chat_id)
+        except Exception:  # noqa: BLE001
+            member_ids = [sender_id]
+    await _republish_message_to_members(
+        db,
+        message=message,
+        chat_id=chat_id,
+        sender_id=sender_id,
+        member_ids=list({*member_ids}),
+    )
+    await db.commit()
+
+
 async def _republish_message_to_members(
     db: AsyncSession,
     *,
@@ -1029,10 +1051,12 @@ async def finish_voice_transcription_job(
     sender_id: int,
     sender_language: str,
     recipient_ids: list[int] | None = None,
+    message_type: str | None = None,
 ) -> None:
-    """Voice → STT → text_original, then per-recipient translation jobs."""
+    """Voice/video → STT → text_original (subtitles), then per-recipient translation."""
     from app.integrations.stt import transcribe_audio
 
+    allowed_types = {"voice", "video", "audio"}
     factory = get_session_factory()
     async with factory() as db:
         try:
@@ -1042,8 +1066,14 @@ async def finish_voice_transcription_job(
                 .options(selectinload(Message.translations))
             )
             message = result.scalar_one_or_none()
-            if message is None or message.type != "voice":
+            if message is None or message.type not in allowed_types:
                 return
+            default_ct = (
+                "video/mp4" if message.type == "video" else "audio/mp4"
+            )
+            default_name = (
+                "video.mp4" if message.type == "video" else "voice.m4a"
+            )
             if (message.text_original or "").strip():
                 # Already transcribed (retry / duplicate job).
                 transcript = message.text_original.strip()
@@ -1052,27 +1082,22 @@ async def finish_voice_transcription_job(
                     audio_bytes, fetched_ct = await _download_audio_bytes(audio_url)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
-                        "Voice download failed for message %s: %s", message_id, exc
+                        "Media download failed for message %s: %s", message_id, exc
                     )
-                    meta = dict(message.meta or {})
-                    meta["transcription_status"] = "failed"
-                    message.meta = meta
-                    await db.flush()
-                    await _republish_message_to_members(
+                    await _mark_voice_transcription_failed(
                         db,
                         message=message,
                         chat_id=chat_id,
                         sender_id=sender_id,
-                        member_ids=[sender_id, *(recipient_ids or [])],
+                        recipient_ids=recipient_ids,
                     )
-                    await db.commit()
                     return
                 try:
                     transcript = await transcribe_audio(
                         audio_bytes,
-                        content_type=content_type or fetched_ct or "audio/mp4",
+                        content_type=content_type or fetched_ct or default_ct,
                         language=source_lang or sender_language,
-                        filename=filename or "voice.m4a",
+                        filename=filename or default_name,
                     )
                 except AppError as exc:
                     logger.warning(
@@ -1081,49 +1106,34 @@ async def finish_voice_transcription_job(
                         exc.error_code,
                         exc.message,
                     )
-                    meta = dict(message.meta or {})
-                    meta["transcription_status"] = "failed"
-                    message.meta = meta
-                    await db.flush()
-                    await _republish_message_to_members(
+                    await _mark_voice_transcription_failed(
                         db,
                         message=message,
                         chat_id=chat_id,
                         sender_id=sender_id,
-                        member_ids=[sender_id, *(recipient_ids or [])],
+                        recipient_ids=recipient_ids,
                     )
-                    await db.commit()
                     return
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Voice STT failed for message %s: %s", message_id, exc)
-                    meta = dict(message.meta or {})
-                    meta["transcription_status"] = "failed"
-                    message.meta = meta
-                    await db.flush()
-                    await _republish_message_to_members(
+                    await _mark_voice_transcription_failed(
                         db,
                         message=message,
                         chat_id=chat_id,
                         sender_id=sender_id,
-                        member_ids=[sender_id, *(recipient_ids or [])],
+                        recipient_ids=recipient_ids,
                     )
-                    await db.commit()
                     return
 
                 transcript = (transcript or "").strip()
                 if not transcript:
-                    meta = dict(message.meta or {})
-                    meta["transcription_status"] = "failed"
-                    message.meta = meta
-                    await db.flush()
-                    await _republish_message_to_members(
+                    await _mark_voice_transcription_failed(
                         db,
                         message=message,
                         chat_id=chat_id,
                         sender_id=sender_id,
-                        member_ids=[sender_id, *(recipient_ids or [])],
+                        recipient_ids=recipient_ids,
                     )
-                    await db.commit()
                     return
 
                 # Moderator AI — ovoz transkripti
@@ -1172,9 +1182,7 @@ async def finish_voice_transcription_job(
 
                 message.text_original = transcript
                 message.original_language = source_lang or sender_language
-                meta = dict(message.meta or {})
-                meta["transcription_status"] = "done"
-                message.meta = meta
+                _set_transcription_status(message, "done")
                 await db.flush()
 
             peers = list(recipient_ids or [])
@@ -1199,6 +1207,28 @@ async def finish_voice_transcription_job(
                 message_id,
                 exc,
             )
+            # Shimmer forever bo‘lmasin — failed holatini yetkazamiz.
+            try:
+                async with factory() as db2:
+                    result = await db2.execute(
+                        select(Message).where(Message.id == message_id)
+                    )
+                    msg = result.scalar_one_or_none()
+                    if msg is not None and msg.type in {"voice", "video", "audio"}:
+                        if not (msg.text_original or "").strip():
+                            await _mark_voice_transcription_failed(
+                                db2,
+                                message=msg,
+                                chat_id=chat_id,
+                                sender_id=sender_id,
+                                recipient_ids=recipient_ids,
+                            )
+            except Exception as mark_exc:  # noqa: BLE001
+                logger.warning(
+                    "Could not mark voice STT failed for message %s: %s",
+                    message_id,
+                    mark_exc,
+                )
             return
 
     # Separate session for translations (same pattern as text jobs).
@@ -1708,5 +1738,10 @@ async def summarize_chat_for_user(
         "bullets": list(summary.get("bullets") or []),
         "message_count": message_count,
         "covered_count": len(rows),
+        "latest_topic": summary.get("latest_topic"),
+        "latest_topic_is_greeting_only": bool(
+            summary.get("latest_topic_is_greeting_only")
+        ),
+        "previous_topic": summary.get("previous_topic"),
     }
 

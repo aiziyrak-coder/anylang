@@ -110,17 +110,23 @@ def compute_period_price(plan: str, months: int) -> tuple[Decimal, Decimal, int]
 
 
 def period_catalog_for_plan(plan: str) -> list[dict]:
+    from app.payments.tax import PAYMENT_TAX_PERCENT, apply_payment_tax
+
     base = PLAN_MONTHLY_BASE.get(plan)
     if base is None:
         return []
     out: list[dict] = []
     for months in (1, 3, 6, 12):
         total, per_month, savings = compute_period_price(plan, months)
+        _, tax, total_with_tax = apply_payment_tax(total)
         out.append(
             {
                 "months": months,
                 "code": billing_cycle_code(months),
                 "total": f"{total:.2f}",
+                "tax": f"{tax:.2f}",
+                "tax_percent": PAYMENT_TAX_PERCENT,
+                "total_with_tax": f"{total_with_tax:.2f}",
                 "per_month": f"{per_month:.2f}",
                 "savings_percent": savings if savings > 0 else None,
             }
@@ -268,8 +274,11 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
                 plan["selected_period"] = match
         plans.append(plan)
 
+    from app.payments.tax import PAYMENT_TAX_PERCENT
+
     return {
         "plans": plans,
+        "payment_tax_percent": PAYMENT_TAX_PERCENT,
         "period_options": [
             {"months": m, "code": str(m), "discount_percent": int(float(PERIOD_DISCOUNT[m]) * 100)}
             for m in (1, 3, 6, 12)

@@ -29,6 +29,9 @@ class OpenEditProfileFromSettings extends SettingsAction {}
 class OpenSubscriptionFromSettings extends SettingsAction {}
 class OpenNumbersFromSettings extends SettingsAction {}
 class OpenSupportFromSettings extends SettingsAction {}
+class OpenPrivacyPolicy extends SettingsAction {}
+class OpenPublicOffer extends SettingsAction {}
+class OpenDevicesFromSettings extends SettingsAction {}
 class SettingsLogoutRequested extends SettingsAction {}
 
 class SettingsDeleteAccountRequested extends SettingsAction {}

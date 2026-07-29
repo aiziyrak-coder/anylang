@@ -11,6 +11,8 @@ class SessionStore {
   static const _kAccess = 'accessToken';
   static const _kRefresh = 'refreshToken';
   static const _kExpire = 'tokenExpireTime';
+  static const _kSessionId = 'authSessionId';
+  static const _kDeviceId = 'deviceId';
 
   static final FlutterSecureStorage _secure = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -21,6 +23,7 @@ class SessionStore {
   static String? _accessCache;
   static String? _refreshCache;
   static int? _expireCache;
+  static String? _sessionIdCache;
   static bool _ready = false;
 
   /// Ilova startida chaqiriladi — Hive dan secure storage ga migrate qiladi.
@@ -30,6 +33,7 @@ class SessionStore {
     _refreshCache = await _secure.read(key: _kRefresh);
     final expireRaw = await _secure.read(key: _kExpire);
     _expireCache = int.tryParse(expireRaw ?? '');
+    _sessionIdCache = await _secure.read(key: _kSessionId);
 
     // Legacy plaintext Hive → secure migration
     final legacyAccess = _box.get(_kAccess) as String?;
@@ -54,6 +58,7 @@ class SessionStore {
     required String refreshToken,
     Map<String, dynamic>? user,
     int? expiresInSeconds,
+    String? sessionId,
   }) async {
     final fromJwt = _jwtExpMillis(accessToken);
     final expire = fromJwt ??
@@ -68,6 +73,10 @@ class SessionStore {
     await _secure.write(key: _kAccess, value: accessToken);
     await _secure.write(key: _kRefresh, value: refreshToken);
     await _secure.write(key: _kExpire, value: '$expire');
+    if (sessionId != null && sessionId.isNotEmpty) {
+      _sessionIdCache = sessionId;
+      await _secure.write(key: _kSessionId, value: sessionId);
+    }
     await _clearLegacyTokenKeys();
 
     if (user != null) {
@@ -82,22 +91,39 @@ class SessionStore {
   static String? get refreshToken => _refreshCache;
   static String? get accessToken => _accessCache;
   static int? get tokenExpireTime => _expireCache;
+  static String? get sessionId => _sessionIdCache;
 
   static bool get hasSession {
     final rt = refreshToken;
     return rt != null && rt.isNotEmpty && rt != 'none';
   }
 
+  /// Qurilma ID — bir marta yaratiladi, loginlarda qayta ishlatiladi.
+  static Future<String> ensureDeviceId() async {
+    final existing = _box.get(_kDeviceId)?.toString();
+    if (existing != null && existing.length >= 8) return existing;
+    // Local import loopdan qochish — oddiy hex.
+    final r = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+    final id = '${r}a${(r.hashCode & 0xfffffff).toRadixString(16)}';
+    await _box.put(_kDeviceId, id);
+    return id;
+  }
+
   static Future<void> clear() async {
     _accessCache = null;
     _refreshCache = null;
     _expireCache = null;
+    _sessionIdCache = null;
     await _secure.delete(key: _kAccess);
     await _secure.delete(key: _kRefresh);
     await _secure.delete(key: _kExpire);
+    await _secure.delete(key: _kSessionId);
     await _clearLegacyTokenKeys();
     await _box.delete('user');
   }
+
+  /// Multi-account: aktiv tokenlarni tozalash (slotda saqlangan holda).
+  static Future<void> clearActiveOnly() => clear();
 
   static Future<void> _clearLegacyTokenKeys() async {
     await _box.delete(_kAccess);
@@ -212,7 +238,15 @@ class SessionStore {
     }
     final app = user['app_language']?.toString();
     if (app != null && app.isNotEmpty) {
-      await _box.put('language', app);
+      final normalized = app.replaceAll('-', '_').trim();
+      if (normalized.contains('_')) {
+        await _box.put('language', normalized);
+      } else {
+        final current = _box.get('language') as String?;
+        if (current == null || current.isEmpty) {
+          await _box.put('language', normalized);
+        }
+      }
     }
   }
 
@@ -224,6 +258,8 @@ class SessionStore {
   }
 
   static const _kMutedChats = 'muted_chats';
+  /// chatId → expiry epoch ms; `0` = forever.
+  static const _kMutedChatsUntil = 'muted_chats_until';
   static const _kBlockedUsers = 'blocked_users';
 
   static Set<String> _stringIdSet(String key) {
@@ -236,18 +272,96 @@ class SessionStore {
     await _box.put(key, ids.toList());
   }
 
-  static bool isChatMuted(int chatId) =>
-      chatId > 0 && _stringIdSet(_kMutedChats).contains('$chatId');
-
-  static Future<void> setChatMuted(int chatId, bool muted) async {
-    if (chatId <= 0) return;
-    final ids = _stringIdSet(_kMutedChats);
-    if (muted) {
-      ids.add('$chatId');
-    } else {
-      ids.remove('$chatId');
+  static Map<String, int> _mutedUntilMap() {
+    final raw = _box.get(_kMutedChatsUntil);
+    final out = <String, int>{};
+    if (raw is Map) {
+      for (final e in raw.entries) {
+        final k = e.key.toString();
+        final v = e.value;
+        if (k.isEmpty) continue;
+        if (v is int) {
+          out[k] = v;
+        } else if (v is num) {
+          out[k] = v.toInt();
+        }
+      }
     }
-    await _putStringIdSet(_kMutedChats, ids);
+    // Legacy boolean set → forever.
+    for (final id in _stringIdSet(_kMutedChats)) {
+      out.putIfAbsent(id, () => 0);
+    }
+    return out;
+  }
+
+  static Future<void> _putMutedUntilMap(Map<String, int> map) async {
+    await _box.put(_kMutedChatsUntil, map);
+    // Keep legacy key in sync for older code paths.
+    final foreverOrActive = <String>{};
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final e in map.entries) {
+      if (e.value == 0 || e.value > now) foreverOrActive.add(e.key);
+    }
+    await _putStringIdSet(_kMutedChats, foreverOrActive);
+  }
+
+  /// `null` = not muted; `0` = forever; else expiry epoch ms.
+  static int? chatMuteUntilMs(int chatId) {
+    if (chatId <= 0) return null;
+    final until = _mutedUntilMap()['$chatId'];
+    if (until == null) return null;
+    if (until == 0) return 0;
+    if (DateTime.now().millisecondsSinceEpoch >= until) {
+      // Lazy clear expired (fire-and-forget).
+      // ignore: discarded_futures
+      setChatMuted(chatId, false);
+      return null;
+    }
+    return until;
+  }
+
+  static bool isChatMuted(int chatId) => chatMuteUntilMs(chatId) != null;
+
+  /// [duration] `null` + muted=true → forever.
+  static Future<void> setChatMuted(
+    int chatId,
+    bool muted, {
+    Duration? duration,
+  }) async {
+    if (chatId <= 0) return;
+    final map = _mutedUntilMap();
+    final key = '$chatId';
+    if (!muted) {
+      map.remove(key);
+    } else if (duration == null) {
+      map[key] = 0;
+    } else {
+      map[key] = DateTime.now().add(duration).millisecondsSinceEpoch;
+    }
+    await _putMutedUntilMap(map);
+  }
+
+  /// Serverdan kelgan mute holatini localga sinxronlash.
+  static Future<void> syncChatMuteFromServer(
+    int chatId, {
+    required bool muted,
+    DateTime? mutedUntil,
+  }) async {
+    if (chatId <= 0) return;
+    if (!muted) {
+      await setChatMuted(chatId, false);
+      return;
+    }
+    if (mutedUntil == null) {
+      await setChatMuted(chatId, true);
+      return;
+    }
+    final remaining = mutedUntil.difference(DateTime.now());
+    if (remaining.isNegative) {
+      await setChatMuted(chatId, false);
+      return;
+    }
+    await setChatMuted(chatId, true, duration: remaining);
   }
 
   static bool isUserBlocked(int userId) =>

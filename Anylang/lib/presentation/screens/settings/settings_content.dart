@@ -143,6 +143,12 @@ class SettingsContent extends ScreenContent<SettingsState> {
             showChevron: true,
             onTap: () => sendAction(OpenSupportFromSettings()),
           ),
+          InfoRow(
+            icon: Icons.devices_rounded,
+            label: 'devices_title'.tr,
+            showChevron: true,
+            onTap: () => sendAction(OpenDevicesFromSettings()),
+          ),
         ], padHorizontal: false),
         SizedBox(height: 20.dp),
         KeyedSubtree(
@@ -235,6 +241,23 @@ class SettingsContent extends ScreenContent<SettingsState> {
             ],
           ),
         ),
+        SizedBox(height: 20.dp),
+        _sectionLabel(c, 'settings_legal'.tr),
+        SizedBox(height: 9.dp),
+        _card(c, [
+          InfoRow(
+            icon: Icons.privacy_tip_outlined,
+            label: 'legal_privacy_policy'.tr,
+            showChevron: true,
+            onTap: () => sendAction(OpenPrivacyPolicy()),
+          ),
+          InfoRow(
+            icon: Icons.description_outlined,
+            label: 'legal_public_offer'.tr,
+            showChevron: true,
+            onTap: () => sendAction(OpenPublicOffer()),
+          ),
+        ], padHorizontal: false),
         SizedBox(height: 20.dp),
         _sectionLabel(c, 'settings_account_danger'.tr),
         SizedBox(height: 9.dp),

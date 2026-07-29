@@ -10,7 +10,7 @@ enum ChatOverflowAction {
   groupSettings,
   groupCatalog,
   groupStats,
-  dealMode,
+  sharedMedia,
   search,
   mute,
   pin,
@@ -72,6 +72,13 @@ Future<ChatOverflowAction?> showChatOverflowSheet(
                     : 'chat_overflow_pin'.tr,
                 ChatOverflowAction.pin,
               ),
+              _item(
+                ctx,
+                c,
+                Icons.search_rounded,
+                'chat_overflow_search'.tr,
+                ChatOverflowAction.search,
+              ),
               if (!isGroup)
                 _item(
                   ctx,
@@ -107,9 +114,9 @@ Future<ChatOverflowAction?> showChatOverflowSheet(
               _item(
                 ctx,
                 c,
-                Icons.handshake_outlined,
-                'chat_overflow_deal_mode'.tr,
-                ChatOverflowAction.dealMode,
+                Icons.photo_library_outlined,
+                'chat_overflow_shared_media'.tr,
+                ChatOverflowAction.sharedMedia,
               ),
               _item(
                 ctx,

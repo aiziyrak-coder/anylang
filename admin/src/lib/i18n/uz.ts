@@ -36,6 +36,7 @@ export const uz = {
   nav: {
     overview: "Boshqaruv paneli",
     users: "Foydalanuvchilar",
+    verification: "Verifikatsiya",
     subscriptions: "Obunalar",
     promos: "Promokodlar",
     payments: "To‘lovlar",
@@ -205,6 +206,21 @@ export const uz = {
     colTarget: "Maqsad",
     colIp: "IP",
     filterAction: "Amal bo‘yicha filtr",
+  },
+  verification: {
+    title: "Biznes verifikatsiya",
+    subtitle: "Hujjatlar navbati — tasdiqlash yoki rad etish",
+    pending: "Kutilmoqda",
+    approved: "Tasdiqlangan",
+    rejected: "Rad etilgan",
+    approve: "Tasdiqlash",
+    reject: "Rad etish",
+    confirmApprove: "Bu biznesni verifikatsiyadan o‘tkazilsinmi?",
+    confirmReject: "Ariza rad etilsinmi?",
+    approveHint:
+      "Tasdiqlanganda ishonchlilik belgisi beriladi va scam ogohlantirishi olib tashlanadi.",
+    rejectNoteRequired: "Rad etish sababi majburiy",
+    rejectNotePlaceholder: "Rad etish sababini yozing…",
   },
   products: {
     title: "Mahsulotlar",

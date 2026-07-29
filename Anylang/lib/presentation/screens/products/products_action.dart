@@ -25,8 +25,6 @@ class ShowFavorites extends ProductsAction {}
 /// AI savdo yordamchisi (marketplace).
 class OpenTradeAssistant extends ProductsAction {}
 
-class OpenBusinessFeed extends ProductsAction {}
-
 class OpenAiMatching extends ProductsAction {}
 
 class RetryAiMatching extends ProductsAction {}
@@ -81,6 +79,32 @@ class ProductsTogglePremiumSeller extends ProductsAction {}
 /// Barcha filtrlarni tozalash.
 class ProductsClearFilters extends ProductsAction {}
 
+/// Filter sheet — «Saralash» (draft → apply + dismiss).
+class ProductsApplySheetFilters extends ProductsAction {
+  final String? promoId;
+  final bool verifiedOnly;
+  final bool factoryOnly;
+  final bool trendOnly;
+  final bool readyStockOnly;
+  final bool newOnly;
+  final bool freeShippingOnly;
+  final bool premiumSellerOnly;
+
+  ProductsApplySheetFilters({
+    this.promoId,
+    required this.verifiedOnly,
+    required this.factoryOnly,
+    required this.trendOnly,
+    required this.readyStockOnly,
+    required this.newOnly,
+    required this.freeShippingOnly,
+    required this.premiumSellerOnly,
+  });
+}
+
+/// Filter bottom sheet (promo kolleksiyalar + tezkor filterlar).
+class OpenProductsFilters extends ProductsAction {}
+
 /// Davlat tanlash sheet'ini ochish.
 class ProductsPickCountry extends ProductsAction {}
 
@@ -98,9 +122,6 @@ class ProductsBannerTap extends ProductsAction {
 
 /// Biznes — mahsulot qo‘shish (FAB / header).
 class OpenAddProduct extends ProductsAction {}
-
-/// Mening mahsulotlarim (ishlab chiqaruvchi).
-class ShowMyProducts extends ProductsAction {}
 
 /// Egasi: tahrirlash.
 class EditOwnProduct extends ProductsAction {

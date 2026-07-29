@@ -36,6 +36,29 @@ class ChatRepository {
     );
   }
 
+  Future<BaseResult> getOrCreateSavedMessages() {
+    return _client.post(
+      api: 'api/v1/chats/saved',
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> sharedMedia(
+    int chatId, {
+    String section = 'summary',
+    int? beforeId,
+    int limit = 40,
+  }) {
+    return _client.get(
+      api: 'api/v1/chats/$chatId/shared-media',
+      queryParameters: {
+        'section': section,
+        'limit': limit,
+        if (beforeId != null) 'before_id': beforeId,
+      },
+    );
+  }
+
   Future<BaseResult> createGroup({
     required String title,
     required List<int> userIds,
@@ -143,68 +166,6 @@ class ChatRepository {
 
   Future<BaseResult> groupStats(int chatId) {
     return _client.get(api: 'api/v1/chats/$chatId/stats');
-  }
-
-  Future<BaseResult> getDeal(int chatId) {
-    return _client.get(api: 'api/v1/chats/$chatId/deal');
-  }
-
-  Future<BaseResult> startDeal(int chatId) {
-    return _client.post(api: 'api/v1/chats/$chatId/deal', notify: SnackNotify.none);
-  }
-
-  Future<BaseResult> updateDeal(
-    int chatId, {
-    String? product,
-    String? price,
-    String? currency,
-    String? quantity,
-    String? unit,
-    String? delivery,
-    String? payment,
-  }) {
-    return _client.patch(
-      api: 'api/v1/chats/$chatId/deal',
-      data: {
-        if (product != null) 'product': product,
-        if (price != null) 'price': price,
-        if (currency != null) 'currency': currency,
-        if (quantity != null) 'quantity': quantity,
-        if (unit != null) 'unit': unit,
-        if (delivery != null) 'delivery': delivery,
-        if (payment != null) 'payment': payment,
-      },
-      notify: SnackNotify.none,
-    );
-  }
-
-  Future<BaseResult> acceptDeal(int chatId) {
-    return _client.post(
-      api: 'api/v1/chats/$chatId/deal/accept',
-      notify: SnackNotify.none,
-    );
-  }
-
-  Future<BaseResult> attachDealDocument(int chatId, int messageId) {
-    return _client.post(
-      api: 'api/v1/chats/$chatId/deal/documents',
-      data: {'message_id': messageId},
-      notify: SnackNotify.none,
-    );
-  }
-
-  Future<BaseResult> detachDealDocument(int chatId, int messageId) {
-    return _client.delete(
-      api: 'api/v1/chats/$chatId/deal/documents/$messageId',
-      notify: SnackNotify.none,
-    );
-  }
-
-  Future<BaseResult> closeDeal(int chatId) {
-    return _client.post(
-      api: 'api/v1/chats/$chatId/deal/close',
-      notify: SnackNotify.none,
-    );
   }
 
   Future<BaseResult> markRead(int chatId, List<int> messageIds) {
@@ -453,8 +414,14 @@ class ChatRepository {
     return _client.post(api: 'api/v1/chats/$chatId/hide', notify: SnackNotify.none);
   }
 
-  Future<BaseResult> muteChat(int chatId) {
-    return _client.post(api: 'api/v1/chats/$chatId/mute', notify: SnackNotify.none);
+  Future<BaseResult> muteChat(int chatId, {int? durationSeconds}) {
+    return _client.post(
+      api: 'api/v1/chats/$chatId/mute',
+      data: {
+        if (durationSeconds != null) 'duration_seconds': durationSeconds,
+      },
+      notify: SnackNotify.none,
+    );
   }
 
   Future<BaseResult> unmuteChat(int chatId) {

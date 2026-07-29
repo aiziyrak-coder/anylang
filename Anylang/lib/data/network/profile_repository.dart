@@ -110,6 +110,40 @@ class ProfileRepository {
     );
   }
 
+  Future<BaseResult> getBusinessVerification({String? locale}) {
+    return _client.get(
+      api: 'api/v1/users/me/business/verification',
+      queryParameters: {
+        if (locale != null && locale.isNotEmpty) 'locale': locale,
+      },
+    );
+  }
+
+  Future<BaseResult> uploadVerificationDocument({
+    required String filePath,
+    required String docType,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': await _imagePart(filePath),
+    });
+    return _client.post(
+      api: 'api/v1/users/me/business/verification/documents',
+      queryParameters: {'doc_type': docType},
+      data: formData,
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> submitBusinessVerification({String? note}) {
+    return _client.post(
+      api: 'api/v1/users/me/business/verification/submit',
+      data: {
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
   Future<BaseResult> deleteAuditReport() {
     return _client.delete(api: 'api/v1/users/me/business/audit-report');
   }

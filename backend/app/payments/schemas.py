@@ -8,14 +8,15 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.user import BillingCycle, SubscriptionPlan
 
-CheckoutProvider = Literal["click", "paddle"]
+CheckoutProvider = Literal["click", "paddle", "multicard"]
 
 
 class SubscriptionCheckoutIn(BaseModel):
     plan: SubscriptionPlan
     billing_cycle: BillingCycle | None = None
     provider: CheckoutProvider = Field(
-        description="click = UZS mahalliy; paddle = USD xalqaro (MoR)"
+        default="multicard",
+        description="multicard = UZS (card/Payme/Click/Uzum/Visa); click = Click only; paddle = USD",
     )
 
 
@@ -28,6 +29,9 @@ class SubscriptionCheckoutOut(BaseModel):
     currency: str
     status: str = "pending"
     mock_confirm: bool = False
+    amount_before_tax: str | None = None
+    tax_amount: str | None = None
+    tax_percent: int | None = None
 
     @model_validator(mode="after")
     def _sync_id(self) -> Self:

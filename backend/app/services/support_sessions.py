@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +11,14 @@ from app.models.support import SupportMessage, SupportSession
 from app.models.user import User
 from app.schemas.support import SupportHistoryItem
 from app.services import support_chat as support_chat_service
+
+
+def _loaded_messages(session: SupportSession) -> list[SupportMessage]:
+    """Return messages without triggering async lazy-load (MissingGreenlet)."""
+    insp = sa_inspect(session)
+    if "messages" in insp.unloaded:
+        return []
+    return list(session.messages)
 
 
 def _session_to_dict(session: SupportSession, *, include_messages: bool) -> dict:
@@ -33,7 +41,7 @@ def _session_to_dict(session: SupportSession, *, include_messages: bool) -> dict
                 "content": m.content,
                 "created_at": m.created_at,
             }
-            for m in session.messages
+            for m in _loaded_messages(session)
         ]
     return data
 
@@ -147,6 +155,8 @@ async def _get_or_create_active_session(
         status="active",
         locale=(locale or "uz")[:16],
     )
+    # Init empty collection while pending — after flush, lazy-load would 500.
+    session.messages = []
     db.add(session)
     await db.flush()
     return session
@@ -154,7 +164,7 @@ async def _get_or_create_active_session(
 
 def _history_from_session(session: SupportSession) -> list[SupportHistoryItem]:
     items: list[SupportHistoryItem] = []
-    for m in session.messages:
+    for m in _loaded_messages(session):
         role = m.role if m.role in {"user", "assistant"} else "user"
         content = (m.content or "").strip()
         if not content:
@@ -194,20 +204,18 @@ async def chat_in_session(
         source="app",
     )
 
-    user_msg = SupportMessage(session_id=session.id, role="user", content=text[:2000])
-    assistant_msg = SupportMessage(
-        session_id=session.id, role="assistant", content=reply[:4000]
-    )
-    db.add(user_msg)
-    db.add(assistant_msg)
+    user_msg = SupportMessage(role="user", content=text[:2000])
+    assistant_msg = SupportMessage(role="assistant", content=reply[:4000])
+    # Append via relationship — keeps collection loaded, no lazy-load later.
+    session.messages.append(user_msg)
+    session.messages.append(assistant_msg)
 
     if not session.preview:
         session.preview = text[:240]
     session.locale = (locale or session.locale or "uz")[:16]
     session.updated_at = datetime.now(UTC)
 
-    await db.commit()
-    await db.refresh(session)
+    await db.flush()
 
     return {
         "reply": reply,
@@ -245,6 +253,5 @@ async def rate_session(
     session.status = "completed"
     session.closed_at = datetime.now(UTC)
     session.updated_at = datetime.now(UTC)
-    await db.commit()
-    await db.refresh(session)
+    await db.flush()
     return _session_to_dict(session, include_messages=True)

@@ -1,6 +1,5 @@
 /// Til tanlash ro'yxatidagi bitta variant.
-/// [localeCode] — interfeys tili (uz_UZ / ru_RU / us_US) yoki null
-///   (null = interfeys o'zgarmaydi, faqat ona / tarjima tili).
+/// [localeCode] — interfeys tili (uz_UZ / ru_RU / us_US / tr_TR / …).
 /// [langCode] — ISO 639-1 (har doim).
 /// [flagUrl] — serverdagi bayroq PNG (`https://anylang.uz/flags/{cc}.png`).
 class LanguageOption {
@@ -51,6 +50,96 @@ const String kFlagsBaseUrl = 'https://anylang.uz/flags';
 String flagUrlForCountry(String countryCode) =>
     '$kFlagsBaseUrl/${countryCode.toLowerCase()}.png';
 
+/// ISO til → UI locale (Hive / GetX kaliti).
+String? uiLocaleCodeFor(String langCode) {
+  final c = langCode.toLowerCase().trim();
+  const map = <String, String>{
+    'uz': 'uz_UZ',
+    'en': 'us_US',
+    'ru': 'ru_RU',
+    'tr': 'tr_TR',
+    'kk': 'kk_KZ',
+    'ky': 'ky_KG',
+    'tg': 'tg_TJ',
+    'az': 'az_AZ',
+    'tk': 'tk_TM',
+    'de': 'de_DE',
+    'fr': 'fr_FR',
+    'es': 'es_ES',
+    'pt': 'pt_PT',
+    'it': 'it_IT',
+    'pl': 'pl_PL',
+    'uk': 'uk_UA',
+    'nl': 'nl_NL',
+    'sv': 'sv_SE',
+    'no': 'no_NO',
+    'nb': 'no_NO',
+    'da': 'da_DK',
+    'fi': 'fi_FI',
+    'el': 'el_GR',
+    'cs': 'cs_CZ',
+    'sk': 'sk_SK',
+    'ro': 'ro_RO',
+    'hu': 'hu_HU',
+    'bg': 'bg_BG',
+    'sr': 'sr_RS',
+    'hr': 'hr_HR',
+    'bs': 'bs_BA',
+    'ar': 'ar_SA',
+    'fa': 'fa_IR',
+    'he': 'he_IL',
+    'ka': 'ka_GE',
+    'hy': 'hy_AM',
+    'zh': 'zh_CN',
+    'ja': 'ja_JP',
+    'ko': 'ko_KR',
+    'hi': 'hi_IN',
+    'bn': 'bn_BD',
+    'ur': 'ur_PK',
+    'pa': 'pa_IN',
+    'ta': 'ta_IN',
+    'te': 'te_IN',
+    'mr': 'mr_IN',
+    'gu': 'gu_IN',
+    'kn': 'kn_IN',
+    'ml': 'ml_IN',
+    'si': 'si_LK',
+    'ne': 'ne_NP',
+    'th': 'th_TH',
+    'vi': 'vi_VN',
+    'id': 'id_ID',
+    'ms': 'ms_MY',
+    'tl': 'tl_PH',
+    'fil': 'tl_PH',
+    'my': 'my_MM',
+    'km': 'km_KH',
+    'sw': 'sw_KE',
+    'am': 'am_ET',
+    'ha': 'ha_NG',
+    'yo': 'yo_NG',
+    'mn': 'mn_MN',
+    'sq': 'sq_AL',
+    'lt': 'lt_LT',
+    'lv': 'lv_LV',
+    'et': 'et_EE',
+    'sl': 'sl_SI',
+    'mk': 'mk_MK',
+    'be': 'be_BY',
+    'af': 'af_ZA',
+    'ca': 'ca_ES',
+    'is': 'is_IS',
+    'ga': 'ga_IE',
+    'mt': 'mt_MT',
+    'cy': 'cy_GB',
+    'ps': 'ps_AF',
+    'ku': 'ku_TR',
+    'so': 'so_SO',
+    'zu': 'zu_ZA',
+    'ig': 'ig_NG',
+  };
+  return map[c];
+}
+
 LanguageOption _opt({
   required String key,
   String? localeCode,
@@ -61,7 +150,7 @@ LanguageOption _opt({
 }) {
   return LanguageOption(
     key: key,
-    localeCode: localeCode,
+    localeCode: localeCode ?? uiLocaleCodeFor(langCode),
     langCode: langCode,
     nativeName: nativeName,
     flagCountry: flagCountry,
@@ -70,8 +159,7 @@ LanguageOption _opt({
   );
 }
 
-/// Dunyo bo‘ylab mashhur tillar (chat / jonli / ona tili).
-/// Interfeys tarjimasi hozircha faqat uz/ru/en — qolganlarda localeCode = null.
+/// Dunyo tillari — har biri to‘liq UI locale bilan.
 final List<LanguageOption> languageOptions = [
   _opt(key: 'lang_name_uz', localeCode: 'uz_UZ', langCode: 'uz', nativeName: 'O‘zbek', flagCountry: 'uz', flagEmoji: '🇺🇿'),
   _opt(key: 'lang_name_en', localeCode: 'us_US', langCode: 'en', nativeName: 'English', flagCountry: 'gb', flagEmoji: '🇬🇧'),
@@ -134,6 +222,26 @@ final List<LanguageOption> languageOptions = [
   _opt(key: 'lang_name_am', langCode: 'am', nativeName: 'አማርኛ', flagCountry: 'et', flagEmoji: '🇪🇹'),
   _opt(key: 'lang_name_ha', langCode: 'ha', nativeName: 'Hausa', flagCountry: 'ng', flagEmoji: '🇳🇬'),
   _opt(key: 'lang_name_yo', langCode: 'yo', nativeName: 'Yorùbá', flagCountry: 'ng', flagEmoji: '🇳🇬'),
+  // Qo‘shimcha tillar
+  _opt(key: 'lang_name_mn', langCode: 'mn', nativeName: 'Монгол', flagCountry: 'mn', flagEmoji: '🇲🇳'),
+  _opt(key: 'lang_name_sq', langCode: 'sq', nativeName: 'Shqip', flagCountry: 'al', flagEmoji: '🇦🇱'),
+  _opt(key: 'lang_name_lt', langCode: 'lt', nativeName: 'Lietuvių', flagCountry: 'lt', flagEmoji: '🇱🇹'),
+  _opt(key: 'lang_name_lv', langCode: 'lv', nativeName: 'Latviešu', flagCountry: 'lv', flagEmoji: '🇱🇻'),
+  _opt(key: 'lang_name_et', langCode: 'et', nativeName: 'Eesti', flagCountry: 'ee', flagEmoji: '🇪🇪'),
+  _opt(key: 'lang_name_sl', langCode: 'sl', nativeName: 'Slovenščina', flagCountry: 'si', flagEmoji: '🇸🇮'),
+  _opt(key: 'lang_name_mk', langCode: 'mk', nativeName: 'Македонски', flagCountry: 'mk', flagEmoji: '🇲🇰'),
+  _opt(key: 'lang_name_be', langCode: 'be', nativeName: 'Беларуская', flagCountry: 'by', flagEmoji: '🇧🇾'),
+  _opt(key: 'lang_name_af', langCode: 'af', nativeName: 'Afrikaans', flagCountry: 'za', flagEmoji: '🇿🇦'),
+  _opt(key: 'lang_name_ca', langCode: 'ca', nativeName: 'Català', flagCountry: 'es', flagEmoji: '🇪🇸'),
+  _opt(key: 'lang_name_is', langCode: 'is', nativeName: 'Íslenska', flagCountry: 'is', flagEmoji: '🇮🇸'),
+  _opt(key: 'lang_name_ga', langCode: 'ga', nativeName: 'Gaeilge', flagCountry: 'ie', flagEmoji: '🇮🇪'),
+  _opt(key: 'lang_name_mt', langCode: 'mt', nativeName: 'Malti', flagCountry: 'mt', flagEmoji: '🇲🇹'),
+  _opt(key: 'lang_name_cy', langCode: 'cy', nativeName: 'Cymraeg', flagCountry: 'gb', flagEmoji: '🇬🇧'),
+  _opt(key: 'lang_name_ps', langCode: 'ps', nativeName: 'پښتو', flagCountry: 'af', flagEmoji: '🇦🇫'),
+  _opt(key: 'lang_name_ku', langCode: 'ku', nativeName: 'Kurdî', flagCountry: 'iq', flagEmoji: '🇮🇶'),
+  _opt(key: 'lang_name_so', langCode: 'so', nativeName: 'Soomaali', flagCountry: 'so', flagEmoji: '🇸🇴'),
+  _opt(key: 'lang_name_zu', langCode: 'zu', nativeName: 'isiZulu', flagCountry: 'za', flagEmoji: '🇿🇦'),
+  _opt(key: 'lang_name_ig', langCode: 'ig', nativeName: 'Igbo', flagCountry: 'ng', flagEmoji: '🇳🇬'),
 ];
 
 LanguageOption? languageOptionByCode(String? code) {
@@ -141,6 +249,19 @@ LanguageOption? languageOptionByCode(String? code) {
   final c = code.toLowerCase();
   for (final o in languageOptions) {
     if (o.langCode == c) return o;
+  }
+  return null;
+}
+
+LanguageOption? languageOptionByLocale(String? localeCode) {
+  if (localeCode == null || localeCode.isEmpty) return null;
+  final n = localeCode.replaceAll('-', '_');
+  for (final o in languageOptions) {
+    if (o.localeCode == n) return o;
+  }
+  // en_US → us_US
+  if (n == 'en_US' || n == 'en_GB') {
+    return languageOptionByCode('en');
   }
   return null;
 }

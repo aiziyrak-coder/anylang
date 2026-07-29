@@ -38,6 +38,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", labelKey: "nav.overview", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/users", labelKey: "nav.users", icon: Users },
+  { href: "/dashboard/verification", labelKey: "nav.verification", icon: FileText },
   { href: "/dashboard/subscriptions", labelKey: "nav.subscriptions", icon: CreditCard },
   { href: "/dashboard/promo-codes", labelKey: "nav.promos", icon: Tag },
   { href: "/dashboard/payments", labelKey: "nav.payments", icon: Wallet },

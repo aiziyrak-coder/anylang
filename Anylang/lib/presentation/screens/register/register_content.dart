@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/primary_button.dart';
@@ -23,6 +24,8 @@ class RegisterContent extends ScreenContent<RegisterState> {
   late final TextEditingController _emailCtrl;
   late final TextEditingController _passCtrl;
   late final TextEditingController _birthCtrl;
+  late final TapGestureRecognizer _termsOfferTap;
+  late final TapGestureRecognizer _termsPrivacyTap;
 
   @override
   void initContent() {
@@ -30,6 +33,8 @@ class RegisterContent extends ScreenContent<RegisterState> {
     _emailCtrl = TextEditingController();
     _passCtrl = TextEditingController();
     _birthCtrl = TextEditingController();
+    _termsOfferTap = TapGestureRecognizer();
+    _termsPrivacyTap = TapGestureRecognizer();
   }
 
   @override
@@ -38,6 +43,8 @@ class RegisterContent extends ScreenContent<RegisterState> {
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _birthCtrl.dispose();
+    _termsOfferTap.dispose();
+    _termsPrivacyTap.dispose();
   }
 
   @override
@@ -179,33 +186,69 @@ class RegisterContent extends ScreenContent<RegisterState> {
 
   Widget _terms(BuildContext context, RegisterState state, void Function(MyAction) sendAction) {
     final c = context.appColors;
+    final baseStyle = TextStyle(color: c.textSecondary, fontSize: 13.sp, height: 1.35);
+    final linkStyle = baseStyle.copyWith(
+      color: c.accent,
+      fontWeight: FontWeight.w700,
+      decoration: TextDecoration.underline,
+      decorationColor: c.accent,
+    );
     return Obx(() {
       final checked = state.termsAccepted.value;
-      return InkWell(
-        onTap: () => sendAction(ToggleTerms(!checked)),
-        borderRadius: BorderRadius.circular(8.dp),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 24.dp,
-              height: 24.dp,
-              decoration: BoxDecoration(
-                color: checked ? c.accent : Colors.transparent,
-                borderRadius: BorderRadius.circular(7.dp),
-                border: Border.all(color: checked ? c.accent : c.surfaceBorder, width: 1.6),
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => sendAction(ToggleTerms(!checked)),
+              borderRadius: BorderRadius.circular(8.dp),
+              child: Padding(
+                padding: EdgeInsets.only(top: 1.dp, right: 4.dp, bottom: 4.dp),
+                child: Container(
+                  width: 24.dp,
+                  height: 24.dp,
+                  decoration: BoxDecoration(
+                    color: checked ? c.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(7.dp),
+                    border: Border.all(
+                      color: checked ? c.accent : c.surfaceBorder,
+                      width: 1.6,
+                    ),
+                  ),
+                  child: checked
+                      ? Icon(Icons.check, size: 16.dp, color: c.onAccent)
+                      : null,
+                ),
               ),
-              child: checked ? Icon(Icons.check, size: 16.dp, color: c.onAccent) : null,
             ),
-            SizedBox(width: 12.dp),
-            Expanded(
-              child: Text(
-                'terms_agree'.tr,
-                style: TextStyle(color: c.textSecondary, fontSize: 13.sp, height: 1.35),
+          ),
+          SizedBox(width: 8.dp),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                style: baseStyle,
+                children: [
+                  TextSpan(text: 'terms_agree_before'.tr),
+                  TextSpan(
+                    text: 'legal_public_offer'.tr,
+                    style: linkStyle,
+                    recognizer: _termsOfferTap
+                      ..onTap = () => sendAction(OpenPublicOffer()),
+                  ),
+                  TextSpan(text: 'terms_agree_and'.tr),
+                  TextSpan(
+                    text: 'legal_privacy_policy'.tr,
+                    style: linkStyle,
+                    recognizer: _termsPrivacyTap
+                      ..onTap = () => sendAction(OpenPrivacyPolicy()),
+                  ),
+                  TextSpan(text: 'terms_agree_after'.tr),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     });
   }

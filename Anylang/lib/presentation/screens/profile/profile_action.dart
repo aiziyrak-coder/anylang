@@ -15,11 +15,26 @@ class OpenAppSettings extends ProfileAction {}
 
 class OpenSupportFromProfile extends ProfileAction {}
 
+/// Faol qurilmalar / seanslar.
+class OpenDevicesFromProfile extends ProfileAction {}
+
+/// Hisoblar — almashtirish / qo‘shish.
+class OpenAccountSwitcher extends ProfileAction {}
+
+/// Maxfiylik siyosati (sayt).
+class OpenPrivacyPolicyFromProfile extends ProfileAction {}
+
+/// Ommaviy oferta (sayt).
+class OpenPublicOfferFromProfile extends ProfileAction {}
+
 /// Sofiya AI — savol / muammo / maslahat.
 class OpenSofiyaAi extends ProfileAction {}
 
 /// "Akkaunt sozlamalari" — maxfiylik, parol, chiqish.
 class OpenAccountSettings extends ProfileAction {}
+
+/// Profil overflow menyu — hisobdan chiqish.
+class ProfileLogoutRequested extends ProfileAction {}
 
 /// Eski yo'l — umumiy sozlamalar (tizim).
 class OpenSettings extends ProfileAction {}
@@ -72,6 +87,9 @@ class OpenBusinessAccount extends ProfileAction {}
 /// BUSINESS badge — premium afzalliklar sheet.
 class ShowBusinessBenefits extends ProfileAction {}
 
+/// Profil bio (300 belgi) — biznes uchun tahrirlash.
+class EditProfileBio extends ProfileAction {}
+
 /// Zavod media (rasm/video) preview.
 class OpenFactoryMedia extends ProfileAction {
   final String url;
@@ -89,6 +107,9 @@ class RetryMarketAnalytics extends ProfileAction {}
 
 /// Business Card QR ko‘rsatish.
 class ShowBusinessCardQr extends ProfileAction {}
+
+/// Business verifikatsiya (hujjatlar → admin).
+class OpenBusinessVerification extends ProfileAction {}
 
 /// Sozlamalar bo‘limlari.
 class OpenSettingsLanguage extends ProfileAction {}

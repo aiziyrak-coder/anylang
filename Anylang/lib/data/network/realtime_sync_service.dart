@@ -1,19 +1,25 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../audio/message_alert_sound_service.dart';
 import '../audio/waveform_utils.dart';
 import '../core/mappers.dart';
 import '../local/session_store.dart';
 import 'chat_repository.dart';
 import 'socket_service.dart';
+import '../../presentation/modal/new_device_alert_dialog.dart';
+import '../../presentation/screens/devices/devices_screen.dart';
 import '../../presentation/screens/chat/chat_message.dart';
-import '../../presentation/screens/chat/chat_state.dart';
+import '../../presentation/screens/chat/chat_state_scope.dart';
 import '../../presentation/screens/friends/friends_state.dart';
+import '../../presentation/screens/login/login_screen.dart';
 import '../../presentation/screens/messages/conversation.dart';
 import '../../presentation/screens/messages/messages_state.dart';
 import '../../presentation/ui/theme/gradients.dart';
+import '../core/buildNetwork/api_service.dart';
+import 'auth_repository.dart';
 
 /// WebSocket eventlarini GetX state'larga ulaydi.
 /// SocketService faqat stream beradi — tinglash shu yerda.
@@ -70,79 +76,123 @@ class RealtimeSyncService extends GetxService {
         _onPresence(data);
       case 'typing':
         _onTyping(data);
+      case 'device_login':
+        _onDeviceLogin(data);
+      case 'session_revoked':
+        _onSessionRevoked(data);
       default:
         break;
     }
+  }
+
+  void _onDeviceLogin(Map<String, dynamic> data) {
+    final sid = data['session_id']?.toString();
+    if (sid != null &&
+        sid.isNotEmpty &&
+        sid == SessionStore.sessionId) {
+      return;
+    }
+    final name = (data['device_name']?.toString() ?? '').trim();
+    final deviceName = name.isEmpty ? 'Mobile' : name;
+    Future.microtask(() async {
+      final ctx = Get.overlayContext;
+      if (ctx == null || !ctx.mounted) return;
+      await showNewDeviceAlertDialog(
+        ctx,
+        deviceName: deviceName,
+        onOpenDevices: () {
+          // Profil stack ustida ochish — oddiy Get push.
+          final nav = Navigator.of(ctx, rootNavigator: true);
+          nav.push(
+            MaterialPageRoute(builder: (_) => DevicesScreen().build()),
+          );
+        },
+      );
+    });
+  }
+
+  void _onSessionRevoked(Map<String, dynamic> data) {
+    final sid = data['session_id']?.toString();
+    final mine = SessionStore.sessionId;
+    if (sid == null || mine == null || sid != mine) return;
+    Future.microtask(() async {
+      try {
+        await Get.find<AuthRepository>().logout();
+      } catch (_) {
+        await SessionStore.clear();
+      }
+      if (Get.isRegistered<SessionExpiredBus>()) {
+        Get.find<SessionExpiredBus>().notify();
+      } else {
+        Get.offAll(() => LoginScreen().build());
+      }
+    });
   }
 
   void _onMessageEdited(Map<String, dynamic> data) {
     final chatId = _asInt(data['chat_id']);
     final msgMap = asMap(data['message']);
     if (chatId == null || msgMap == null) return;
-    if (!Get.isRegistered<ChatState>()) return;
-    final chat = Get.find<ChatState>();
-    if (chat.chatId.value != chatId) return;
-    final mapped = mapChatMessageFromApi(msgMap, me: SessionStore.userId(), peerName: chat.peerName.value);
-    final idx = chat.messages.indexWhere((m) => m.id == mapped.id);
-    if (idx >= 0) {
-      final prevShowing = chat.messages[idx].showingOriginal;
-      chat.messages[idx] = mapped.withShowingOriginal(prevShowing);
-    }
+    ChatStateScope.forChatId(chatId, (chat) {
+      final mapped = mapChatMessageFromApi(msgMap, me: SessionStore.userId(), peerName: chat.peerName.value);
+      final idx = chat.messages.indexWhere((m) => m.id == mapped.id);
+      if (idx >= 0) {
+        final prevShowing = chat.messages[idx].showingOriginal;
+        chat.messages[idx] = mapped.withShowingOriginal(prevShowing);
+      }
+    });
   }
 
   void _onMessageReaction(Map<String, dynamic> data) {
     final chatId = _asInt(data['chat_id']);
     final messageId = '${data['message_id']}';
     if (chatId == null) return;
-    if (!Get.isRegistered<ChatState>()) return;
-    final chat = Get.find<ChatState>();
-    if (chat.chatId.value != chatId) return;
     final reactions = (data['reactions'] as List?)
             ?.whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
             .toList() ??
         const <Map<String, dynamic>>[];
-    final idx = chat.messages.indexWhere((m) => m.id == messageId);
-    if (idx >= 0) {
-      chat.messages[idx] = chat.messages[idx].withReactions(reactions);
-    }
+    ChatStateScope.forChatId(chatId, (chat) {
+      final idx = chat.messages.indexWhere((m) => m.id == messageId);
+      if (idx >= 0) {
+        chat.messages[idx] = chat.messages[idx].withReactions(reactions);
+      }
+    });
   }
 
   void _onMessagePinEvent(Map<String, dynamic> data, {required bool pinned}) {
     final chatId = _asInt(data['chat_id']);
     final messageId = '${data['message_id']}';
     if (chatId == null) return;
-    if (!Get.isRegistered<ChatState>()) return;
-    final chat = Get.find<ChatState>();
-    if (chat.chatId.value != chatId) return;
-    final idx = chat.messages.indexWhere((m) => m.id == messageId);
-    if (idx >= 0) {
-      final msg = chat.messages[idx].withPinned(pinned);
-      chat.messages[idx] = msg;
-      if (pinned) {
-        chat.pinnedMessages.removeWhere((m) => m.id == messageId);
-        chat.pinnedMessages.add(msg);
-        chat.pinnedBanner.value = msg;
-      } else {
-        chat.pinnedMessages.removeWhere((m) => m.id == messageId);
-        chat.pinnedBanner.value = chat.pinnedMessages.isNotEmpty
-            ? chat.pinnedMessages.last
-            : null;
+    ChatStateScope.forChatId(chatId, (chat) {
+      final idx = chat.messages.indexWhere((m) => m.id == messageId);
+      if (idx >= 0) {
+        final msg = chat.messages[idx].withPinned(pinned);
+        chat.messages[idx] = msg;
+        if (pinned) {
+          chat.pinnedMessages.removeWhere((m) => m.id == messageId);
+          chat.pinnedMessages.add(msg);
+          chat.pinnedBanner.value = msg;
+        } else {
+          chat.pinnedMessages.removeWhere((m) => m.id == messageId);
+          chat.pinnedBanner.value = chat.pinnedMessages.isNotEmpty
+              ? chat.pinnedMessages.last
+              : null;
+        }
       }
-    }
+    });
   }
 
   void _onHistoryCleared(Map<String, dynamic> data) {
     final chatId = _asInt(data['chat_id']);
     if (chatId == null) return;
-    if (!Get.isRegistered<ChatState>()) return;
-    final chat = Get.find<ChatState>();
-    if (chat.chatId.value != chatId) return;
-    if (data['for_everyone'] == true) {
-      chat.messages.clear();
-      chat.pinnedBanner.value = null;
-      chat.pinnedMessages.clear();
-    }
+    ChatStateScope.forChatId(chatId, (chat) {
+      if (data['for_everyone'] == true) {
+        chat.messages.clear();
+        chat.pinnedBanner.value = null;
+        chat.pinnedMessages.clear();
+      }
+    });
   }
 
   void _onGroupDeleted(Map<String, dynamic> data) {
@@ -165,66 +215,67 @@ class RealtimeSyncService extends GetxService {
     final msgId = '${msgMap['id']}';
     final clientId = msgMap['client_message_id']?.toString();
 
-    // Open chat → append / merge
-    if (Get.isRegistered<ChatState>()) {
-      final chat = Get.find<ChatState>();
-      if (chat.chatId.value == chatId) {
-        final mapped = mapChatMessageFromApi(
-          msgMap,
-          me: me,
-          peerName: chat.peerName.value,
-        );
-        final idx = chat.messages.indexWhere(
-          (m) =>
-              m.id == msgId ||
-              (clientId != null &&
-                  clientId.isNotEmpty &&
-                  m.id == clientId),
-        );
-        if (idx >= 0) {
-          final prevShowing = chat.messages[idx].showingOriginal;
-          final prev = chat.messages[idx];
-          var next = mapped.withShowingOriginal(prevShowing);
-          // Lokal pending ovoz — server URL kelguncha lokal path/samples saqlansin.
-          if (prev.type == ChatMsgType.voice && mapped.type == ChatMsgType.voice) {
-            next = ChatMessage.voice(
-              id: mapped.id,
-              dir: mapped.dir,
-              time: mapped.time,
-              createdAt: mapped.createdAt,
-              duration: mapped.voiceDuration ?? prev.voiceDuration ?? '0:00',
-              durationMs: mapped.voiceDurationMs ?? prev.voiceDurationMs,
-              path: (mapped.voicePath != null && mapped.voicePath!.isNotEmpty)
-                  ? mapped.voicePath
-                  : prev.voicePath,
-              samples: mapped.voiceSamples.isNotEmpty
-                  ? mapped.voiceSamples
-                  : prev.voiceSamples,
-              downloaded: mapped.voiceDownloaded || prev.voiceDownloaded,
-              status: mapped.status,
-              reply: mapped.reply ?? prev.reply,
-              senderId: mapped.senderId,
-              senderName: mapped.senderName,
-              senderAvatarUrl: mapped.senderAvatarUrl,
-              text: mapped.text,
-              textOriginal: mapped.textOriginal,
-              showingOriginal: prevShowing,
-              transcriptPending: mapped.transcriptPending,
-              transcriptFailed: mapped.transcriptFailed,
-            );
-          }
-          chat.messages[idx] = next;
-        } else {
-          chat.messages.add(mapped);
+    // Open chat → append / merge (nested chat stackdagi barcha mos state).
+    var appliedToOpenChat = false;
+    ChatStateScope.forChatId(chatId, (chat) {
+      appliedToOpenChat = true;
+      final mapped = mapChatMessageFromApi(
+        msgMap,
+        me: me,
+        peerName: chat.peerName.value,
+      );
+      final idx = chat.messages.indexWhere(
+        (m) =>
+            m.id == msgId ||
+            (clientId != null &&
+                clientId.isNotEmpty &&
+                m.id == clientId),
+      );
+      if (idx >= 0) {
+        final prevShowing = chat.messages[idx].showingOriginal;
+        final prev = chat.messages[idx];
+        var next = mapped.withShowingOriginal(prevShowing);
+        // Lokal pending ovoz — server URL kelguncha lokal path/samples saqlansin.
+        if (prev.type == ChatMsgType.voice && mapped.type == ChatMsgType.voice) {
+          next = ChatMessage.voice(
+            id: mapped.id,
+            dir: mapped.dir,
+            time: mapped.time,
+            createdAt: mapped.createdAt,
+            duration: mapped.voiceDuration ?? prev.voiceDuration ?? '0:00',
+            durationMs: mapped.voiceDurationMs ?? prev.voiceDurationMs,
+            path: (mapped.voicePath != null && mapped.voicePath!.isNotEmpty)
+                ? mapped.voicePath
+                : prev.voicePath,
+            samples: mapped.voiceSamples.isNotEmpty
+                ? mapped.voiceSamples
+                : prev.voiceSamples,
+            downloaded: mapped.voiceDownloaded || prev.voiceDownloaded,
+            status: mapped.status,
+            reply: mapped.reply ?? prev.reply,
+            senderId: mapped.senderId,
+            senderName: mapped.senderName,
+            senderAvatarUrl: mapped.senderAvatarUrl,
+            text: mapped.text,
+            textOriginal: mapped.textOriginal,
+            showingOriginal: prevShowing,
+            transcriptPending: mapped.transcriptPending,
+            transcriptFailed: mapped.transcriptFailed,
+          );
         }
-        if (!isMine) {
-          chat.peerTyping.value = false;
-          chat.peerActivity.value = '';
-          final id = int.tryParse(msgId);
-          if (id != null) {
-            Get.find<ChatRepository>().markRead(chatId, [id]);
-          }
-        }
+        chat.messages[idx] = next;
+      } else {
+        chat.messages.add(mapped);
+      }
+      if (!isMine) {
+        chat.peerTyping.value = false;
+        chat.peerActivity.value = '';
+      }
+    });
+    if (appliedToOpenChat && !isMine) {
+      final id = int.tryParse(msgId);
+      if (id != null) {
+        Get.find<ChatRepository>().markRead(chatId, [id]);
       }
     }
 
@@ -270,6 +321,23 @@ class RealtimeSyncService extends GetxService {
       // Unknown chat — soft refresh list in background
       unawaited(_softReloadConversations());
     }
+
+    _maybePlayIncomingSound(chatId: chatId, isMine: isMine);
+  }
+
+  void _maybePlayIncomingSound({required int chatId, required bool isMine}) {
+    if (isMine) return;
+    // Ochiq chatda o‘qilayotgan suhbat — tovushsiz.
+    if (_activeChatId == chatId) return;
+    if (!SessionStore.newMessagesNotificationsEnabled()) return;
+    if (SessionStore.isChatMuted(chatId)) return;
+    if (Get.isRegistered<MessagesState>()) {
+      final list = Get.find<MessagesState>().conversations;
+      final i = list.indexWhere((c) => c.id == chatId);
+      if (i >= 0 && list[i].muted) return;
+    }
+    if (!Get.isRegistered<MessageAlertSoundService>()) return;
+    unawaited(Get.find<MessageAlertSoundService>().play());
   }
 
   void _onMessagesRead(Map<String, dynamic> data) {
@@ -279,27 +347,23 @@ class RealtimeSyncService extends GetxService {
             .toSet() ??
         {};
     if (chatId == null || ids.isEmpty) return;
-    if (!Get.isRegistered<ChatState>()) return;
-    final chat = Get.find<ChatState>();
-    if (chat.chatId.value != chatId) return;
-    for (var i = 0; i < chat.messages.length; i++) {
-      final m = chat.messages[i];
-      if (m.isOutgoing && ids.contains(m.id)) {
-        chat.messages[i] = m.withStatus(ChatStatus.read);
+    ChatStateScope.forChatId(chatId, (chat) {
+      for (var i = 0; i < chat.messages.length; i++) {
+        final m = chat.messages[i];
+        if (m.isOutgoing && ids.contains(m.id)) {
+          chat.messages[i] = m.withStatus(ChatStatus.read);
+        }
       }
-    }
+    });
   }
 
   void _onMessageDeleted(Map<String, dynamic> data) {
     final chatId = _asInt(data['chat_id']);
     final messageId = data['message_id']?.toString();
     if (chatId == null || messageId == null) return;
-    if (Get.isRegistered<ChatState>()) {
-      final chat = Get.find<ChatState>();
-      if (chat.chatId.value == chatId) {
-        chat.messages.removeWhere((m) => m.id == messageId);
-      }
-    }
+    ChatStateScope.forChatId(chatId, (chat) {
+      chat.messages.removeWhere((m) => m.id == messageId);
+    });
     unawaited(_softReloadConversations());
   }
 
@@ -308,8 +372,7 @@ class RealtimeSyncService extends GetxService {
     final online = data['is_online'] == true;
     if (userId == null) return;
 
-    if (Get.isRegistered<ChatState>()) {
-      final chat = Get.find<ChatState>();
+    for (final chat in ChatStateScope.all) {
       if (chat.peerId.value == userId) {
         chat.peerOnline.value = online;
       }
@@ -348,28 +411,24 @@ class RealtimeSyncService extends GetxService {
     final isTyping = data['is_typing'] == true;
     final activityRaw = data['activity']?.toString().trim().toLowerCase() ?? '';
     if (chatId == null || userId == null) return;
-    if (!Get.isRegistered<ChatState>()) return;
-    final chat = Get.find<ChatState>();
-    if (chat.chatId.value != chatId) return;
-    // DM: faqat peer; guruh: har qanday a'zo (o'zimdan tashqari — server filtrlagan).
-    if (!chat.isGroup.value && chat.peerId.value != userId) return;
+    ChatStateScope.forChatId(chatId, (chat) {
+      // DM: faqat peer; guruh: har qanday a'zo (o'zimdan tashqari — server filtrlagan).
+      if (!chat.isGroup.value && chat.peerId.value != userId) return;
 
-    chat.peerTyping.value = isTyping;
-    chat.typingUserId.value = isTyping ? userId : null;
-    chat.peerActivity.value = isTyping
-        ? (activityRaw.isNotEmpty ? activityRaw : 'typing')
-        : '';
+      chat.peerTyping.value = isTyping;
+      chat.typingUserId.value = isTyping ? userId : null;
+      chat.peerActivity.value = isTyping
+          ? (activityRaw.isNotEmpty ? activityRaw : 'typing')
+          : '';
+    });
     _typingClearTimer?.cancel();
     if (isTyping) {
       _typingClearTimer = Timer(const Duration(seconds: 4), () {
-        if (Get.isRegistered<ChatState>()) {
-          final c = Get.find<ChatState>();
-          if (c.chatId.value == chatId) {
-            c.peerTyping.value = false;
-            c.peerActivity.value = '';
-            c.typingUserId.value = null;
-          }
-        }
+        ChatStateScope.forChatId(chatId, (c) {
+          c.peerTyping.value = false;
+          c.peerActivity.value = '';
+          c.typingUserId.value = null;
+        });
       });
     }
   }
@@ -470,8 +529,16 @@ ChatMessage mapChatMessageFromApi(
     final url = meta['url']?.toString();
     final hasText = text.trim().isNotEmpty;
     final sttStatus = meta['transcription_status']?.toString();
-    final transcriptFailed = sttStatus == 'failed';
-    final transcriptPending = !transcriptFailed && !hasText;
+    // STT 45s dan oshsa yoki failed — shimmer o‘rniga xato matni.
+    const sttTimeout = Duration(seconds: 45);
+    final age = created != null
+        ? DateTime.now().toUtc().difference(created.toUtc())
+        : Duration.zero;
+    final stale = age > sttTimeout;
+    final transcriptFailed = sttStatus == 'failed' ||
+        (!hasText && (sttStatus == 'pending' || sttStatus == null) && stale);
+    final transcriptPending =
+        !transcriptFailed && !hasText && !stale;
     mapped = ChatMessage.voice(
       id: '${json['id']}',
       dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
@@ -484,6 +551,38 @@ ChatMessage mapChatMessageFromApi(
       path: url,
       samples: samples,
       downloaded: url != null && url.isNotEmpty,
+      status: status,
+      reply: reply,
+      text: textTranslated,
+      textOriginal: textOriginal,
+      transcriptPending: transcriptPending,
+      transcriptFailed: transcriptFailed,
+    );
+  } else if (type == 'video') {
+    final meta = Map<String, dynamic>.from(json['meta'] as Map? ?? {});
+    final durationMs = (meta['duration_ms'] as num?)?.toInt();
+    final url = meta['url']?.toString();
+    final hasText = text.trim().isNotEmpty;
+    final sttStatus = meta['transcription_status']?.toString();
+    const sttTimeout = Duration(seconds: 90);
+    final age = created != null
+        ? DateTime.now().toUtc().difference(created.toUtc())
+        : Duration.zero;
+    final stale = age > sttTimeout;
+    final transcriptFailed = sttStatus == 'failed' ||
+        (!hasText && (sttStatus == 'pending' || sttStatus == null) && stale);
+    final transcriptPending = !transcriptFailed && !hasText && !stale;
+    mapped = ChatMessage.video(
+      id: '${json['id']}',
+      dir: outgoing ? ChatDir.outgoing : ChatDir.incoming,
+      time: formatMessageClock(created),
+      createdAt: created,
+      url: url,
+      isRoundNote: meta['is_round_note'] == true,
+      duration: durationMs != null
+          ? WaveformUtils.formatDuration(Duration(milliseconds: durationMs))
+          : null,
+      durationMs: durationMs,
       status: status,
       reply: reply,
       text: textTranslated,

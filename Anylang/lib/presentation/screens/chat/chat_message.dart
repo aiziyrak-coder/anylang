@@ -12,6 +12,7 @@ enum ChatStatus { pending, sent, delivered, read }
 enum ChatMsgType {
   text,
   image,
+  video,
   voice,
   product,
   location,
@@ -66,6 +67,12 @@ class ChatMessage {
   // image
   final LinearGradient? imageGradient;
   final String? imageUrl;
+
+  // video
+  final String? videoUrl;
+  final bool isRoundNote;
+  final String? videoDuration;
+  final int? videoDurationMs;
 
   // voice
   final String? voiceDuration; // "0:21"
@@ -153,6 +160,10 @@ class ChatMessage {
     this.isAiFaq = false,
     this.imageGradient,
     this.imageUrl,
+    this.videoUrl,
+    this.isRoundNote = false,
+    this.videoDuration,
+    this.videoDurationMs,
     this.voiceDuration,
     this.voiceDownloaded = true,
     this.voicePath,
@@ -265,6 +276,10 @@ class ChatMessage {
         isAiFaq: isAiFaq ?? this.isAiFaq,
         imageGradient: imageGradient,
         imageUrl: imageUrl,
+        videoUrl: videoUrl,
+        isRoundNote: isRoundNote,
+        videoDuration: videoDuration,
+        videoDurationMs: videoDurationMs,
         voiceDuration: voiceDuration,
         voiceDownloaded: voiceDownloaded,
         voicePath: voicePath,
@@ -415,6 +430,48 @@ class ChatMessage {
         senderAvatarUrl: senderAvatarUrl,
         imageGradient: gradient,
         imageUrl: url,
+      );
+
+  factory ChatMessage.video({
+    required String id,
+    required ChatDir dir,
+    required String time,
+    DateTime? createdAt,
+    String? url,
+    bool isRoundNote = false,
+    String? duration,
+    int? durationMs,
+    ChatStatus status = ChatStatus.read,
+    ChatReply? reply,
+    int? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
+    String? text,
+    String? textOriginal,
+    bool showingOriginal = false,
+    bool transcriptPending = false,
+    bool transcriptFailed = false,
+  }) =>
+      ChatMessage(
+        id: id,
+        type: ChatMsgType.video,
+        dir: dir,
+        time: time,
+        createdAt: createdAt,
+        status: status,
+        reply: reply,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
+        text: text,
+        textOriginal: textOriginal,
+        showingOriginal: showingOriginal,
+        videoUrl: url,
+        isRoundNote: isRoundNote,
+        videoDuration: duration,
+        videoDurationMs: durationMs,
+        transcriptPending: transcriptPending,
+        transcriptFailed: transcriptFailed,
       );
 
   factory ChatMessage.voice({
@@ -590,6 +647,10 @@ class ChatMessage {
         return displayText;
       case ChatMsgType.image:
         return 'chat_preview_photo'.tr;
+      case ChatMsgType.video:
+        return isRoundNote
+            ? 'chat_preview_round_video'.tr
+            : 'chat_preview_video'.tr;
       case ChatMsgType.voice:
         final caption = displayText.trim();
         if (caption.isNotEmpty) return caption;

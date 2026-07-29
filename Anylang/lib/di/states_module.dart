@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 import '../presentation/screens/add_friend/add_friend_state.dart';
 import '../presentation/screens/create_group/create_group_screen.dart';
-import '../presentation/screens/chat/chat_state.dart';
 import '../presentation/screens/add_product/add_product_state.dart';
 import '../presentation/screens/edit_business_info/edit_business_info_state.dart';
 import '../presentation/screens/friends/friends_state.dart';
@@ -23,16 +22,15 @@ import '../presentation/screens/forgot_password/forgot_password_screen.dart';
 import '../presentation/screens/restore_account/restore_account_screen.dart';
 import '../presentation/screens/group_settings/group_settings_state.dart';
 import '../presentation/screens/verify/verify_state.dart';
+import '../presentation/screens/devices/devices_state.dart';
 import '../presentation/screens/support_chat/support_chat_state.dart';
 import '../presentation/screens/trade_assistant/trade_assistant_state.dart';
-import '../presentation/screens/business_feed/business_feed_state.dart';
 import '../presentation/screens/business_card_scan/business_card_scan_state.dart';
 import '../presentation/screens/group_catalog/group_catalog_state.dart';
 import '../presentation/screens/group_stats/group_stats_state.dart';
 import '../presentation/screens/marketplace_groups/marketplace_groups_state.dart';
-import '../presentation/screens/deal_mode/deal_mode_state.dart';
+import '../presentation/screens/marketplace_verified_group/marketplace_verified_group_state.dart';
 import '../presentation/screens/market_map/market_map_state.dart';
-import '../presentation/screens/nearby/nearby_state.dart';
 
 class StatesModule {
 
@@ -47,14 +45,15 @@ class StatesModule {
     Get.lazyPut<MainState>(() => MainState(), fenix: true);
     Get.lazyPut<MessagesState>(() => MessagesState(), fenix: true);
     Get.lazyPut<CreateGroupState>(() => CreateGroupState(), fenix: true);
-    Get.lazyPut<ChatState>(() => ChatState(), fenix: true);
     Get.lazyPut<GroupSettingsState>(() => GroupSettingsState(), fenix: true);
     Get.lazyPut<GroupCatalogState>(() => GroupCatalogState(), fenix: true);
     Get.lazyPut<GroupStatsState>(() => GroupStatsState(), fenix: true);
     Get.lazyPut<MarketplaceGroupsState>(() => MarketplaceGroupsState(), fenix: true);
-    Get.lazyPut<DealModeState>(() => DealModeState(), fenix: true);
+    Get.lazyPut<MarketplaceVerifiedGroupState>(
+      () => MarketplaceVerifiedGroupState(),
+      fenix: true,
+    );
     Get.lazyPut<MarketMapState>(() => MarketMapState(), fenix: true);
-    Get.lazyPut<NearbyState>(() => NearbyState(), fenix: true);
     Get.lazyPut<FriendsState>(() => FriendsState(), fenix: true);
     Get.lazyPut<AddFriendState>(() => AddFriendState(), fenix: true);
     Get.lazyPut<ProductsState>(() => ProductsState(), fenix: true);
@@ -62,6 +61,7 @@ class StatesModule {
     Get.lazyPut<UserProfileState>(() => UserProfileState(), fenix: true);
     Get.lazyPut<JonliState>(() => JonliState(), fenix: true);
     Get.lazyPut<ProfileState>(() => ProfileState(), fenix: true);
+    Get.lazyPut<DevicesState>(() => DevicesState(), fenix: true);
     Get.lazyPut<ProfileEditState>(() => ProfileEditState(), fenix: true);
     Get.lazyPut<SettingsState>(() => SettingsState(), fenix: true);
     Get.lazyPut<SubscriptionState>(() => SubscriptionState(), fenix: true);
@@ -69,7 +69,6 @@ class StatesModule {
     Get.lazyPut<AddProductState>(() => AddProductState(), fenix: true);
     Get.lazyPut<SupportChatState>(() => SupportChatState(), fenix: true);
     Get.lazyPut<TradeAssistantState>(() => TradeAssistantState(), fenix: true);
-    Get.lazyPut<BusinessFeedState>(() => BusinessFeedState(), fenix: true);
     Get.lazyPut<BusinessCardScanState>(() => BusinessCardScanState(), fenix: true);
   }
 }

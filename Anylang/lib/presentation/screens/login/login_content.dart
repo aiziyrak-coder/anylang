@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/network/google_auth_service.dart';
+import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/rich_button.dart';
 import '../../ui/gradient_background.dart';
@@ -50,8 +51,21 @@ class LoginContent extends ScreenContent<LoginState> {
 
     return GradientBackground(
       child: SafeArea(
-        child: KeyboardAwareScrollView(
-          padding: EdgeInsets.fromLTRB(24.dp, 24.dp, 24.dp, 12.dp),
+        child: Obx(() {
+          final addMode = state.isAddAccount.value;
+          return Column(
+            children: [
+              if (addMode)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(8.dp, 4.dp, 16.dp, 0),
+                  child: AppTopBar(
+                    title: 'accounts_add'.tr,
+                    onBack: () => sendAction(Back()),
+                  ),
+                ),
+              Expanded(
+                child: KeyboardAwareScrollView(
+          padding: EdgeInsets.fromLTRB(24.dp, addMode ? 8.dp : 24.dp, 24.dp, 12.dp),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -61,13 +75,13 @@ class LoginContent extends ScreenContent<LoginState> {
               ),
               SizedBox(height: 20.dp),
               Text(
-                'welcome'.tr,
+                addMode ? 'accounts_add'.tr : 'welcome'.tr,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: c.textPrimary, fontSize: 26.sp, fontWeight: FontWeight.w700),
               ),
               SizedBox(height: 6.dp),
               Text(
-                'login_subtitle'.tr,
+                addMode ? 'accounts_add_subtitle'.tr : 'login_subtitle'.tr,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
               ),
@@ -182,7 +196,11 @@ class LoginContent extends ScreenContent<LoginState> {
               ),
             ],
           ),
-        ),
+                ),
+              ),
+            ],
+          );
+        }),
       ),
     );
   }

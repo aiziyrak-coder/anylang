@@ -10,6 +10,7 @@ import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/payment_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../modal/payment_confirm_bottom_sheet.dart';
 import '../../ui/items/plan_card.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -121,6 +122,13 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           state.priceCurrencyPrefix.value =
               currency.length <= 3 ? currency : '\$';
         }
+        final taxPct = data['payment_tax_percent'];
+        if (taxPct is num) {
+          state.paymentTaxPercent.value = taxPct.toInt();
+        } else if (taxPct is String) {
+          final parsed = int.tryParse(taxPct);
+          if (parsed != null) state.paymentTaxPercent.value = parsed;
+        }
         var currentCode = state.currentPlanCode.value;
         if (currentCode == null) {
           final userPlan = SessionStore.user()?['subscription'];
@@ -167,6 +175,14 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
                 months: m,
                 total: price(p['total']?.toString()),
                 perMonth: price(p['per_month']?.toString()),
+                tax: price(p['tax']?.toString()),
+                totalWithTax: price(p['total_with_tax']?.toString()),
+                taxPercent: () {
+                  final tp = p['tax_percent'];
+                  if (tp is int) return tp;
+                  if (tp is num) return tp.toInt();
+                  return state.paymentTaxPercent.value;
+                }(),
                 savingsPercent: sp is int
                     ? sp
                     : (sp is num ? sp.toInt() : null),
@@ -427,13 +443,13 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
 
     final payments = Get.find<PaymentRepository>();
     final cycle = '${state.billingMonths.value}';
+    final months = state.billingMonths.value;
     final promo = state.promoPreview.value?.code ??
         (state.promoInput.value.trim().isEmpty
             ? null
             : state.promoInput.value.trim());
-    final country =
-        (SessionStore.user()?['country']?.toString() ?? '').toUpperCase();
-    final provider = country == 'UZ' ? 'click' : 'paddle';
+
+    final provider = 'multicard';
     final checkout = await payments.checkoutSubscription(
       plan: plan.code,
       billingCycle: cycle,
@@ -447,6 +463,39 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         final id = data['id'] ?? data['payment_id'];
         final checkoutUrl = data['checkout_url']?.toString();
         final mockConfirm = data['mock_confirm'] == true;
+        final currency = (data['currency']?.toString() ?? 'UZS').toUpperCase();
+        final amount = data['amount']?.toString() ?? '';
+        final beforeTax = data['amount_before_tax']?.toString();
+        final taxAmount = data['tax_amount']?.toString();
+        final taxPctRaw = data['tax_percent'];
+        final taxPct = taxPctRaw is num
+            ? taxPctRaw.toInt()
+            : int.tryParse('$taxPctRaw') ?? state.paymentTaxPercent.value;
+
+        final periodKey = switch (months) {
+          1 => 'subscription_period_1',
+          3 => 'subscription_period_3',
+          6 => 'subscription_period_6',
+          _ => 'subscription_period_12',
+        };
+
+        final confirmed = await showPaymentConfirmBottomSheet(
+          context,
+          title: 'subscription_pay_confirm_title'.tr,
+          subtitle: 'payment_confirm_subtitle'.tr,
+          amount: amount,
+          currency: currency,
+          amountBeforeTax: beforeTax,
+          taxAmount: taxAmount,
+          taxPercent: taxPct,
+          planLabel: plan.title,
+          periodLabel: periodKey.tr,
+          ctaText: 'subscription_pay_confirm_cta'.tr,
+        );
+        if (confirmed != true) {
+          showAppMessage('payment_confirm_later_hint'.tr);
+          return;
+        }
 
         if (checkoutUrl != null &&
             checkoutUrl.isNotEmpty &&

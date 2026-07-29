@@ -31,6 +31,7 @@ from app.services import chats as chats_service
 from app.services import company_profile as company_profile_service
 from app.services import nearby as nearby_service
 from app.services import profile_views as profile_views_service
+from app.services import verification as verification_service
 from app.services.admin_ops import client_ip
 from app.services.users import (
     get_public_profile,
@@ -260,6 +261,7 @@ async def patch_my_business(
         country=body.country,
         business_role=body.business_role,
         website=body.website,
+        bio=body.bio,
         description=body.description,
         seo_text=body.seo_text,
         keywords=body.keywords,
@@ -354,6 +356,67 @@ async def delete_audit_report(
     await business_service.delete_audit_report(db, current_user)
     await db.commit()
     return MessageResponse(message="Audit report o'chirildi")
+
+
+class VerificationSubmitIn(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+@router.get("/me/business/verification")
+async def get_my_business_verification(
+    current_user: CurrentUser,
+    db: DbSession,
+    locale: str | None = Query(default=None),
+) -> dict:
+    data = await verification_service.get_my_verification(
+        db,
+        current_user,
+        locale=locale or current_user.app_language or "uz",
+    )
+    return data
+
+
+@router.post("/me/business/verification/documents")
+async def upload_business_verification_document(
+    current_user: CurrentUser,
+    db: DbSession,
+    doc_type: str = Query(..., min_length=3, max_length=40),
+    file: UploadFile = File(...),
+) -> dict:
+    data = await verification_service.upload_verification_document(
+        db, current_user, file, doc_type=doc_type
+    )
+    await db.commit()
+    return data
+
+
+@router.delete("/me/business/verification/documents/{document_id}")
+async def delete_business_verification_document(
+    document_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> dict:
+    data = await verification_service.delete_verification_document(
+        db, current_user, document_id
+    )
+    await db.commit()
+    return data
+
+
+@router.post("/me/business/verification/submit")
+async def submit_business_verification(
+    body: VerificationSubmitIn,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> dict:
+    data = await verification_service.submit_verification(
+        db,
+        current_user,
+        note=body.note,
+        locale=current_user.app_language or "uz",
+    )
+    await db.commit()
+    return data
 
 
 @router.get("/search", response_model=UserSearchOut)

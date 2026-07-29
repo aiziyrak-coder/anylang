@@ -8,7 +8,8 @@ import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
-import '../subscription/subscription_screen.dart';
+import '../marketplace_verified_group/marketplace_verified_group_payload.dart';
+import '../marketplace_verified_group/marketplace_verified_group_screen.dart';
 import 'marketplace_group.dart';
 import 'marketplace_groups_action.dart';
 import 'marketplace_groups_content.dart';
@@ -61,13 +62,13 @@ class MarketplaceGroupsScreen extends Screen<MarketplaceGroupsState, void> {
 
   Future<void> _openGroup(MarketplaceGroup group) async {
     if (state.joining.value) return;
-    if (!group.joined && group.verifiedOnly && !group.canJoin) {
-      if (!state.viewerVerified.value) {
-        showAppWarning('marketplace_verified_need_badge'.tr);
-        await navigate(SubscriptionScreen());
-        return;
-      }
-      showAppError('marketplace_verified_need_badge'.tr);
+    // Verified + qo‘shilmagan: tarif o‘rniga guruh info + ishonchlilik ekrani.
+    if (group.verifiedOnly && !group.joined && !group.canJoin) {
+      await navigate(
+        MarketplaceVerifiedGroupScreen(),
+        payload: MarketplaceVerifiedGroupPayload(group: group),
+      );
+      await _load(fromRefresh: true);
       return;
     }
     state.joining.value = true;

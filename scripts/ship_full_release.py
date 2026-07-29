@@ -104,6 +104,19 @@ def read_version() -> tuple[str, int]:
     return m.group(1), int(m.group(2))
 
 
+def read_maps_key() -> str:
+    env_key = (os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
+    if env_key:
+        return env_key
+    props = APP / "android" / "local.properties"
+    if props.exists():
+        for line in props.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            if s.startswith("GOOGLE_MAPS_API_KEY="):
+                return s.split("=", 1)[1].strip()
+    return ""
+
+
 def main() -> int:
     print("=== 1) SSH connect + sync ===")
     c = paramiko.SSHClient()
@@ -180,14 +193,22 @@ def main() -> int:
     env = os.environ.copy()
     env["PATH"] = r"C:\Users\alocomputers\AppData\Local\flutter\bin;" + env.get("PATH", "")
     env["PUB_CACHE"] = str(Path.home() / "AppData" / "Local" / "Pub" / "Cache")
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from flutter_release_build import flutter_release_apk_args, read_maps_key
+
+    maps_key = read_maps_key()
+    flutter_args = flutter_release_apk_args(
+        api_base="https://anylang.uz/",
+        flutter=FLUTTER,
+        obfuscate=True,
+    )
+    if maps_key:
+        print("Maps API key: configured")
+    else:
+        print("WARNING: GOOGLE_MAPS_API_KEY empty — map/places may fail")
+    print("Flutter args: obfuscate + split-debug-info enabled")
     subprocess.check_call(
-        [
-            str(FLUTTER),
-            "build",
-            "apk",
-            "--release",
-            "--dart-define=API_BASE_URL=https://anylang.uz/",
-        ],
+        flutter_args,
         cwd=str(APP),
         env=env,
     )
@@ -210,7 +231,7 @@ def main() -> int:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
         "package": "com.izodev.anylang",
-        "notes": f"Release {ver}+{build} — My products: edit/delete/TOP boost $5/mo",
+        "notes": f"Release {ver}+{build} — Google Maps + Multicard + 2% soliq",
     }
     meta_path = ROOT / "landing" / "download-meta.json"
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

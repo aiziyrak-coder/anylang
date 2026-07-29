@@ -4,7 +4,9 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../local/account_store.dart';
 import '../../local/session_store.dart';
+import '../../network/device_info_payload.dart';
 import 'api_config.dart';
 
 /// Single-flight token refresh with JWT exp awareness.
@@ -65,11 +67,16 @@ class TokenRefresher {
       }
 
       final expiresIn = response['expires_in'];
+      final sessionId = response['session_id']?.toString();
       await SessionStore.saveTokens(
         accessToken: accessToken,
         refreshToken: newRefreshToken,
         expiresInSeconds: expiresIn is num ? expiresIn.toInt() : null,
+        sessionId: sessionId,
       );
+      try {
+        await AccountStore.syncActiveFromSessionStore();
+      } catch (_) {}
       completer.complete(accessToken);
       return accessToken;
     } catch (e) {
@@ -116,9 +123,14 @@ class TokenRefresher {
         receiveTimeout: const Duration(seconds: 15),
       ),
     );
+    Map<String, dynamic> body = {'refresh_token': refreshToken};
+    try {
+      final device = await DeviceInfoPayload.current();
+      body['device'] = device.toJson();
+    } catch (_) {}
     final response = await dio.post(
       '$kBaseUrl/$kRefreshTokenApi',
-      data: {'refresh_token': refreshToken},
+      data: body,
       options: Options(
         headers: {
           'accept': 'application/json',

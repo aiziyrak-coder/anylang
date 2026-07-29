@@ -14,9 +14,11 @@ import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/language_localizations.dart';
+import '../../utils/legal_urls.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
-import '../chat/chat_state.dart';
+import '../chat/chat_state_scope.dart';
+import '../devices/devices_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
 import '../forgot_password/forgot_password_screen.dart';
 import '../login/login_screen.dart';
@@ -60,10 +62,11 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         final locale = Get.locale;
         if (locale != null) {
           final code = '${locale.languageCode}_${locale.countryCode}';
-          final match = languageOptions.firstWhere(
-            (o) => o.localeCode == code,
-            orElse: () => languageOptions.first,
-          );
+          final match = languageOptionByLocale(code) ??
+              languageOptions.firstWhere(
+                (o) => o.langCode == locale.languageCode,
+                orElse: () => languageOptions.first,
+              );
           state.currentLanguageKey.value = match.key;
         }
       }
@@ -106,7 +109,8 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         Get.find<ThemeController>().setMode(a.mode);
       case SelectAppLanguage a:
         state.currentLanguageKey.value = a.language.key;
-        final localeCode = a.language.localeCode;
+        final localeCode =
+            a.language.localeCode ?? uiLocaleCodeFor(a.language.langCode);
         if (localeCode != null) {
           LanguageLocalizations.changeLocale(localeCode);
           await SessionStore.applyAppLanguage(
@@ -114,7 +118,6 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
             isoCode: a.language.langCode,
           );
         } else {
-          // UI tiliga tegilmaydi — faqat chat tarjima (ona) tili.
           await SessionStore.applyNativeLanguage(a.language.langCode);
         }
         try {
@@ -130,23 +133,21 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
           // Lokal til saqlangan; keyingi so'rovda sync bo'ladi.
         }
         // Ochiq chat tarixini yangi til bilan qayta yuklash.
-        if (Get.isRegistered<ChatState>()) {
-          final chat = Get.find<ChatState>();
+        if (ChatStateScope.isRegistered) {
+          final chat = ChatStateScope.currentOrNull!;
           final cid = chat.chatId.value;
           if (cid > 0 && Get.isRegistered<ChatRepository>()) {
             Future<void> reload() async {
-              if (!Get.isRegistered<ChatState>()) return;
-              final live = Get.find<ChatState>();
-              if (live.chatId.value != cid) return;
+              final live = ChatStateScope.currentOrNull;
+              if (live == null || live.chatId.value != cid) return;
               final page =
                   await Get.find<ChatRepository>().listMessages(cid, limit: 50);
-              if (!Get.isRegistered<ChatState>()) return;
-              if (Get.find<ChatState>().chatId.value != cid) return;
+              final liveChat = ChatStateScope.currentOrNull;
+              if (liveChat == null || liveChat.chatId.value != cid) return;
               page.when(
                 success: (data) {
-                  if (!Get.isRegistered<ChatState>()) return;
-                  final liveChat = Get.find<ChatState>();
-                  if (liveChat.chatId.value != cid) return;
+                  final still = ChatStateScope.currentOrNull;
+                  if (still == null || still.chatId.value != cid) return;
                   final me = SessionStore.userId();
                   final raw = asList(data)
                       .whereType<Map>()
@@ -157,11 +158,11 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
                         (e) => mapChatMessageFromApi(
                           e,
                           me: me,
-                          peerName: liveChat.peerName.value,
+                          peerName: still.peerName.value,
                         ),
                       )
                       .toList();
-                  liveChat.messages.assignAll(mapped);
+                  still.messages.assignAll(mapped);
                 },
                 failure: (_) {
                   showAppWarning('settings_chat_reload_failed'.tr);
@@ -288,6 +289,12 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
         await navigate(NumbersScreen());
       case OpenSupportFromSettings _:
         await navigate(SupportChatScreen());
+      case OpenDevicesFromSettings _:
+        await navigate(DevicesScreen());
+      case OpenPrivacyPolicy _:
+        await LegalUrls.openPrivacy();
+      case OpenPublicOffer _:
+        await LegalUrls.openTerms();
     }
   }
 }

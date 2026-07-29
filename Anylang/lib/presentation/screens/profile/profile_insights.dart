@@ -32,30 +32,6 @@ class ProfileAnalytics7d {
   }
 }
 
-class ProfileAchievements {
-  final bool translations100;
-  final bool languages10;
-  final bool firstListing;
-  final bool rating5;
-
-  const ProfileAchievements({
-    this.translations100 = false,
-    this.languages10 = false,
-    this.firstListing = false,
-    this.rating5 = false,
-  });
-
-  factory ProfileAchievements.fromApi(Map<String, dynamic>? json) {
-    if (json == null) return const ProfileAchievements();
-    return ProfileAchievements(
-      translations100: json['translations_100'] == true,
-      languages10: json['languages_10'] == true,
-      firstListing: json['first_listing'] == true,
-      rating5: json['rating_5'] == true,
-    );
-  }
-}
-
 class ProfileInsights {
   final int followers;
   final int likes;
@@ -67,7 +43,6 @@ class ProfileInsights {
   final double? rating;
   final int profileVisitsTotal;
   final ProfileAnalytics7d analytics7d;
-  final ProfileAchievements achievements;
 
   const ProfileInsights({
     this.followers = 0,
@@ -80,13 +55,11 @@ class ProfileInsights {
     this.rating,
     this.profileVisitsTotal = 0,
     this.analytics7d = const ProfileAnalytics7d(),
-    this.achievements = const ProfileAchievements(),
   });
 
   factory ProfileInsights.fromApi(Map<String, dynamic>? json) {
     if (json == null) return const ProfileInsights();
     final a7 = json['analytics_7d'];
-    final ach = json['achievements'];
     return ProfileInsights(
       followers: (json['followers'] as num?)?.toInt() ?? 0,
       likes: (json['likes'] as num?)?.toInt() ?? 0,
@@ -99,9 +72,6 @@ class ProfileInsights {
       profileVisitsTotal: (json['profile_visits_total'] as num?)?.toInt() ?? 0,
       analytics7d: ProfileAnalytics7d.fromApi(
         a7 is Map ? Map<String, dynamic>.from(a7) : null,
-      ),
-      achievements: ProfileAchievements.fromApi(
-        ach is Map ? Map<String, dynamic>.from(ach) : null,
       ),
     );
   }

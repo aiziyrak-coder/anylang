@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     elevenlabs_voice_male: str = ""
     translation_provider: str = "mock"  # mock | deepl | openai
 
-    payment_provider: str = "mock"  # mock | stripe | click | paddle
+    payment_provider: str = "mock"  # mock | stripe | click | paddle | multicard
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_success_url: str = "https://anylang.uz/billing/success"
@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     click_pay_base_url: str = "https://my.click.uz/services/pay"
     # Public backend URL used in return_url (set via env in prod).
     public_api_base_url: str = "https://anylang.uz"
+
+    # Multicard / Rahmat Pay (UZS tiyin) — card + Payme + Click + Uzum + Visa/MC.
+    multicard_base_url: str = "https://dev-mesh.multicard.uz"
+    multicard_application_id: str = ""
+    multicard_secret: str = ""
+    multicard_store_id: int = 0
 
     # Paddle MoR (USD) — placeholders until vendor credentials are set.
     paddle_api_key: str = ""

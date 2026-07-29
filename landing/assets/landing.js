@@ -66,6 +66,8 @@ const I18N = {
       "Until Play Store and App Store — grab the release APK here and stay updated.",
     close_soon: "Google Play & App Store — coming soon",
     footer_tag: "Speak any language. Do business anywhere.",
+    footer_privacy: "Privacy Policy",
+    footer_terms: "Public Offer",
   },
   uz: {
     page_title:
@@ -130,6 +132,8 @@ const I18N = {
     close_soon: "Google Play va App Store — tez orada",
     footer_tag:
       "Har qanday tilda gaplashing. Dunyoning istalgan nuqtasida biznes qiling.",
+    footer_privacy: "Maxfiylik siyosati",
+    footer_terms: "Ommaviy oferta",
   },
   ru: {
     page_title: "AnyLang — Говорите на любом языке. Ведите бизнес где угодно.",
@@ -190,6 +194,8 @@ const I18N = {
       "Пока нет Play Store и App Store — берите релизный APK здесь и обновляйтесь.",
     close_soon: "Google Play и App Store — скоро",
     footer_tag: "Говорите на любом языке. Ведите бизнес где угодно.",
+    footer_privacy: "Политика конфиденциальности",
+    footer_terms: "Публичная оферта",
   },
 };
 

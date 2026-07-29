@@ -214,7 +214,11 @@ async def compute_scam_risk(
     score = 0
 
     age_days = _account_age_days(user)
-    if age_days is not None and age_days < NEW_ACCOUNT_DAYS:
+    certs = [str(c).strip() for c in (biz.certificates or []) if str(c).strip()]
+    docs_ok = bool(biz.documents_verified or user.verified_badge)
+
+    # Verifikatsiyadan o‘tmagan business — yangi hisob + hujjat ogohlantirishi.
+    if not docs_ok and age_days is not None and age_days < NEW_ACCOUNT_DAYS:
         reasons.append(
             {
                 "key": "new_account",
@@ -222,31 +226,20 @@ async def compute_scam_risk(
                 "meta": {"account_age_days": age_days},
             }
         )
-        # Yangiroq = yuqoriroq ball
         score += 35 if age_days < 7 else 25 if age_days < 14 else 18
 
-    certs = [str(c).strip() for c in (biz.certificates or []) if str(c).strip()]
-    docs_ok = bool(biz.documents_verified or user.verified_badge)
-    # Sertifikat da’vo qilingan, lekin hujjat tasdiqlanmagan
-    if certs and not docs_ok:
+    if not docs_ok:
         reasons.append(
             {
                 "key": "bad_documents",
                 "label": labels["bad_documents"],
-                "meta": {"certificates_count": len(certs), "documents_verified": False},
+                "meta": {
+                    "certificates_count": len(certs),
+                    "documents_verified": False,
+                },
             }
         )
-        score += 30
-    elif not docs_ok and not certs and bool(biz.factory_verified):
-        # Factory verified flag without docs — shubhali
-        reasons.append(
-            {
-                "key": "bad_documents",
-                "label": labels["bad_documents"],
-                "meta": {"factory_verified_without_docs": True},
-            }
-        )
-        score += 22
+        score += 32 if certs else 24
 
     blocked_by = await count_blocked_by(redis, user.id)
     if blocked_by >= MANY_BLOCKS_THRESHOLD:

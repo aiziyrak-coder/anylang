@@ -75,6 +75,7 @@ SmartPinInfo classifySmartPin(ChatMessage msg) {
       break;
     case ChatMsgType.text:
     case ChatMsgType.voice:
+    case ChatMsgType.video:
     case ChatMsgType.image:
     case ChatMsgType.contact:
     case ChatMsgType.businessCard:

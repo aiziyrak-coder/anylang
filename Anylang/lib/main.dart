@@ -11,6 +11,7 @@ import 'package:anylang/presentation/ui/my_snackbar.dart';
 import 'data/core/buildNetwork/api_config.dart';
 import 'data/core/buildNetwork/api_service.dart';
 import 'data/core/buildNetwork/token_refresher.dart';
+import 'data/local/account_store.dart';
 import 'data/local/offline_chat_store.dart';
 import 'data/local/public_profile_cache.dart';
 import 'data/local/session_store.dart';
@@ -41,9 +42,12 @@ void main() async {
 
   await Hive.initFlutter();
   await Hive.openBox('user');
+  await Hive.openBox('accounts');
+  await AccountStore.open();
   await OfflineChatStore.open();
   await PublicProfileCache.open();
   await SessionStore.init();
+  await LanguageLocalizations.load();
   await MainModule().initModule();
   runApp(const MyApp());
 }
@@ -64,9 +68,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _sessionWorker = ever<int>(Get.find<SessionExpiredBus>().tick, (_) async {
       MySnackBar.dismiss();
-      // TokenRefresher ko‘pincha avval clear qiladi — shunda ham Main'dan
-      // chiqish kerak (eski guard sticky Main qoldirardi).
+      final expiredId = SessionStore.userId();
       await SessionStore.clear();
+      if (expiredId != null) {
+        try {
+          await AccountStore.removeSlot(expiredId);
+        } catch (_) {}
+      }
+      // Boshqa saqlangan hisob bo‘lsa — avtomatik o‘tamiz.
+      final others = AccountStore.slots();
+      for (final s in others) {
+        final ok = await AccountStore.activate(s.userId);
+        if (ok) {
+          await connectRealtimeIfNeeded();
+          Get.offAll(() => MainScreen().build());
+          return;
+        }
+      }
       if (Get.isRegistered<LoginState>()) {
         Get.find<LoginState>().password = '';
       }
@@ -97,6 +115,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       translations: LanguageLocalizations(),
+      fallbackLocale: LanguageLocalizations.fallbackLocale,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: Get.find<ThemeController>().mode.value,
@@ -126,16 +145,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      fallbackLocale: LanguageLocalizations.fallbackLocale,
       home: const _BootstrapHome(),
     );
   }
 
   Locale _getLanguage() {
     final box = Hive.box("user");
-    final language = box.get("language", defaultValue: 'uz_UZ');
-    final parts = language.split('_');
-    return Locale(parts[0], parts.length > 1 ? parts[1] : 'UZ');
+    final language = box.get("language", defaultValue: 'uz_UZ') as String;
+    return LanguageLocalizations.localeFromCode(
+      LanguageLocalizations.canonicalLocaleCode(language),
+    );
   }
 }
 

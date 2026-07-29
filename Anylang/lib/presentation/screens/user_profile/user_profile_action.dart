@@ -27,3 +27,6 @@ class OpenListing extends UserProfileAction {
 
 /// Kompaniya AI savdo yordamchisi.
 class OpenCompanyTradeAssistant extends UserProfileAction {}
+
+/// O'z business profilida verifikatsiya.
+class OpenOwnBusinessVerification extends UserProfileAction {}

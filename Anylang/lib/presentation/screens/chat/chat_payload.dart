@@ -20,6 +20,7 @@ class ChatPayload {
   /// Marketplace soha guruhi (Textile Group va h.k.).
   final bool isMarketplace;
   final String? marketplaceSlug;
+  final bool isSaved;
 
   const ChatPayload({
     required this.chatId,
@@ -36,5 +37,6 @@ class ChatPayload {
     this.inviteLink,
     this.isMarketplace = false,
     this.marketplaceSlug,
+    this.isSaved = false,
   });
 }

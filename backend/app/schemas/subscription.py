@@ -13,6 +13,9 @@ class PlanPeriodOut(BaseModel):
     code: str
     total: str
     per_month: str
+    tax: str | None = None
+    tax_percent: int | None = None
+    total_with_tax: str | None = None
     savings_percent: int | None = None
 
 
@@ -40,6 +43,7 @@ class PlanOut(BaseModel):
 
 class PlansOut(BaseModel):
     plans: list[PlanOut]
+    payment_tax_percent: int = 2
     period_options: list[PeriodOptionOut] = Field(default_factory=list)
 
 

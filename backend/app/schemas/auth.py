@@ -61,16 +61,26 @@ class RegisterIn(BaseModel):
         return value.upper()
 
 
+class DeviceInfoIn(BaseModel):
+    device_id: str = Field(min_length=8, max_length=64)
+    device_name: str = Field(default="Mobile", min_length=1, max_length=120)
+    device_type: str = Field(default="mobile", max_length=32)
+    platform: str | None = Field(default=None, max_length=64)
+    app_version: str | None = Field(default=None, max_length=32)
+
+
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
     app_language: AppLanguage | None = None
     native_language: str | None = Field(default=None, min_length=2, max_length=8)
+    device: DeviceInfoIn | None = None
 
 
 class VerifyEmailIn(BaseModel):
     email: EmailStr
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    device: DeviceInfoIn | None = None
 
 
 class ResendIn(BaseModel):
@@ -82,6 +92,7 @@ class GoogleIn(BaseModel):
     id_token: str = Field(min_length=10)
     app_language: AppLanguage | None = None
     native_language: str | None = Field(default=None, min_length=2, max_length=8)
+    device: DeviceInfoIn | None = None
 
 
 class ForgotIn(BaseModel):
@@ -106,11 +117,13 @@ class LogoutIn(BaseModel):
 
 class RefreshIn(BaseModel):
     refresh_token: str
+    device: DeviceInfoIn | None = None
 
 
 class TokenPairOut(BaseModel):
     access_token: str
     refresh_token: str
+    session_id: str | None = None
 
 
 class RegisterOut(BaseModel):
@@ -123,3 +136,33 @@ class RegisterOut(BaseModel):
 
 class AuthSessionOut(TokenPairOut):
     user: UserOut
+
+
+class DeviceSessionOut(BaseModel):
+    id: str
+    device_name: str
+    device_type: str
+    platform: str | None = None
+    app_version: str | None = None
+    ip_address: str | None = None
+    is_current: bool = False
+    is_online: bool = False
+    last_active_at: datetime | None = None
+    session_started_at: datetime | None = None
+    can_revoke: bool = False
+
+
+class DeviceSessionListOut(BaseModel):
+    current: DeviceSessionOut | None = None
+    sessions: list[DeviceSessionOut] = Field(default_factory=list)
+    can_revoke_others: bool = False
+
+
+class RevokeSessionIn(BaseModel):
+    """Bo'sh body — path id yetadi; refresh_token ixtiyoriy (joriy seans)."""
+
+    refresh_token: str | None = None
+
+
+class RevokeOthersIn(BaseModel):
+    refresh_token: str

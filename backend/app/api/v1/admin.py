@@ -670,3 +670,53 @@ async def admin_list_payments(
         page=page,
         limit=limit,
     )
+
+
+class AdminVerificationDecideIn(BaseModel):
+    approve: bool
+    admin_note: str | None = Field(default=None, max_length=500)
+
+
+@router.get("/verification-requests")
+async def admin_list_verification_requests(
+    db: DbSession,
+    admin: ModeratorPlus,
+    status_filter: str | None = Query(default="pending", alias="status"),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> dict:
+    from app.services import verification as verification_service
+
+    items = await verification_service.list_admin_verification_requests(
+        db, status=status_filter, limit=limit
+    )
+    return {"items": items}
+
+
+@router.post("/verification-requests/{request_id}/decide")
+async def admin_decide_verification_request(
+    request_id: int,
+    body: AdminVerificationDecideIn,
+    db: DbSession,
+    admin: ModeratorPlus,
+    request: Request,
+) -> dict:
+    from app.services import verification as verification_service
+
+    data = await verification_service.decide_verification_request(
+        db,
+        request_id=request_id,
+        admin=admin,
+        approve=body.approve,
+        admin_note=body.admin_note,
+    )
+    await write_audit(
+        db,
+        admin=admin,
+        action="verification.decide",
+        target_type="verification_request",
+        target_id=request_id,
+        meta={"approve": body.approve, "status": data.get("status")},
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return data

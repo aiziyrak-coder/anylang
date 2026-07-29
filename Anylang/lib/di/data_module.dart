@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../data/audio/message_alert_sound_service.dart';
 import '../data/audio/voice_player_service.dart';
 import '../data/audio/voice_recorder_service.dart';
 import '../data/core/buildNetwork/api_service.dart';
@@ -29,7 +30,6 @@ import '../data/network/ai_matching_repository.dart';
 import '../data/network/market_analytics_repository.dart';
 import '../data/network/marketplace_groups_repository.dart';
 import '../data/network/business_card_deep_link_service.dart';
-import '../data/network/feed_repository.dart';
 import '../data/network/nearby_repository.dart';
 import '../data/network/connectivity_service.dart';
 import '../data/network/connection_status_service.dart';
@@ -97,10 +97,6 @@ class DataModule {
       TradeAssistantRepository(client: Get.find()),
       permanent: true,
     );
-    Get.put<FeedRepository>(
-      FeedRepository(client: Get.find()),
-      permanent: true,
-    );
     Get.put<AiMatchingRepository>(
       AiMatchingRepository(client: Get.find()),
       permanent: true,
@@ -131,6 +127,7 @@ class DataModule {
     Get.put<ForwardPendingStore>(ForwardPendingStore(), permanent: true);
     Get.put<VoiceRecorderService>(VoiceRecorderService(), permanent: true);
     Get.put<VoicePlayerService>(VoicePlayerService(), permanent: true);
+    Get.put<MessageAlertSoundService>(MessageAlertSoundService(), permanent: true);
     await OfflineChatStore.open();
     await Get.putAsync<ConnectivityService>(
       () => ConnectivityService().init(),

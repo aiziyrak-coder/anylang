@@ -9,6 +9,7 @@ import '../../../data/network/chat_repository.dart';
 import '../../../data/network/payment_repository.dart';
 import '../../modal/add_group_members_bottom_sheet.dart';
 import '../../modal/image_picker.dart';
+import '../../modal/payment_confirm_bottom_sheet.dart';
 import '../../modal/telegram_action_sheet.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
@@ -341,6 +342,30 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
     final url = map['checkout_url']?.toString();
     final id = (map['id'] as num?)?.toInt();
     final mock = map['mock_confirm'] == true;
+    final currency = (map['currency']?.toString() ?? 'UZS').toUpperCase();
+    final amount = map['amount']?.toString() ?? '';
+    final taxPctRaw = map['tax_percent'];
+    final taxPct = taxPctRaw is num
+        ? taxPctRaw.toInt()
+        : int.tryParse('$taxPctRaw') ?? 2;
+
+    final confirmed = await showPaymentConfirmBottomSheet(
+      context,
+      title: 'group_settings_super'.tr,
+      subtitle: 'payment_confirm_subtitle'.tr,
+      amount: amount,
+      currency: currency,
+      amountBeforeTax: map['amount_before_tax']?.toString(),
+      taxAmount: map['tax_amount']?.toString(),
+      taxPercent: taxPct,
+      planLabel: 'group_settings_super_badge'.tr,
+      ctaText: 'subscription_pay_confirm_cta'.tr,
+    );
+    if (confirmed != true) {
+      showAppMessage('payment_confirm_later_hint'.tr);
+      return;
+    }
+
     if (url != null && url.isNotEmpty) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }

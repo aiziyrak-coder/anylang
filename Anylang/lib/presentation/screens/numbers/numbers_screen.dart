@@ -10,6 +10,7 @@ import '../../../data/local/session_store.dart';
 import '../../../data/network/numbers_repository.dart';
 import '../../../data/network/payment_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../modal/payment_confirm_bottom_sheet.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/secondary_button.dart';
 import '../../ui/theme/colors.dart';
@@ -357,6 +358,30 @@ class NumbersScreen extends Screen<NumbersState, void> {
           final id = data['id'];
           final checkoutUrl = data['checkout_url']?.toString();
           final mockConfirm = data['mock_confirm'] == true;
+          final currency =
+              (data['currency']?.toString() ?? 'UZS').toUpperCase();
+          final amount = data['amount']?.toString() ?? '';
+          final taxPctRaw = data['tax_percent'];
+          final taxPct = taxPctRaw is num
+              ? taxPctRaw.toInt()
+              : int.tryParse('$taxPctRaw') ?? 2;
+
+          final confirmed = await showPaymentConfirmBottomSheet(
+            context,
+            title: 'payment_confirm_number_title'.tr,
+            subtitle: 'payment_confirm_subtitle'.tr,
+            amount: amount,
+            currency: currency,
+            amountBeforeTax: data['amount_before_tax']?.toString(),
+            taxAmount: data['tax_amount']?.toString(),
+            taxPercent: taxPct,
+            planLabel: formatNumber(item.number),
+            ctaText: 'subscription_pay_confirm_cta'.tr,
+          );
+          if (confirmed != true) {
+            showAppMessage('payment_confirm_later_hint'.tr);
+            return;
+          }
 
           if (checkoutUrl != null &&
               checkoutUrl.isNotEmpty &&

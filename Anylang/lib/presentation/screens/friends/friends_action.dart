@@ -103,7 +103,4 @@ class FriendsToggleVerified extends FriendsAction {}
 
 class FriendsToggleOnline extends FriendsAction {}
 
-/// Yaqindagi odamlar (Nearby) — Premium.
-class OpenNearby extends FriendsAction {}
-
 class FriendsClearFilters extends FriendsAction {}

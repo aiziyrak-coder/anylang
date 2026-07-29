@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Query, Request
 
 from app.api.deps_auth import CurrentUser
@@ -16,6 +18,7 @@ from app.services import support_chat as support_service
 from app.services import support_sessions as support_sessions_service
 
 router = APIRouter()
+_log = logging.getLogger(__name__)
 
 
 @router.get("/sessions/active", response_model=SupportSessionOut | None)
@@ -75,14 +78,37 @@ async def support_chat(
     db: DbSession,
     current_user: CurrentUser,
 ) -> SupportChatOut:
-    data = await support_sessions_service.chat_in_session(
-        db,
-        user=current_user,
-        message=body.message,
-        locale=body.locale,
-        session_id=body.session_id,
-    )
-    return SupportChatOut.model_validate(data)
+    try:
+        data = await support_sessions_service.chat_in_session(
+            db,
+            user=current_user,
+            message=body.message,
+            locale=body.locale,
+            session_id=body.session_id,
+        )
+        return SupportChatOut.model_validate(data)
+    except Exception as exc:
+        # Session persistence must not block Sofiya replies (MissingGreenlet / schema).
+        from app.core.errors import AppError
+
+        if isinstance(exc, AppError):
+            raise
+        _log.exception("support session chat failed; falling back to stateless: %s", exc)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        reply = await support_service.reply_support(
+            message=body.message,
+            history=body.history,
+            locale=body.locale,
+            source="app",
+        )
+        return SupportChatOut(
+            reply=reply,
+            agent_name=support_service.agent_name(),
+            session_id=body.session_id or 0,
+        )
 
 
 @router.post("/public", response_model=SupportChatOut)

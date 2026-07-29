@@ -6,13 +6,20 @@ import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/account_store.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/ai_matching_repository.dart';
+import '../../../data/network/auth_repository.dart';
 import '../../../data/network/market_analytics_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../../data/network/session_bootstrap.dart';
+import '../../../data/network/socket_service.dart';
+import '../../modal/account_switcher_bottom_sheet.dart';
 import '../../modal/ai_matching_bottom_sheet.dart';
 import '../../modal/business_card_qr_bottom_sheet.dart';
+import '../../modal/business_verification_bottom_sheet.dart';
+import '../../modal/edit_bio_bottom_sheet.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/market_analytics_bottom_sheet.dart';
@@ -24,11 +31,13 @@ import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/business_plan_dialog.dart';
+import '../../utils/legal_urls.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
 import '../add_product/add_product_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
+import '../main/main_screen.dart';
 import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
 import '../products/products_state.dart';
@@ -37,7 +46,8 @@ import '../settings/settings_payload.dart';
 import '../settings/settings_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../numbers/numbers_screen.dart';
-import '../forgot_password/forgot_password_screen.dart';
+import '../login/login_screen.dart';
+import '../devices/devices_screen.dart';
 import '../support_chat/support_chat_screen.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
@@ -240,6 +250,33 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case OpenSettings _:
       case OpenAppSettings _:
         await _openSettings(SettingsFocus.app);
+      case ProfileLogoutRequested _:
+        final uid = SessionStore.userId();
+        final logout = await Get.find<AuthRepository>().logout();
+        if (logout.errorOrNull != null) {
+          showAppWarning('logout_failed'.tr);
+        } else {
+          showAppMessage('settings_logout_success'.tr);
+        }
+        if (Get.isRegistered<SocketService>()) {
+          Get.find<SocketService>().disconnect();
+        }
+        // Boshqa saqlangan hisob bo‘lsa — unga o‘tamiz.
+        final others = AccountStore.slots()
+            .where((s) => s.userId != uid)
+            .toList();
+        if (others.isNotEmpty) {
+          final ok = await AccountStore.activate(others.first.userId);
+          if (ok) {
+            await connectRealtimeIfNeeded();
+            navigateAndRemoveUntil(MainScreen());
+            return;
+          }
+        }
+        navigateAndRemoveUntil(LoginScreen());
+      case OpenAccountSwitcher _:
+        if (!context.mounted) return;
+        await showAccountSwitcherBottomSheet(context);
       case OpenSettingsLanguage _:
         await _openSettings(SettingsFocus.language);
       case OpenSettingsTheme _:
@@ -251,13 +288,19 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case OpenSettingsPrivacy _:
         await _openSettings(SettingsFocus.privacy);
       case OpenSettingsSecurity _:
-        await navigate(ForgotPasswordScreen());
+        await navigate(DevicesScreen());
       case OpenAccountSettings _:
         await _openSettings(SettingsFocus.account);
       case OpenSettingsAiAssistant _:
         await navigate(SupportChatScreen());
       case OpenSupportFromProfile _:
         await navigate(SupportChatScreen());
+      case OpenDevicesFromProfile _:
+        await navigate(DevicesScreen());
+      case OpenPrivacyPolicyFromProfile _:
+        await LegalUrls.openPrivacy();
+      case OpenPublicOfferFromProfile _:
+        await LegalUrls.openTerms();
       case OpenSofiyaAi _:
         if (!context.mounted) return;
         await showSofiyaAiBottomSheet(context, sendAction: (a) {
@@ -269,6 +312,54 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case EditBusinessInfo _:
         await navigate(EditBusinessInfoScreen());
         await _load();
+      case EditProfileBio _:
+        final acc = state.account.value;
+        if (acc == null) return;
+        if (!acc.isBusiness) {
+          final goPlans = await Get.dialog<bool>(
+            AlertDialog(
+              title: Text('profile_bio_business_required_title'.tr),
+              content: Text('profile_bio_business_required_body'.tr),
+              actions: [
+                TextButton(
+                  onPressed: () => Get.back(result: false),
+                  child: Text('common_cancel'.tr),
+                ),
+                TextButton(
+                  onPressed: () => Get.back(result: true),
+                  child: Text('add_product_go_plans'.tr),
+                ),
+              ],
+            ),
+          );
+          if (goPlans == true) {
+            await navigate(SubscriptionScreen());
+            await _load();
+          }
+          return;
+        }
+        if (!context.mounted) return;
+        final edited = await showEditBioBottomSheet(
+          context,
+          initial: acc.bio ?? '',
+        );
+        if (edited == null) return;
+        final result = await Get.find<ProfileRepository>().updateBusiness({
+          'bio': edited,
+        });
+        result.when(
+          success: (_) {
+            final current = state.account.value;
+            if (current != null) {
+              state.account.value = edited.isEmpty
+                  ? current.copyWith(clearBio: true)
+                  : current.copyWith(bio: edited);
+            }
+            showAppMessage('profile_bio_saved'.tr);
+            unawaited(_load());
+          },
+          failure: showAppError,
+        );
       case AddProductRequested _:
         final isBiz = state.account.value?.isBusiness == true;
         if (!isBiz) {
@@ -381,6 +472,12 @@ class ProfileScreen extends Screen<ProfileState, void> {
           userId: qrAcc.id,
           companyName: qrAcc.name,
         );
+      case OpenBusinessVerification _:
+        if (!context.mounted) return;
+        final snap = await showBusinessVerificationBottomSheet(context);
+        if (snap != null) {
+          await _softRefresh();
+        }
       case SeeAllListings _:
         await _loadListings();
         final items = state.account.value?.listings ?? const [];

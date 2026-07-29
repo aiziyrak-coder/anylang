@@ -14,6 +14,7 @@ import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../modal/telegram_action_sheet.dart';
 import '../../modal/conversation_actions_dialog.dart';
+import '../../modal/chat_mute_duration_bottom_sheet.dart';
 import '../../modal/chat_overflow_sheet.dart';
 import '../../modal/new_chat_actions_dialog.dart';
 import '../../utils/app_snackbar.dart';
@@ -77,7 +78,15 @@ class MessagesScreen extends Screen<MessagesState, void> {
           final items = <Conversation>[];
           for (final e in raw) {
             try {
-              items.add(Conversation.fromApi(e));
+              final conv = Conversation.fromApi(e);
+              items.add(conv);
+              unawaited(
+                SessionStore.syncChatMuteFromServer(
+                  conv.id,
+                  muted: conv.muted,
+                  mutedUntil: conv.mutedUntil,
+                ),
+              );
             } catch (err, st) {
               debugPrint('Conversation.fromApi skipped: $err\n$st');
             }
@@ -288,6 +297,7 @@ class MessagesScreen extends Screen<MessagesState, void> {
             inviteLink: conv.inviteLink,
             isMarketplace: conv.isMarketplace,
             marketplaceSlug: conv.marketplaceSlug,
+            isSaved: conv.isSaved,
           ),
         );
         if (Get.isRegistered<RealtimeSyncService>()) {
@@ -357,8 +367,12 @@ class MessagesScreen extends Screen<MessagesState, void> {
         final repo = Get.find<ChatRepository>();
         var failed = 0;
         for (final id in state.selectedIds.toList()) {
+          await SessionStore.setChatMuted(id, true);
           final r = await repo.muteChat(id);
-          if (r.errorOrNull != null) failed++;
+          if (r.errorOrNull != null) {
+            await SessionStore.setChatMuted(id, false);
+            failed++;
+          }
         }
         state.selecting.value = false;
         state.selectedIds.clear();
@@ -449,19 +463,51 @@ class MessagesScreen extends Screen<MessagesState, void> {
     final repo = Get.find<ChatRepository>();
     switch (chosen) {
       case ChatOverflowAction.mute:
-        final next = !muted;
-        await SessionStore.setChatMuted(conv.id, next);
-        final result =
-            next ? await repo.muteChat(conv.id) : await repo.unmuteChat(conv.id);
-        if (result.errorOrNull != null) {
-          await SessionStore.setChatMuted(conv.id, muted);
-          showAppError(result.errorOrNull);
-          return;
-        }
-        final idx = state.conversations.indexWhere((c) => c.id == conv.id);
-        if (idx >= 0) {
-          state.conversations[idx] =
-              state.conversations[idx].copyWith(muted: next);
+        if (muted) {
+          await SessionStore.setChatMuted(conv.id, false);
+          final result = await repo.unmuteChat(conv.id);
+          if (result.errorOrNull != null) {
+            await SessionStore.syncChatMuteFromServer(
+              conv.id,
+              muted: true,
+              mutedUntil: conv.mutedUntil,
+            );
+            showAppError(result.errorOrNull);
+            return;
+          }
+          final idx = state.conversations.indexWhere((c) => c.id == conv.id);
+          if (idx >= 0) {
+            state.conversations[idx] =
+                state.conversations[idx].copyWith(
+              muted: false,
+              clearMutedUntil: true,
+            );
+          }
+          showAppMessage('chat_unmuted'.tr);
+        } else {
+          if (!context.mounted) return;
+          final choice = await showChatMuteDurationBottomSheet(context);
+          if (choice == null) return;
+          final dur = choice.asDuration;
+          await SessionStore.setChatMuted(conv.id, true, duration: dur);
+          final result = await repo.muteChat(
+            conv.id,
+            durationSeconds: choice.durationSeconds,
+          );
+          if (result.errorOrNull != null) {
+            await SessionStore.setChatMuted(conv.id, false);
+            showAppError(result.errorOrNull);
+            return;
+          }
+          final until = dur == null
+              ? null
+              : DateTime.now().add(dur);
+          final idx = state.conversations.indexWhere((c) => c.id == conv.id);
+          if (idx >= 0) {
+            state.conversations[idx] = state.conversations[idx]
+                .copyWith(muted: true, mutedUntil: until);
+          }
+          showAppMessage(choice.toastKey.tr);
         }
       case ChatOverflowAction.pin:
         final next = !conv.pinned;
@@ -596,7 +642,7 @@ class MessagesScreen extends Screen<MessagesState, void> {
       case ChatOverflowAction.search:
       case ChatOverflowAction.groupCatalog:
       case ChatOverflowAction.groupStats:
-      case ChatOverflowAction.dealMode:
+      case ChatOverflowAction.sharedMedia:
       case ChatOverflowAction.aiSummary:
         break;
     }

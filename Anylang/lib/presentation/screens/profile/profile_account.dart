@@ -56,6 +56,10 @@ class ProfileAccount {
   final String initial;
   final LinearGradient avatarGradient;
   final bool verified;
+  /// Business hujjat verifikatsiyasi (admin tasdiqlagan).
+  final bool documentsVerified;
+  /// none | draft | pending | approved | rejected
+  final String verificationStatus;
   final String flagAsset;
   /// ISO alpha-2 (API uchun).
   final String countryCode;
@@ -95,6 +99,8 @@ class ProfileAccount {
   final List<OwnListing> listings;
   final String? avatarUrl;
   final String? email;
+  /// Qisqa bio (faqat biznes yozadi, max 300).
+  final String? bio;
   final TrustScore? trustScore;
   final FactoryVerification factoryVerification;
   final ScamRisk? scamRisk;
@@ -113,6 +119,8 @@ class ProfileAccount {
     required this.country,
     this.id = 0,
     this.verified = false,
+    this.documentsVerified = false,
+    this.verificationStatus = 'none',
     this.username,
     this.anylangNumber = '',
     this.handle = '',
@@ -143,6 +151,7 @@ class ProfileAccount {
     this.listings = const [],
     this.avatarUrl,
     this.email,
+    this.bio,
     this.trustScore,
     this.factoryVerification = const FactoryVerification(),
     this.scamRisk,
@@ -234,6 +243,15 @@ class ProfileAccount {
       initial: initialsOf(displayName),
       avatarGradient: avatarGradientFor(id),
       verified: json['verified_badge'] == true,
+      documentsVerified: biz?['documents_verified'] == true ||
+          json['verified_badge'] == true,
+      verificationStatus: () {
+        if (biz?['documents_verified'] == true ||
+            json['verified_badge'] == true) {
+          return 'approved';
+        }
+        return (biz?['verification_status'] as String?) ?? 'none';
+      }(),
       flagAsset: flagAssetForCountry(countryCode),
       countryCode: countryCode.toUpperCase(),
       country: formatCountryName(countryCode),
@@ -291,6 +309,12 @@ class ProfileAccount {
         return (top != null && top.isNotEmpty) ? top : null;
       })(),
       email: json['email'] as String?,
+      bio: () {
+        final fromBiz = (biz?['bio'] as String?)?.trim();
+        if (fromBiz != null && fromBiz.isNotEmpty) return fromBiz;
+        final top = (json['bio'] as String?)?.trim();
+        return (top != null && top.isNotEmpty) ? top : null;
+      }(),
       trustScore: trustFromBiz,
       factoryVerification: FactoryVerification.fromBusiness(
         biz is Map ? Map<String, dynamic>.from(biz) : null,
@@ -314,6 +338,8 @@ class ProfileAccount {
     String? name,
     String? initial,
     String? email,
+    String? bio,
+    bool clearBio = false,
   }) {
     return ProfileAccount(
       id: id,
@@ -322,6 +348,8 @@ class ProfileAccount {
       initial: initial ?? this.initial,
       avatarGradient: avatarGradient,
       verified: verified,
+      documentsVerified: documentsVerified,
+      verificationStatus: verificationStatus,
       flagAsset: flagAsset,
       countryCode: countryCode,
       country: country,
@@ -355,6 +383,7 @@ class ProfileAccount {
       listings: listings ?? this.listings,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       email: email ?? this.email,
+      bio: clearBio ? null : (bio ?? this.bio),
       trustScore: trustScore,
       factoryVerification: factoryVerification,
       scamRisk: scamRisk,

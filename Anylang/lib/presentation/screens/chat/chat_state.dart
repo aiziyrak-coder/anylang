@@ -20,6 +20,7 @@ class ChatState extends GetxController {
   final RxInt chatId = 0.obs;
   final RxInt peerId = 0.obs;
   final RxBool isGroup = false.obs;
+  final RxBool isSaved = false.obs;
   String? myRole;
   bool isSuper = false;
   String? inviteLink;
@@ -45,11 +46,16 @@ class ChatState extends GetxController {
   final RxnString aiSuggestMessageId = RxnString();
   final RxBool searching = false.obs;
   final RxString searchQuery = ''.obs;
+  /// Matn topilgan xabar id lari (eski → yangi).
+  final RxList<String> searchMatchIds = <String>[].obs;
+  /// Hozirgi natija indeksi (`searchMatchIds` ichida).
+  final RxInt searchMatchIndex = 0.obs;
   final RxBool muted = false.obs;
 
   /// Telegram: chatlar bo'yicha scroll holati (qayta ochganda).
-  final Map<int, double> _scrollOffsetByChat = {};
-  final Map<int, bool> _scrollPinnedByChat = {};
+  /// Static — har ChatScreen alohida ChatState yaratadi.
+  static final Map<int, double> _scrollOffsetByChat = {};
+  static final Map<int, bool> _scrollPinnedByChat = {};
   bool scrollPinnedToBottom = true;
   double? savedScrollOffset;
 
@@ -74,6 +80,7 @@ class ChatState extends GetxController {
     peerAvatarUrl.value = p.avatarUrl;
     peerOnline.value = p.online;
     isGroup.value = p.isGroup;
+    isSaved.value = p.isSaved;
     pinned.value = p.pinned;
     myRole = p.myRole;
     isSuper = p.isSuper;
@@ -89,6 +96,8 @@ class ChatState extends GetxController {
     typingUserId.value = null;
     searching.value = false;
     searchQuery.value = '';
+    searchMatchIds.clear();
+    searchMatchIndex.value = 0;
     input.value = '';
     replyTo.value = null;
     recording.value = false;

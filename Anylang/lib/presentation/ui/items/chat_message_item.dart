@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
@@ -8,9 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../data/audio/voice_player_service.dart';
 import '../../../data/network/invite_deep_link_service.dart';
 import '../../modal/full_screen_image_dialog.dart';
+import '../../modal/product_video_dialog.dart';
 import '../../screens/chat/chat_message.dart';
 import '../../utils/size_controller.dart';
-import '../chat_ai_reply_styles.dart';
 import '../chat_auto_business_card.dart';
 import '../profile_avatar.dart';
 import '../../utils/business_reactions.dart';
@@ -44,15 +45,13 @@ class ChatMessageItem extends StatelessWidget {
   /// Multi-select rejimi.
   final bool selecting;
   final bool selected;
+  /// Chat ichidagi qidiruv — joriy topilma.
+  final bool searchHighlight;
   /// Guruh invite linki ostidagi "Qo'shilish" tugmasi.
   final ValueChanged<String>? onJoinGroupInvite;
   /// Kontakt kartasi: Xabar / Qo‘shish.
   final VoidCallback? onContactMessage;
   final VoidCallback? onContactAdd;
-  /// Kiruvchi xabar ostida AI javob uslublari.
-  final ValueChanged<String>? onAiReplyStyle;
-  final bool aiReplyLoading;
-  final String? aiReplyActiveTone;
   /// Narx taklifi: qabul / qarshi.
   final VoidCallback? onAcceptOffer;
   final VoidCallback? onCounterOffer;
@@ -74,12 +73,10 @@ class ChatMessageItem extends StatelessWidget {
     this.showAvatar = false,
     this.selecting = false,
     this.selected = false,
+    this.searchHighlight = false,
     this.onJoinGroupInvite,
     this.onContactMessage,
     this.onContactAdd,
-    this.onAiReplyStyle,
-    this.aiReplyLoading = false,
-    this.aiReplyActiveTone,
     this.onAcceptOffer,
     this.onCounterOffer,
     this.onReplyToRfq,
@@ -229,7 +226,9 @@ class ChatMessageItem extends StatelessWidget {
         Material(
           color: selected
               ? c.accent.withValues(alpha: 0.14)
-              : Colors.transparent,
+              : (searchHighlight
+                  ? c.accent.withValues(alpha: 0.18)
+                  : Colors.transparent),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: selecting ? onTap : null,
@@ -243,20 +242,6 @@ class ChatMessageItem extends StatelessWidget {
             ),
           ),
         ),
-        if (onAiReplyStyle != null && !selecting) ...[
-          Padding(
-            padding: EdgeInsets.only(
-              left: isGroup && !_out ? 38.dp : 0,
-              top: 2.dp,
-              bottom: 6.dp,
-            ),
-            child: ChatAiReplyStyles(
-              onSelect: onAiReplyStyle!,
-              loading: aiReplyLoading,
-              activeTone: aiReplyActiveTone,
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -282,6 +267,8 @@ class ChatMessageItem extends StatelessWidget {
         return _text(context, c);
       case ChatMsgType.image:
         return _image(context, c);
+      case ChatMsgType.video:
+        return _video(context, c);
       case ChatMsgType.voice:
         return _voice(c);
       case ChatMsgType.product:
@@ -711,6 +698,131 @@ class ChatMessageItem extends StatelessWidget {
     );
   }
 
+  Widget _video(BuildContext context, AppColors c) {
+    final url = message.videoUrl;
+    final isNet = url != null &&
+        (url.startsWith('http://') || url.startsWith('https://'));
+    final isFile = url != null && url.isNotEmpty && !isNet;
+    final openable = isNet || isFile;
+    final round = message.isRoundNote;
+    final size = round ? 180.dp : _kChatImageWidth.dp;
+    final metaColor = _out
+        ? c.onAccent.withValues(alpha: 0.85)
+        : c.textFaint;
+
+    Future<void> open() async {
+      final path = url;
+      if (!openable || path == null || path.isEmpty) return;
+      await showProductVideoDialog(context, url: path, maxPlay: null);
+    }
+
+    final thumb = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: openable ? open : null,
+        customBorder: round ? const CircleBorder() : null,
+        borderRadius: round ? null : _bubbleRadius,
+        child: Ink(
+          width: size,
+          height: round ? size : 160.dp,
+          decoration: BoxDecoration(
+            color: c.isDark ? const Color(0xFF12263A) : const Color(0xFFE8EEF5),
+            shape: round ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: round ? null : _bubbleRadius,
+            border: round
+                ? Border.all(color: c.accent.withValues(alpha: 0.55), width: 3)
+                : null,
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                Icons.play_circle_fill_rounded,
+                size: round ? 56.dp : 48.dp,
+                color: c.accent,
+              ),
+              if ((message.videoDuration ?? '').isNotEmpty)
+                Positioned(
+                  left: round ? null : 10.dp,
+                  bottom: round ? 14.dp : 10.dp,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.dp,
+                      vertical: 3.dp,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10.dp),
+                    ),
+                    child: Text(
+                      message.videoDuration!,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              Positioned(
+                right: round ? 14.dp : 8.dp,
+                bottom: round ? 14.dp : 8.dp,
+                child: _meta(
+                  c.copyWith(onAccent: kAvatarFg, textFaint: kAvatarFg),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final caption = message.displayText.trim();
+    final showCaption = caption.isNotEmpty ||
+        message.transcriptPending ||
+        message.transcriptFailed;
+
+    return Column(
+      crossAxisAlignment:
+          _out ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        thumb,
+        if (showCaption)
+          Padding(
+            padding: EdgeInsets.only(top: 6.dp),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: size),
+              child: _bubble(
+                c,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (caption.isNotEmpty)
+                      Text(
+                        caption,
+                        style: TextStyle(
+                          color: _out ? c.onAccent : c.textPrimary,
+                          fontSize: 14.sp,
+                          height: 1.35,
+                        ),
+                      ),
+                    _VoiceTranscriptSection(
+                      message: message,
+                      outgoing: _out,
+                      metaColor: metaColor,
+                      primaryText: _out ? c.onAccent : c.textPrimary,
+                      colors: c,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _voice(AppColors c) {
     final player = Get.find<VoicePlayerService>();
     final waveColor = _out ? c.onAccent.withValues(alpha: 0.55) : c.textFaint;
@@ -861,71 +973,13 @@ class ChatMessageItem extends StatelessWidget {
           children: [
             if (message.reply != null) _replyQuote(c, message.reply!),
             voiceRow,
-            if (message.transcriptFailed) ...[
-              SizedBox(height: 8.dp),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.translate_rounded,
-                    size: 16.dp,
-                    color: _metaColor(c),
-                  ),
-                  SizedBox(width: 6.dp),
-                  Expanded(
-                    child: Text(
-                      'voice_transcript_failed'.tr,
-                      style: TextStyle(
-                        color: _metaColor(c),
-                        fontSize: 12.5.sp,
-                        fontStyle: FontStyle.italic,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ] else if (message.transcriptPending &&
-                message.displayText.trim().isEmpty) ...[
-              SizedBox(height: 8.dp),
-              Row(
-                children: [
-                  Icon(
-                    Icons.translate_rounded,
-                    size: 16.dp,
-                    color: _metaColor(c),
-                  ),
-                  SizedBox(width: 6.dp),
-                  Expanded(
-                    child: Text(
-                      'voice_transcribing'.tr,
-                      style: TextStyle(
-                        color: _metaColor(c),
-                        fontSize: 11.5.sp,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 6.dp),
-              TranscriptShimmer(
-                color: _out
-                    ? c.onAccent.withValues(alpha: 0.35)
-                    : c.textFaint.withValues(alpha: 0.35),
-              ),
-            ] else if (message.displayText.trim().isNotEmpty) ...[
-              SizedBox(height: 8.dp),
-              Text(
-                message.displayText,
-                style: TextStyle(
-                  color: _primaryText(c),
-                  fontSize: 14.sp,
-                  fontWeight: _out ? FontWeight.w600 : FontWeight.w400,
-                  height: 1.3,
-                ),
-              ),
-            ],
+            _VoiceTranscriptSection(
+              message: message,
+              outgoing: _out,
+              metaColor: _metaColor(c),
+              primaryText: _primaryText(c),
+              colors: c,
+            ),
           ],
         );
 
@@ -1951,5 +2005,170 @@ class _InviteAwareTextState extends State<_InviteAwareText> {
     }
 
     return Text.rich(TextSpan(children: spans));
+  }
+}
+
+/// Ovoz → matn: pending shimmer, timeout/failed — lokalizatsiyalangan xato.
+class _VoiceTranscriptSection extends StatefulWidget {
+  final ChatMessage message;
+  final bool outgoing;
+  final Color metaColor;
+  final Color primaryText;
+  final AppColors colors;
+
+  const _VoiceTranscriptSection({
+    required this.message,
+    required this.outgoing,
+    required this.metaColor,
+    required this.primaryText,
+    required this.colors,
+  });
+
+  @override
+  State<_VoiceTranscriptSection> createState() =>
+      _VoiceTranscriptSectionState();
+}
+
+class _VoiceTranscriptSectionState extends State<_VoiceTranscriptSection> {
+  static const _sttTimeout = Duration(seconds: 45);
+  Timer? _timer;
+  bool _timedOut = false;
+
+  ChatMessage get message => widget.message;
+
+  @override
+  void initState() {
+    super.initState();
+    _armTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _VoiceTranscriptSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.id != message.id ||
+        oldWidget.message.transcriptPending != message.transcriptPending ||
+        oldWidget.message.transcriptFailed != message.transcriptFailed ||
+        oldWidget.message.displayText != message.displayText) {
+      _armTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _armTimer() {
+    _timer?.cancel();
+    _timedOut = false;
+    final hasText = message.displayText.trim().isNotEmpty;
+    if (message.transcriptFailed ||
+        hasText ||
+        !message.transcriptPending) {
+      return;
+    }
+    final created = message.createdAt ?? DateTime.now();
+    final remaining =
+        _sttTimeout - DateTime.now().toUtc().difference(created.toUtc());
+    if (remaining <= Duration.zero) {
+      _timedOut = true;
+      return;
+    }
+    _timer = Timer(remaining, () {
+      if (mounted) setState(() => _timedOut = true);
+    });
+  }
+
+  bool get _showFailed =>
+      message.transcriptFailed ||
+      (_timedOut &&
+          message.transcriptPending &&
+          message.displayText.trim().isEmpty);
+
+  bool get _showPending =>
+      !_showFailed &&
+      message.transcriptPending &&
+      message.displayText.trim().isEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showFailed) {
+      return Padding(
+        padding: EdgeInsets.only(top: 8.dp),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.translate_rounded,
+              size: 16.dp,
+              color: widget.metaColor,
+            ),
+            SizedBox(width: 6.dp),
+            Expanded(
+              child: Text(
+                'voice_transcript_failed'.tr,
+                style: TextStyle(
+                  color: widget.metaColor,
+                  fontSize: 12.5.sp,
+                  fontStyle: FontStyle.italic,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_showPending) {
+      return Padding(
+        padding: EdgeInsets.only(top: 8.dp),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.translate_rounded,
+                  size: 16.dp,
+                  color: widget.metaColor,
+                ),
+                SizedBox(width: 6.dp),
+                Expanded(
+                  child: Text(
+                    'voice_transcribing'.tr,
+                    style: TextStyle(
+                      color: widget.metaColor,
+                      fontSize: 11.5.sp,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 6.dp),
+            TranscriptShimmer(
+              color: widget.outgoing
+                  ? widget.colors.onAccent.withValues(alpha: 0.35)
+                  : widget.colors.textFaint.withValues(alpha: 0.35),
+            ),
+          ],
+        ),
+      );
+    }
+    final text = message.displayText.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: 8.dp),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: widget.primaryText,
+          fontSize: 14.sp,
+          fontWeight: widget.outgoing ? FontWeight.w600 : FontWeight.w400,
+          height: 1.3,
+        ),
+      ),
+    );
   }
 }

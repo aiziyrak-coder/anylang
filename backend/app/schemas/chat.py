@@ -50,7 +50,7 @@ class LastMessagePreviewOut(BaseModel):
 
 class ChatOut(BaseModel):
     id: int
-    type: Literal["direct", "group"] = "direct"
+    type: Literal["direct", "group", "saved"] = "direct"
     title: str | None = None
     avatar_url: str | None = None
     interlocutor: InterlocutorOut | None = None
@@ -59,7 +59,9 @@ class ChatOut(BaseModel):
     unread_count: int = Field(ge=0, default=0)
     last_message_at: datetime | None = None
     muted: bool = False
+    muted_until: datetime | None = None
     pinned: bool = False
+    is_saved: bool = False
     my_role: str | None = None
     is_super: bool = False
     created_by: int | None = None
@@ -81,6 +83,12 @@ class ChatListOut(BaseModel):
 
 class ChatCreateIn(BaseModel):
     user_id: int
+
+
+class MuteChatIn(BaseModel):
+    """duration_seconds omit / null → forever; else timed mute."""
+
+    duration_seconds: int | None = Field(default=None, ge=60, le=31_536_000)
 
 
 class GroupCreateIn(BaseModel):
@@ -136,10 +144,42 @@ class InvitePreviewOut(BaseModel):
 
 class ChatSearchItemOut(BaseModel):
     id: int
-    type: Literal["direct", "group"] = "direct"
+    type: Literal["direct", "group", "saved"] = "direct"
     title: str | None = None
     interlocutor: InterlocutorOut | None = None
     last_message_at: datetime | None = None
+    is_saved: bool = False
+
+
+class SharedMediaCountsOut(BaseModel):
+    photos: int = 0
+    videos: int = 0
+    files: int = 0
+    audio: int = 0
+    links: int = 0
+    voice: int = 0
+    total_messages: int = 0
+
+
+class SharedMediaItemOut(BaseModel):
+    id: int
+    type: str
+    section: str
+    created_at: datetime
+    sender_id: int
+    sender_name: str | None = None
+    text: str | None = None
+    meta: dict[str, Any] | None = None
+    url: str | None = None
+    title: str | None = None
+    subtitle: str | None = None
+
+
+class SharedMediaOut(BaseModel):
+    counts: SharedMediaCountsOut
+    section: str
+    items: list[SharedMediaItemOut] = Field(default_factory=list)
+    has_more: bool = False
 
 
 class ChatSearchOut(BaseModel):
@@ -248,6 +288,10 @@ class ChatSummaryOut(BaseModel):
     bullets: list[str] = Field(default_factory=list)
     message_count: int = 0
     covered_count: int = 0
+    # Oxirgi 2 mavzu (oxirgi xabarlar asosida)
+    latest_topic: str | None = None
+    latest_topic_is_greeting_only: bool = False
+    previous_topic: str | None = None
 
 
 class MessageDeletedOut(BaseModel):

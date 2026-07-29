@@ -7,4 +7,7 @@ class LoginState extends GetxController {
   /// Xato / soft-rebuild da inputlar yo‘qolmasin.
   String email = '';
   String password = '';
+
+  /// Multi-account: qo‘shimcha hisob qo‘shish oqimi.
+  final RxBool isAddAccount = false.obs;
 }

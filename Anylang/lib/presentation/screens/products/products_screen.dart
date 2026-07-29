@@ -14,6 +14,8 @@ import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/ai_matching_bottom_sheet.dart';
 import '../../modal/country_picker_bottom_sheet.dart';
+import '../../modal/payment_confirm_bottom_sheet.dart';
+import '../../modal/products_filters_bottom_sheet.dart';
 import '../../ui/ai_matching.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
@@ -26,7 +28,6 @@ import '../add_product/add_product_screen.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
 import '../trade_assistant/trade_assistant_screen.dart';
-import '../business_feed/business_feed_screen.dart';
 import '../business_card_scan/business_card_scan_screen.dart';
 import '../marketplace_groups/marketplace_groups_screen.dart';
 import '../market_map/market_map_screen.dart';
@@ -186,6 +187,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
     state.newOnly.value = false;
     state.freeShippingOnly.value = false;
     state.premiumSellerOnly.value = false;
+    state.selectedPromoId.value = null;
   }
 
   Future<void> _load({bool keepQuery = false}) async {
@@ -416,6 +418,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
     state.smartSearchActive.value = false;
     state.smartInterpretation.value = null;
     state.smartSort.value = null;
+    state.selectedPromoId.value = id;
 
     switch (id) {
       case 'uz_export':
@@ -442,8 +445,86 @@ class ProductsScreen extends Screen<ProductsState, void> {
         state.searching.value = false;
         return;
       default:
+        state.selectedPromoId.value = null;
         return;
     }
+    await _reloadWithFilters();
+  }
+
+  /// Filter sheet «Saralash» — draft tanlovlarni bir martada qo‘llash.
+  Future<void> _applySheetFilters(ProductsApplySheetFilters a) async {
+    final promo = a.promoId?.trim();
+    final hasPromo = promo != null && promo.isNotEmpty;
+
+    if (hasPromo && promo == 'ai_recommended') {
+      await _applyBanner(promo);
+      return;
+    }
+
+    _clearQuickFilters();
+    state.smartSearchActive.value = false;
+    state.smartInterpretation.value = null;
+    state.smartSort.value = null;
+
+    if (hasPromo) {
+      state.selectedPromoId.value = promo;
+      switch (promo) {
+        case 'uz_export':
+          state.country.value = 'UZ';
+        case 'china_factory':
+          state.country.value = 'CN';
+          state.businessRole.value = 'manufacturer';
+        case 'deals':
+          state.trendOnly.value = true;
+      }
+    }
+
+    state.verifiedOnly.value = a.verifiedOnly;
+    state.readyStockOnly.value = a.readyStockOnly;
+    state.newOnly.value = a.newOnly;
+    state.freeShippingOnly.value = a.freeShippingOnly;
+    state.premiumSellerOnly.value = a.premiumSellerOnly;
+
+    if (a.factoryOnly || promo == 'china_factory') {
+      state.businessRole.value = 'manufacturer';
+    }
+
+    if (a.trendOnly || promo == 'deals') {
+      state.trendOnly.value = true;
+    } else {
+      state.trendOnly.value = false;
+    }
+
+    final nothingSelected = !hasPromo &&
+        !a.verifiedOnly &&
+        !a.factoryOnly &&
+        !a.trendOnly &&
+        !a.readyStockOnly &&
+        !a.newOnly &&
+        !a.freeShippingOnly &&
+        !a.premiumSellerOnly;
+
+    if (nothingSelected) {
+      state.searching.value = true;
+      final q = state.query.value.trim();
+      final result = await Get.find<ProductsRepository>().list(
+        q: q.isEmpty ? null : q,
+        limit: 40,
+      );
+      result.when(
+        success: (data) {
+          state.all.assignAll(_mapProducts(data));
+          if (q.isNotEmpty) {
+            state.newest.clear();
+            state.recommended.clear();
+          }
+        },
+        failure: showAppError,
+      );
+      state.searching.value = false;
+      return;
+    }
+
     await _reloadWithFilters();
   }
 
@@ -640,30 +721,34 @@ class ProductsScreen extends Screen<ProductsState, void> {
   }
 
   Future<void> _openAddProduct({int? editProductId}) async {
-    await _refreshBusinessFlag();
-    if (!state.isBusiness.value) {
-      final goPlans = await showBusinessPlanRequiredDialog();
-      if (!goPlans) return;
-      await navigate(SubscriptionScreen());
-      await _refreshBusinessFlag();
-      if (!state.isBusiness.value) return;
-    }
-    await navigate(
-      AddProductScreen(),
-      payload: editProductId != null && editProductId > 0
-          ? AddProductPayload(editProductId: editProductId)
-          : null,
-    );
-    if (state.showingMyProducts.value) {
-      await _loadMyProducts();
-    } else {
+    if (state.addProductBusy.value || isNavigating) return;
+    state.addProductBusy.value = true;
+    try {
+      // FAB faqat isBusiness bo‘lganda ko‘rinadi — tarmoq kutmasdan ochamiz.
+      if (!state.isBusiness.value) {
+        await _refreshBusinessFlag();
+        if (!state.isBusiness.value) {
+          final goPlans = await showBusinessPlanRequiredDialog();
+          if (!goPlans) return;
+          await navigate(SubscriptionScreen());
+          await _refreshBusinessFlag();
+          if (!state.isBusiness.value) return;
+        }
+      }
+      await navigate(
+        AddProductScreen(),
+        payload: editProductId != null && editProductId > 0
+            ? AddProductPayload(editProductId: editProductId)
+            : null,
+      );
       await _load(keepQuery: true);
+    } finally {
+      state.addProductBusy.value = false;
     }
   }
 
   Future<void> _loadMyProducts() async {
     state.loading.value = true;
-    state.showingMyProducts.value = true;
     state.showingFavorites.value = false;
     final mine = await Get.find<ProductsRepository>().listMine(limit: 50);
     var ok = false;
@@ -679,7 +764,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
       failure: showAppError,
     );
     if (!ok) {
-      state.showingMyProducts.value = false;
       state.all.clear();
     }
     state.loading.value = false;
@@ -748,25 +832,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
   }
 
   Future<void> _boostProductTop(Product product) async {
-    final confirm = await Get.dialog<bool>(
-          AlertDialog(
-            title: Text('my_products_boost_title'.tr),
-            content: Text('my_products_boost_body'.tr),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(result: false),
-                child: Text('cancel'.tr),
-              ),
-              TextButton(
-                onPressed: () => Get.back(result: true),
-                child: Text('my_products_boost_pay'.tr),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirm) return;
-
     final payments = Get.find<PaymentRepository>();
     final checkout =
         await payments.checkoutProductTop(productId: product.id);
@@ -776,6 +841,32 @@ class ProductsScreen extends Screen<ProductsState, void> {
         final id = data['id'];
         final checkoutUrl = data['checkout_url']?.toString();
         final mockConfirm = data['mock_confirm'] == true;
+        final currency =
+            (data['currency']?.toString() ?? 'UZS').toUpperCase();
+        final amount = data['amount']?.toString() ?? '';
+        final taxPctRaw = data['tax_percent'];
+        final taxPct = taxPctRaw is num
+            ? taxPctRaw.toInt()
+            : int.tryParse('$taxPctRaw') ?? 2;
+
+        final confirmed = await showPaymentConfirmBottomSheet(
+          context,
+          title: 'my_products_boost_title'.tr,
+          subtitle: 'payment_confirm_subtitle'.tr,
+          amount: amount,
+          currency: currency,
+          amountBeforeTax: data['amount_before_tax']?.toString(),
+          taxAmount: data['tax_amount']?.toString(),
+          taxPercent: taxPct,
+          planLabel: product.name,
+          periodLabel: 'my_products_boost_period'.tr,
+          ctaText: 'my_products_boost_pay'.tr,
+        );
+        if (confirmed != true) {
+          showAppMessage('payment_confirm_later_hint'.tr);
+          return;
+        }
+
         if (checkoutUrl != null &&
             checkoutUrl.isNotEmpty &&
             mockConfirm != true) {
@@ -822,13 +913,10 @@ class ProductsScreen extends Screen<ProductsState, void> {
           state.searching.value = false;
         });
       case RefreshProducts _:
-        if (state.showingMyProducts.value) {
-          await _loadMyProducts();
-        } else if (state.showingFavorites.value) {
+        if (state.showingFavorites.value) {
           await actionHandler(state, ShowFavorites());
         } else {
           state.showingFavorites.value = false;
-          state.showingMyProducts.value = false;
           await _load(keepQuery: true);
           await _refreshBusinessFlag();
         }
@@ -836,21 +924,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         await _refreshBusinessFlag();
       case OpenAddProduct _:
         await _openAddProduct();
-      case ShowMyProducts _:
-        if (state.showingMyProducts.value) {
-          state.showingMyProducts.value = false;
-          await _load();
-          return;
-        }
-        await _refreshBusinessFlag();
-        if (!state.isBusiness.value) {
-          final goPlans = await showBusinessPlanRequiredDialog();
-          if (!goPlans) return;
-          await navigate(SubscriptionScreen());
-          await _refreshBusinessFlag();
-          if (!state.isBusiness.value) return;
-        }
-        await _loadMyProducts();
       case ShowFavorites _:
         if (state.showingFavorites.value) {
           state.showingFavorites.value = false;
@@ -859,7 +932,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         }
         state.loading.value = true;
         state.showingFavorites.value = true;
-        state.showingMyProducts.value = false;
         final fav = await Get.find<ProductsRepository>().listFavorites();
         var ok = false;
         fav.when(
@@ -880,8 +952,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
         state.loading.value = false;
       case OpenTradeAssistant _:
         await navigate(TradeAssistantScreen());
-      case OpenBusinessFeed _:
-        await navigate(BusinessFeedScreen());
       case OpenMarketplaceGroups _:
         await navigate(MarketplaceGroupsScreen());
       case OpenMarketMap _:
@@ -897,6 +967,12 @@ class ProductsScreen extends Screen<ProductsState, void> {
             state.businessRole.value = 'manufacturer';
             await _reloadWithFilters();
           },
+        );
+      case OpenProductsFilters _:
+        await showProductsFiltersBottomSheet(
+          context,
+          state: state,
+          sendAction: (a) => actionHandler(state, a),
         );
       case OpenBusinessCardScan _:
         await navigate(BusinessCardScanScreen());
@@ -990,6 +1066,8 @@ class ProductsScreen extends Screen<ProductsState, void> {
           failure: showAppError,
         );
         state.searching.value = false;
+      case ProductsApplySheetFilters a:
+        await _applySheetFilters(a);
       case ProductsPickCountry _:
         await _pickCountry();
       case ProductsPickRole _:
@@ -999,10 +1077,6 @@ class ProductsScreen extends Screen<ProductsState, void> {
       case ProductsBannerTap a:
         await _applyBanner(a.id);
       case OpenProduct a:
-        if (state.showingMyProducts.value) {
-          await _handleOwnProduct(a.product);
-          return;
-        }
         showProductInfoBottomSheet(
           context,
           a.product,

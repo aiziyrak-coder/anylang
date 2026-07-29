@@ -1157,6 +1157,30 @@ main,
   font-size: 0.9rem;
 }
 
+.foot-legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.foot-legal a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.foot-legal a:hover {
+  color: var(--lime);
+}
+
+.foot-sep {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
 .foot-mail {
   font-size: 0.88rem;
   font-weight: 600;

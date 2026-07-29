@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from app.core.deps import DbSession
 from app.core.errors import AppError
 from app.payments import click as click_mod
+from app.payments import multicard as multicard_mod
 from app.payments import paddle as paddle_mod
 
 router = APIRouter()
@@ -131,3 +132,25 @@ async def paddle_webhook(request: Request, db: DbSession) -> dict[str, str]:
     )
     await db.commit()
     return result
+
+
+@router.post("/multicard/callback")
+async def multicard_callback(request: Request, db: DbSession) -> JSONResponse:
+    """Multicard / Rahmat invoice webhook (no JWT — sign or IP)."""
+    content_type = (request.headers.get("content-type") or "").lower()
+    payload: dict[str, Any] = {}
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+            payload = data if isinstance(data, dict) else {}
+        except Exception:
+            payload = {}
+    else:
+        form = await request.form()
+        payload = {k: form.get(k) for k in form.keys()}
+    # Nested payment object sometimes wraps fields.
+    if isinstance(payload.get("data"), dict) and "uuid" not in payload:
+        payload = {**payload, **payload["data"]}
+    result = await multicard_mod.handle_callback(db, payload)
+    await db.commit()
+    return JSONResponse(result)

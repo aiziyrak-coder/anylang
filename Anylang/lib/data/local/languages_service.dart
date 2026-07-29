@@ -96,7 +96,7 @@ class LanguagesService extends GetxService {
     final flagUrl = (m['flag_url'] as String?)?.trim();
     return LanguageOption(
       key: local?.key ?? 'lang_name_$code',
-      localeCode: local?.localeCode,
+      localeCode: local?.localeCode ?? uiLocaleCodeFor(code),
       langCode: code,
       nativeName:
           (m['native_name'] as String?)?.trim().isNotEmpty == true

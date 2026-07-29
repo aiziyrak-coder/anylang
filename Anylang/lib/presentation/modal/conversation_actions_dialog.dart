@@ -151,9 +151,7 @@ class _MenuCard extends StatelessWidget {
         children: [
           _row(
             context,
-            muted
-                ? Icons.notifications_active_outlined
-                : Icons.notifications_off_outlined,
+            Icons.notifications_off_outlined,
             muted ? 'chat_overflow_unmute'.tr : 'chat_overflow_mute'.tr,
             ChatOverflowAction.mute,
           ),

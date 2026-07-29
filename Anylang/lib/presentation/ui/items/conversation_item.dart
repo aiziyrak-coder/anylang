@@ -17,6 +17,7 @@ class ConversationItem extends StatelessWidget {
   final bool muted;
   final bool pinned;
   final bool isGroup;
+  final bool isSaved;
   final String? avatarUrl;
   final VoidCallback onTap;
   final ValueChanged<Rect>? onLongPress;
@@ -36,6 +37,7 @@ class ConversationItem extends StatelessWidget {
     this.muted = false,
     this.pinned = false,
     this.isGroup = false,
+    this.isSaved = false,
     this.avatarUrl,
     required this.onTap,
     this.onLongPress,
@@ -75,13 +77,29 @@ class ConversationItem extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 11.dp, vertical: 11.dp),
           child: Row(
             children: [
-              ProfileAvatar(
-                initial: initial,
-                gradient: avatarGradient,
-                imageUrl: avatarUrl,
-                size: 52,
-                online: online,
-              ),
+              if (isSaved)
+                Container(
+                  width: 52.dp,
+                  height: 52.dp,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: avatarGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.bookmark_rounded,
+                    color: Colors.white,
+                    size: 26.dp,
+                  ),
+                )
+              else
+                ProfileAvatar(
+                  initial: initial,
+                  gradient: avatarGradient,
+                  imageUrl: avatarUrl,
+                  size: 52,
+                  online: online,
+                ),
               SizedBox(width: 12.dp),
               Expanded(child: _content(c)),
               if (selected)

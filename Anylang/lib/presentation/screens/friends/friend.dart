@@ -107,7 +107,7 @@ class Friend {
       reviewsCount: (json['reviews_count'] as num?)?.toInt() ?? 0,
       trust: (json['trust'] as num?)?.toInt(),
       riskLevel: risk,
-      isScammer: json['is_scammer'] == true || risk == 'high',
+      isScammer: json['is_scammer'] == true,
       verified: verified,
       isBusiness: json['is_business'] == true,
       keywords: keywords,

@@ -13,12 +13,15 @@ class UserProfilePayload {
   final String initial;
   final LinearGradient avatarGradient;
   final bool verified;
+  final bool documentsVerified;
+  final String verificationStatus;
   final String flagAsset;
   final String country;
   final String role;
   final String phone;
   final String? experience;
   final String? website;
+  final String? bio;
   final String? description;
   final String? seoText;
   final List<String> keywords;
@@ -59,8 +62,11 @@ class UserProfilePayload {
     required this.phone,
     this.id = 0,
     this.verified = false,
+    this.documentsVerified = false,
+    this.verificationStatus = 'none',
     this.experience,
     this.website,
+    this.bio,
     this.description,
     this.seoText,
     this.keywords = const [],
@@ -96,20 +102,71 @@ class UserProfilePayload {
     LinearGradient? avatarGradient,
     String? avatarUrl,
     int? existingChatId,
+    bool isBusiness = false,
+    String? country,
+    String? role,
+    bool verified = false,
+    List<String> keywords = const [],
+    int listings = 0,
+    int networkingCountries = 0,
+    int? networkingTrust,
+    String friendshipStatus = 'none',
+    String riskLevel = 'none',
+    bool isScammer = false,
   }) {
     final trimmed = name.trim().isEmpty ? 'User' : name.trim();
+    final countryCode = (country ?? '').trim();
+    String roleKey = '';
+    final roleRaw = (role ?? '').trim();
+    if (roleRaw.isNotEmpty) {
+      final lower = roleRaw.toLowerCase();
+      if (lower.startsWith('business_role_')) {
+        roleKey = lower;
+      } else {
+        roleKey = 'business_role_$lower';
+      }
+    }
+    final level = isScammer
+        ? 'high'
+        : (riskLevel.trim().isEmpty ? 'none' : riskLevel.trim().toLowerCase());
+    final showRisk = isScammer || level == 'high' || level == 'medium';
+    final trust = networkingTrust;
     return UserProfilePayload(
       id: id,
-      business: false,
+      business: isBusiness,
       name: trimmed,
       initial: initial ?? initialsOf(trimmed),
       avatarGradient: avatarGradient ?? avatarGradientFor(id),
-      flagAsset: '',
-      country: '',
-      role: '',
+      flagAsset: countryCode.isEmpty ? '' : flagAssetForCountry(countryCode),
+      country: countryCode.isEmpty ? '' : formatCountryName(countryCode),
+      role: roleKey,
       phone: '',
       avatarUrl: avatarUrl,
       existingChatId: existingChatId,
+      verified: verified,
+      documentsVerified: verified,
+      verificationStatus: verified ? 'approved' : 'none',
+      keywords: keywords,
+      listings: listings,
+      networkingCountries: networkingCountries,
+      networkingTrust: trust,
+      friendshipStatus: friendshipStatus,
+      trustScore: trust == null
+          ? null
+          : TrustScore(
+              score: trust.clamp(0, 100),
+              level: trust >= 70
+                  ? 'high'
+                  : (trust >= 40 ? 'medium' : 'low'),
+            ),
+      scamRisk: showRisk
+          ? ScamRisk(
+              riskLevel: level,
+              riskScore: isScammer ? 85 : (level == 'high' ? 70 : 45),
+              showWarning: true,
+              message: isScammer ? 'scammer' : level,
+            )
+          : null,
       loadFull: true,
     );
   }
@@ -168,6 +225,7 @@ class UserProfilePayload {
           ? 'profile_founded_year'.trParams({'year': '$year'})
           : null,
       website: biz?['website'] as String?,
+      bio: (biz?['bio'] as String?)?.trim(),
       description: (biz?['description'] as String?)?.trim(),
       seoText: (biz?['seo_text'] as String?)?.trim(),
       keywords: (biz?['keywords'] is List)
@@ -206,6 +264,15 @@ class UserProfilePayload {
           : 0,
       flagAsset: flagAssetForCountry(country),
       verified: json['verified_badge'] == true,
+      documentsVerified: biz?['documents_verified'] == true ||
+          json['verified_badge'] == true,
+      verificationStatus: () {
+        if (biz?['documents_verified'] == true ||
+            json['verified_badge'] == true) {
+          return 'approved';
+        }
+        return (biz?['verification_status'] as String?) ?? 'none';
+      }(),
       avatarUrl: avatar,
       existingChatId: existingChatId,
       friendshipStatus: (json['friendship_status'] as String?) ?? 'none',

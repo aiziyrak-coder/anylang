@@ -330,6 +330,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
                           muted: conv.muted || SessionStore.isChatMuted(conv.id),
                           pinned: conv.pinned,
                           isGroup: conv.isGroup,
+                          isSaved: conv.isSaved,
                           avatarUrl: conv.avatarUrl,
                           selected: state.selecting.value &&
                               state.selectedIds.contains(conv.id),
@@ -438,6 +439,7 @@ class MessagesContent extends ScreenContent<MessagesState> {
                 muted: conv.muted || SessionStore.isChatMuted(conv.id),
                 pinned: conv.pinned,
                 isGroup: conv.isGroup,
+                isSaved: conv.isSaved,
                 avatarUrl: conv.avatarUrl,
                 onTap: () => sendAction(OpenConversation(conv)),
               ),

@@ -1,7 +1,7 @@
 name: anylang
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.67+68
+version: 1.0.73+74
 
 environment:
   sdk: ^3.12.2
@@ -47,6 +47,7 @@ dependencies:
   app_links: ^7.2.1
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.4.0
+  google_maps_flutter: ^2.18.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -61,3 +62,5 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
+    - assets/i18n/
+    - assets/sounds/

@@ -14,10 +14,11 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models.payment import Payment
 from app.models.user import User
-from app.payments.base import is_paid
+from app.payments.base import is_paid, amount_str
 from app.payments.click import ClickProvider
 from app.payments.fx import usd_to_uzs
 from app.payments.paddle import PaddleProvider
+from app.payments.tax import PAYMENT_TAX_PERCENT, apply_payment_tax, tax_meta
 from app.services.subscription import (
     activate_paid_subscription,
     billing_cycle_code,
@@ -25,7 +26,7 @@ from app.services.subscription import (
     normalize_billing_months,
 )
 
-ProviderName = Literal["click", "paddle"]
+ProviderName = Literal["click", "paddle", "multicard"]
 
 
 async def activate_subscription(
@@ -139,6 +140,10 @@ def _provider_instance(name: ProviderName):
         return ClickProvider()
     if name == "paddle":
         return PaddleProvider()
+    if name == "multicard":
+        from app.payments.multicard import MulticardProvider
+
+        return MulticardProvider()
     raise AppError(
         message="Noto'g'ri to'lov provayderi",
         error_code="INVALID_PROVIDER",
@@ -155,9 +160,9 @@ async def create_subscription_checkout(
     provider: str,
 ) -> dict[str, Any]:
     provider_name = (provider or "").strip().lower()
-    if provider_name not in {"click", "paddle"}:
+    if provider_name not in {"click", "paddle", "multicard"}:
         raise AppError(
-            message="provider click yoki paddle bo'lishi kerak",
+            message="provider click, paddle yoki multicard bo'lishi kerak",
             error_code="INVALID_PROVIDER",
             status_code=400,
         )
@@ -196,11 +201,14 @@ async def create_subscription_checkout(
         # Default (ideal): cancel_and_recreate — yangi checkout eski pendingni yopadi.
         await _cancel_pending_for_user(db, user.id, provider=provider_name)
 
-    if provider_name == "click":
-        amount = usd_to_uzs(amount_usd)
+    from app.payments.tax import apply_payment_tax, tax_meta
+
+    if provider_name in {"click", "multicard"}:
+        base_amount = usd_to_uzs(amount_usd)
         currency = "UZS"
+        base_amount, tax_amount, amount = apply_payment_tax(base_amount, whole=True)
     else:
-        amount = amount_usd
+        base_amount, tax_amount, amount = apply_payment_tax(amount_usd)
         currency = "USD"
 
     if amount <= 0:
@@ -219,7 +227,10 @@ async def create_subscription_checkout(
         currency=currency,
         plan=plan,
         billing_cycle=cycle,
-        meta={"amount_usd": f"{amount_usd:.2f}"},
+        meta={
+            "amount_usd": f"{amount_usd:.2f}",
+            **tax_meta(base_amount, tax_amount, amount),
+        },
         raw_payload={},
     )
     db.add(payment)
@@ -228,4 +239,11 @@ async def create_subscription_checkout(
     impl = _provider_instance(provider_name)  # type: ignore[arg-type]
     checkout = await impl.create_checkout(payment)
     await db.flush()
+    checkout = {
+        **checkout,
+        "amount_before_tax": f"{base_amount}",
+        "tax_amount": f"{tax_amount}",
+        "tax_percent": PAYMENT_TAX_PERCENT,
+        "amount": checkout.get("amount") or amount_str(payment.amount),
+    }
     return checkout

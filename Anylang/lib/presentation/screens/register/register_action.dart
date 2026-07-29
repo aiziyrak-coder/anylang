@@ -24,6 +24,10 @@ class ToggleTerms extends RegisterAction {
   ToggleTerms(this.value);
 }
 
+class OpenPrivacyPolicy extends RegisterAction {}
+
+class OpenPublicOffer extends RegisterAction {}
+
 class RegisterSubmit extends RegisterAction {
   final String fullName;
   final String email;

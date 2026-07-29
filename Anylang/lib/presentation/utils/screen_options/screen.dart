@@ -12,12 +12,20 @@ abstract class Screen<S extends GetxController, Payload> {
   late BuildContext context;
   Payload? payload;
 
+  /// Bir screen'dan bir vaqtda bitta push — ikki marta bosish stack'ni
+  /// ikki marta ochib yubormasin.
+  bool _navigationInFlight = false;
+
+  /// Boshqa joyda ham (FAB) ikki marta bosishni oldini olish uchun.
+  bool get isNavigating => _navigationInFlight;
+
   Screen({
     required this.mobileContent,
     this.tabletContent,
-    this.payload
+    this.payload,
+    S Function()? createState,
   }) {
-    state = Get.find<S>();
+    state = createState != null ? createState() : Get.find<S>();
   }
 
   void initState(Payload? payload) {}
@@ -56,25 +64,39 @@ abstract class Screen<S extends GetxController, Payload> {
         Object? payload,
         void Function(R? result)? onBackResult,
       }) async {
-    screen.payload = payload;
+    // Sync guard — await dan oldin, parallel tap stack'ni ko'paytirmasin.
+    if (_navigationInFlight) return;
+    _navigationInFlight = true;
+    try {
+      screen.payload = payload;
 
-    final result = await Navigator.push<R>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => screen.build(),
-      ),
-    );
+      final result = await Navigator.push<R>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => screen.build(),
+        ),
+      );
 
-    onBackResult?.call(result);
+      onBackResult?.call(result);
+    } finally {
+      _navigationInFlight = false;
+    }
   }
 
   void navigateAndRemoveUntil(Screen screen, {Object? payload}) {
-    screen.payload = payload;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => screen.build()),
-          (route) => false,
-    );
+    if (_navigationInFlight) return;
+    _navigationInFlight = true;
+    try {
+      screen.payload = payload;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => screen.build()),
+            (route) => false,
+      );
+    } finally {
+      // pushAndRemoveUntil darhol tugaydi (await yo‘q) — lockni ochamiz.
+      _navigationInFlight = false;
+    }
   }
 
   void popBackNavigate() {

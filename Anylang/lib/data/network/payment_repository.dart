@@ -17,7 +17,7 @@ class PaymentRepository {
       data: {
         'plan': plan,
         'billing_cycle': billingCycle,
-        'provider': provider ?? 'paddle',
+        'provider': provider ?? 'multicard',
         if (promoCode != null && promoCode.trim().isNotEmpty)
           'promo_code': promoCode.trim(),
       },
@@ -56,6 +56,14 @@ class PaymentRepository {
         'kind': 'super_group',
         'chat_id': chatId,
       },
+    );
+  }
+
+  /// Qo‘shimcha hisob sloti — \$10 (faqat biznes, max 10).
+  Future<BaseResult> checkoutAccountSlot() {
+    return _client.post(
+      api: 'api/v1/payments/checkout',
+      data: {'kind': 'account_slot'},
     );
   }
 

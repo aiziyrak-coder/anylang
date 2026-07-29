@@ -190,6 +190,8 @@ def main() -> int:
             "build",
             "apk",
             "--release",
+            "--obfuscate",
+            f"--split-debug-info={app / 'build' / 'debug-info'}",
             "--dart-define=API_BASE_URL=https://anylang.uz/",
         ],
         cwd=str(app),

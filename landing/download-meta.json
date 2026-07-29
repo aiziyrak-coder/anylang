@@ -1,13 +1,13 @@
 {
-  "version": "1.0.67",
-  "build": 68,
-  "version_full": "1.0.67+68",
+  "version": "1.0.73",
+  "build": 74,
+  "version_full": "1.0.73+74",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.67+68.apk",
-  "size_bytes": 91562573,
-  "size_mb": 87.32,
-  "updated_at": "2026-07-27T08:23:45.292228+00:00",
+  "versioned_filename": "anylang-1.0.73+74.apk",
+  "size_bytes": 0,
+  "size_mb": 0,
+  "updated_at": "2026-07-29T11:12:00+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.67+68 — chat UX, support sessions, profile cache"
+  "notes": "Release 1.0.73+74 — mute timed, verified group info, filters, multi-account, no Business Feed"
 }

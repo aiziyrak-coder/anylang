@@ -37,20 +37,6 @@ class GroupStatsContent extends ScreenContent<GroupStatsState> {
                 onBack: () => sendAction(Back()),
               ),
             ),
-            Obx(() {
-              final subtitle = state.title.value.trim();
-              if (subtitle.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: EdgeInsets.fromLTRB(20.dp, 4.dp, 20.dp, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    subtitle,
-                    style: TextStyle(color: c.textSecondary, fontSize: 13.sp),
-                  ),
-                ),
-              );
-            }),
             Expanded(
               child: Obx(() {
                 if (state.loading.value) {
@@ -70,16 +56,6 @@ class GroupStatsContent extends ScreenContent<GroupStatsState> {
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(16.dp, 8.dp, 16.dp, 24.dp),
                     children: [
-                      if (state.title.value.trim().isNotEmpty) ...[
-                        Text(
-                          state.title.value,
-                          style: TextStyle(
-                            color: c.textSecondary,
-                            fontSize: 13.sp,
-                          ),
-                        ),
-                        SizedBox(height: 8.dp),
-                      ],
                       Text(
                         'group_stats_meta'.trParams({
                           'members': '${data.memberCount}',
@@ -252,7 +228,7 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final child = Ink(
+    final card = Container(
       padding: EdgeInsets.all(14.dp),
       decoration: BoxDecoration(
         color: c.surface,
@@ -328,13 +304,13 @@ class _HeroCard extends StatelessWidget {
       ),
     );
 
-    if (onTap == null) return child;
+    if (onTap == null) return card;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16.dp),
-        child: child,
+        child: card,
       ),
     );
   }
@@ -360,7 +336,7 @@ class _LeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final row = Ink(
+    final row = Container(
       padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
       decoration: BoxDecoration(
         color: c.surface,

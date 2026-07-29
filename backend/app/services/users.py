@@ -14,6 +14,7 @@ from app.models.product import Product, ProductFavorite, ProductView
 from app.models.user import BusinessProfile, ProfileView, Subscription, User
 from app.services import trust_score as trust_score_service
 from app.services import scam_detection as scam_detection_service
+from app.services import verification as verification_service
 from app.services.business_card import business_card_url
 from app.services.factory_verification import build_factory_verification
 
@@ -123,6 +124,22 @@ def _serialize_subscription(subscription: Subscription) -> dict:
     }
 
 
+def max_local_accounts_for(*, is_business: bool, extra_account_slots: int) -> int:
+    """Free=3; business=5 + purchased extras (hard cap 10)."""
+    if not is_business:
+        return 3
+    extras = max(0, int(extra_account_slots or 0))
+    return min(10, 5 + extras)
+
+
+def max_purchasable_account_slots(*, is_business: bool, extra_account_slots: int) -> int:
+    """Faqat biznes: 5 dan 10 gacha — qolgan slotlar."""
+    if not is_business:
+        return 0
+    extras = max(0, int(extra_account_slots or 0))
+    return max(0, 10 - (5 + extras))
+
+
 async def serialize_user(
     user: User,
     db: AsyncSession,
@@ -162,6 +179,7 @@ async def serialize_user(
             "country": user.business.country,
             "business_role": user.business.business_role,
             "website": user.business.website,
+            "bio": (user.business.bio or "").strip() or None,
             "description": user.business.description,
             "seo_text": user.business.seo_text,
             "keywords": list(user.business.keywords or []),
@@ -178,6 +196,9 @@ async def serialize_user(
             "complaints_count": int(user.business.complaints_count or 0),
             "documents_verified": bool(
                 user.business.documents_verified or user.verified_badge
+            ),
+            "verification_status": await verification_service.verification_status_summary(
+                db, user, user.business
             ),
             "factory_verified": bool(
                 build_factory_verification(user.business, user=user)["factory_verified"]
@@ -218,6 +239,11 @@ async def serialize_user(
         "business": business_payload,
         "networking": (networking := await _networking_for(db, user)),
         "profile_insights": await _profile_insights(db, user, networking=networking),
+        "extra_account_slots": int(getattr(user, "extra_account_slots", 0) or 0),
+        "max_local_accounts": max_local_accounts_for(
+            is_business=is_business,
+            extra_account_slots=int(getattr(user, "extra_account_slots", 0) or 0),
+        ),
     }
 
 
@@ -388,13 +414,6 @@ async def _profile_insights(
         if isinstance(trust, dict) and trust.get("score") is not None:
             trust_pct = int(trust["score"])
 
-    achievements = {
-        "translations_100": translations_count >= 100,
-        "languages_10": len(languages_used) >= 10,
-        "first_listing": listings_count >= 1,
-        "rating_5": rating is not None and rating >= 4.95,
-    }
-
     return {
         "followers": followers,
         "likes": likes,
@@ -411,7 +430,6 @@ async def _profile_insights(
             "listing_clicks": listing_clicks_7d,
             "views_series": views_series,
         },
-        "achievements": achievements,
     }
 
 
@@ -508,6 +526,7 @@ async def get_public_profile(
             "business_role": business.business_role,
             "founded_year": business.founded_year,
             "website": business.website,
+            "bio": (business.bio or "").strip() or None,
             "description": business.description,
             "seo_text": business.seo_text,
             "keywords": list(business.keywords or []),
@@ -524,6 +543,9 @@ async def get_public_profile(
             "complaints_count": int(business.complaints_count or 0),
             "documents_verified": bool(
                 business.documents_verified or user.verified_badge
+            ),
+            "verification_status": await verification_service.verification_status_summary(
+                db, user, business
             ),
             "factory_verified": bool(
                 build_factory_verification(business, user=user)["factory_verified"]

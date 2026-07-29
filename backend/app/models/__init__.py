@@ -3,7 +3,6 @@
 from app.models.base import TimestampMixin
 from app.models.chat import (
     Chat,
-    ChatDeal,
     ChatFaq,
     ChatMedia,
     ChatParticipant,
@@ -29,6 +28,10 @@ from app.models.product import (
     ProductView,
 )
 from app.models.support import SupportMessage, SupportSession
+from app.models.verification import (
+    BusinessVerificationDocument,
+    BusinessVerificationRequest,
+)
 from app.models.user import (
     AccountRestoreRequest,
     AdminAuditLog,
@@ -69,7 +72,6 @@ __all__ = [
     "ProductTopRequest",
     "BusinessFeedPost",
     "Chat",
-    "ChatDeal",
     "ChatFaq",
     "ChatParticipant",
     "Message",
@@ -84,4 +86,6 @@ __all__ = [
     "LiveTurn",
     "SupportSession",
     "SupportMessage",
+    "BusinessVerificationRequest",
+    "BusinessVerificationDocument",
 ]

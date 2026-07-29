@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.user import BillingCycle, SubscriptionPlan, UserOut
 
-PaymentKind = Literal["subscription", "number", "super_group", "product_top"]
+PaymentKind = Literal["subscription", "number", "super_group", "product_top", "account_slot"]
 PaymentStatus = Literal[
     "pending",
     "paid",
@@ -14,7 +14,7 @@ PaymentStatus = Literal[
     "cancelled",
     "refunded",
 ]
-PaymentProvider = Literal["mock", "stripe", "click", "paddle"]
+PaymentProvider = Literal["mock", "stripe", "click", "paddle", "multicard"]
 
 
 class CheckoutIn(BaseModel):
@@ -26,8 +26,8 @@ class CheckoutIn(BaseModel):
     chat_id: int | None = None
     # Paid product TOP boost ($5 / 30 days).
     product_id: int | None = Field(default=None, ge=1)
-    # Optional: when set, subscription checkout uses Click/Paddle module.
-    provider: Literal["click", "paddle"] | None = None
+    # Optional: when set, subscription checkout uses Click/Paddle/Multicard module.
+    provider: Literal["click", "paddle", "multicard"] | None = None
 
 
 class CheckoutOut(BaseModel):

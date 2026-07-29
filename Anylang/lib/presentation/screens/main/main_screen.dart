@@ -8,6 +8,7 @@ import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/permissions/app_permissions.dart';
+import '../../modal/account_switcher_bottom_sheet.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -81,6 +82,9 @@ class MainScreen extends Screen<MainState, void> {
         if (a.index == 4) await _softRefreshProfile();
       case HandleSystemBack _:
         await _onSystemBack(state);
+      case ProfileTabLongPressed _:
+        if (!context.mounted) return;
+        await showAccountSwitcherBottomSheet(context);
     }
   }
 

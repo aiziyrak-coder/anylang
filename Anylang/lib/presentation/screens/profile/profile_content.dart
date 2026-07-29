@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../modal/business_benefits_bottom_sheet.dart';
-import '../../modal/trust_score_bottom_sheet.dart';
 import '../../modal/scam_risk_bottom_sheet.dart';
 import '../../ui/ai_matching_card.dart';
 import '../../ui/market_analytics_card.dart';
@@ -20,12 +20,12 @@ import '../../ui/networking_score_bar.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
+import '../../ui/verification_cta_button.dart';
 import '../../utils/formatters/time_formatter.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
 import 'profile_account.dart';
-import 'profile_achievements_section.dart';
 import 'profile_action.dart';
 import 'profile_analytics_section.dart';
 import 'profile_anylang_id_card.dart';
@@ -82,16 +82,24 @@ class ProfileContent extends ScreenContent<ProfileState> {
             onRefresh: () async { await sendAction(RefreshProfile()); },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 24.dp),
+              padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 36.dp),
               child: Column(
                 children: [
+                  _topOverflowBar(c, d, sendAction),
+                  SizedBox(height: 4.dp),
                   _avatarHeader(c, d, sendAction),
                   SizedBox(height: 14.dp),
-                  _nameRow(c, d),
+                  _nameRow(context, c, d, sendAction),
+                  if (d.isBusiness) ...[
+                    SizedBox(height: 10.dp),
+                    _verificationCta(d, sendAction),
+                  ],
                   SizedBox(height: 8.dp),
                   _idHandleRow(c, d, sendAction),
                   SizedBox(height: 6.dp),
                   _subtitleRow(c, d),
+                  SizedBox(height: 12.dp),
+                  _bioSection(context, c, d, sendAction),
                   if (d.networkingConnections > 0 ||
                       d.networkingCountries > 0 ||
                       d.networkingTrust != null) ...[
@@ -103,49 +111,28 @@ class ProfileContent extends ScreenContent<ProfileState> {
                     ),
                   ],
                   if (d.isBusiness) ...[
-                    SizedBox(height: 12.dp),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 8.dp,
-                      runSpacing: 8.dp,
-                      children: [
-                        ProfilePressable(
-                          borderRadius: BorderRadius.circular(999.dp),
-                          onTap: () => showBusinessBenefitsBottomSheet(
-                            context,
-                            sendAction: sendAction,
-                          ),
-                          child: PillBadge(
-                            label: 'profile_business'.tr,
-                            background: c.accentSoft,
-                            foreground: c.accentText,
-                            borderColor: c.accent,
-                            fontSize: 12,
-                          ),
-                        ),
-                        if (!d.factoryVerification.factoryVerified && d.verified)
-                          PillBadge(
-                            label: 'profile_verified'.tr,
-                            icon: Icons.verified_rounded,
-                            background: c.accent,
-                            foreground: c.onAccent,
-                            fontSize: 12,
-                          ),
-                        if (d.trustScore != null)
-                          TrustScoreBadge(
-                            trust: d.trustScore!,
-                            onTap: () => showTrustScoreBottomSheet(
-                              context,
-                              trust: d.trustScore!,
-                            ),
-                          ),
-                      ],
-                    ),
+                    if (d.documentsVerified || d.verified) ...[
+                      SizedBox(height: 12.dp),
+                      const TrustVerifiedMark(),
+                    ],
+                    if (!d.factoryVerification.factoryVerified &&
+                        d.verified &&
+                        !d.documentsVerified) ...[
+                      SizedBox(height: 12.dp),
+                      PillBadge(
+                        label: 'profile_verified'.tr,
+                        icon: Icons.verified_rounded,
+                        background: c.accent,
+                        foreground: c.onAccent,
+                        fontSize: 12,
+                      ),
+                    ],
                     if (d.factoryVerification.hasAny) ...[
                       SizedBox(height: 10.dp),
                       FactoryVerificationBadges(data: d.factoryVerification),
                     ],
-                    if (d.scamRisk?.hasWarning == true) ...[
+                    if (d.scamRisk?.hasWarning == true &&
+                        !d.documentsVerified) ...[
                       SizedBox(height: 12.dp),
                       ScamRiskBanner(
                         risk: d.scamRisk!,
@@ -206,21 +193,116 @@ class ProfileContent extends ScreenContent<ProfileState> {
                     SizedBox(height: 18.dp),
                     _infoCard(c, d),
                   ],
-                  SizedBox(height: 18.dp),
-                  _settingsHub(c, sendAction),
-                  SizedBox(height: 18.dp),
-                  ProfileAchievementsSection(
-                    achievements: d.insights.achievements,
-                  ),
                   if (d.isBusiness) ...[
                     SizedBox(height: 22.dp),
                     _listingsSection(c, d, sendAction),
                   ],
+                  SizedBox(height: 28.dp),
+                  _devicesEntry(c, sendAction),
+                  SizedBox(height: 10.dp),
+                  _accountsEntry(c, sendAction),
+                  SizedBox(height: 12.dp),
+                  _supportLegalFooter(c, sendAction),
                 ],
               ),
             ),
           );
         }),
+      ),
+    );
+  }
+
+  Widget _topOverflowBar(
+    AppColors c,
+    ProfileAccount d,
+    void Function(MyAction) sendAction,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'profile_title'.tr,
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        PopupMenuButton<_ProfileOverflowAction>(
+          tooltip: 'profile_more_menu'.tr,
+          icon: Icon(Icons.more_vert_rounded, color: c.accentText, size: 24.dp),
+          position: PopupMenuPosition.under,
+          color: c.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14.dp),
+            side: BorderSide(color: c.surfaceBorder, width: 0.7),
+          ),
+          onSelected: (action) {
+            HapticFeedback.selectionClick();
+            switch (action) {
+              case _ProfileOverflowAction.edit:
+                sendAction(
+                  d.isBusiness ? EditBusinessInfo() : EditPersonalProfile(),
+                );
+              case _ProfileOverflowAction.settings:
+                sendAction(OpenSettings());
+              case _ProfileOverflowAction.logout:
+                sendAction(ProfileLogoutRequested());
+            }
+          },
+          itemBuilder: (ctx) => [
+            _overflowItem(
+              c,
+              value: _ProfileOverflowAction.edit,
+              icon: Icons.edit_outlined,
+              label: 'profile_edit'.tr,
+            ),
+            _overflowItem(
+              c,
+              value: _ProfileOverflowAction.settings,
+              icon: Icons.settings_outlined,
+              label: 'profile_settings'.tr,
+            ),
+            _overflowItem(
+              c,
+              value: _ProfileOverflowAction.logout,
+              icon: Icons.logout_rounded,
+              label: 'settings_logout'.tr,
+              danger: true,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  PopupMenuItem<_ProfileOverflowAction> _overflowItem(
+    AppColors c, {
+    required _ProfileOverflowAction value,
+    required IconData icon,
+    required String label,
+    bool danger = false,
+  }) {
+    final color = danger ? c.danger : c.textPrimary;
+    final iconColor = danger ? c.danger : c.accentText;
+    return PopupMenuItem<_ProfileOverflowAction>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 20.dp),
+          SizedBox(width: 12.dp),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -279,10 +361,32 @@ class ProfileContent extends ScreenContent<ProfileState> {
     );
   }
 
-  Widget _nameRow(AppColors c, ProfileAccount d) {
+  Widget _nameRow(
+    BuildContext context,
+    AppColors c,
+    ProfileAccount d,
+    void Function(MyAction) sendAction,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        if (d.isBusiness) ...[
+          ProfilePressable(
+            borderRadius: BorderRadius.circular(999.dp),
+            onTap: () => showBusinessBenefitsBottomSheet(
+              context,
+              sendAction: sendAction,
+            ),
+            child: PillBadge(
+              label: 'profile_business'.tr,
+              background: c.accentSoft,
+              foreground: c.accentText,
+              borderColor: c.accent,
+              fontSize: 12,
+            ),
+          ),
+          SizedBox(width: 8.dp),
+        ],
         Flexible(
           child: Text(
             d.name,
@@ -318,6 +422,25 @@ class ProfileContent extends ScreenContent<ProfileState> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _verificationCta(
+    ProfileAccount d,
+    void Function(MyAction) sendAction,
+  ) {
+    final approved = d.documentsVerified || d.verificationStatus == 'approved';
+    final pending = d.verificationStatus == 'pending';
+    final label = approved
+        ? 'verification_cta_approved'.tr
+        : pending
+            ? 'verification_cta_pending'.tr
+            : 'verification_cta'.tr;
+    return VerificationCtaButton(
+      label: label,
+      verified: approved,
+      pending: pending,
+      onTap: () => sendAction(OpenBusinessVerification()),
     );
   }
 
@@ -386,6 +509,74 @@ class ProfileContent extends ScreenContent<ProfileState> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _bioSection(
+    BuildContext context,
+    AppColors c,
+    ProfileAccount d,
+    void Function(MyAction) sendAction,
+  ) {
+    final bio = (d.bio ?? '').trim();
+    final empty = bio.isEmpty;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => sendAction(EditProfileBio()),
+        borderRadius: BorderRadius.circular(16.dp),
+        child: Ink(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 14.dp, vertical: 12.dp),
+          decoration: BoxDecoration(
+            color: c.isDark ? const Color(0x66152A42) : const Color(0x66FFFFFF),
+            borderRadius: BorderRadius.circular(16.dp),
+            border: Border.all(color: c.surfaceBorder, width: 0.7),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.notes_rounded,
+                size: 20.dp,
+                color: empty ? c.textFaint : c.accentText,
+              ),
+              SizedBox(width: 10.dp),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'profile_bio'.tr,
+                      style: TextStyle(
+                        color: c.textSecondary,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 4.dp),
+                    Text(
+                      empty ? 'profile_bio_add'.tr : bio,
+                      style: TextStyle(
+                        color: empty ? c.textFaint : c.textPrimary,
+                        fontSize: 14.sp,
+                        height: 1.35,
+                        fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8.dp),
+              Icon(
+                Icons.edit_outlined,
+                size: 18.dp,
+                color: c.textFaint,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -580,13 +771,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
     void Function(MyAction) sendAction,
   ) {
     final actions = <(IconData, String, VoidCallback)>[
-      (
-        Icons.edit_outlined,
-        'profile_edit'.tr,
-        () => sendAction(
-          d.isBusiness ? EditBusinessInfo() : EditPersonalProfile(),
-        ),
-      ),
       (
         Icons.workspace_premium_rounded,
         'profile_plans'.tr,
@@ -902,115 +1086,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
     );
   }
 
-  Widget _settingsHub(AppColors c, void Function(MyAction) sendAction) {
-    final subtitle = [
-      'profile_settings_language'.tr,
-      'profile_settings_theme'.tr,
-      'profile_settings_notifications'.tr,
-      'profile_settings_privacy'.tr,
-      'profile_settings_security'.tr,
-      'profile_settings_translation'.tr,
-      'profile_settings_ai'.tr,
-    ].join(', ');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'profile_settings_hub'.tr.toUpperCase(),
-          style: TextStyle(
-            color: c.textSecondary,
-            fontSize: 12.sp,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.6,
-          ),
-        ),
-        SizedBox(height: 10.dp),
-        _settingsTile(
-          c,
-          icon: Icons.settings_outlined,
-          title: 'profile_settings_hub'.tr,
-          subtitle: subtitle,
-          onTap: () => sendAction(OpenSettings()),
-        ),
-      ],
-    );
-  }
-
-  Widget _settingsTile(
-    AppColors c, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18.dp),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18.dp),
-        child: Ink(
-          padding: EdgeInsets.all(14.dp),
-          decoration: BoxDecoration(
-            color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
-            borderRadius: BorderRadius.circular(18.dp),
-            border: Border.all(color: c.surfaceBorder, width: 0.7),
-            boxShadow: c.glassShadow,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42.dp,
-                height: 42.dp,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: c.accentSoft,
-                  borderRadius: BorderRadius.circular(14.dp),
-                ),
-                child: Icon(icon, color: c.accentText, size: 22.dp),
-              ),
-              SizedBox(width: 12.dp),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 2.dp),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: c.textSecondary,
-                        fontSize: 12.sp,
-                        height: 1.3,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: c.textFaint,
-                size: 22.dp,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _listingsSection(
     AppColors c,
     ProfileAccount d,
@@ -1159,4 +1234,119 @@ class ProfileContent extends ScreenContent<ProfileState> {
       ),
     );
   }
+
+  /// Eng pastda: qo‘llab-quvvatlash, Privacy Policy, Public Offer — alohida kartalar.
+  Widget _devicesEntry(
+    AppColors c,
+    void Function(MyAction) sendAction,
+  ) {
+    return _supportLegalTile(
+      c,
+      icon: Icons.devices_rounded,
+      label: 'devices_title'.tr,
+      trailing: Icons.chevron_right_rounded,
+      onTap: () => sendAction(OpenDevicesFromProfile()),
+    );
+  }
+
+  Widget _accountsEntry(
+    AppColors c,
+    void Function(MyAction) sendAction,
+  ) {
+    return _supportLegalTile(
+      c,
+      icon: Icons.switch_account_rounded,
+      label: 'accounts_switch_title'.tr,
+      trailing: Icons.chevron_right_rounded,
+      onTap: () => sendAction(OpenAccountSwitcher()),
+    );
+  }
+
+  Widget _supportLegalFooter(
+    AppColors c,
+    void Function(MyAction) sendAction,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _supportLegalTile(
+          c,
+          icon: Icons.support_agent_rounded,
+          label: 'support_faq'.tr,
+          trailing: Icons.chevron_right_rounded,
+          onTap: () => sendAction(OpenSupportFromProfile()),
+        ),
+        SizedBox(height: 10.dp),
+        _supportLegalTile(
+          c,
+          icon: Icons.privacy_tip_outlined,
+          label: 'legal_privacy_policy'.tr,
+          trailing: Icons.open_in_new_rounded,
+          onTap: () => sendAction(OpenPrivacyPolicyFromProfile()),
+        ),
+        SizedBox(height: 10.dp),
+        _supportLegalTile(
+          c,
+          icon: Icons.description_outlined,
+          label: 'legal_public_offer'.tr,
+          trailing: Icons.open_in_new_rounded,
+          onTap: () => sendAction(OpenPublicOfferFromProfile()),
+        ),
+      ],
+    );
+  }
+
+  Widget _supportLegalTile(
+    AppColors c, {
+    required IconData icon,
+    required String label,
+    required IconData trailing,
+    required VoidCallback onTap,
+  }) {
+    final radius = BorderRadius.circular(16.dp);
+    return ProfilePressable(
+      borderRadius: radius,
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.dp, vertical: 12.dp),
+        decoration: BoxDecoration(
+          color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
+          borderRadius: radius,
+          border: Border.all(color: c.surfaceBorder, width: 0.7),
+          boxShadow: c.glassShadow,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42.dp,
+              height: 42.dp,
+              decoration: BoxDecoration(
+                color: c.accentSoft,
+                borderRadius: BorderRadius.circular(12.dp),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 22.dp, color: c.accentText),
+            ),
+            SizedBox(width: 12.dp),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            SizedBox(width: 8.dp),
+            Icon(trailing, size: 18.dp, color: c.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+enum _ProfileOverflowAction { edit, settings, logout }

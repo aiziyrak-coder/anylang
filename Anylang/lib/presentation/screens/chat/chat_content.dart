@@ -33,7 +33,10 @@ class ChatContent extends ScreenContent<ChatState> {
   Worker? _messagesWorker;
   Worker? _inputWorker;
   Worker? _searchWorker;
+  Worker? _searchMatchWorker;
+  Worker? _searchMatchIdsWorker;
   Worker? _loadingWorker;
+  ChatState? _boundState;
   int _lastMessageCount = 0;
   /// Telegram: pastda bo'lsa yangi xabar / keyboard bilan pastga yopishadi.
   bool _pinnedToBottom = true;
@@ -49,16 +52,18 @@ class ChatContent extends ScreenContent<ChatState> {
   void onClose() {
     _scroll.removeListener(_onScroll);
     // Keyingi ochilishda (shu chat) scroll holatini tiklash.
-    if (_scroll.hasClients && Get.isRegistered<ChatState>()) {
-      final s = Get.find<ChatState>();
-      s.rememberScroll(
+    if (_scroll.hasClients && _boundState != null) {
+      _boundState!.rememberScroll(
         pinnedToBottom: _isNearBottom(),
         offset: _scroll.offset,
       );
     }
+    _boundState = null;
     _messagesWorker?.dispose();
     _inputWorker?.dispose();
     _searchWorker?.dispose();
+    _searchMatchWorker?.dispose();
+    _searchMatchIdsWorker?.dispose();
     _loadingWorker?.dispose();
     _input.dispose();
     _search.dispose();
@@ -111,6 +116,7 @@ class ChatContent extends ScreenContent<ChatState> {
 
   @override
   void uiBuildFinished(ChatState state) {
+    _boundState = state;
     _lastMessageCount = state.messages.length;
     _lastKeyboardInset = 0;
     // Faqat yangi xabar qo'shilganda pastga — status yangilanishida sakramasin.
@@ -157,9 +163,25 @@ class ChatContent extends ScreenContent<ChatState> {
         );
       }
     });
+    _searchMatchWorker = ever(state.searchMatchIndex, (_) {
+      _scrollToCurrentSearchMatch(state);
+    });
+    _searchMatchIdsWorker = ever(state.searchMatchIds, (_) {
+      _scrollToCurrentSearchMatch(state);
+    });
     if (!state.loading.value && state.messages.isNotEmpty) {
       _restoreOrJumpBottom(state);
     }
+  }
+
+  void _scrollToCurrentSearchMatch(ChatState state) {
+    final ids = state.searchMatchIds;
+    if (ids.isEmpty) return;
+    final i = state.searchMatchIndex.value.clamp(0, ids.length - 1);
+    final id = ids[i];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToMessage(id);
+    });
   }
 
   void _restoreOrJumpBottom(ChatState state) {
@@ -355,14 +377,19 @@ class ChatContent extends ScreenContent<ChatState> {
                   statusText: _peerStatusText(state),
                   searching: state.searching.value,
                   hasSearchQuery: state.searchQuery.value.trim().isNotEmpty,
+                  searchMatchCount: state.searchMatchIds.length,
+                  searchMatchIndex: state.searchMatchIndex.value,
                   searchController: _search,
                   selecting: state.selecting.value,
                   selectedCount: state.selectedIds.length,
                   onBack: () => sendAction(Back()),
                   onMenu: (rect) => sendAction(OpenChatMenu(rect)),
                   onPeerTap: () => sendAction(OpenPeerProfile()),
+                  onOpenSearch: () => sendAction(ToggleChatSearch()),
                   onCloseSearch: () => sendAction(ToggleChatSearch()),
                   onSearchChanged: (v) => sendAction(ChatSearchChanged(v)),
+                  onSearchPrev: () => sendAction(ChatSearchPrev()),
+                  onSearchNext: () => sendAction(ChatSearchNext()),
                   onForwardSelected: () => sendAction(ForwardSelectedMessages()),
                   onDeleteSelected: () => sendAction(DeleteSelectedMessages()),
                 ),
@@ -456,39 +483,20 @@ class ChatContent extends ScreenContent<ChatState> {
       final selecting = state.selecting.value;
       final selectedIds = state.selectedIds.toSet();
       final q = state.searchQuery.value.trim().toLowerCase();
-      final messages = q.isEmpty
-          ? state.messages.toList()
-          : state.messages
-              .where((m) => m.previewText().toLowerCase().contains(q))
-              .toList();
-      if (state.messages.isEmpty) {
+      final matchIds = state.searchMatchIds.toSet();
+      final currentMatchId = state.searchMatchIds.isEmpty
+          ? null
+          : state.searchMatchIds[
+              state.searchMatchIndex.value.clamp(0, state.searchMatchIds.length - 1)];
+      final messages = state.messages.toList();
+      if (messages.isEmpty) {
         return AppEmptyState(
           icon: Icons.forum_outlined,
           title: 'chat_empty'.tr,
           subtitle: 'chat_empty_hint'.tr,
         );
       }
-      if (q.isNotEmpty && messages.isEmpty) {
-        return AppEmptyState(
-          icon: Icons.search_off_rounded,
-          title: 'chat_search_empty'.tr,
-          subtitle: 'chat_search_empty_hint'.tr,
-        );
-      }
       final items = _buildListItems(messages);
-      String? lastAiTargetId;
-      for (final m in messages.reversed) {
-        if (!m.isOutgoing &&
-            (m.type == ChatMsgType.text || m.type == ChatMsgType.voice) &&
-            m.displayText.trim().isNotEmpty) {
-          lastAiTargetId = m.id;
-          break;
-        }
-      }
-      // Obx tracking for AI chip spinner
-      final aiLoading = state.aiSuggesting.value;
-      final aiTone = state.aiSuggestTone.value;
-      final aiMsgId = state.aiSuggestMessageId.value;
       return ListView.builder(
         controller: _scroll,
         padding: EdgeInsets.fromLTRB(
@@ -518,15 +526,9 @@ class ChatContent extends ScreenContent<ChatState> {
                 prev == null || !_sameIncomingSender(prev, msg);
             showAvatar = next == null || !_sameIncomingSender(msg, next);
           }
-          var showAutoCard = false;
-          if (!msg.isOutgoing && msg.autoBusinessCard != null) {
-            final prev = _prevMessage(items, i);
-            showAutoCard =
-                prev == null || !_sameIncomingSender(prev, msg);
-          }
-          final showAiStyles = !selecting &&
-              !msg.isOutgoing &&
-              lastAiTargetId == msg.id;
+          // Auto business card chat oqimida ko‘rsatilmaydi.
+          const showAutoCard = false;
+          final isCurrentHit = currentMatchId != null && msg.id == currentMatchId;
           return KeyedSubtree(
             key: key,
             child: ChatMessageItem(
@@ -537,9 +539,16 @@ class ChatContent extends ScreenContent<ChatState> {
               showAutoBusinessCard: showAutoCard,
               selecting: selecting,
               selected: selectedIds.contains(msg.id),
+              searchHighlight: isCurrentHit,
               onTap: selecting
                   ? () => sendAction(ToggleSelectMessage(msg))
-                  : null,
+                  : (q.isNotEmpty && matchIds.contains(msg.id)
+                      ? () {
+                          final idx = state.searchMatchIds.indexOf(msg.id);
+                          if (idx >= 0) state.searchMatchIndex.value = idx;
+                          _scrollToMessage(msg.id);
+                        }
+                      : null),
               onSenderTap: (!selecting &&
                       !msg.isOutgoing &&
                       (msg.senderId ?? 0) > 0)
@@ -576,13 +585,6 @@ class ChatContent extends ScreenContent<ChatState> {
                   : (msg.type == ChatMsgType.contact
                       ? () => sendAction(AddSharedContact(msg))
                       : null),
-              onAiReplyStyle: showAiStyles
-                  ? (tone) => sendAction(
-                        SuggestAiReply(message: msg, tone: tone),
-                      )
-                  : null,
-              aiReplyLoading: showAiStyles && aiLoading && aiMsgId == msg.id,
-              aiReplyActiveTone: aiTone,
               onAcceptOffer: (!selecting &&
                       msg.type == ChatMsgType.offer &&
                       !msg.isOutgoing)

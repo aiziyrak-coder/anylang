@@ -296,12 +296,18 @@ async def serialize_business(db: AsyncSession, user: User, redis=None) -> dict:
         trust=trust,
     )
     factory = build_factory_verification(business, user=user)
+    from app.services import verification as verification_service
+
+    ver_status = await verification_service.verification_status_summary(
+        db, user, business
+    )
     return {
         "company_name": business.company_name,
         "logo_url": business.logo_url,
         "country": business.country,
         "business_role": business.business_role,
         "website": business.website,
+        "bio": (business.bio or "").strip() or None,
         "description": business.description,
         "founded_year": business.founded_year,
         "certificates": list(business.certificates or []),
@@ -313,6 +319,7 @@ async def serialize_business(db: AsyncSession, user: User, redis=None) -> dict:
         "documents_verified": bool(
             business.documents_verified or user.verified_badge
         ),
+        "verification_status": ver_status,
         "factory_verified": bool(factory["factory_verified"]),
         "inspection_passed": bool(factory["inspection_passed"]),
         "audit_report_url": factory["audit_report_url"],
@@ -336,6 +343,7 @@ async def update_business(
     country: str | None = None,
     business_role: str | None = None,
     website: str | None = None,
+    bio: str | None = None,
     description: str | None = None,
     seo_text: str | None = None,
     keywords: list[str] | None = None,
@@ -358,6 +366,15 @@ async def update_business(
         business.business_role = business_role
     if website is not None:
         business.website = website.strip() or None
+    if bio is not None:
+        cleaned = bio.strip()
+        if len(cleaned) > 300:
+            raise AppError(
+                message="Bio 300 belgidan oshmasligi kerak",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        business.bio = cleaned or None
     if description is not None:
         business.description = description.strip() or None
     if seo_text is not None:

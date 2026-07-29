@@ -5,7 +5,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../../../data/local/session_store.dart';
 import '../../modal/full_screen_image_dialog.dart';
-import '../../modal/trust_score_bottom_sheet.dart';
 import '../../modal/scam_risk_bottom_sheet.dart';
 import '../../ui/factory_verification_badges.dart';
 import '../../ui/app_empty_state.dart';
@@ -21,6 +20,7 @@ import '../../ui/networking_score_bar.dart';
 import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
+import '../../ui/verification_cta_button.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
@@ -67,6 +67,14 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
                       ] else ...[
                         SizedBox(height: 6.dp),
                         _subtitle(c, d),
+                        if ((d.bio ?? '').trim().isNotEmpty) ...[
+                          SizedBox(height: 10.dp),
+                          _bioText(c, d.bio!.trim()),
+                        ],
+                        if (d.business && _isOwnProfile(d)) ...[
+                          SizedBox(height: 10.dp),
+                          _ownVerificationCta(d, sendAction),
+                        ],
                         if (d.networkingConnections > 0 ||
                             d.networkingCountries > 0 ||
                             d.networkingTrust != null) ...[
@@ -78,37 +86,28 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
                           ),
                         ],
                         if (d.business) ...[
-                          SizedBox(height: 12.dp),
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 8.dp,
-                            runSpacing: 8.dp,
-                            children: [
-                              _businessBadge(c),
-                              if (!d.factoryVerification.factoryVerified &&
-                                  d.verified)
-                                PillBadge(
-                                  label: 'profile_verified'.tr,
-                                  icon: Icons.verified_rounded,
-                                  background: c.accent,
-                                  foreground: c.onAccent,
-                                  fontSize: 12,
-                                ),
-                              if (d.trustScore != null)
-                                TrustScoreBadge(
-                                  trust: d.trustScore!,
-                                  onTap: () => showTrustScoreBottomSheet(
-                                    context,
-                                    trust: d.trustScore!,
-                                  ),
-                                ),
-                            ],
-                          ),
+                          if (d.documentsVerified || d.verified) ...[
+                            SizedBox(height: 12.dp),
+                            const TrustVerifiedMark(),
+                          ],
+                          if (!d.factoryVerification.factoryVerified &&
+                              d.verified &&
+                              !d.documentsVerified) ...[
+                            SizedBox(height: 12.dp),
+                            PillBadge(
+                              label: 'profile_verified'.tr,
+                              icon: Icons.verified_rounded,
+                              background: c.accent,
+                              foreground: c.onAccent,
+                              fontSize: 12,
+                            ),
+                          ],
                           if (d.factoryVerification.hasAny) ...[
                             SizedBox(height: 10.dp),
                             FactoryVerificationBadges(data: d.factoryVerification),
                           ],
-                          if (d.scamRisk?.hasWarning == true) ...[
+                          if (d.scamRisk?.hasWarning == true &&
+                              !d.documentsVerified) ...[
                             SizedBox(height: 12.dp),
                             ScamRiskBanner(
                               risk: d.scamRisk!,
@@ -307,14 +306,42 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
             style: TextStyle(color: c.textPrimary, fontSize: 22.sp, fontWeight: FontWeight.w700),
           ),
         ),
-        if (d.verified || d.factoryVerification.factoryVerified) ...[
+        if (d.business) ...[
+          SizedBox(width: 8.dp),
+          _businessBadge(c),
+        ],
+        if (d.verified || d.documentsVerified || d.factoryVerification.factoryVerified) ...[
           SizedBox(width: 6.dp),
-          if (d.factoryVerification.factoryVerified)
+          if (d.factoryVerification.factoryVerified || d.documentsVerified)
             Icon(Icons.verified_rounded, size: 20.dp, color: c.accent)
           else
             SvgPicture.asset('assets/icons/ic_verified.svg', width: 20.dp, height: 20.dp),
         ],
       ],
+    );
+  }
+
+  bool _isOwnProfile(UserProfilePayload d) {
+    final me = SessionStore.userId();
+    return me != null && d.id > 0 && d.id == me;
+  }
+
+  Widget _ownVerificationCta(
+    UserProfilePayload d,
+    void Function(MyAction) sendAction,
+  ) {
+    final approved = d.documentsVerified || d.verificationStatus == 'approved';
+    final pending = d.verificationStatus == 'pending';
+    final label = approved
+        ? 'verification_cta_approved'.tr
+        : pending
+            ? 'verification_cta_pending'.tr
+            : 'verification_cta'.tr;
+    return VerificationCtaButton(
+      label: label,
+      verified: approved,
+      pending: pending,
+      onTap: () => sendAction(OpenOwnBusinessVerification()),
     );
   }
 
@@ -343,6 +370,21 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _bioText(AppColors c, String bio) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12.dp),
+      child: Text(
+        bio,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: c.textPrimary,
+          fontSize: 14.sp,
+          height: 1.4,
+        ),
+      ),
     );
   }
 
@@ -426,9 +468,9 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
     if (status == 'accepted') {
       return MyIconButton(
         onClick: () => showAppMessage('add_friend_is_friend'.tr),
-        svgIcon: 'assets/icons/ic_friends.svg',
+        icon: Icons.check_circle_rounded,
         iconColor: c.accentText,
-        iconSize: 20.dp,
+        iconSize: 22.dp,
         backgroundColor: c.accentSoft,
         borderRadius: 14.dp,
         padding: EdgeInsets.all(14.dp),

@@ -1,8 +1,8 @@
 import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
+import '../../../data/local/public_profile_cache.dart';
 import '../../../data/network/chat_repository.dart';
-import '../../../data/network/profile_repository.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -16,6 +16,8 @@ import 'group_stats_state.dart';
 
 class GroupStatsScreen extends Screen<GroupStatsState, GroupStatsPayload> {
   GroupStatsScreen() : super(mobileContent: GroupStatsContent());
+
+  bool _openingProfile = false;
 
   @override
   void initState(GroupStatsPayload? payload) {
@@ -61,17 +63,56 @@ class GroupStatsScreen extends Screen<GroupStatsState, GroupStatsPayload> {
     }
   }
 
+  /// Tez ochish: local cache → stats preview; to‘liq yangilash UserProfileScreen ichida.
   Future<void> _openUser(int userId) async {
     if (userId <= 0) return;
-    final profile = await Get.find<ProfileRepository>().getPublicUser(userId);
-    final map = asMap(profile.dataOrNull);
-    if (map == null) {
-      showAppError(profile.errorOrNull ?? 'error'.tr);
-      return;
+    // Navigatsiya yoki oldingi ochish jarayonida — ikkinchi tap stack'ga qo'shilmasin.
+    if (_openingProfile || isNavigating) return;
+    _openingProfile = true;
+    try {
+      final cached = PublicProfileCache.get(userId);
+      final UserProfilePayload payload;
+      if (cached != null) {
+        payload = UserProfilePayload.fromApi(cached);
+      } else {
+        payload = _previewFromStats(userId) ??
+            UserProfilePayload.preview(id: userId, name: 'User');
+      }
+      await navigate(UserProfileScreen(), payload: payload);
+    } finally {
+      _openingProfile = false;
     }
-    await navigate(
-      UserProfileScreen(),
-      payload: UserProfilePayload.fromApi(map),
+  }
+
+  UserProfilePayload? _previewFromStats(int userId) {
+    final data = state.data.value;
+    if (data == null) return null;
+
+    String? name;
+    String? logo;
+    if (data.topCompany?.userId == userId) {
+      name = data.topCompany!.companyName;
+      logo = data.topCompany!.logoUrl;
+    } else if (data.topProducts?.userId == userId) {
+      name = data.topProducts!.companyName;
+      logo = data.topProducts!.logoUrl;
+    } else if (data.topDeals?.userId == userId) {
+      name = data.topDeals!.companyName;
+      logo = data.topDeals!.logoUrl;
+    } else {
+      for (final c in data.companies) {
+        if (c.userId == userId) {
+          name = c.companyName;
+          logo = c.logoUrl;
+          break;
+        }
+      }
+    }
+    if (name == null || name.trim().isEmpty) return null;
+    return UserProfilePayload.preview(
+      id: userId,
+      name: name,
+      avatarUrl: logo,
     );
   }
 

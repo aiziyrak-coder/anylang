@@ -26,7 +26,6 @@ import '../products/products_state.dart';
 import '../subscription/subscription_screen.dart';
 import '../user_profile/user_profile_payload.dart';
 import '../user_profile/user_profile_screen.dart';
-import '../nearby/nearby_screen.dart';
 import 'friend.dart';
 import 'friend_recommendation.dart';
 import 'friend_request.dart';
@@ -40,6 +39,8 @@ class FriendsScreen extends Screen<FriendsState, void> {
   FriendsScreen() : super(mobileContent: FriendsContent());
 
   static const _roleCodes = ['manufacturer', 'distributor', 'retail', 'service'];
+  final Set<int> _openingChatUserIds = <int>{};
+  final Set<int> _openingProfileUserIds = <int>{};
 
   @override
   void initState(void payload) {
@@ -477,8 +478,6 @@ class FriendsScreen extends Screen<FriendsState, void> {
         await _openViewerProfile(a.item);
       case OpenProfileViewersPremium _:
         await navigate(SubscriptionScreen());
-      case OpenNearby _:
-        await navigate(NearbyScreen());
       case FriendsPickCountry _:
         await _pickCountry();
       case FriendsSelectCountry a:
@@ -552,105 +551,135 @@ class FriendsScreen extends Screen<FriendsState, void> {
   }
 
   Future<void> _openChat(Friend friend) async {
+    if (_openingChatUserIds.contains(friend.id)) return;
     if (SessionStore.isUserBlocked(friend.id)) {
       showAppWarning('chat_blocked'.tr);
       return;
     }
-    final result = await Get.find<ChatRepository>().createChat(friend.id);
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        final chatId = (map?['id'] as num?)?.toInt() ?? 0;
-        if (chatId <= 0) {
-          showAppError('chat_open_failed'.tr);
-          return;
-        }
-        navigate(
-          ChatScreen(),
-          payload: ChatPayload(
-            chatId: chatId,
-            peerId: friend.id,
-            name: friend.name,
-            initial: friend.initial,
-            avatarGradient: friend.avatarGradient,
-            online: friend.online,
-            avatarUrl: friend.avatarUrl,
-          ),
-        );
-      },
-      failure: showAppError,
-    );
+    _openingChatUserIds.add(friend.id);
+    try {
+      final result = await Get.find<ChatRepository>().createChat(friend.id);
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+          if (chatId <= 0) {
+            showAppError('chat_open_failed'.tr);
+            return;
+          }
+          navigate(
+            ChatScreen(),
+            payload: ChatPayload(
+              chatId: chatId,
+              peerId: friend.id,
+              name: friend.name,
+              initial: friend.initial,
+              avatarGradient: friend.avatarGradient,
+              online: friend.online,
+              avatarUrl: friend.avatarUrl,
+            ),
+          );
+        },
+        failure: showAppError,
+      );
+    } finally {
+      _openingChatUserIds.remove(friend.id);
+    }
   }
 
   Future<void> _openRecommendedChat(FriendRecommendation item) async {
     if (item.userId <= 0) return;
+    if (_openingChatUserIds.contains(item.userId)) return;
     if (SessionStore.isUserBlocked(item.userId)) {
       showAppWarning('chat_blocked'.tr);
       return;
     }
-    final result = await Get.find<ChatRepository>().createChat(item.userId);
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        final chatId = (map?['id'] as num?)?.toInt() ?? 0;
-        if (chatId <= 0) {
-          showAppError('chat_open_failed'.tr);
-          return;
-        }
-        navigate(
-          ChatScreen(),
-          payload: ChatPayload(
-            chatId: chatId,
-            peerId: item.userId,
-            name: item.name,
-            initial: item.initial,
-            avatarGradient: item.avatarGradient,
-            online: false,
-            avatarUrl: item.logoUrl,
-          ),
-        );
-      },
-      failure: showAppError,
-    );
+    _openingChatUserIds.add(item.userId);
+    try {
+      final result = await Get.find<ChatRepository>().createChat(item.userId);
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+          if (chatId <= 0) {
+            showAppError('chat_open_failed'.tr);
+            return;
+          }
+          navigate(
+            ChatScreen(),
+            payload: ChatPayload(
+              chatId: chatId,
+              peerId: item.userId,
+              name: item.name,
+              initial: item.initial,
+              avatarGradient: item.avatarGradient,
+              online: false,
+              avatarUrl: item.logoUrl,
+            ),
+          );
+        },
+        failure: showAppError,
+      );
+    } finally {
+      _openingChatUserIds.remove(item.userId);
+    }
   }
 
   Future<void> _openViewerProfile(ProfileViewer item) async {
     if (item.userId <= 0) return;
-    final result =
-        await Get.find<ProfileRepository>().getPublicUser(item.userId);
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        if (map == null) {
-          showAppError('chat_profile_unavailable'.tr);
-          return;
-        }
-        navigate(
-          UserProfileScreen(),
-          payload: UserProfilePayload.fromApi(map),
-        );
-      },
-      failure: showAppError,
-    );
+    if (_openingProfileUserIds.contains(item.userId)) return;
+    _openingProfileUserIds.add(item.userId);
+    try {
+      // Darhol ochish — local preview / cache; to‘liq ma’lumot UserProfileScreen
+      // ichida soft refresh bilan yangilanadi.
+      await navigate(
+        UserProfileScreen(),
+        payload: UserProfilePayload.preview(
+          id: item.userId,
+          name: item.name,
+          initial: item.initial,
+          avatarGradient: item.avatarGradient,
+          avatarUrl: item.avatarUrl,
+          isBusiness: item.isBusiness,
+          country: item.country,
+          role: item.businessRole,
+        ),
+      );
+    } finally {
+      _openingProfileUserIds.remove(item.userId);
+    }
   }
 
   Future<void> _openProfile(Friend friend) async {
-    final result =
-        await Get.find<ProfileRepository>().getPublicUser(friend.id);
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        if (map == null) {
-          showAppError('chat_profile_unavailable'.tr);
-          return;
-        }
-        navigate(
-          UserProfileScreen(),
-          payload: UserProfilePayload.fromApi(map),
-        );
-      },
-      failure: showAppError,
-    );
+    if (_openingProfileUserIds.contains(friend.id)) return;
+    _openingProfileUserIds.add(friend.id);
+    try {
+      // Tarmoq kartasidagi local ma’lumot bilan darhol ochish;
+      // to‘liq profil UserProfileScreen soft refresh’ida yangilanadi.
+      await navigate(
+        UserProfileScreen(),
+        payload: UserProfilePayload.preview(
+          id: friend.id,
+          name: friend.name,
+          initial: friend.initial,
+          avatarGradient: friend.avatarGradient,
+          avatarUrl: friend.avatarUrl,
+          isBusiness: friend.isBusiness,
+          country: friend.country,
+          role: friend.businessRole,
+          verified: friend.verified,
+          keywords: friend.keywords,
+          listings: friend.productsCount,
+          networkingCountries: friend.countriesCount,
+          networkingTrust: friend.trust,
+          friendshipStatus: 'accepted',
+          riskLevel: friend.riskLevel,
+          isScammer: friend.isScammer,
+        ),
+      );
+    } finally {
+      _openingProfileUserIds.remove(friend.id);
+    }
   }
 
   Future<void> _openProducts(Friend friend) async {

@@ -460,7 +460,7 @@ async def handle_complete(db: AsyncSession, payload: dict[str, Any]) -> dict[str
         from app.services.products import activate_product_top_from_payment
 
         await activate_product_top_from_payment(db, payment)
-    elif payment.kind in {"number", "super_group"}:
+    elif payment.kind in {"number", "super_group", "account_slot"}:
         from app.services.payments import apply_payment
 
         # Status already "paid"; apply_payment expects pending→succeeded.
@@ -475,6 +475,14 @@ async def handle_complete(db: AsyncSession, payload: dict[str, Any]) -> dict[str
                 from app.services.group_admin import mark_chat_super
 
                 await mark_chat_super(db, chat_id=int(chat_id), payment_id=payment.id)
+        elif payment.kind == "account_slot":
+            from app.services.users import max_purchasable_account_slots
+
+            if user.is_business:
+                extras = int(getattr(user, "extra_account_slots", 0) or 0)
+                if max_purchasable_account_slots(is_business=True, extra_account_slots=extras) > 0:
+                    user.extra_account_slots = extras + 1
+                    await db.flush()
 
     return _click_response(
         click_trans_id=click_trans_id,

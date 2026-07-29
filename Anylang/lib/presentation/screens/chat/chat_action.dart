@@ -7,6 +7,8 @@ import 'chat_message.dart';
 enum AttachKind {
   gallery,
   camera,
+  video,
+  roundVideo,
   file,
   product,
   location,
@@ -130,7 +132,8 @@ class OpenGroupCatalog extends ChatAction {
 
 class OpenGroupStats extends ChatAction {}
 
-class OpenDealMode extends ChatAction {}
+/// Suhbatdagi media / fayl / havolalar.
+class OpenSharedMedia extends ChatAction {}
 
 
 /// Mikrofon — ovoz yozishni boshlash (composer record holatiga o'tadi).
@@ -159,6 +162,11 @@ class ChatSearchChanged extends ChatAction {
   final String text;
   ChatSearchChanged(this.text);
 }
+
+/// Oldingi / keyingi topilgan xabarga o‘tish.
+class ChatSearchPrev extends ChatAction {}
+
+class ChatSearchNext extends ChatAction {}
 
 /// Bildirishnomalarni o‘chirish / yoqish.
 class ToggleChatMute extends ChatAction {}

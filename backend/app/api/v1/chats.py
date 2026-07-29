@@ -26,9 +26,11 @@ from app.schemas.chat import (
     MessageForwardIn,
     MessageListOut,
     MessageOut,
+    MuteChatIn,
     ReactionIn,
     ReadMessagesIn,
     ReadMessagesOut,
+    SharedMediaOut,
     SuggestReplyIn,
     SuggestReplyOut,
     ChatSummaryOut,
@@ -36,19 +38,14 @@ from app.schemas.chat import (
 )
 from app.schemas.group_catalog import GroupCatalogOut
 from app.schemas.group_stats import GroupStatsOut
-from app.schemas.deal_mode import (
-    DealAttachDocumentIn,
-    DealGetOut,
-    DealUpdateIn,
-)
 from app.models.chat import Chat
 from app.services import chats as chats_service
-from app.services import deal_mode as deal_mode_service
 from app.services import group_admin as group_admin_service
 from app.services import group_catalog as group_catalog_service
 from app.services import group_stats as group_stats_service
 from app.services import message_features as message_features_service
 from app.services import messages as messages_service
+from app.services import shared_media as shared_media_service
 from app.services.business import _upload_image
 
 router = APIRouter()
@@ -89,6 +86,7 @@ def _schedule_voice_jobs(background_tasks: BackgroundTasks, jobs: list[dict] | N
             sender_id=job["sender_id"],
             sender_language=job["sender_language"],
             recipient_ids=job.get("recipient_ids"),
+            message_type=job.get("message_type"),
         )
 
 
@@ -118,7 +116,7 @@ async def list_chats(
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
     sort: str = Query(default="activity", pattern="^(activity|unread|name)$"),
-    chat_type: str | None = Query(default=None, alias="type", pattern="^(direct|group)$"),
+    chat_type: str | None = Query(default=None, alias="type", pattern="^(direct|group|saved)$"),
 ) -> ChatListOut:
     data = await chats_service.list_chats(
         db,
@@ -154,6 +152,21 @@ async def get_or_create_chat(
         target_user_id=body.user_id,
         redis=redis,
     )
+    return ChatOut.model_validate(data)
+
+
+@router.post("/saved", response_model=ChatOut, status_code=status.HTTP_200_OK)
+async def get_or_create_saved_messages(
+    db: DbSession,
+    redis: RedisClient,
+    current_user: CurrentUser,
+) -> ChatOut:
+    data = await chats_service.get_or_create_saved_messages(
+        db,
+        user=current_user,
+        redis=redis,
+    )
+    await db.commit()
     return ChatOut.model_validate(data)
 
 
@@ -286,6 +299,7 @@ async def mute_chat(
     db: DbSession,
     redis: RedisClient,
     current_user: CurrentUser,
+    body: MuteChatIn = MuteChatIn(),
 ) -> dict:
     return await chats_service.set_chat_muted(
         db,
@@ -293,6 +307,7 @@ async def mute_chat(
         chat_id=chat_id,
         muted=True,
         redis=redis,
+        duration_seconds=body.duration_seconds,
     )
 
 
@@ -357,6 +372,29 @@ async def list_members(
     return MembersOut.model_validate(data)
 
 
+@router.get("/{chat_id}/shared-media", response_model=SharedMediaOut)
+async def get_shared_media(
+    chat_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+    section: str = Query(
+        default="summary",
+        pattern="^(summary|photos|videos|files|audio|links|voice)$",
+    ),
+    before_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=40, ge=1, le=100),
+) -> SharedMediaOut:
+    data = await shared_media_service.get_shared_media(
+        db,
+        user=current_user,
+        chat_id=chat_id,
+        section=section,
+        before_id=before_id,
+        limit=limit,
+    )
+    return SharedMediaOut.model_validate(data)
+
+
 @router.get("/{chat_id}/catalog", response_model=GroupCatalogOut)
 async def get_group_catalog(
     chat_id: int,
@@ -385,100 +423,6 @@ async def get_group_stats(
         db, user=current_user, chat_id=chat_id
     )
     return GroupStatsOut.model_validate(data)
-
-
-@router.get("/{chat_id}/deal", response_model=DealGetOut)
-async def get_deal(
-    chat_id: int,
-    db: DbSession,
-    current_user: CurrentUser,
-) -> DealGetOut:
-    data = await deal_mode_service.get_deal(db, user=current_user, chat_id=chat_id)
-    return DealGetOut.model_validate(data)
-
-
-@router.post("/{chat_id}/deal", response_model=DealGetOut, status_code=status.HTTP_200_OK)
-async def start_deal(
-    chat_id: int,
-    db: DbSession,
-    current_user: CurrentUser,
-) -> DealGetOut:
-    data = await deal_mode_service.start_deal(db, user=current_user, chat_id=chat_id)
-    await db.commit()
-    return DealGetOut.model_validate(data)
-
-
-@router.patch("/{chat_id}/deal", response_model=DealGetOut)
-async def update_deal(
-    chat_id: int,
-    body: DealUpdateIn,
-    db: DbSession,
-    current_user: CurrentUser,
-) -> DealGetOut:
-    data = await deal_mode_service.update_deal(
-        db,
-        user=current_user,
-        chat_id=chat_id,
-        data=body.model_dump(exclude_unset=True),
-    )
-    await db.commit()
-    return DealGetOut.model_validate(data)
-
-
-@router.post("/{chat_id}/deal/accept", response_model=DealGetOut)
-async def accept_deal(
-    chat_id: int,
-    db: DbSession,
-    current_user: CurrentUser,
-) -> DealGetOut:
-    data = await deal_mode_service.accept_deal(db, user=current_user, chat_id=chat_id)
-    await db.commit()
-    return DealGetOut.model_validate(data)
-
-
-@router.post("/{chat_id}/deal/documents", response_model=DealGetOut)
-async def attach_deal_document(
-    chat_id: int,
-    body: DealAttachDocumentIn,
-    db: DbSession,
-    current_user: CurrentUser,
-) -> DealGetOut:
-    data = await deal_mode_service.attach_document(
-        db,
-        user=current_user,
-        chat_id=chat_id,
-        message_id=body.message_id,
-    )
-    await db.commit()
-    return DealGetOut.model_validate(data)
-
-
-@router.delete("/{chat_id}/deal/documents/{message_id}", response_model=DealGetOut)
-async def detach_deal_document(
-    chat_id: int,
-    message_id: int,
-    db: DbSession,
-    current_user: CurrentUser,
-) -> DealGetOut:
-    data = await deal_mode_service.detach_document(
-        db,
-        user=current_user,
-        chat_id=chat_id,
-        message_id=message_id,
-    )
-    await db.commit()
-    return DealGetOut.model_validate(data)
-
-
-@router.post("/{chat_id}/deal/close", response_model=DealGetOut)
-async def close_deal(
-    chat_id: int,
-    db: DbSession,
-    current_user: CurrentUser,
-) -> DealGetOut:
-    data = await deal_mode_service.close_deal(db, user=current_user, chat_id=chat_id)
-    await db.commit()
-    return DealGetOut.model_validate(data)
 
 
 @router.post("/{chat_id}/members", response_model=MembersOut)

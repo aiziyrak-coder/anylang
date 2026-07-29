@@ -1,3 +1,5 @@
+import 'package:get/get.dart';
+
 class ScamRiskReason {
   final String key;
   final String label;
@@ -6,6 +8,14 @@ class ScamRiskReason {
     required this.key,
     required this.label,
   });
+
+  /// Joriy tilga mos yorliq (`scam_reason_<key>`).
+  String get localizedLabel {
+    final k = 'scam_reason_$key';
+    final tr = k.tr;
+    if (tr != k && tr.isNotEmpty) return tr;
+    return label;
+  }
 
   factory ScamRiskReason.fromApi(Map<String, dynamic> json) {
     return ScamRiskReason(
@@ -34,7 +44,19 @@ class ScamRisk {
 
   bool get isHigh => riskLevel == 'high';
   bool get isMedium => riskLevel == 'medium';
-  bool get hasWarning => showWarning && message.trim().isNotEmpty;
+  bool get hasWarning =>
+      showWarning &&
+      (isHigh ||
+          isMedium ||
+          message.trim().isNotEmpty ||
+          reasons.isNotEmpty);
+
+  String get localizedMessage {
+    if (isHigh) return 'scam_detection_high'.tr;
+    if (isMedium) return 'scam_detection_medium'.tr;
+    if (message.trim().isNotEmpty) return message;
+    return 'scam_detection_low'.tr;
+  }
 
   factory ScamRisk.fromApi(dynamic raw) {
     if (raw is! Map) return const ScamRisk();

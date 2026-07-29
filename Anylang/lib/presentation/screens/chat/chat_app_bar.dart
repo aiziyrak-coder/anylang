@@ -6,7 +6,7 @@ import '../../ui/profile_avatar.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/size_controller.dart';
 
-/// Chat ekrani yuqori paneli — orqaga, suhbatdosh doira avatari (rasm), ism.
+/// Chat ekrani yuqori paneli — orqaga, suhbatdosh, qidiruv, menyu.
 class ChatAppBar extends StatelessWidget {
   final String name;
   final String initial;
@@ -17,12 +17,17 @@ class ChatAppBar extends StatelessWidget {
   final String? statusText;
   final bool searching;
   final bool hasSearchQuery;
+  final int searchMatchCount;
+  final int searchMatchIndex;
   final TextEditingController? searchController;
   final VoidCallback onBack;
   final ValueChanged<Rect> onMenu;
   final VoidCallback onPeerTap;
+  final VoidCallback onOpenSearch;
   final VoidCallback onCloseSearch;
   final ValueChanged<String>? onSearchChanged;
+  final VoidCallback? onSearchPrev;
+  final VoidCallback? onSearchNext;
   final bool selecting;
   final int selectedCount;
   final VoidCallback? onForwardSelected;
@@ -41,9 +46,14 @@ class ChatAppBar extends StatelessWidget {
     required this.onPeerTap,
     this.searching = false,
     this.hasSearchQuery = false,
+    this.searchMatchCount = 0,
+    this.searchMatchIndex = 0,
     this.searchController,
+    this.onOpenSearch = _noop,
     this.onCloseSearch = _noop,
     this.onSearchChanged,
+    this.onSearchPrev,
+    this.onSearchNext,
     this.selecting = false,
     this.selectedCount = 0,
     this.onForwardSelected,
@@ -62,7 +72,16 @@ class ChatAppBar extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(6.dp, 6.dp, 10.dp, 10.dp),
           child: searching
-              ? _searchRow(c)
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _searchRow(c),
+                    if (hasSearchQuery) ...[
+                      SizedBox(height: 6.dp),
+                      _searchNavRow(c),
+                    ],
+                  ],
+                )
               : selecting
                   ? _selectRow(c)
                   : _peerRow(c),
@@ -106,7 +125,7 @@ class ChatAppBar extends StatelessWidget {
         MyIconButton(
           onClick: onDeleteSelected ?? _noop,
           icon: Icons.delete_outline_rounded,
-          iconColor: kListenRed,
+          iconColor: const Color(0xFFB42318),
           iconSize: 22.dp,
           backgroundColor: Colors.transparent,
           borderRadius: 12.dp,
@@ -174,6 +193,15 @@ class ChatAppBar extends StatelessWidget {
             ),
           ),
         ),
+        MyIconButton(
+          onClick: onOpenSearch,
+          icon: Icons.search_rounded,
+          iconColor: c.textSecondary,
+          iconSize: 22.dp,
+          backgroundColor: Colors.transparent,
+          borderRadius: 12.dp,
+          padding: EdgeInsets.all(6.dp),
+        ),
         Builder(
           builder: (btnCtx) {
             return MyIconButton(
@@ -226,6 +254,7 @@ class ChatAppBar extends StatelessWidget {
             onChanged: onSearchChanged,
             style: TextStyle(color: c.textPrimary, fontSize: 16.sp),
             cursorColor: c.accentText,
+            textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'chat_search_hint'.tr,
               hintStyle: TextStyle(color: c.textSecondary, fontSize: 15.sp),
@@ -248,6 +277,52 @@ class ChatAppBar extends StatelessWidget {
             borderRadius: 12.dp,
             padding: EdgeInsets.all(6.dp),
           ),
+      ],
+    );
+  }
+
+  Widget _searchNavRow(AppColors c) {
+    final total = searchMatchCount;
+    final cur = total == 0 ? 0 : (searchMatchIndex + 1);
+    final label = total == 0
+        ? 'chat_search_empty'.tr
+        : 'chat_search_count'.trParams({
+            'current': '$cur',
+            'total': '$total',
+          });
+    return Row(
+      children: [
+        SizedBox(width: 44.dp),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: total == 0 ? c.textFaint : c.textSecondary,
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        MyIconButton(
+          onClick: total == 0 ? _noop : (onSearchPrev ?? _noop),
+          enabled: total > 0 && searchMatchIndex > 0,
+          icon: Icons.keyboard_arrow_up_rounded,
+          iconColor: c.textPrimary,
+          iconSize: 26.dp,
+          backgroundColor: Colors.transparent,
+          borderRadius: 12.dp,
+          padding: EdgeInsets.all(4.dp),
+        ),
+        MyIconButton(
+          onClick: total == 0 ? _noop : (onSearchNext ?? _noop),
+          enabled: total > 0 && searchMatchIndex < total - 1,
+          icon: Icons.keyboard_arrow_down_rounded,
+          iconColor: c.textPrimary,
+          iconSize: 26.dp,
+          backgroundColor: Colors.transparent,
+          borderRadius: 12.dp,
+          padding: EdgeInsets.all(4.dp),
+        ),
       ],
     );
   }

@@ -11,7 +11,6 @@ import '../../ui/buttons/my_icon_button.dart';
 import '../../ui/items/friend_recommendation_item.dart';
 import '../../ui/items/profile_viewer_item.dart';
 import '../../ui/items/user_card_item.dart';
-import '../../ui/networking_score_bar.dart';
 import '../../ui/search_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -23,6 +22,18 @@ import 'friends_state.dart';
 
 class FriendsContent extends ScreenContent<FriendsState> {
   FriendsContent() : super(color: Colors.transparent);
+
+  late final TextEditingController _searchCtrl;
+
+  @override
+  void initContent() {
+    _searchCtrl = TextEditingController();
+  }
+
+  @override
+  void onClose() {
+    _searchCtrl.dispose();
+  }
 
   @override
   Widget build(BuildContext context, FriendsState state, FutureOr<void> Function(MyAction action) sendAction) {
@@ -88,16 +99,6 @@ class FriendsContent extends ScreenContent<FriendsState> {
                 }),
                 SizedBox(width: 8.dp),
                 MyIconButton(
-                  onClick: () => sendAction(OpenNearby()),
-                  icon: Icons.near_me_rounded,
-                  iconColor: c.textPrimary,
-                  iconSize: 22.dp,
-                  backgroundColor: c.surface,
-                  borderRadius: 12.dp,
-                  padding: EdgeInsets.all(10.dp),
-                ),
-                SizedBox(width: 8.dp),
-                MyIconButton(
                   onClick: () => sendAction(AddFriend()),
                   icon: Icons.person_add_alt_1,
                   iconColor: c.onAccent,
@@ -109,37 +110,34 @@ class FriendsContent extends ScreenContent<FriendsState> {
               ],
             ),
           ),
-          Obx(() {
-            final connections = state.networkingConnections.value;
-            final countries = state.networkingCountries.value;
-            final trust = state.networkingTrust.value;
-            if (connections <= 0 && countries <= 0 && trust == null) {
-              return SizedBox(height: 16.dp);
-            }
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 4.dp),
-              child: NetworkingScoreBar(
-                connections: connections,
-                countries: countries,
-                trust: trust,
-                compact: true,
-              ),
-            );
-          }),
-          SizedBox(height: 12.dp),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.dp),
-            child: SearchField(
-              hint: 'friends_search_hint'.tr,
-              onChanged: (v) => sendAction(FriendsSearchChanged(v)),
-            ),
-          ),
-          SizedBox(height: 10.dp),
-          _filtersRow(c, state, sendAction),
-          SizedBox(height: 8.dp),
           Expanded(
             child: Obx(() {
-              if (state.loading.value) return const AppLoading();
+              final header = <Widget>[
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20.dp, 12.dp, 20.dp, 0),
+                  child: SearchField(
+                    key: const ValueKey('friends_search'),
+                    hint: 'friends_search_hint'.tr,
+                    controller: _searchCtrl,
+                    onChanged: (v) => sendAction(FriendsSearchChanged(v)),
+                  ),
+                ),
+                SizedBox(height: 10.dp),
+                _filtersRow(c, state, sendAction),
+                SizedBox(height: 8.dp),
+              ];
+
+              if (state.loading.value) {
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    ...header,
+                    SizedBox(height: 48.dp),
+                    const AppLoading(),
+                  ],
+                );
+              }
+
               final q = state.query.value.trim().toLowerCase();
               final filtered = state.friends.where((f) => _matches(f, state, q)).toList();
               final onlineOnly = state.filterOnline.value;
@@ -168,25 +166,34 @@ class FriendsContent extends ScreenContent<FriendsState> {
                   !showRecsFailed &&
                   !showViewers) {
                 final noFilters = q.isEmpty && !state.hasActiveFilters;
-                return AppEmptyState(
-                  icon: noFilters
-                      ? Icons.people_outline_rounded
-                      : Icons.search_off_rounded,
-                  title: noFilters
-                      ? 'friends_empty'.tr
-                      : 'empty_no_results'.tr,
-                  subtitle: noFilters ? 'friends_empty_hint'.tr : null,
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    ...header,
+                    SizedBox(
+                      height: 320.dp,
+                      child: AppEmptyState(
+                        icon: noFilters
+                            ? Icons.people_outline_rounded
+                            : Icons.search_off_rounded,
+                        title: noFilters
+                            ? 'friends_empty'.tr
+                            : 'empty_no_results'.tr,
+                        subtitle: noFilters ? 'friends_empty_hint'.tr : null,
+                      ),
+                    ),
+                  ],
                 );
               }
 
-              final children = <Widget>[];
+              final children = <Widget>[...header];
               if (showRecs) {
                 final matchCount = state.recommendationTotalCount.value > 0
                     ? state.recommendationTotalCount.value
                     : recs.length;
                 children.add(
                   Padding(
-                    padding: EdgeInsets.fromLTRB(8.dp, 4.dp, 8.dp, 4.dp),
+                    padding: EdgeInsets.fromLTRB(20.dp, 4.dp, 20.dp, 4.dp),
                     child: Text(
                       'business_match_title'.tr,
                       style: TextStyle(
@@ -199,7 +206,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
                 );
                 children.add(
                   Padding(
-                    padding: EdgeInsets.fromLTRB(8.dp, 0, 8.dp, 8.dp),
+                    padding: EdgeInsets.fromLTRB(20.dp, 0, 20.dp, 8.dp),
                     child: Container(
                       width: double.infinity,
                       padding: EdgeInsets.symmetric(
@@ -241,7 +248,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
                     height: 188.dp,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.fromLTRB(8.dp, 4.dp, 8.dp, 8.dp),
+                      padding: EdgeInsets.fromLTRB(20.dp, 4.dp, 20.dp, 8.dp),
                       itemCount: recs.length,
                       separatorBuilder: (_, __) => SizedBox(width: 10.dp),
                       itemBuilder: (_, i) {
@@ -273,7 +280,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
               if (showViewers) {
                 children.add(
                   Padding(
-                    padding: EdgeInsets.fromLTRB(8.dp, 8.dp, 8.dp, 4.dp),
+                    padding: EdgeInsets.fromLTRB(20.dp, 8.dp, 20.dp, 4.dp),
                     child: Text(
                       'profile_viewers_title'.tr,
                       style: TextStyle(
@@ -287,7 +294,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
                 if (viewersLocked) {
                   children.add(
                     Padding(
-                      padding: EdgeInsets.fromLTRB(8.dp, 0, 8.dp, 8.dp),
+                      padding: EdgeInsets.fromLTRB(20.dp, 0, 20.dp, 8.dp),
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
@@ -352,7 +359,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding:
-                            EdgeInsets.fromLTRB(8.dp, 4.dp, 8.dp, 8.dp),
+                            EdgeInsets.fromLTRB(20.dp, 4.dp, 20.dp, 8.dp),
                         itemCount: viewers.length,
                         separatorBuilder: (_, __) => SizedBox(width: 10.dp),
                         itemBuilder: (_, i) {
@@ -371,7 +378,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
               if (onlineVisible.isEmpty && others.isEmpty) {
                 children.add(
                   Padding(
-                    padding: EdgeInsets.fromLTRB(8.dp, 20.dp, 8.dp, 8.dp),
+                    padding: EdgeInsets.fromLTRB(20.dp, 20.dp, 20.dp, 8.dp),
                     child: Column(
                       children: [
                         Icon(
@@ -405,25 +412,45 @@ class FriendsContent extends ScreenContent<FriendsState> {
               } else {
                 if (onlineVisible.isNotEmpty) {
                   children.add(
-                    _sectionHeader(
-                      c,
-                      'friends_section_online'.trParams({
-                        'n': '${onlineVisible.length}',
-                      }),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8.dp),
+                      child: _sectionHeader(
+                        c,
+                        'friends_section_online'.trParams({
+                          'n': '${onlineVisible.length}',
+                        }),
+                      ),
                     ),
                   );
-                  children.addAll(onlineVisible.map((f) => _item(f, sendAction)));
+                  children.addAll(
+                    onlineVisible.map(
+                      (f) => Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.dp),
+                        child: _item(f, sendAction),
+                      ),
+                    ),
+                  );
                 }
                 if (others.isNotEmpty) {
                   children.add(
-                    _sectionHeader(
-                      c,
-                      'friends_section_all'.trParams({
-                        'n': '${others.length}',
-                      }),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8.dp),
+                      child: _sectionHeader(
+                        c,
+                        'friends_section_all'.trParams({
+                          'n': '${others.length}',
+                        }),
+                      ),
                     ),
                   );
-                  children.addAll(others.map((f) => _item(f, sendAction)));
+                  children.addAll(
+                    others.map(
+                      (f) => Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.dp),
+                        child: _item(f, sendAction),
+                      ),
+                    ),
+                  );
                 }
               }
 
@@ -431,7 +458,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
                 onRefresh: () async { await sendAction(RefreshFriends()); },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(12.dp, 4.dp, 12.dp, 12.dp),
+                  padding: EdgeInsets.only(bottom: 12.dp),
                   children: children,
                 ),
               );
@@ -653,7 +680,7 @@ class FriendsContent extends ScreenContent<FriendsState> {
         countriesCount: f.countriesCount,
         showMessage: false,
         showAdd: false,
-        showQuickActions: true,
+        showQuickActions: !f.isScammer,
         onTap: () => sendAction(OpenFriendProfile(f)),
         onMessage: () => sendAction(OpenChat(f)),
         onCall: null,

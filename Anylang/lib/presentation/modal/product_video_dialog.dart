@@ -9,9 +9,11 @@ import '../utils/size_controller.dart';
 
 /// Mahsulotning qisqa videosini to‘liq ekranda ko‘rsatadi.
 /// YouTube / tashqi sahifalar — tashqi brauzerda ochiladi.
+/// [maxPlay] berilmasa — to‘liq video o‘ynaydi (chat videolari).
 Future<void> showProductVideoDialog(
   BuildContext context, {
   required String url,
+  Duration? maxPlay = const Duration(seconds: 15),
 }) async {
   final raw = url.trim();
   if (raw.isEmpty) return;
@@ -31,7 +33,7 @@ Future<void> showProductVideoDialog(
   await showDialog<void>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.92),
-    builder: (_) => _ProductVideoDialog(url: raw),
+    builder: (_) => _ProductVideoDialog(url: raw, maxPlay: maxPlay),
   );
 }
 
@@ -45,8 +47,9 @@ bool _isExternalPage(String url) {
 
 class _ProductVideoDialog extends StatefulWidget {
   final String url;
+  final Duration? maxPlay;
 
-  const _ProductVideoDialog({required this.url});
+  const _ProductVideoDialog({required this.url, this.maxPlay});
 
   @override
   State<_ProductVideoDialog> createState() => _ProductVideoDialogState();
@@ -56,7 +59,8 @@ class _ProductVideoDialogState extends State<_ProductVideoDialog> {
   VideoPlayerController? _controller;
   bool _ready = false;
   bool _failed = false;
-  static const _maxPlay = Duration(seconds: 15);
+
+  Duration? get _maxPlay => widget.maxPlay;
 
   @override
   void initState() {
@@ -82,10 +86,11 @@ class _ProductVideoDialogState extends State<_ProductVideoDialog> {
 
   void _onTick() {
     final ctrl = _controller;
-    if (ctrl == null || !ctrl.value.isInitialized) return;
-    if (ctrl.value.position >= _maxPlay) {
+    final maxPlay = _maxPlay;
+    if (ctrl == null || !ctrl.value.isInitialized || maxPlay == null) return;
+    if (ctrl.value.position >= maxPlay) {
       ctrl.pause();
-      ctrl.seekTo(_maxPlay);
+      ctrl.seekTo(maxPlay);
     }
   }
 
@@ -144,7 +149,8 @@ class _ProductVideoDialogState extends State<_ProductVideoDialog> {
                             fit: StackFit.expand,
                             children: [
                               VideoPlayer(ctrl!),
-                              Positioned(
+                              if (_maxPlay != null)
+                                Positioned(
                                 left: 12.dp,
                                 bottom: 12.dp,
                                 child: Container(
@@ -174,7 +180,9 @@ class _ProductVideoDialogState extends State<_ProductVideoDialog> {
                                       if (ctrl.value.isPlaying) {
                                         ctrl.pause();
                                       } else {
-                                        if (ctrl.value.position >= _maxPlay) {
+                                        final maxPlay = _maxPlay;
+                                        if (maxPlay != null &&
+                                            ctrl.value.position >= maxPlay) {
                                           ctrl.seekTo(Duration.zero);
                                         }
                                         ctrl.play();

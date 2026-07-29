@@ -100,9 +100,7 @@ class _ChatOverflowOverlay extends StatelessWidget {
                     _row(
                       context,
                       c,
-                      muted
-                          ? Icons.notifications_active_outlined
-                          : Icons.notifications_off_outlined,
+                      Icons.notifications_off_outlined,
                       muted
                           ? 'chat_overflow_unmute'.tr
                           : 'chat_overflow_mute'.tr,
@@ -118,6 +116,13 @@ class _ChatOverflowOverlay extends StatelessWidget {
                           ? 'chat_overflow_unpin'.tr
                           : 'chat_overflow_pin'.tr,
                       ChatOverflowAction.pin,
+                    ),
+                    _row(
+                      context,
+                      c,
+                      Icons.search_rounded,
+                      'chat_overflow_search'.tr,
+                      ChatOverflowAction.search,
                     ),
                     if (!isGroup)
                       _row(
@@ -154,9 +159,9 @@ class _ChatOverflowOverlay extends StatelessWidget {
                     _row(
                       context,
                       c,
-                      Icons.handshake_outlined,
-                      'chat_overflow_deal_mode'.tr,
-                      ChatOverflowAction.dealMode,
+                      Icons.photo_library_outlined,
+                      'chat_overflow_shared_media'.tr,
+                      ChatOverflowAction.sharedMedia,
                     ),
                     _row(
                       context,

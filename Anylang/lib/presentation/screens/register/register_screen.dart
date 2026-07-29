@@ -10,6 +10,7 @@ import '../../../data/network/auth_repository.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
+import '../../utils/legal_urls.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../main/main_screen.dart';
@@ -92,6 +93,10 @@ class RegisterScreen extends Screen<RegisterState, void> {
       case ToggleTerms a:
         state.termsAccepted.value = a.value;
         state.formError.value = '';
+      case OpenPrivacyPolicy _:
+        await LegalUrls.openPrivacy();
+      case OpenPublicOffer _:
+        await LegalUrls.openTerms();
       case RegisterSubmit a:
         await _submit(state, a);
     }
