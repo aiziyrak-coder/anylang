@@ -1,6 +1,8 @@
 import logging
 import json
+import hashlib
 import re
+from collections import OrderedDict
 
 import httpx
 
@@ -12,6 +14,13 @@ logger = logging.getLogger(__name__)
 DEEPL_FREE_URL = "https://api-free.deepl.com/v2/translate"
 DEEPL_PRO_URL = "https://api.deepl.com/v2/translate"
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
+
+# Reused HTTP client (TLS/keepalive) — major latency win under load.
+_openai_http: httpx.AsyncClient | None = None
+
+# Identical short chat lines often repeat — skip re-paying tokens.
+_TRANSLATE_CACHE: OrderedDict[str, str] = OrderedDict()
+_TRANSLATE_CACHE_MAX = 2048
 
 _LANG_NAMES = {
     "uz": "Uzbek (Latin script)",
@@ -86,22 +95,21 @@ _LANG_ALIASES = {
 }
 
 _LANG_QUALITY = {
-    "uz": (
-        "Uzbek: use modern Latin orthography (o‘, g‘, sh, ch, ng). "
-        "Correct case endings and verb agreement. No Russian word-order calques. "
-        "Natural spoken Uzbek for chat; never leave misspellings."
-    ),
-    "ru": (
-        "Russian: perfect cases, gender/number agreement, verb aspect, and punctuation. "
-        "Natural chat Russian; no literal calques from other languages."
-    ),
-    "en": (
-        "English: correct articles (a/an/the), verb tense/agreement, prepositions, "
-        "and spelling (US or consistent). Natural chat English; no broken syntax."
-    ),
-    "tr": (
-        "Turkish: correct agglutination and vowel harmony; natural chat Turkish."
-    ),
+    "uz": "Uzbek Latin (o‘/g‘); native grammar; no Russian calques.",
+    "ru": "Russian: cases/gender/aspect perfect; natural chat.",
+    "en": "English: articles/tense/prepositions perfect; natural chat.",
+    "tr": "Turkish: vowel harmony + agglutination correct.",
+    "ar": "Arabic MSA/natural chat; correct grammar & diacritics when needed.",
+    "zh": "Simplified Chinese; natural phrasing.",
+    "ja": "Natural Japanese; correct particles/politeness.",
+    "ko": "Natural Korean; correct honorifics when implied.",
+    "de": "German: cases/articles correct; natural chat.",
+    "fr": "French: gender/agreement correct; natural chat.",
+    "es": "Spanish: gender/agreement correct; natural chat.",
+    "pt": "Portuguese: natural grammar; consistent variant.",
+    "uk": "Ukrainian: correct cases; natural chat.",
+    "kk": "Kazakh: natural orthography & grammar.",
+    "hi": "Hindi: natural Devanagari grammar.",
 }
 
 TRANSLATION_DOMAINS = (
@@ -114,42 +122,12 @@ TRANSLATION_DOMAINS = (
 )
 
 _DOMAIN_HINTS = {
-    "medical": (
-        "Domain: MEDICAL / healthcare.\n"
-        "Use precise clinical and pharmaceutical terminology (diagnosis, dosage, "
-        "contraindications, lab markers, anatomy). Never invent drug names or dosages. "
-        "Keep Latin/international drug and condition names correct when standard. "
-        "Prefer clinician-grade wording over casual paraphrases."
-    ),
-    "legal": (
-        "Domain: LEGAL / contracts.\n"
-        "Preserve legal force of terms: party, obligation, liability, indemnity, "
-        "jurisdiction, force majeure, termination, governing law. "
-        "Do not soften or invent clauses. Keep defined terms consistent."
-    ),
-    "textile": (
-        "Domain: TEXTILE / apparel manufacturing.\n"
-        "Use industry terms correctly: GSM, yarn count, MOQ, OEM/ODM, greige, "
-        "combed/carded, knit/woven, dyeing, finishing, fabric composition (%), "
-        "lead time, packing. Keep units and specs exact."
-    ),
-    "it": (
-        "Domain: IT / software.\n"
-        "Preserve technical tokens: API, SDK, HTTP, JSON, CI/CD, repo, deploy, "
-        "latency, auth/OAuth, DB schemas, error codes. Do not translate code "
-        "identifiers, file paths, or command names."
-    ),
-    "construction": (
-        "Domain: CONSTRUCTION / building materials.\n"
-        "Use correct terms: foundation, rebar, concrete grade, formwork, "
-        "load-bearing, HVAC, finishing, BOM, site, tender. Keep measurements "
-        "and standards (MPa, m², ГОСТ/ISO codes) exact."
-    ),
-    "general": (
-        "Domain: GENERAL chat / trade.\n"
-        "Natural messaging tone; if specialized terms appear, translate them "
-        "with the correct professional meaning for that field."
-    ),
+    "medical": "MEDICAL: precise clinical terms; never invent drugs/dosages.",
+    "legal": "LEGAL: preserve legal force; keep defined terms consistent.",
+    "textile": "TEXTILE: GSM/MOQ/OEM/fabric specs exact.",
+    "it": "IT: keep API/SDK/code/paths/commands untranslated.",
+    "construction": "CONSTRUCTION: keep grades/units/standards exact.",
+    "general": "",
 }
 
 _DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
@@ -311,7 +289,40 @@ def _translation_model(settings) -> str:
     dedicated = (getattr(settings, "openai_translation_model", None) or "").strip()
     if dedicated:
         return dedicated
-    return (settings.openai_model or "gpt-4o-mini").strip()
+    return (settings.openai_model or "gpt-4o-mini").strip() or "gpt-4o-mini"
+
+
+def _cache_key(
+    text: str,
+    target: str,
+    source: str | None,
+    domain: str,
+    model: str,
+) -> str:
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()
+    return f"{model}|{source or '-'}|{target}|{domain}|{digest}"
+
+
+def _cache_get(key: str) -> str | None:
+    hit = _TRANSLATE_CACHE.get(key)
+    if hit is None:
+        return None
+    _TRANSLATE_CACHE.move_to_end(key)
+    return hit
+
+
+def _cache_put(key: str, value: str) -> None:
+    _TRANSLATE_CACHE[key] = value
+    _TRANSLATE_CACHE.move_to_end(key)
+    while len(_TRANSLATE_CACHE) > _TRANSLATE_CACHE_MAX:
+        _TRANSLATE_CACHE.popitem(last=False)
+
+
+def _max_output_tokens(text: str) -> int:
+    """Cap completion size tightly — biggest token-cost control."""
+    # ~1 token ≈ 4 chars; allow modest expansion for target language.
+    est = max(48, (len(text) // 3) + 32)
+    return min(est, 600)
 
 
 def _strip_model_wrappers(text: str) -> str:
@@ -338,6 +349,16 @@ def _strip_model_wrappers(text: str) -> str:
     return out.strip()
 
 
+async def _openai_http_client(timeout: float) -> httpx.AsyncClient:
+    global _openai_http
+    if _openai_http is None or _openai_http.is_closed:
+        _openai_http = httpx.AsyncClient(
+            timeout=httpx.Timeout(timeout, connect=4.0),
+            limits=httpx.Limits(max_keepalive_connections=32, max_connections=64),
+        )
+    return _openai_http
+
+
 async def _openai_chat(
     *,
     api_key: str,
@@ -345,13 +366,14 @@ async def _openai_chat(
     system: str,
     user: str,
     temperature: float = 0.0,
-    timeout: float = 35.0,
+    timeout: float = 18.0,
+    max_tokens: int | None = None,
 ) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-    payload = {
+    payload: dict = {
         "model": model,
         "temperature": temperature,
         "messages": [
@@ -359,65 +381,55 @@ async def _openai_chat(
             {"role": "user", "content": user},
         ],
     }
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
+    client = await _openai_http_client(timeout)
+    try:
         response = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
         response.raise_for_status()
-        data = response.json()
-        content = (
-            ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-        ).strip()
-        if not content:
-            raise AppError(
-                message="Tarjima javobi bo'sh",
-                error_code="TRANSLATION_FAILED",
-                status_code=502,
-            )
-        return _strip_model_wrappers(content)
+    except httpx.TimeoutException:
+        # One retry with a fresh client on timeout / stale connection.
+        global _openai_http
+        if _openai_http is not None:
+            try:
+                await _openai_http.aclose()
+            except Exception:  # noqa: BLE001
+                pass
+            _openai_http = None
+        client = await _openai_http_client(timeout)
+        response = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
+        response.raise_for_status()
+    data = response.json()
+    content = (
+        ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+    ).strip()
+    if not content:
+        raise AppError(
+            message="Tarjima javobi bo'sh",
+            error_code="TRANSLATION_FAILED",
+            status_code=502,
+        )
+    return _strip_model_wrappers(content)
 
 
 def _translate_system(tgt: str, domain: str = "general") -> str:
-    quality = _LANG_QUALITY.get(tgt, "Use perfect native grammar, spelling, and syntax.")
-    dom = normalize_translation_domain(domain)
-    domain_block = _DOMAIN_HINTS.get(dom, _DOMAIN_HINTS["general"])
-    return (
-        "You are AnyLang Smart Translation — a senior domain-aware professional translator "
-        "for a multilingual messaging app.\n"
-        "Recipients must read every chat message in their native language with "
-        "ZERO spelling, grammar, or syntax mistakes — native-speaker quality only.\n\n"
-        f"{domain_block}\n\n"
-        "Hard rules:\n"
-        "1) Output ONLY the translated message text. No quotes, labels, markdown, notes.\n"
-        "2) Meaning must stay exact: do not invent, expand, summarize, or omit.\n"
-        "3) Preserve names, @mentions, #hashtags, URLs, emails, phones, codes exactly.\n"
-        "4) Keep emojis and relative positions; do not add/remove emojis.\n"
-        "5) Match chat tone (casual/formal) and preserve line breaks.\n"
-        "6) If already in the target language, or only names/emojis/symbols/numbers — return unchanged.\n"
-        "7) Never produce broken word order, missing words, or misspellings.\n"
-        "8) Prefer natural idiomatic phrasing over word-for-word calques.\n"
-        "9) Domain terminology must be industry-correct (not casual synonyms).\n\n"
-        f"Target-language quality bar:\n{quality}"
+    """Ultra-compact system prompt — max quality signal, min tokens."""
+    quality = _LANG_QUALITY.get(
+        tgt, "Native grammar, spelling, syntax — zero errors."
     )
-
-
-def _proofread_system(tgt: str, domain: str = "general") -> str:
-    quality = _LANG_QUALITY.get(tgt, "Fix every grammar, spelling, and syntax error.")
     dom = normalize_translation_domain(domain)
-    domain_block = _DOMAIN_HINTS.get(dom, _DOMAIN_HINTS["general"])
-    return (
-        "You are a native-speaker copy editor for Smart Translation in AnyLang. "
-        "Your ONLY job is to eliminate spelling, grammar, syntax, and punctuation errors "
-        "while keeping the meaning identical and domain terminology correct.\n\n"
-        f"{domain_block}\n\n"
-        "Hard rules:\n"
-        "1) Output ONLY the corrected text — no quotes, labels, or commentary.\n"
-        "2) Fix: spelling, diacritics, grammar, agreement, word order, punctuation.\n"
-        "3) Do NOT change meaning, add content, remove content, or rephrase style unless "
-        "needed to fix an error or incorrect domain term.\n"
-        "4) Preserve names, @mentions, #hashtags, URLs, emails, phones, codes, emojis exactly.\n"
-        "5) Preserve line breaks.\n"
-        "6) If the text is already perfect, return it unchanged.\n\n"
-        f"Language focus:\n{quality}"
-    )
+    domain_line = _DOMAIN_HINTS.get(dom, "")
+    parts = [
+        f"Elite chat translator → {_lang_name(tgt)}.",
+        "Output ONLY translation. Exact meaning. Zero grammar/spelling mistakes.",
+        "Keep names,@,#hashtags,URLs,emails,phones,codes,emojis,linebreaks.",
+        "Natural idiomatic chat; no calques; no invent/omit.",
+        "If already target lang or only symbols/names — return unchanged.",
+        quality,
+    ]
+    if domain_line:
+        parts.append(domain_line)
+    return " ".join(parts)
 
 
 async def _translate_openai(
@@ -429,58 +441,38 @@ async def _translate_openai(
     fast: bool = False,
 ) -> str:
     settings = get_settings()
-    src_name = _lang_name(source)
-    tgt_name = _lang_name(target)
-    # Live: prefer faster chat model; chat: quality model.
-    if fast:
-        model = (settings.openai_model or "gpt-4o-mini").strip() or "gpt-4o-mini"
-    else:
-        model = _translation_model(settings)
+    src = _normalize_lang(source) if source else None
     tgt = _normalize_lang(target)
     dom = normalize_translation_domain(domain)
+    # One fast model for Live + chat: quality via prompt, cost via max_tokens + no 2nd pass.
+    model = (
+        (settings.openai_model or "gpt-4o-mini").strip() or "gpt-4o-mini"
+        if fast
+        else _translation_model(settings)
+    )
 
-    draft = await _openai_chat(
+    key = _cache_key(text, tgt, src, dom, model)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    src_name = _lang_name(src)
+    tgt_name = _lang_name(tgt)
+    # Minimal user payload (biggest prompt-token save after system shrink).
+    user_msg = f"{src_name}→{tgt_name}\n{text}"
+
+    out = await _openai_chat(
         api_key=settings.openai_api_key,
         model=model,
         system=_translate_system(tgt, dom),
-        user=(
-            f"Source language: {src_name}\n"
-            f"Target language: {tgt_name}\n"
-            f"Industry domain: {dom}\n\n"
-            f"Text to translate:\n{text}"
-        ),
+        user=user_msg,
         temperature=0.0,
-        timeout=18.0 if fast else 35.0,
+        timeout=12.0 if fast else 18.0,
+        max_tokens=_max_output_tokens(text),
     )
-
-    if fast:
-        return draft
-
-    # Short / emoji-only: skip second pass.
-    meaningful = re.sub(r"[\W_]+", "", draft, flags=re.UNICODE)
-    if len(meaningful) < 3:
-        return draft
-
-    try:
-        polished = await _openai_chat(
-            api_key=settings.openai_api_key,
-            model=model,
-            system=_proofread_system(tgt, dom),
-            user=(
-                f"Language: {tgt_name}\n"
-                f"Industry domain: {dom}\n"
-                f"Original source ({src_name}):\n{text}\n\n"
-                f"Draft translation to proofread:\n{draft}"
-            ),
-            temperature=0.0,
-            timeout=35.0,
-        )
-        if (polished or "").strip():
-            return polished
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Translation proofread skipped (%s); using draft", exc)
-
-    return draft
+    if (out or "").strip():
+        _cache_put(key, out)
+    return out
 
 
 async def _translate_deepl(text: str, target: str, source: str | None) -> str:

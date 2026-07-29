@@ -26,8 +26,9 @@ PaymentKind = Literal["subscription", "number", "super_group", "product_top", "a
 
 SUPER_GROUP_PRICE = Decimal("10.00")
 ACCOUNT_SLOT_PRICE = Decimal("10.00")
-PRODUCT_TOP_PRICE_USD = Decimal("5.00")
-PRODUCT_TOP_DAYS = 30
+PRODUCT_TOP_PRICE_USD = Decimal("30.00")
+PRODUCT_TOP_DAYS = 7
+PRODUCT_TOP_SLOTS = 10
 
 
 def _compute_subscription_amount(plan: str, billing_cycle: str) -> tuple[Decimal, int, str]:
@@ -121,6 +122,7 @@ async def create_checkout(
     number: str | None = None,
     chat_id: int | None = None,
     product_id: int | None = None,
+    product_top_mode: str | None = None,
     promo_code: str | None = None,
     provider: str | None = None,
 ) -> dict[str, Any]:
@@ -279,7 +281,12 @@ async def create_checkout(
         from app.payments.fx import usd_to_uzs
         from app.services.products import prepare_product_top_checkout
 
-        await prepare_product_top_checkout(db, user=user, product_id=product_id)
+        _, resolved_mode = await prepare_product_top_checkout(
+            db,
+            user=user,
+            product_id=product_id,
+            mode=product_top_mode or "boost",
+        )
         amount_usd = PRODUCT_TOP_PRICE_USD
         # Multicard hosts card/Payme/Click/Visa/MC — prefer it when configured.
         if multicard_ready and (not chosen or chosen == "multicard"):
@@ -307,6 +314,8 @@ async def create_checkout(
             "product_id": int(product_id),
             "days": PRODUCT_TOP_DAYS,
             "amount_usd": f"{amount_usd:.2f}",
+            "mode": resolved_mode,
+            "slots": PRODUCT_TOP_SLOTS,
         }
     else:
         raise AppError(message="Noto'g'ri to'lov turi", error_code="PAYMENT_INVALID", status_code=400)

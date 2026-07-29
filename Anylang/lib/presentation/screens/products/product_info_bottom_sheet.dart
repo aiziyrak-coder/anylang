@@ -1,13 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
+import '../../../data/network/payment_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/full_screen_image_dialog.dart';
+import '../../modal/payment_confirm_bottom_sheet.dart';
 import '../../modal/product_video_dialog.dart';
 import '../../screens/chat/chat_payload.dart';
 import '../../screens/chat/chat_screen.dart';
@@ -23,6 +27,7 @@ import '../../ui/product_video_badge.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/size_controller.dart';
+import 'own_product_actions_sheet.dart';
 import 'product.dart';
 
 /// S11 — mahsulot ma'lumoti bottom sheet. Joriy oyna ustida ochiladi.
@@ -332,38 +337,84 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
     setState(() => _favLoading = false);
   }
 
-  Future<void> _requestTop() async {
+  Future<void> _payForTop() async {
     if (_topBusy || _product.id <= 0) return;
     setState(() => _topBusy = true);
-    final result = await Get.find<ProductsRepository>().requestTop(_product.id);
+    final payments = Get.find<PaymentRepository>();
+    final extend = _product.isTop || _product.topCanExtend;
+    final checkout = await payments.checkoutProductTop(
+      productId: _product.id,
+      extend: extend,
+    );
     if (!mounted) return;
-    setState(() => _topBusy = false);
-    if (result.errorOrNull != null) {
-      showAppError(result.errorOrNull);
-      return;
-    }
-    final map = asMap(result.dataOrNull);
-    setState(() {
-      _product = _product.copyWith(
-        topRequestStatus: map?['status']?.toString() ?? 'pending',
-      );
-    });
-  }
+    await checkout.when(
+      success: (data) async {
+        if (data is! Map) return;
+        final id = data['id'];
+        final checkoutUrl = data['checkout_url']?.toString();
+        final mockConfirm = data['mock_confirm'] == true;
+        final currency =
+            (data['currency']?.toString() ?? 'UZS').toUpperCase();
+        final amount = data['amount']?.toString() ?? '';
+        final taxPctRaw = data['tax_percent'];
+        final taxPct = taxPctRaw is num
+            ? taxPctRaw.toInt()
+            : int.tryParse('$taxPctRaw') ?? 2;
 
-  Future<void> _cancelTopRequest() async {
-    if (_topBusy || _product.id <= 0) return;
-    setState(() => _topBusy = true);
-    final result =
-        await Get.find<ProductsRepository>().cancelTopRequest(_product.id);
-    if (!mounted) return;
-    setState(() => _topBusy = false);
-    if (result.errorOrNull != null) {
-      showAppError(result.errorOrNull);
-      return;
-    }
-    setState(() {
-      _product = _product.copyWith(topRequestStatus: 'cancelled');
-    });
+        final confirmed = await showPaymentConfirmBottomSheet(
+          context,
+          title: extend
+              ? 'my_products_boost_extend'.tr
+              : 'my_products_boost_title'.tr,
+          subtitle: 'my_products_boost_body'.tr,
+          amount: amount,
+          currency: currency,
+          amountBeforeTax: data['amount_before_tax']?.toString(),
+          taxAmount: data['tax_amount']?.toString(),
+          taxPercent: taxPct,
+          planLabel: _product.name,
+          periodLabel: 'my_products_boost_period'.trParams({'days': '7'}),
+          ctaText: 'my_products_boost_pay'.tr,
+        );
+        if (confirmed != true) {
+          showAppMessage('payment_confirm_later_hint'.tr);
+          return;
+        }
+
+        if (checkoutUrl != null &&
+            checkoutUrl.isNotEmpty &&
+            mockConfirm != true) {
+          final uri = Uri.tryParse(checkoutUrl);
+          if (uri != null) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+          showAppMessage('my_products_boost_checkout_opened'.tr);
+          return;
+        }
+        if (id is num && (kDebugMode || mockConfirm == true)) {
+          final confirmPay = await payments.confirmMock(id.toInt());
+          if (confirmPay.errorOrNull != null) {
+            showAppError(confirmPay.errorOrNull);
+            return;
+          }
+          showAppMessage(
+            extend
+                ? 'my_products_boost_extend_success'.tr
+                : 'my_products_boost_success'.tr,
+          );
+          final detail =
+              await Get.find<ProductsRepository>().detail(_product.id);
+          final map = asMap(detail.dataOrNull);
+          if (map != null && mounted) {
+            setState(() => _product = Product.fromApi(map));
+          }
+        } else {
+          showAppMessage('my_products_boost_checkout_opened'.tr);
+        }
+      },
+      failure: (e) async => showAppError(e),
+    );
+    if (mounted) setState(() => _topBusy = false);
   }
 
   @override
@@ -910,6 +961,44 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
 
   Widget _ownerTopAction(AppColors c, BorderRadius radius) {
     if (_product.isTop) {
+      final left = formatTopCountdown(_product.topSecondsLeft);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 12.dp, horizontal: 16.dp),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(color: c.outline),
+            ),
+            child: Text(
+              'product_top_active_left'.trParams({'time': left}),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: c.accentText,
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(height: 10.dp),
+          RichButton(
+            text: 'my_products_boost_extend'.tr,
+            onTap: _topBusy ? () {} : _payForTop,
+            textColor: c.onAccent,
+            textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
+            padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+            borderRadius: radius,
+            decoration: BoxDecoration(
+              gradient: limeButtonGradient,
+              borderRadius: radius,
+            ),
+          ),
+        ],
+      );
+    }
+    final status = _product.topRequestStatus;
+    if (status == 'queued') {
       return Container(
         padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
         decoration: BoxDecoration(
@@ -917,63 +1006,16 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
           border: Border.all(color: c.outline),
         ),
         child: Text(
-          'product_already_top'.tr,
+          'my_products_top_queue_pos'.trParams({
+            'pos': '${_product.topQueuePosition ?? '—'}',
+          }),
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: c.textSecondary,
-            fontSize: 15.sp,
-            fontWeight: FontWeight.w600,
+            color: c.accentText,
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w700,
           ),
         ),
-      );
-    }
-    final status = _product.topRequestStatus;
-    if (status == 'pending') {
-      return Row(
-        children: [
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 12.dp),
-              decoration: BoxDecoration(
-                borderRadius: radius,
-                border: Border.all(color: c.outline),
-              ),
-              child: Text(
-                'product_top_pending'.tr,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: c.textSecondary,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 10.dp),
-          Material(
-            color: c.surface,
-            borderRadius: radius,
-            child: InkWell(
-              borderRadius: radius,
-              onTap: _topBusy ? null : _cancelTopRequest,
-              child: Ink(
-                decoration: BoxDecoration(
-                  borderRadius: radius,
-                  border: Border.all(color: c.outline),
-                ),
-                padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 14.dp),
-                child: Text(
-                  'product_top_cancel'.tr,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
       );
     }
     if (_product.status != 'published') {
@@ -996,7 +1038,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
     }
     return RichButton(
       text: 'product_request_top'.tr,
-      onTap: _topBusy ? () {} : _requestTop,
+      onTap: _topBusy ? () {} : _payForTop,
       textColor: c.onAccent,
       textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
       padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),

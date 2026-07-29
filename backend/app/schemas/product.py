@@ -94,13 +94,30 @@ class ProductTopRequestOut(BaseModel):
     id: int
     product_id: int
     seller_id: int
-    status: Literal["pending", "approved", "rejected", "cancelled"]
+    status: Literal[
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
+        "queued",
+        "active",
+        "expired",
+    ]
     note: str = ""
     admin_note: str = ""
     created_at: datetime
     reviewed_at: datetime | None = None
+    paid_at: datetime | None = None
+    activated_at: datetime | None = None
+    expires_at: datetime | None = None
+    seconds_left: int | None = None
+    queue_position: int | None = None
+    can_extend: bool = False
     product_name: str | None = None
     is_top_pinned: bool | None = None
+    price_usd: str | None = None
+    period_days: int | None = None
+    max_slots: int | None = None
 
 
 class ProductDetailOut(ProductOut):

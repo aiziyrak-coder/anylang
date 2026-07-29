@@ -19,6 +19,9 @@ class Product {
   final String status;
   final String? topRequestStatus;
   final String? topPinnedUntil;
+  final int? topQueuePosition;
+  final int? topSecondsLeft;
+  final bool topCanExtend;
   final String? videoUrl;
   final String? factoryVideoUrl;
   final String? processVideoUrl;
@@ -45,6 +48,9 @@ class Product {
     this.status = 'published',
     this.topRequestStatus,
     this.topPinnedUntil,
+    this.topQueuePosition,
+    this.topSecondsLeft,
+    this.topCanExtend = false,
     this.videoUrl,
     this.factoryVideoUrl,
     this.processVideoUrl,
@@ -55,6 +61,8 @@ class Product {
     this.reviewsCount = 0,
     this.trustBadges = const ProductTrustBadges(),
   });
+
+  bool get isTopQueued => topRequestStatus == 'queued';
 
   factory Product.fromApi(Map<String, dynamic> json) {
     final id = (json['id'] as num?)?.toInt() ?? 0;
@@ -78,8 +86,17 @@ class Product {
     }
     final topReq = json['top_request'];
     String? topStatus;
+    int? queuePos;
+    int? secondsLeft;
+    var canExtend = false;
+    String? pinnedUntil = json['top_pinned_until']?.toString();
     if (topReq is Map) {
       topStatus = topReq['status']?.toString();
+      queuePos = (topReq['queue_position'] as num?)?.toInt();
+      secondsLeft = (topReq['seconds_left'] as num?)?.toInt();
+      canExtend = topReq['can_extend'] == true;
+      final exp = topReq['expires_at']?.toString();
+      if (exp != null && exp.isNotEmpty) pinnedUntil = exp;
     }
     final countriesRaw = json['shipping_countries'];
     final countries = <String>[];
@@ -123,7 +140,10 @@ class Product {
       isTop: json['is_top'] == true,
       status: (json['status'] as String?) ?? 'published',
       topRequestStatus: topStatus,
-      topPinnedUntil: json['top_pinned_until']?.toString(),
+      topPinnedUntil: pinnedUntil,
+      topQueuePosition: queuePos,
+      topSecondsLeft: secondsLeft,
+      topCanExtend: canExtend,
       videoUrl: _optUrl(json['video_url']),
       factoryVideoUrl: _optUrl(json['factory_video_url']),
       processVideoUrl: _optUrl(json['process_video_url']),
@@ -148,6 +168,9 @@ class Product {
     String? status,
     String? topRequestStatus,
     String? topPinnedUntil,
+    int? topQueuePosition,
+    int? topSecondsLeft,
+    bool? topCanExtend,
     ProductTrustBadges? trustBadges,
   }) {
     return Product(
@@ -166,6 +189,9 @@ class Product {
       status: status ?? this.status,
       topRequestStatus: topRequestStatus ?? this.topRequestStatus,
       topPinnedUntil: topPinnedUntil ?? this.topPinnedUntil,
+      topQueuePosition: topQueuePosition ?? this.topQueuePosition,
+      topSecondsLeft: topSecondsLeft ?? this.topSecondsLeft,
+      topCanExtend: topCanExtend ?? this.topCanExtend,
       videoUrl: videoUrl,
       factoryVideoUrl: factoryVideoUrl,
       processVideoUrl: processVideoUrl,

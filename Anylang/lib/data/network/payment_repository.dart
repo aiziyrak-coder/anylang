@@ -67,13 +67,17 @@ class PaymentRepository {
     );
   }
 
-  /// Mahsulotni TOP ga chiqarish — $5 / 30 kun.
-  Future<BaseResult> checkoutProductTop({required int productId}) {
+  /// Mahsulotni TOP ga chiqarish / uzaytirish — $30 / 7 kun.
+  Future<BaseResult> checkoutProductTop({
+    required int productId,
+    bool extend = false,
+  }) {
     return _client.post(
       api: 'api/v1/payments/checkout',
       data: {
         'kind': 'product_top',
         'product_id': productId,
+        'product_top_mode': extend ? 'extend' : 'boost',
       },
     );
   }

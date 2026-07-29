@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../product_video_badge.dart';
-import '../product_trust_badges.dart';
-import '../product_trust_badges_view.dart';
 import '../theme/colors.dart';
 import '../../utils/size_controller.dart';
 
@@ -17,7 +15,6 @@ class ProductGridCard extends StatelessWidget {
   final String views;
   final String? imageUrl;
   final bool hasVideo;
-  final ProductTrustBadges trustBadges;
   final VoidCallback onTap;
   final VoidCallback? onVideoTap;
 
@@ -32,7 +29,6 @@ class ProductGridCard extends StatelessWidget {
     this.subtitle,
     this.imageUrl,
     this.hasVideo = false,
-    this.trustBadges = const ProductTrustBadges(),
     this.onVideoTap,
   });
 
@@ -89,16 +85,6 @@ class ProductGridCard extends StatelessWidget {
                       child: ProductVideoBadge(
                         compact: true,
                         onTap: onVideoTap,
-                      ),
-                    ),
-                  if (trustBadges.hasAny)
-                    Positioned(
-                      left: 6.dp,
-                      right: 6.dp,
-                      top: 6.dp,
-                      child: ProductTrustBadgesView(
-                        data: trustBadges,
-                        compact: true,
                       ),
                     ),
                 ],

@@ -105,8 +105,12 @@ class ProductTopRequest(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(
         String(16), default="pending", index=True, nullable=False
-    )  # pending | approved | rejected | cancelled
+    )  # queued | active | expired | cancelled | pending | approved | rejected
     note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
     admin_note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
     reviewed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payment_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

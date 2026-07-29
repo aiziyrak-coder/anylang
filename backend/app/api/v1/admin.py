@@ -454,11 +454,34 @@ async def admin_pin_product(
     admin: ModeratorPlus,
     request: Request,
 ) -> dict:
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.products import (
+        PRODUCT_TOP_BOOST_DAYS,
+        PRODUCT_TOP_SLOTS,
+        count_active_top_slots,
+        promote_top_queue,
+    )
+
     product = await db.get(Product, product_id)
     if product is None:
         raise AppError(message="Mahsulot topilmadi", error_code="PRODUCT_NOT_FOUND", status_code=404)
 
-    product.is_top_pinned = body.pinned
+    if body.pinned:
+        slots = await count_active_top_slots(db)
+        if not product.is_top_pinned and slots >= PRODUCT_TOP_SLOTS:
+            raise AppError(
+                message=f"Top band ({PRODUCT_TOP_SLOTS}/{PRODUCT_TOP_SLOTS}). Navbatdan chiqishini kuting yoki birini oling.",
+                error_code="TOP_SLOTS_FULL",
+                status_code=400,
+            )
+        product.is_top_pinned = True
+        product.top_pinned_until = datetime.now(UTC) + timedelta(days=PRODUCT_TOP_BOOST_DAYS)
+    else:
+        product.is_top_pinned = False
+        product.top_pinned_until = None
+        await promote_top_queue(db)
+
     await db.flush()
     await write_audit(
         db,
@@ -501,7 +524,7 @@ async def admin_archive_product(
 async def admin_list_top_requests(
     db: DbSession,
     _admin: ModeratorPlus,
-    status_filter: str | None = Query(default="pending", alias="status"),
+    status_filter: str | None = Query(default="queued", alias="status"),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
 ) -> dict:

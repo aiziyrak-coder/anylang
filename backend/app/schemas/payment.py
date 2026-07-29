@@ -24,8 +24,9 @@ class CheckoutIn(BaseModel):
     promo_code: str | None = Field(default=None, min_length=3, max_length=64)
     number: str | None = Field(default=None, min_length=7, max_length=7)
     chat_id: int | None = None
-    # Paid product TOP boost ($5 / 30 days).
+    # Paid product TOP boost ($30 / 7 days). mode: boost | extend
     product_id: int | None = Field(default=None, ge=1)
+    product_top_mode: Literal["boost", "extend"] | None = None
     # Optional: when set, subscription checkout uses Click/Paddle/Multicard module.
     provider: Literal["click", "paddle", "multicard"] | None = None
 

@@ -141,7 +141,7 @@ class ToggleOwnProductPublish extends ProductsAction {
   ToggleOwnProductPublish(this.product);
 }
 
-/// Egasi: TOP boost ($5/oy).
+/// Egasi: TOP boost ($30/hafta, navbat).
 class BoostOwnProductTop extends ProductsAction {
   final Product product;
   BoostOwnProductTop(this.product);

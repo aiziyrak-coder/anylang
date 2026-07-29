@@ -234,7 +234,7 @@ def main() -> int:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
         "package": "com.izodev.anylang",
-        "notes": f"Release {ver}+{build} — Telegram chat media, attach sheet, video thumbnails, chat UX polish",
+        "notes": f"Release {ver}+{build} — full UI i18n (80 langs), TOP $30/week + paid queue, faster chat translation",
     }
     meta_path = ROOT / "landing" / "download-meta.json"
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

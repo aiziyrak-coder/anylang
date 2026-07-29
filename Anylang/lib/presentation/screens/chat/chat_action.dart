@@ -5,7 +5,8 @@ import 'chat_message.dart';
 
 /// Biriktirish menyusidagi variantlar.
 enum AttachKind {
-  photo,
+  gallery,
+  camera,
   file,
   product,
   location,

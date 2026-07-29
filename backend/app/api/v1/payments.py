@@ -57,6 +57,7 @@ async def create_checkout(
         number=body.number,
         chat_id=body.chat_id,
         product_id=body.product_id,
+        product_top_mode=body.product_top_mode,
         promo_code=body.promo_code,
         provider=body.provider,
     )
