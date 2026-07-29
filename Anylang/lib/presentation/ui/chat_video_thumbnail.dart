@@ -3,15 +3,14 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../data/core/buildNetwork/api_config.dart';
 import '../utils/size_controller.dart';
 import 'theme/colors.dart';
 
-/// LRU kesh — bir xil video uchun kadr qayta olinmasin.
-final _thumbCache = LinkedHashMap<String, Uint8List>();
-const _kMaxCache = 48;
+/// Bir xil URL uchun controller qayta ochilmasin.
+final _readyUrls = LinkedHashSet<String>();
 
 String _absoluteVideoPath(String raw) {
   final t = raw.trim();
@@ -32,44 +31,7 @@ String _absoluteVideoPath(String raw) {
   return t;
 }
 
-Future<Uint8List?> _loadVideoFrame(String videoPath) async {
-  final cached = _thumbCache[videoPath];
-  if (cached != null) {
-    _thumbCache.remove(videoPath);
-    _thumbCache[videoPath] = cached;
-    return cached;
-  }
-
-  try {
-    Uint8List? bytes = await VideoThumbnail.thumbnailData(
-      video: videoPath,
-      imageFormat: ImageFormat.JPEG,
-      maxWidth: 480,
-      quality: 72,
-      timeMs: 200,
-    );
-    if (bytes == null || bytes.isEmpty) {
-      bytes = await VideoThumbnail.thumbnailData(
-        video: videoPath,
-        imageFormat: ImageFormat.JPEG,
-        maxWidth: 480,
-        quality: 72,
-        timeMs: 0,
-      );
-    }
-    if (bytes == null || bytes.isEmpty) return null;
-    _thumbCache[videoPath] = bytes;
-    while (_thumbCache.length > _kMaxCache) {
-      _thumbCache.remove(_thumbCache.keys.first);
-    }
-    return bytes;
-  } catch (e, st) {
-    debugPrint('ChatVideoThumbnail: $e\n$st');
-    return null;
-  }
-}
-
-/// Chat video bubble: videoning boshidagi kadr rasmi.
+/// Chat video bubble: videoning boshidagi kadr rasmi (`video_player`).
 class ChatVideoThumbnail extends StatefulWidget {
   final String url;
   final bool round;
@@ -91,8 +53,9 @@ class ChatVideoThumbnail extends StatefulWidget {
 }
 
 class _ChatVideoThumbnailState extends State<ChatVideoThumbnail> {
-  Uint8List? _bytes;
-  bool _loading = true;
+  VideoPlayerController? _ctrl;
+  bool _ready = false;
+  bool _failed = false;
   int _gen = 0;
 
   @override
@@ -105,35 +68,68 @@ class _ChatVideoThumbnailState extends State<ChatVideoThumbnail> {
   void didUpdateWidget(covariant ChatVideoThumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _bytes = null;
-      _loading = true;
+      _disposeCtrl();
+      _ready = false;
+      _failed = false;
       _load();
     }
   }
 
   Future<void> _load() async {
     final gen = ++_gen;
-    final raw = widget.url.trim();
-    if (raw.isEmpty) {
+    final path = _absoluteVideoPath(widget.url);
+    if (path.isEmpty) {
       if (!mounted || gen != _gen) return;
-      setState(() => _loading = false);
+      setState(() => _failed = true);
       return;
     }
-
-    final path = _absoluteVideoPath(raw);
     final isNet = path.startsWith('http://') || path.startsWith('https://');
     if (!isNet && !File(path).existsSync()) {
       if (!mounted || gen != _gen) return;
-      setState(() => _loading = false);
+      setState(() => _failed = true);
       return;
     }
+    try {
+      final ctrl = isNet
+          ? VideoPlayerController.networkUrl(Uri.parse(path))
+          : VideoPlayerController.file(File(path));
+      _ctrl = ctrl;
+      await ctrl.initialize();
+      await ctrl.setVolume(0);
+      // Ba'zi kodeklar 0ms da qora — biroz oldinga.
+      final target = ctrl.value.duration.inMilliseconds > 400
+          ? const Duration(milliseconds: 200)
+          : Duration.zero;
+      await ctrl.seekTo(target);
+      await ctrl.pause();
+      if (!mounted || gen != _gen) {
+        await ctrl.dispose();
+        return;
+      }
+      _readyUrls.add(path);
+      setState(() {
+        _ready = true;
+        _failed = false;
+      });
+    } catch (e, st) {
+      debugPrint('ChatVideoThumbnail: $e\n$st');
+      if (!mounted || gen != _gen) return;
+      setState(() {
+        _ready = false;
+        _failed = true;
+      });
+    }
+  }
 
-    final bytes = await _loadVideoFrame(path);
-    if (!mounted || gen != _gen) return;
-    setState(() {
-      _bytes = bytes;
-      _loading = false;
-    });
+  void _disposeCtrl() {
+    _ctrl?.dispose();
+    _ctrl = null;
+  }
+
+  @override
+  void dispose() {
+    _disposeCtrl();
+    super.dispose();
   }
 
   @override
@@ -141,35 +137,26 @@ class _ChatVideoThumbnailState extends State<ChatVideoThumbnail> {
     final c = context.appColors;
 
     Widget content;
-    if (_bytes != null) {
-      content = Image.memory(
-        _bytes!,
-        width: widget.width,
-        height: widget.height,
+    if (_ready && _ctrl != null) {
+      content = FittedBox(
         fit: BoxFit.cover,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
-      );
-    } else if (_loading) {
-      content = ColoredBox(
-        color: c.isDark ? const Color(0xFF12263A) : const Color(0xFFE8EEF5),
-        child: Center(
-          child: SizedBox(
-            width: 22.dp,
-            height: 22.dp,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: c.accent,
-            ),
-          ),
+        clipBehavior: Clip.hardEdge,
+        child: SizedBox(
+          width: _ctrl!.value.size.width,
+          height: _ctrl!.value.size.height,
+          child: VideoPlayer(_ctrl!),
         ),
       );
-    } else {
+    } else if (_failed) {
       content = Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            setState(() => _loading = true);
+            setState(() {
+              _failed = false;
+              _ready = false;
+            });
+            _disposeCtrl();
             _load();
           },
           child: ColoredBox(
@@ -180,6 +167,20 @@ class _ChatVideoThumbnailState extends State<ChatVideoThumbnail> {
                 size: 36.dp,
                 color: c.textFaint,
               ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      content = ColoredBox(
+        color: c.isDark ? const Color(0xFF12263A) : const Color(0xFFE8EEF5),
+        child: Center(
+          child: SizedBox(
+            width: 22.dp,
+            height: 22.dp,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: c.accent,
             ),
           ),
         ),
