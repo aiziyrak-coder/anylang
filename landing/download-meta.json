@@ -1,13 +1,13 @@
 {
-  "version": "1.0.87",
-  "build": 88,
-  "version_full": "1.0.87+88",
+  "version": "1.0.88",
+  "build": 89,
+  "version_full": "1.0.88+89",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.87+88.apk",
-  "size_bytes": 88573784,
-  "size_mb": 84.47,
-  "updated_at": "2026-07-30T06:29:43.013624+00:00",
+  "versioned_filename": "anylang-1.0.88+89.apk",
+  "size_bytes": 88737772,
+  "size_mb": 84.63,
+  "updated_at": "2026-07-30T08:15:03.191720+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.cradev.anylang",
-  "notes": "Release 1.0.87+88 — full UI i18n (80 langs), TOP $30/week + paid queue, faster chat translation"
+  "notes": "Release 1.0.88+89 — admin number assign, admin list kit (sort/search/pagination), chat denorm"
 }
