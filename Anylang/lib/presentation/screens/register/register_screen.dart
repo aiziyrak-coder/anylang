@@ -121,9 +121,14 @@ class RegisterScreen extends Screen<RegisterState, void> {
       _fail('birth_required'.tr);
       return;
     }
-    final ageYears =
-        DateTime.now().difference(state.birthDate.value!).inDays / 365.25;
-    if (ageYears < 13) {
+    final birth = state.birthDate.value!;
+    final now = DateTime.now();
+    var age = now.year - birth.year;
+    if (now.month < birth.month ||
+        (now.month == birth.month && now.day < birth.day)) {
+      age--;
+    }
+    if (age < 13) {
       _fail('birth_too_young'.tr);
       return;
     }

@@ -67,7 +67,9 @@ def validate_settings(settings: Settings) -> None:
         if settings.allow_otp_in_response or settings.smtp_fail_open:
             host = (settings.smtp_host or "").strip().lower()
             smtp_ready = bool(host) and host not in {"localhost", "127.0.0.1", "::1"}
-            if smtp_ready:
+            resend_ready = bool((settings.resend_api_key or "").strip())
+            mail_ready = resend_ready or smtp_ready
+            if mail_ready:
                 if settings.allow_otp_in_response:
                     errors.append("ALLOW_OTP_IN_RESPONSE must be false in production")
                 if settings.smtp_fail_open:
@@ -77,8 +79,9 @@ def validate_settings(settings: Settings) -> None:
                     )
             else:
                 logger.warning(
-                    "SMTP not configured — ALLOW_OTP_IN_RESPONSE=%s SMTP_FAIL_OPEN=%s "
-                    "(bootstrap mode; configure real SMTP ASAP)",
+                    "Email delivery not configured (set RESEND_API_KEY or SMTP_HOST) — "
+                    "ALLOW_OTP_IN_RESPONSE=%s SMTP_FAIL_OPEN=%s "
+                    "(bootstrap mode; configure ASAP)",
                     settings.allow_otp_in_response,
                     settings.smtp_fail_open,
                 )

@@ -271,6 +271,7 @@
   "chat_menu_translated": "Translation",
   "chat_menu_unpin": "Unpin",
   "chat_message_not_found": "Message not found",
+  "chat_meters": "@n m",
   "chat_mic_hold": "Hold to record voice",
   "chat_mic_hold_hint": "Tap to switch mic/camera. Hold to record; swipe up to lock",
   "chat_msg_delete_choose": "You can delete the message just for yourself or for everyone.",
@@ -1566,5 +1567,8 @@
   "trade_ai_settings_saved": "AnyTrade AI knowledge saved",
   "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings",
   "jonli_hold_hint": "Hold to talk",
-  "jonli_not_recognized": "Please speak again — we could not recognize it"
+  "jonli_not_recognized": "Please speak again — we could not recognize it",
+  "email_disposable": "Temporary emails are not allowed — use a real address",
+  "email_send_failed": "Could not send the code. Tap resend or try again later",
+  "verify_check_inbox": "Check your inbox (and Spam folder)"
 }

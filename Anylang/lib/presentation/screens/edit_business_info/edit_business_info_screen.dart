@@ -262,23 +262,27 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
         }
       case AddCertificateRequested _:
         final ctrl = TextEditingController();
-        final name = await Get.dialog<String>(
-          AlertDialog(
-            title: Text('business_certificate_title'.tr),
-            content: TextField(controller: ctrl, autofocus: true),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: Text('cancel'.tr),
-              ),
-              TextButton(
-                onPressed: () => Get.back(result: ctrl.text.trim()),
-                child: Text('confirm'.tr),
-              ),
-            ],
-          ),
-        );
-        if (name != null && name.isNotEmpty) state.certificates.add(name);
+        try {
+          final name = await Get.dialog<String>(
+            AlertDialog(
+              title: Text('business_certificate_title'.tr),
+              content: TextField(controller: ctrl, autofocus: true),
+              actions: [
+                TextButton(
+                  onPressed: () => Get.back(),
+                  child: Text('cancel'.tr),
+                ),
+                TextButton(
+                  onPressed: () => Get.back(result: ctrl.text.trim()),
+                  child: Text('confirm'.tr),
+                ),
+              ],
+            ),
+          );
+          if (name != null && name.isNotEmpty) state.certificates.add(name);
+        } finally {
+          ctrl.dispose();
+        }
       case AddFactoryImageRequested _:
         final file = await pickImage(context);
         if (file == null) return;

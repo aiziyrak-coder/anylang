@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
-import '../../modal/business_benefits_bottom_sheet.dart';
 import '../../modal/scam_risk_bottom_sheet.dart';
 import '../../ui/ai_matching_card.dart';
 import '../../ui/market_analytics_card.dart';
@@ -364,10 +363,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
         if (d.isBusiness) ...[
           ProfilePressable(
             borderRadius: BorderRadius.circular(999.dp),
-            onTap: () => showBusinessBenefitsBottomSheet(
-              context,
-              sendAction: sendAction,
-            ),
+            onTap: () => sendAction(ShowBusinessBenefits()),
             child: PillBadge(
               label: 'profile_business'.tr,
               background: c.accentSoft,

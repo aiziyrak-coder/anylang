@@ -58,21 +58,27 @@ class AddProductContent extends ScreenContent<AddProductState> {
     _processVideoCtrl = TextEditingController();
   }
 
+  void _applyHydrate(AddProductState state) {
+    _nameCtrl.text = state.draftName.value ?? '';
+    _priceCtrl.text = state.draftPrice.value ?? '';
+    _shortDescCtrl.text = state.draftShort.value ?? '';
+    _detailedDescCtrl.text = state.draftDetailed.value ?? '';
+    _moqCtrl.text = state.draftMoq.value ?? '';
+    _shippingCtrl.text = state.draftShipping.value ?? '';
+    _factoryVideoCtrl.text = state.draftFactoryVideo.value ?? '';
+    _processVideoCtrl.text = state.draftProcessVideo.value ?? '';
+    final v = state.productVideoUrl.value;
+    if (v != null && v.isNotEmpty) _videoCtrl.text = v;
+  }
+
   @override
   void uiBuildFinished(AddProductState state) {
     _hydrateWorker?.dispose();
     _hydrateWorker = ever(state.draftHydrateToken, (_) {
-      _nameCtrl.text = state.draftName.value ?? '';
-      _priceCtrl.text = state.draftPrice.value ?? '';
-      _shortDescCtrl.text = state.draftShort.value ?? '';
-      _detailedDescCtrl.text = state.draftDetailed.value ?? '';
-      _moqCtrl.text = state.draftMoq.value ?? '';
-      _shippingCtrl.text = state.draftShipping.value ?? '';
-      _factoryVideoCtrl.text = state.draftFactoryVideo.value ?? '';
-      _processVideoCtrl.text = state.draftProcessVideo.value ?? '';
-      final v = state.productVideoUrl.value;
-      if (v != null && v.isNotEmpty) _videoCtrl.text = v;
+      _applyHydrate(state);
     });
+    // Apply immediately — hydrate may have finished before bind.
+    _applyHydrate(state);
   }
 
   @override

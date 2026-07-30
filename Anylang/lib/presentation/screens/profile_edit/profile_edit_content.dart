@@ -43,6 +43,7 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
     if (_hydrateBound) return;
     _hydrateBound = true;
     void apply() {
+      if (state.dirty.value) return;
       final acc = state.account.value;
       _nameCtrl.text = acc?.name ?? '';
       _emailCtrl.text = acc?.email ?? '';
@@ -51,6 +52,10 @@ class ProfileEditContent extends ScreenContent<ProfileEditState> {
     }
 
     _formWorker = ever(state.formEpoch, (_) => apply());
+    _nameCtrl.addListener(() {
+      if (!_hydrateBound) return;
+      state.dirty.value = true;
+    });
     apply();
   }
 

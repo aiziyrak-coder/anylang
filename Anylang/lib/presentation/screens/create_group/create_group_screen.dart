@@ -126,17 +126,20 @@ class CreateGroupScreen extends Screen<CreateGroupState, void> {
           showAppError('error'.tr);
           return;
         }
-        await navigate(
-          ChatScreen(),
-          payload: ChatPayload(
-            chatId: chatId,
-            peerId: 0,
-            name: title,
-            initial: initialsOf(title),
-            avatarGradient: avatarGradientFor(chatId),
-            online: false,
-            isGroup: true,
-          ),
+        // Replace create-group so back from chat doesn't return to a filled form.
+        final chatScreen = ChatScreen();
+        chatScreen.payload = ChatPayload(
+          chatId: chatId,
+          peerId: 0,
+          name: title,
+          initial: initialsOf(title),
+          avatarGradient: avatarGradientFor(chatId),
+          online: false,
+          isGroup: true,
+        );
+        if (!context.mounted) return;
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => chatScreen.build()),
         );
       } finally {
         state.submitting.value = false;

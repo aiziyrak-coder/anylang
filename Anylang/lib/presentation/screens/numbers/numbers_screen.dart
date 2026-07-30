@@ -106,8 +106,8 @@ class NumbersScreen extends Screen<NumbersState, void> {
   Future<void> _loadCatalog({required bool reset}) async {
     if (reset) {
       state.page.value = 1;
-      state.catalogLoading.value = true;
     }
+    state.catalogLoading.value = true;
     final result = await Get.find<NumbersRepository>().catalog(
       search: state.searchQuery.value.trim().isEmpty
           ? null
@@ -345,20 +345,28 @@ class NumbersScreen extends Screen<NumbersState, void> {
         return;
       }
 
-      // Reserve then checkout
-      final reserve =
-          await Get.find<NumbersRepository>().reserve(item.number);
+      // Reserve then checkout — always release on abort / fail / bad payload.
+      final numbersRepo = Get.find<NumbersRepository>();
+      final reserve = await numbersRepo.reserve(item.number);
       final reserveOk = reserve.errorOrNull == null;
       if (!reserveOk) {
         showAppError(reserve.errorOrNull);
         return;
       }
 
+      Future<void> release() async {
+        unawaited(numbersRepo.releaseReserve(item.number));
+      }
+
       final payments = Get.find<PaymentRepository>();
       final checkout = await payments.checkoutNumber(number: item.number);
       await checkout.when(
         success: (data) async {
-          if (data is! Map) return;
+          if (data is! Map) {
+            await release();
+            showAppError('error_generic'.tr);
+            return;
+          }
           final id = data['id'];
           final checkoutUrl = data['checkout_url']?.toString();
           final mockConfirm = data['mock_confirm'] == true;
@@ -383,7 +391,7 @@ class NumbersScreen extends Screen<NumbersState, void> {
             ctaText: 'subscription_pay_confirm_cta'.tr,
           );
           if (confirmed != true) {
-            unawaited(Get.find<NumbersRepository>().releaseReserve(item.number));
+            await release();
             showAppMessage('payment_confirm_later_hint'.tr);
             return;
           }
@@ -400,6 +408,9 @@ class NumbersScreen extends Screen<NumbersState, void> {
               state.awaitingPayment.value = true;
               _startPollLoop();
               showAppMessage('numbers_checkout_opened'.tr);
+            } else {
+              await release();
+              showAppError('error_generic'.tr);
             }
             return;
           }
@@ -423,13 +434,20 @@ class NumbersScreen extends Screen<NumbersState, void> {
                 await _loadMine();
                 await _loadCatalog(reset: true);
               },
-              failure: (e) async => showAppError(e),
+              failure: (e) async {
+                await release();
+                showAppError(e);
+              },
             );
           } else {
+            await release();
             showAppMessage('numbers_checkout_opened'.tr);
           }
         },
-        failure: (e) async => showAppError(e),
+        failure: (e) async {
+          await release();
+          showAppError(e);
+        },
       );
     } finally {
       state.purchasing.value = false;
@@ -445,6 +463,8 @@ class NumbersScreen extends Screen<NumbersState, void> {
       if (done || attempts >= 40) {
         _pollTimer?.cancel();
         if (!done && attempts >= 40) {
+          state.awaitingPayment.value = false;
+          _pendingPaymentId = null;
           showAppWarning('numbers_payment_poll_failed'.tr);
         }
       }

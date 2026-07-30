@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,6 +45,7 @@ Future<void> showProductInfoBottomSheet(
   required VoidCallback onOpenBusiness,
   VoidCallback? onEdit,
   VoidCallback? onManage,
+  VoidCallback? onBoostPaid,
   int? existingPeerId,
   int? existingPeerChatId,
   VoidCallback? onReturnToExistingChat,
@@ -57,6 +60,7 @@ Future<void> showProductInfoBottomSheet(
       onOpenBusiness: onOpenBusiness,
       onEdit: onEdit,
       onManage: onManage,
+      onBoostPaid: onBoostPaid,
       existingPeerId: existingPeerId,
       existingPeerChatId: existingPeerChatId,
       onReturnToExistingChat: onReturnToExistingChat,
@@ -77,6 +81,7 @@ class _ProductInfoSheet extends StatefulWidget {
   final VoidCallback onOpenBusiness;
   final VoidCallback? onEdit;
   final VoidCallback? onManage;
+  final VoidCallback? onBoostPaid;
   final int? existingPeerId;
   final int? existingPeerChatId;
   final VoidCallback? onReturnToExistingChat;
@@ -86,6 +91,7 @@ class _ProductInfoSheet extends StatefulWidget {
     required this.onOpenBusiness,
     this.onEdit,
     this.onManage,
+    this.onBoostPaid,
     this.existingPeerId,
     this.existingPeerChatId,
     this.onReturnToExistingChat,
@@ -112,6 +118,11 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   bool _sellerLoading = false;
   bool _detailErrorShown = false;
   FactoryVerification _factoryVerification = const FactoryVerification();
+  int? _pendingPaymentId;
+  bool _pendingBoostExtend = false;
+  Timer? _pollTimer;
+  AppLifecycleListener? _lifecycle;
+  bool _polling = false;
 
   bool get _isOwner {
     final me = SessionStore.userId();
@@ -124,7 +135,22 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
     _product = widget.product;
     _fav = widget.product.isFavorited;
     _description = widget.product.subtitle ?? '';
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (_pendingPaymentId != null) {
+          unawaited(_pollPendingBoostPayment());
+        }
+      },
+    );
     _loadDetail();
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _lifecycle?.dispose();
+    _pendingPaymentId = null;
+    super.dispose();
   }
 
   Future<void> _loadDetail() async {
@@ -278,7 +304,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       return;
     }
 
-    var name = 'User';
+    var name = 'product_seller_unknown'.tr;
     var initial = '?';
     var gradient = avatarGradientFor(sellerId);
     var online = false;
@@ -398,6 +424,11 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
           if (uri != null) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           }
+          if (id is num) {
+            _pendingPaymentId = id.toInt();
+            _pendingBoostExtend = extend;
+            _startBoostPollLoop();
+          }
           showAppMessage('my_products_boost_checkout_opened'.tr);
           return;
         }
@@ -412,12 +443,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                 ? 'my_products_boost_extend_success'.tr
                 : 'my_products_boost_success'.tr,
           );
-          final detail =
-              await Get.find<ProductsRepository>().detail(_product.id);
-          final map = asMap(detail.dataOrNull);
-          if (map != null && mounted) {
-            setState(() => _product = Product.fromApi(map));
-          }
+          await _refreshAfterBoostPaid();
         } else {
           showAppMessage('my_products_boost_checkout_opened'.tr);
         }
@@ -425,6 +451,69 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       failure: (e) async => showAppError(e),
     );
     if (mounted) setState(() => _topBusy = false);
+  }
+
+  void _startBoostPollLoop() {
+    _pollTimer?.cancel();
+    var attempts = 0;
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (_polling) return;
+      attempts++;
+      final done = await _pollPendingBoostPayment();
+      if (done || attempts >= 40) {
+        _pollTimer?.cancel();
+        if (!done && attempts >= 40) {
+          _pendingPaymentId = null;
+          showAppMessage('subscription_payment_check_hint'.tr);
+        }
+      }
+    });
+  }
+
+  Future<bool> _pollPendingBoostPayment() async {
+    final id = _pendingPaymentId;
+    if (id == null) return true;
+    if (_polling) return false;
+    _polling = true;
+    try {
+      final result = await Get.find<PaymentRepository>().getPayment(id);
+      var resolved = false;
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final status = map?['status']?.toString().toLowerCase();
+          if (status == 'paid' ||
+              status == 'succeeded' ||
+              status == 'completed') {
+            resolved = true;
+            _pendingPaymentId = null;
+            _pollTimer?.cancel();
+            showAppMessage(
+              _pendingBoostExtend
+                  ? 'my_products_boost_extend_success'.tr
+                  : 'my_products_boost_success'.tr,
+            );
+            unawaited(_refreshAfterBoostPaid());
+          } else if (status == 'failed' ||
+              status == 'canceled' ||
+              status == 'cancelled') {
+            resolved = true;
+            _pendingPaymentId = null;
+            _pollTimer?.cancel();
+            showAppMessage('subscription_payment_failed'.tr);
+          }
+        },
+        failure: (_) {},
+      );
+      return resolved;
+    } finally {
+      _polling = false;
+    }
+  }
+
+  Future<void> _refreshAfterBoostPaid() async {
+    await _loadDetail();
+    widget.onBoostPaid?.call();
   }
 
   @override

@@ -7,4 +7,6 @@ class VerifyState extends GetxController {
   RxString debugOtp = ''.obs;
   RxInt secondsLeft = 0.obs; // qayta yuborishgacha qolgan vaqt
   RxBool isLoading = false.obs;
+  /// Set true by screen after a successful resend — content starts cooldown.
+  RxBool resendSucceeded = false.obs;
 }

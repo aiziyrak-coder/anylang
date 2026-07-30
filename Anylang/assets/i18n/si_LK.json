@@ -290,6 +290,7 @@
   "chat_muted_1h": "1 පැයක් නිශ්ශබ්ද කර ඇත",
   "chat_muted_3h": "3 පැයක් නිශ්ශබ්ද කර ඇත",
   "chat_my_location": "මගේ ස්ථානය",
+  "chat_distance_meters": "~{m} m",
   "chat_offer_accept": "අනුමත කරන්න",
   "chat_offer_accepted_toast": "ආශාව අනුමත කර ඇත",
   "chat_offer_compose_hint": "නිර්දේශ කාඩ්පතක රැඳී ඇත - එය කතාබහේදී අහිමි නොවේ",
@@ -1566,5 +1567,8 @@
   "trade_ai_settings_saved": "AnyTrade AI knowledge saved",
   "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings",
   "jonli_hold_hint": "Hold to talk",
-  "jonli_not_recognized": "Please speak again — we could not recognize it"
+  "jonli_not_recognized": "Please speak again — we could not recognize it",
+  "email_disposable": "Temporary emails are not allowed — use a real address",
+  "email_send_failed": "Could not send the code. Tap resend or try again later",
+  "verify_check_inbox": "Check your inbox (and Spam folder)"
 }

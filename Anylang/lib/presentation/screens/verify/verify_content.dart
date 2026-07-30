@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/keyboard_aware_scroll.dart';
@@ -15,22 +16,35 @@ import 'verify_action.dart';
 import 'verify_state.dart';
 
 class VerifyContent extends ScreenContent<VerifyState> {
-
   Timer? _timer;
+  Worker? _resendWorker;
   static const int _resendSeconds = 59;
+  bool _startedInitialCooldown = false;
 
   @override
-  void initContent() {
-    _startTimer();
+  void uiBuildFinished(VerifyState state) {
+    if (!_startedInitialCooldown) {
+      _startedInitialCooldown = true;
+      _startTimer(state);
+    }
+    _resendWorker?.dispose();
+    _resendWorker = ever(state.resendSucceeded, (ok) {
+      if (ok == true) {
+        _startTimer(state);
+        state.resendSucceeded.value = false;
+      }
+    });
   }
 
   @override
   void onClose() {
     _timer?.cancel();
+    _resendWorker?.dispose();
+    _resendWorker = null;
+    _startedInitialCooldown = false;
   }
 
-  void _startTimer() {
-    final state = Get.find<VerifyState>();
+  void _startTimer(VerifyState state) {
     state.secondsLeft.value = _resendSeconds;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -52,10 +66,15 @@ class VerifyContent extends ScreenContent<VerifyState> {
     return GradientBackground(
       child: SafeArea(
         child: KeyboardAwareScrollView(
-          padding: EdgeInsets.fromLTRB(24.dp, 40.dp, 24.dp, 24.dp),
+          padding: EdgeInsets.fromLTRB(24.dp, 12.dp, 24.dp, 24.dp),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              AppTopBar(
+                title: 'verify_title'.tr,
+                onBack: () => sendAction(Back()),
+              ),
+              SizedBox(height: 28.dp),
               // Mail ikonka tile
               Center(
                 child: Container(
@@ -80,6 +99,12 @@ class VerifyContent extends ScreenContent<VerifyState> {
                     textAlign: TextAlign.center,
                     style: TextStyle(color: c.textSecondary, fontSize: 14.sp, height: 1.4),
                   )),
+              SizedBox(height: 8.dp),
+              Text(
+                'verify_check_inbox'.tr,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.textFaint, fontSize: 13.sp, height: 1.35),
+              ),
               SizedBox(height: 28.dp),
               Obx(() {
                 final otp = state.debugOtp.value;
@@ -119,7 +144,9 @@ class VerifyContent extends ScreenContent<VerifyState> {
               }),
               Obx(
                 () => OtpField(
-                  key: ValueKey(state.debugOtp.value),
+                  key: ValueKey(
+                    '${state.debugOtp.value}_${state.code.value.isEmpty}',
+                  ),
                   length: 6,
                   initialValue: state.code.value.isNotEmpty
                       ? state.code.value
@@ -152,7 +179,7 @@ class VerifyContent extends ScreenContent<VerifyState> {
     final c = context.appColors;
     return Obx(() {
       final left = state.secondsLeft.value;
-      final canResend = left <= 0;
+      final canResend = left <= 0 && !state.isLoading.value;
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -161,12 +188,7 @@ class VerifyContent extends ScreenContent<VerifyState> {
             style: TextStyle(color: c.textSecondary, fontSize: 14.sp),
           ),
           InkWell(
-            onTap: canResend
-                ? () {
-                    _startTimer();
-                    sendAction(ResendCode());
-                  }
-                : null,
+            onTap: canResend ? () => sendAction(ResendCode()) : null,
             borderRadius: BorderRadius.circular(8.dp),
             child: Padding(
               padding: EdgeInsets.all(2.dp),
@@ -180,7 +202,7 @@ class VerifyContent extends ScreenContent<VerifyState> {
               ),
             ),
           ),
-          if (!canResend)
+          if (!canResend && left > 0)
             Text(
               ' — ${_format(left)}',
               style: TextStyle(color: c.textFaint, fontSize: 14.sp),

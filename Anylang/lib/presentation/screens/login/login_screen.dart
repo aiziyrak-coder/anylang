@@ -71,24 +71,8 @@ class LoginScreen extends Screen<LoginState, LoginPayload?> {
           showAppError(passErr);
           return;
         }
-        // Allaqachon shu hisob slotda bo‘lsa — faqat aktivlashtirish.
-        final existing = AccountStore.slots()
-            .where((s) => s.email.toLowerCase() == a.email.trim().toLowerCase())
-            .toList();
-        if (existing.isNotEmpty &&
-            await AccountStore.hasTokens(existing.first.userId)) {
-          state.isLoading.value = true;
-          try {
-            final ok = await AccountStore.activate(existing.first.userId);
-            if (ok) {
-              MySnackBar.dismiss();
-              await _enterApp();
-              return;
-            }
-          } finally {
-            state.isLoading.value = false;
-          }
-        }
+        // Always authenticate against the server — never activate a saved
+        // slot by email alone (password must be verified).
         state.isLoading.value = true;
         try {
           final repo = Get.find<AuthRepository>();

@@ -41,6 +41,7 @@ class AddFriendScreen extends Screen<AddFriendState, AddFriendPayload> {
   @override
   void dispose() {
     _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadSentRequests() async {

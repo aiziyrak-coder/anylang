@@ -14,4 +14,6 @@ class ProfileEditState extends GetxController {
   final RxInt avatarEpoch = 0.obs;
   /// Forma maydonlarini API bilan sinxronlash.
   final RxInt formEpoch = 0.obs;
+  /// Foydalanuvchi tahrirni boshlagan — kechikkan getMe overwrite qilmasin.
+  final RxBool dirty = false.obs;
 }

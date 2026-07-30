@@ -19,6 +19,13 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
 
   @override
   void initState(Object? payload) {
+    // Clear leftover GetX state from a previous visit.
+    state.code.value = '';
+    state.debugOtp.value = '';
+    state.isLoading.value = false;
+    state.secondsLeft.value = 0;
+    state.resendSucceeded.value = false;
+
     if (payload is VerifyPayload) {
       state.email.value = payload.email;
       state.debugOtp.value = payload.debugOtp ?? '';
@@ -33,6 +40,8 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
   @override
   Future<void> actionHandler(VerifyState state, MyAction action) async {
     switch (action) {
+      case Back _:
+        popBackNavigate();
       case CodeChanged a:
         state.code.value = a.code;
       case ResendCode _:
@@ -42,6 +51,7 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
         }
         if (state.isLoading.value) return;
         state.isLoading.value = true;
+        state.resendSucceeded.value = false;
         try {
           final repo = Get.find<AuthRepository>();
           final result = await repo.resendVerification(email: state.email.value);
@@ -59,6 +69,8 @@ class VerifyScreen extends Screen<VerifyState, Object?> {
           } else {
             showAppMessage('code_sent'.tr);
           }
+          // Signal content to start the cooldown only after success.
+          state.resendSucceeded.value = true;
         } finally {
           state.isLoading.value = false;
         }

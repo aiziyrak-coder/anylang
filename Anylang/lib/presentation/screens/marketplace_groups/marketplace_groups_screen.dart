@@ -71,6 +71,24 @@ class MarketplaceGroupsScreen extends Screen<MarketplaceGroupsState, void> {
       await _load(fromRefresh: true);
       return;
     }
+    // Allaqachon a'zo — join qayta chaqirilmasin; list `id` = chat id.
+    if (group.joined && group.id > 0) {
+      await navigate(
+        ChatScreen(),
+        payload: ChatPayload(
+          chatId: group.id,
+          peerId: 0,
+          name: '${group.emoji} ${group.title}',
+          initial: initialsOf(group.title),
+          avatarGradient: avatarGradientFor(group.id),
+          isGroup: true,
+          myRole: group.myRole,
+          isMarketplace: true,
+          marketplaceSlug: group.slug,
+        ),
+      );
+      return;
+    }
     state.joining.value = true;
     try {
       final result = await Get.find<MarketplaceGroupsRepository>().join(group.slug);

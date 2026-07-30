@@ -835,8 +835,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         if (Get.isRegistered<VoicePlayerService>()) {
           await Get.find<VoicePlayerService>().stop(save: true);
         }
-        popBackNavigate();
         _toast('chat_deleted'.tr);
+        popBackNavigate();
 
       case BlockPeer _:
         if (state.isGroup.value) return;
@@ -873,8 +873,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           await Get.find<VideoNoteRecorderService>().release();
         }
         await Get.find<VoicePlayerService>().stop(save: true);
-        popBackNavigate();
         _toast('chat_blocked'.tr);
+        popBackNavigate();
 
       case OpenChatProduct a:
         await _openChatProduct(a.message);
@@ -1946,7 +1946,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       createdAt: DateTime.now(),
       url: file.path,
       gradient: avatarTealGradient,
-      status: ChatStatus.sent,
+      status: ChatStatus.pending,
       reply: _replyFor(state),
     );
     await _uploadAndSendMedia(
@@ -1978,7 +1978,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       name: name,
       size: file.size > 0 ? _formatBytes(file.size) : '—',
       ext: ext,
-      status: ChatStatus.sent,
+      status: ChatStatus.pending,
       reply: _replyFor(state),
     );
     await _uploadAndSendMedia(
@@ -2001,7 +2001,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       title: product.name,
       price: product.price,
       productId: product.id,
-      status: ChatStatus.sent,
+      status: ChatStatus.pending,
       reply: _replyFor(state),
     );
     await _sendMetaMessage(
@@ -2030,11 +2030,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       createdAt: DateTime.now(),
       label: label,
       distance: picked.accuracyMeters != null
-          ? '~${picked.accuracyMeters!.round()} m'
+          ? 'chat_meters'
+              .trParams({'n': '${picked.accuracyMeters!.round()}'})
           : '',
       latitude: picked.latitude,
       longitude: picked.longitude,
-      status: ChatStatus.sent,
+      status: ChatStatus.pending,
       reply: _replyFor(state),
     );
     await _sendMetaMessage(
@@ -2065,7 +2066,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       name: name,
       phone: phone,
       initial: initialsOf(name),
-      status: ChatStatus.sent,
+      status: ChatStatus.pending,
       userId: contact.userId,
       avatarUrl: contact.avatarUrl,
       number: number,
@@ -2203,7 +2204,7 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       payment: draft.payment.isEmpty ? null : draft.payment,
       status: draft.status,
       productId: draft.productId,
-      chatStatus: ChatStatus.sent,
+      chatStatus: ChatStatus.pending,
     );
     await _sendMetaMessage(
       type: 'offer',

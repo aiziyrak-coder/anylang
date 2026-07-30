@@ -17,6 +17,7 @@ import '../../../data/network/session_bootstrap.dart';
 import '../../../data/network/socket_service.dart';
 import '../../modal/account_switcher_bottom_sheet.dart';
 import '../../modal/ai_matching_bottom_sheet.dart';
+import '../../modal/business_benefits_bottom_sheet.dart';
 import '../../modal/business_card_qr_bottom_sheet.dart';
 import '../../modal/business_verification_bottom_sheet.dart';
 import '../../modal/edit_bio_bottom_sheet.dart';
@@ -420,7 +421,11 @@ class ProfileScreen extends Screen<ProfileState, void> {
         ].join('\n');
         await Share.share(body, subject: shareAcc.name);
       case ShowBusinessBenefits _:
-        break;
+        if (!context.mounted) return;
+        await showBusinessBenefitsBottomSheet(
+          context,
+          sendAction: (a) => actionHandler(state, a),
+        );
       case OpenProfileAvatar _:
         final avatarUrl = state.account.value?.avatarUrl?.trim();
         if (avatarUrl == null || avatarUrl.isEmpty) return;
@@ -434,7 +439,11 @@ class ProfileScreen extends Screen<ProfileState, void> {
         if (matching == null && !state.aiMatchingLoading.value) {
           await _loadAiMatching();
         }
-        final matchingData = state.aiMatching.value ?? const AiMatchingResult();
+        final matchingData = state.aiMatching.value;
+        if (matchingData == null || matchingData.items.isEmpty) {
+          showAppMessage('ai_matching_empty'.tr);
+          return;
+        }
         if (!context.mounted) return;
         await showAiMatchingBottomSheet(
           context,

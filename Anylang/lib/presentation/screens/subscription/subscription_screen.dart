@@ -28,6 +28,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
 
   int? _pendingPaymentId;
   Timer? _pollTimer;
+  bool _polling = false;
   AppLifecycleListener? _lifecycle;
 
   @override
@@ -546,6 +547,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
     _pollTimer?.cancel();
     var attempts = 0;
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (_polling) return;
       attempts++;
       final done = await _pollPendingPayment(showWaiting: false);
       if (done || attempts >= 40) {
@@ -566,37 +568,43 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
       if (showWaiting) showAppMessage('subscription_payment_check_hint'.tr);
       return true;
     }
-    final payments = Get.find<PaymentRepository>();
-    final result = await payments.getPayment(id);
-    var resolved = false;
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        final status = map?['status']?.toString().toLowerCase();
-        if (status == 'paid' || status == 'succeeded' || status == 'completed') {
-          resolved = true;
-          _pendingPaymentId = null;
-          state.awaitingPayment.value = false;
-          _pollTimer?.cancel();
-          showAppMessage('subscription_payment_success'.tr);
-          unawaited(_loadAll());
-        } else if (status == 'failed' ||
-            status == 'canceled' ||
-            status == 'cancelled') {
-          resolved = true;
-          _pendingPaymentId = null;
-          state.awaitingPayment.value = false;
-          _pollTimer?.cancel();
-          showAppMessage('subscription_payment_failed'.tr);
-        } else if (showWaiting) {
-          showAppMessage('subscription_payment_pending'.tr);
-        }
-      },
-      failure: (err) {
-        if (showWaiting) showAppError(err);
-      },
-    );
-    return resolved;
+    if (_polling) return false;
+    _polling = true;
+    try {
+      final payments = Get.find<PaymentRepository>();
+      final result = await payments.getPayment(id);
+      var resolved = false;
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final status = map?['status']?.toString().toLowerCase();
+          if (status == 'paid' || status == 'succeeded' || status == 'completed') {
+            resolved = true;
+            _pendingPaymentId = null;
+            state.awaitingPayment.value = false;
+            _pollTimer?.cancel();
+            showAppMessage('subscription_payment_success'.tr);
+            unawaited(_loadAll());
+          } else if (status == 'failed' ||
+              status == 'canceled' ||
+              status == 'cancelled') {
+            resolved = true;
+            _pendingPaymentId = null;
+            state.awaitingPayment.value = false;
+            _pollTimer?.cancel();
+            showAppMessage('subscription_payment_failed'.tr);
+          } else if (showWaiting) {
+            showAppMessage('subscription_payment_pending'.tr);
+          }
+        },
+        failure: (err) {
+          if (showWaiting) showAppError(err);
+        },
+      );
+      return resolved;
+    } finally {
+      _polling = false;
+    }
   }
 
   String _formatExpires(String iso) {

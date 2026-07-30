@@ -43,7 +43,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "AnyLang <noreply@anylang.local>"
     smtp_tls: bool = False
-    # If SMTP is down, still accept register (OTP hashed in DB). Never return OTP in production.
+    # Preferred production delivery (https://resend.com). If set, SMTP_HOST is unused for OTP.
+    resend_api_key: str = ""
+    # If delivery is down, still accept register (OTP hashed in DB). Never return OTP in production.
     smtp_fail_open: bool = True
     allow_otp_in_response: bool = False
 

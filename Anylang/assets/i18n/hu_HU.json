@@ -290,6 +290,7 @@
   "chat_muted_1h": "Némítva 1 óráig",
   "chat_muted_3h": "Némítva 3 óráig",
   "chat_my_location": "Saját helyem",
+  "chat_distance_meters": "~{m} m",
   "chat_offer_accept": "Elfogadás",
   "chat_offer_accepted_toast": "Ajánlat elfogadva",
   "chat_offer_compose_hint": "A feltételek egy kártyán maradnak — nem fognak elveszni a chatben",
@@ -1566,5 +1567,8 @@
   "trade_ai_settings_saved": "AnyTrade AI knowledge saved",
   "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings",
   "jonli_hold_hint": "Hold to talk",
-  "jonli_not_recognized": "Please speak again — we could not recognize it"
+  "jonli_not_recognized": "Please speak again — we could not recognize it",
+  "email_disposable": "Temporary emails are not allowed — use a real address",
+  "email_send_failed": "Could not send the code. Tap resend or try again later",
+  "verify_check_inbox": "Check your inbox (and Spam folder)"
 }

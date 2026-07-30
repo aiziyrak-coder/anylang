@@ -447,14 +447,14 @@ class ProductsContent extends ScreenContent<ProductsState> {
       value: value,
       child: Row(
         children: [
-          Icon(icon, color: c.accent, size: 22),
-          const SizedBox(width: 12),
+          Icon(icon, color: c.accent, size: 22.dp),
+          SizedBox(width: 12.dp),
           Expanded(
             child: Text(
               label,
               style: TextStyle(
                 color: c.textPrimary,
-                fontSize: 14,
+                fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
               ),
             ),

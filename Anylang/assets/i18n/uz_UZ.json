@@ -271,6 +271,7 @@
   "chat_menu_translated": "Tarjima",
   "chat_menu_unpin": "Qadashni olib tashlash",
   "chat_message_not_found": "Xabar topilmadi",
+  "chat_meters": "@n m",
   "chat_mic_hold": "Ovoz yozish uchun ushlab turing",
   "chat_mic_hold_hint": "Bir marta — mikrofon/kamera. Uzoq bosib yozing; yuqoriga surib ushlab turing",
   "chat_msg_delete_choose": "Xabar faqat sizda yoki hamma ishtirokchida o‘chirilishi mumkin.",
@@ -1566,5 +1567,8 @@
   "trade_ai_settings_saved": "AnyTrade AI bilimi saqlandi",
   "trade_ai_settings_load_failed": "AnyTrade AI sozlamalarini yuklab bo‘lmadi",
   "jonli_hold_hint": "Bosib turing",
-  "jonli_not_recognized": "Qayta gapiring, aniqlolmadik"
+  "jonli_not_recognized": "Qayta gapiring, aniqlolmadik",
+  "email_disposable": "Vaqtinchalik email qabul qilinmaydi — haqiqiy pochta kiriting",
+  "email_send_failed": "Kod emailga yuborilmadi. Qayta yuborishni bosing yoki keyinroq urinib ko‘ring",
+  "verify_check_inbox": "Pochtangizni (Spam papkasini ham) tekshiring"
 }

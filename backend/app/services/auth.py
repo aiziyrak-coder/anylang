@@ -23,6 +23,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import NumberAssignment, RefreshToken, User
+from app.services.email_guard import is_disposable_email
 from app.services.numbers import assign_random_standard_number
 from app.services.otp import (
     PURPOSE_RESET_PASSWORD,
@@ -259,6 +260,13 @@ async def register(
 ) -> dict[str, Any]:
     email_norm = email.lower().strip()
 
+    if is_disposable_email(email_norm):
+        raise AppError(
+            message="Vaqtinchalik email qabul qilinmaydi — haqiqiy pochta kiriting",
+            error_code="EMAIL_DISPOSABLE",
+            status_code=400,
+        )
+
     existing = await db.execute(select(User.id).where(User.email == email_norm))
     if existing.scalar_one_or_none() is not None:
         raise AppError(
@@ -307,6 +315,7 @@ async def register(
         if emailed
         else "Ro'yxatdan o'tdingiz. Tasdiqlash kodi emailga yuborilmadi — keyinroq qayta yuboring",
         "resend_after_seconds": resend_after,
+        "emailed": emailed,
     }
     # When enabled, always return OTP so the mobile app can finish signup
     # even if SMTP is misconfigured or "succeeds" without delivery.
@@ -366,8 +375,9 @@ async def resend_verification(
         enforce_cooldown=True,
     )
     out: dict[str, Any] = {
-        "message": "Kod qayta yuborildi",
+        "message": "Kod emailingizga yuborildi" if emailed else "Kod yuborilmadi — qayta urinib ko‘ring",
         "resend_after_seconds": resend_after,
+        "emailed": emailed,
     }
     settings = get_settings()
     if settings.allow_otp_in_response:

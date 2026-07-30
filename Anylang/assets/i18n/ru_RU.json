@@ -271,6 +271,7 @@
   "chat_menu_translated": "Перевод",
   "chat_menu_unpin": "Открепить",
   "chat_message_not_found": "Сообщение не найдено",
+  "chat_meters": "@n м",
   "chat_mic_hold": "Удерживайте для записи голоса",
   "chat_mic_hold_hint": "Нажмите — микрофон/камера. Удерживайте для записи; свайп вверх — фиксация",
   "chat_msg_delete_choose": "Сообщение можно удалить только у себя или у всех участников.",
@@ -1566,5 +1567,8 @@
   "trade_ai_settings_saved": "База знаний AnyTrade AI сохранена",
   "trade_ai_settings_load_failed": "Не удалось загрузить настройки AnyTrade AI",
   "jonli_hold_hint": "Удерживайте",
-  "jonli_not_recognized": "Повторите, не распознали"
+  "jonli_not_recognized": "Повторите, не распознали",
+  "email_disposable": "Временная почта не принимается — укажите настоящий email",
+  "email_send_failed": "Не удалось отправить код на email. Нажмите «Отправить снова» или попробуйте позже",
+  "verify_check_inbox": "Проверьте почту (и папку «Спам»)"
 }

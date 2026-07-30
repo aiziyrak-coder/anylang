@@ -47,10 +47,22 @@ class ProductsScreen extends Screen<ProductsState, void> {
   int _loadGen = 0;
   Timer? _searchDebounce;
   int _searchSeq = 0;
+  int? _pendingPaymentId;
+  bool _pendingBoostExtend = false;
+  Timer? _pollTimer;
+  AppLifecycleListener? _lifecycle;
+  bool _polling = false;
 
   @override
   void initState(void payload) {
     state.softRefreshHandler = _onSoftRefresh;
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (_pendingPaymentId != null) {
+          unawaited(_pollPendingBoostPayment(showWaiting: false));
+        }
+      },
+    );
     _loadCategories();
     _load();
     unawaited(_refreshBusinessFlag());
@@ -63,6 +75,9 @@ class ProductsScreen extends Screen<ProductsState, void> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _pollTimer?.cancel();
+    _lifecycle?.dispose();
+    _pendingPaymentId = null;
     if (identical(state.softRefreshHandler, _onSoftRefresh)) {
       state.softRefreshHandler = null;
     }
@@ -283,13 +298,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
       state.smartSearchActive.value = false;
       state.smartInterpretation.value = null;
       state.smartSort.value = null;
-      final result = await Get.find<ProductsRepository>().list(
-        q: q,
-        category: state.category.value,
-        country: state.country.value,
-        businessRole: state.businessRole.value,
-        verifiedOnly: state.verifiedOnly.value,
-      );
+      final result = await _listWithState(q: q);
       if (seq != _searchSeq) return;
       result.when(
         success: (data) {
@@ -342,7 +351,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
         state.smartSearchActive.value = false;
         state.smartInterpretation.value = null;
         state.smartSort.value = null;
-        final fallback = await Get.find<ProductsRepository>().list(q: q);
+        final fallback = await _listWithState(q: q);
         if (seq != _searchSeq) return;
         fallback.when(
           success: (data) {
@@ -853,6 +862,11 @@ class ProductsScreen extends Screen<ProductsState, void> {
           if (uri != null) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           }
+          if (id is num) {
+            _pendingPaymentId = id.toInt();
+            _pendingBoostExtend = extend;
+            _startBoostPollLoop();
+          }
           showAppMessage('my_products_boost_checkout_opened'.tr);
           return;
         }
@@ -874,6 +888,74 @@ class ProductsScreen extends Screen<ProductsState, void> {
       },
       failure: (e) async => showAppError(e),
     );
+  }
+
+  void _startBoostPollLoop() {
+    _pollTimer?.cancel();
+    var attempts = 0;
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (_polling) return;
+      attempts++;
+      final done = await _pollPendingBoostPayment(showWaiting: false);
+      if (done || attempts >= 40) {
+        _pollTimer?.cancel();
+        if (!done && attempts >= 40) {
+          _pendingPaymentId = null;
+          showAppMessage('subscription_payment_check_hint'.tr);
+        }
+      }
+    });
+  }
+
+  Future<bool> _pollPendingBoostPayment({required bool showWaiting}) async {
+    final id = _pendingPaymentId;
+    if (id == null) {
+      if (showWaiting) {
+        showAppMessage('subscription_payment_check_hint'.tr);
+      }
+      return true;
+    }
+    if (_polling) return false;
+    _polling = true;
+    try {
+      final payments = Get.find<PaymentRepository>();
+      final result = await payments.getPayment(id);
+      var resolved = false;
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final status = map?['status']?.toString().toLowerCase();
+          if (status == 'paid' ||
+              status == 'succeeded' ||
+              status == 'completed') {
+            resolved = true;
+            _pendingPaymentId = null;
+            _pollTimer?.cancel();
+            showAppMessage(
+              _pendingBoostExtend
+                  ? 'my_products_boost_extend_success'.tr
+                  : 'my_products_boost_success'.tr,
+            );
+            unawaited(_loadMyProducts());
+          } else if (status == 'failed' ||
+              status == 'canceled' ||
+              status == 'cancelled') {
+            resolved = true;
+            _pendingPaymentId = null;
+            _pollTimer?.cancel();
+            showAppMessage('subscription_payment_failed'.tr);
+          } else if (showWaiting) {
+            showAppMessage('subscription_payment_pending'.tr);
+          }
+        },
+        failure: (e) {
+          if (showWaiting) showAppError(e);
+        },
+      );
+      return resolved;
+    } finally {
+      _polling = false;
+    }
   }
 
   @override
@@ -975,7 +1057,16 @@ class ProductsScreen extends Screen<ProductsState, void> {
         if (state.aiMatching.value == null && !state.aiMatchingLoading.value) {
           await _loadAiMatchingIfBusiness();
         }
-        final data = state.aiMatching.value ?? const AiMatchingResult();
+        if (state.aiMatchingLoadFailed.value) {
+          showAppWarning('ai_matching_load_failed'.tr);
+          return;
+        }
+        final data = state.aiMatching.value;
+        if (data == null || data.items.isEmpty) {
+          showAppMessage('ai_matching_empty'.tr);
+          return;
+        }
+        if (!context.mounted) return;
         await showAiMatchingBottomSheet(
           context,
           result: data,
@@ -1091,6 +1182,9 @@ class ProductsScreen extends Screen<ProductsState, void> {
               : null,
           onManage: isOwner
               ? () => unawaited(_handleOwnProduct(a.product))
+              : null,
+          onBoostPaid: isOwner
+              ? () => unawaited(_loadMyProducts())
               : null,
         );
         if (isOwner) await _load(keepQuery: true);

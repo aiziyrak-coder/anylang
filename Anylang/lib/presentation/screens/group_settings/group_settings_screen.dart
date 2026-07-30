@@ -116,7 +116,10 @@ class GroupSettingsScreen extends Screen<GroupSettingsState, GroupSettingsPayloa
               final m = asMap(d) ?? {};
               state.inviteLink.value = m['link']?.toString();
             },
-            failure: showAppError,
+            // Non-admin 403 and similar — silent; only admins need the link.
+            failure: (err) {
+              if (_isAdmin) showAppError(err);
+            },
           );
         } finally {
           state.loading.value = false;

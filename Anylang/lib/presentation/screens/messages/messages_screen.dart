@@ -48,6 +48,12 @@ class MessagesScreen extends Screen<MessagesState, void> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final seq = ++_loadSeq;
     final filter = state.listFilter.value;
@@ -227,6 +233,10 @@ class MessagesScreen extends Screen<MessagesState, void> {
       success: (data) {
         final map = asMap(data);
         final chatId = (map?['id'] as num?)?.toInt() ?? 0;
+        if (chatId <= 0) {
+          showAppError('chat_open_failed'.tr);
+          return;
+        }
         navigate(
           ChatScreen(),
           payload: ChatPayload(

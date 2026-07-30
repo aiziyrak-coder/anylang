@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.integrations.email import send_otp_email
 from app.models.user import OtpCode
@@ -121,6 +122,14 @@ async def create_and_send_otp(
 
     emailed = await send_otp_email(email_norm, code, app_language)
     await _set_resend_cooldown(redis, email_norm, purpose)
+
+    settings = get_settings()
+    if not emailed and settings.is_production and not settings.smtp_fail_open:
+        raise AppError(
+            message="Tasdiqlash kodini emailga yuborib bo‘lmadi. Keyinroq urinib ko‘ring",
+            error_code="EMAIL_SEND_FAILED",
+            status_code=503,
+        )
 
     return code, RESEND_COOLDOWN_SECONDS, emailed
 

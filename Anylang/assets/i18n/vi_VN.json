@@ -290,6 +290,7 @@
   "chat_muted_1h": "Đã tắt tiếng trong 1 giờ",
   "chat_muted_3h": "Đã tắt tiếng trong 3 giờ",
   "chat_my_location": "Vị trí của tôi",
+  "chat_distance_meters": "~{m} m",
   "chat_offer_accept": "Chấp nhận",
   "chat_offer_accepted_toast": "Đề nghị đã được chấp nhận",
   "chat_offer_compose_hint": "Điều khoản sẽ ở trên một thẻ — chúng sẽ không bị mất trong trò chuyện",
@@ -1566,5 +1567,8 @@
   "trade_ai_settings_saved": "AnyTrade AI knowledge saved",
   "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings",
   "jonli_hold_hint": "Hold to talk",
-  "jonli_not_recognized": "Please speak again — we could not recognize it"
+  "jonli_not_recognized": "Please speak again — we could not recognize it",
+  "email_disposable": "Temporary emails are not allowed — use a real address",
+  "email_send_failed": "Could not send the code. Tap resend or try again later",
+  "verify_check_inbox": "Check your inbox (and Spam folder)"
 }

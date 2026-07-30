@@ -44,6 +44,7 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
     state.isSaving.value = false;
     state.avatarUploading.value = false;
     state.hydrateFailed.value = false;
+    state.dirty.value = false;
     state.account.value = payload;
     state.country.value = payload?.countryCode ?? '';
     state.birthDate.value = null;
@@ -65,6 +66,9 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
         unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
         final acc = ProfileAccount.fromApi(map);
         state.account.value = acc;
+        // Agar foydalanuvchi allaqachon tahrirlayotgan bo‘lsa — formani
+        // qayta yozib yubormaymiz (faqat account/session yangilanadi).
+        if (state.dirty.value) return;
         final code = (map['country'] as String?)?.trim().toUpperCase() ?? '';
         if (code.length == 2) {
           state.country.value = code;
@@ -97,8 +101,12 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
       showAppError('birth_date_future'.tr);
       return false;
     }
-    final ageYears = now.difference(date).inDays / 365.25;
-    if (ageYears < 13) {
+    var age = now.year - date.year;
+    if (now.month < date.month ||
+        (now.month == date.month && now.day < date.day)) {
+      age--;
+    }
+    if (age < 13) {
       showAppError('birth_too_young'.tr);
       return false;
     }
@@ -157,10 +165,13 @@ class ProfileEditScreen extends Screen<ProfileEditState, ProfileAccount> {
           state.avatarUploading.value = false;
         }
       case SelectProfileBirthDate a:
+        state.dirty.value = true;
         state.birthDate.value = a.date;
       case SelectProfileCountry a:
+        state.dirty.value = true;
         state.country.value = a.country.toUpperCase();
       case SelectProfileGender a:
+        state.dirty.value = true;
         state.gender.value = a.gender;
       case SaveProfileEdit a:
         if (state.hydrateFailed.value) {

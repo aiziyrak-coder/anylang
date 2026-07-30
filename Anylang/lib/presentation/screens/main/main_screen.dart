@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -27,6 +29,8 @@ class MainScreen extends Screen<MainState, void> {
   MainScreen() : super(mobileContent: MainContent());
 
   static const _exitWindow = Duration(seconds: 2);
+  static const _softRefreshDebounce = Duration(milliseconds: 700);
+  DateTime? _lastSoftRefreshAt;
 
   @override
   void initState(void payload) {
@@ -68,24 +72,31 @@ class MainScreen extends Screen<MainState, void> {
           await _pauseJonli();
         }
         if (a.index == prev) {
-          // Qayta bosish — soft refresh.
-          if (a.index == 0) await _refreshConversations();
-          if (a.index == 1) await _refreshFriends();
-          if (a.index == 2) await _softRefreshProducts();
-          if (a.index == 4) await _softRefreshProfile();
+          // Qayta bosish — soft refresh (debounce).
+          await _softRefreshTab(a.index);
           return;
         }
         // IndexedStack re-init qilmaydi — tab ochilganda soft refresh.
-        if (a.index == 0) await _refreshConversations();
-        if (a.index == 1) await _refreshFriends();
-        if (a.index == 2) await _softRefreshProducts();
-        if (a.index == 4) await _softRefreshProfile();
+        await _softRefreshTab(a.index);
       case HandleSystemBack _:
         await _onSystemBack(state);
       case ProfileTabLongPressed _:
         if (!context.mounted) return;
         await showAccountSwitcherBottomSheet(context);
     }
+  }
+
+  Future<void> _softRefreshTab(int index) async {
+    final now = DateTime.now();
+    final last = _lastSoftRefreshAt;
+    if (last != null && now.difference(last) < _softRefreshDebounce) {
+      return;
+    }
+    _lastSoftRefreshAt = now;
+    if (index == 0) await _refreshConversations();
+    if (index == 1) await _refreshFriends();
+    if (index == 2) await _softRefreshProducts();
+    if (index == 4) await _softRefreshProfile();
   }
 
   Future<void> _pauseJonli() async {

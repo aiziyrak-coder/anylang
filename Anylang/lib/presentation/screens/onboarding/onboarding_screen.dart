@@ -55,7 +55,7 @@ class OnboardingScreen extends Screen<OnboardingState, void> {
       showAppMessage('onboarding_skip_deferred'.tr);
     }
     await SessionStore.setOnboardingCompleted();
-    navigate(LoginScreen());
+    navigateAndRemoveUntil(LoginScreen());
   }
 
   @override

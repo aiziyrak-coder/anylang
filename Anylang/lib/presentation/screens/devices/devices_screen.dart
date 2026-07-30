@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../data/core/mappers.dart';
 import '../../../data/network/auth_repository.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import 'device_session.dart';
@@ -23,7 +24,10 @@ class DevicesScreen extends Screen<DevicesState, void> {
     state.error.value = null;
     final result = await Get.find<AuthRepository>().listSessions();
     if (result.errorOrNull != null) {
-      state.error.value = result.errorOrNull?.toString();
+      state.error.value = AuthValidators.safeError(
+        result.errorOrNull,
+        fallbackKey: 'error_generic',
+      );
       state.loading.value = false;
       return;
     }
