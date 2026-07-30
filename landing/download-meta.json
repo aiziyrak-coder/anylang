@@ -1,13 +1,13 @@
 {
-  "version": "1.0.86",
-  "build": 87,
-  "version_full": "1.0.86+87",
+  "version": "1.0.87",
+  "build": 88,
+  "version_full": "1.0.87+88",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.86+87.apk",
-  "size_bytes": 88571064,
+  "versioned_filename": "anylang-1.0.87+88.apk",
+  "size_bytes": 88573784,
   "size_mb": 84.47,
-  "updated_at": "2026-07-30T06:15:59.523955+00:00",
+  "updated_at": "2026-07-30T06:29:43.013624+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.cradev.anylang",
-  "notes": "Release 1.0.86+87 — full UI i18n (80 langs), TOP $30/week + paid queue, faster chat translation"
+  "notes": "Release 1.0.87+88 — full UI i18n (80 langs), TOP $30/week + paid queue, faster chat translation"
 }
