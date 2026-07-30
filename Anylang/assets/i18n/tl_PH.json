@@ -1565,5 +1565,6 @@
   "trade_ai_settings_limit": "Maximum 8000 characters",
   "trade_ai_settings_saved": "AnyTrade AI knowledge saved",
   "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings",
-  "jonli_hold_hint": "Hold to talk"
+  "jonli_hold_hint": "Hold to talk",
+  "jonli_not_recognized": "Please speak again — we could not recognize it"
 }

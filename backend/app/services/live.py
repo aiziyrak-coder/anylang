@@ -297,8 +297,8 @@ async def create_turn(
     )
     if not text_original.strip():
         raise AppError(
-            message="Audioda nutq topilmadi",
-            error_code="NO_SPEECH_DETECTED",
+            message="Qayta gapiring, aniqlolmadik",
+            error_code="SPEECH_NOT_RECOGNIZED",
             status_code=400,
         )
 

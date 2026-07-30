@@ -135,6 +135,17 @@ class JonliScreen extends Screen<JonliState, void> {
         code == 'JONLI_PREMIUM_REQUIRED';
   }
 
+  bool _isSpeechNotRecognized(Object? err) {
+    final code = AuthValidators.apiErrorCode(err);
+    if (code == 'SPEECH_NOT_RECOGNIZED' ||
+        code == 'NO_SPEECH_DETECTED' ||
+        code == 'STT_FAILED') {
+      return true;
+    }
+    final raw = err?.toString().toLowerCase() ?? '';
+    return raw.contains('aniqlol') || raw.contains('nutq topilmadi');
+  }
+
   Future<void> _offerPlans() async {
     state.needsPremium.value = true;
     showAppMessage('jonli_premium_required'.tr);
@@ -435,6 +446,16 @@ class JonliScreen extends Screen<JonliState, void> {
       );
       final map = asMap(result.dataOrNull);
       if (map == null) {
+        final err = result.errorOrNull ?? 'jonli_translate_failed'.tr;
+        if (_isPremiumRequired(err)) {
+          await _offerPlans();
+          return;
+        }
+        if (_isSpeechNotRecognized(err)) {
+          state.turns.removeWhere((t) => t.clientTurnId == turnId);
+          showAppMessage('jonli_not_recognized'.tr);
+          return;
+        }
         _upsertTurn(
           JonliTranscriptEntry(
             clientTurnId: turnId,
@@ -447,12 +468,7 @@ class JonliScreen extends Screen<JonliState, void> {
             audioPath: filePath,
           ),
         );
-        final err = result.errorOrNull ?? 'jonli_translate_failed'.tr;
-        if (_isPremiumRequired(err)) {
-          await _offerPlans();
-        } else {
-          showAppError(err);
-        }
+        showAppError(err);
         return;
       }
 

@@ -1565,5 +1565,6 @@
   "trade_ai_settings_limit": "Maksimal 8000 belgi",
   "trade_ai_settings_saved": "AnyTrade AI bilimi saqlandi",
   "trade_ai_settings_load_failed": "AnyTrade AI sozlamalarini yuklab bo‘lmadi",
-  "jonli_hold_hint": "Bosib turing"
+  "jonli_hold_hint": "Bosib turing",
+  "jonli_not_recognized": "Qayta gapiring, aniqlolmadik"
 }

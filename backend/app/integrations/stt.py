@@ -1,15 +1,18 @@
 """Speech-to-text for Live / chat voice.
 
-Order (ideal for Uzbek + multilingual):
-  1) OpenAI gpt-4o-mini-transcribe (fast, strong multilingual) → whisper-1
-  2) Auto-detect language if forced-lang returned empty
-  3) Deepgram nova-2 (skip for known-weak Turkic codes unless nothing else worked)
-  4) Production: NO_SPEECH_DETECTED; local: mock
+Order:
+  1) OpenAI with **forced speaker language** (never auto-detect first —
+     that mislabels Uzbek as Japanese/Chinese)
+  2) Same models with auto-detect only if forced returned empty
+  3) Deepgram (skipped / last for weak Turkic codes)
+  4) Script sanity check vs expected language — CJK garbage is rejected
+  5) Production: SPEECH_NOT_RECOGNIZED / NO_SPEECH_DETECTED
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import httpx
@@ -22,11 +25,14 @@ logger = logging.getLogger(__name__)
 DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
 OPENAI_WHISPER_URL = "https://api.openai.com/v1/audio/transcriptions"
 
-# Deepgram nova-2 is unreliable for these ISO codes — Whisper first, Deepgram last.
+# Deepgram nova-2 is unreliable for these ISO codes — Whisper only.
 _DEEPGRAM_WEAK_LANGS = frozenset({"uz", "kk", "ky", "tg", "tk", "az"})
 
 _LANG_PROMPTS: dict[str, str] = {
-    "uz": "O'zbek tili. Oddiy suhbat. To'g'ri o'zbekcha so'zlar.",
+    "uz": (
+        "O'zbek tili (lotin). Oddiy suhbat. Faqat o'zbekcha so'zlar. "
+        "Yapon, xitoy yoki boshqa tillarni yozmang."
+    ),
     "kk": "Қазақ тілі. Қарапайым сөйлесу.",
     "ky": "Кыргыз тили. Жөнөкөй сүйлөшүү.",
     "tg": "Забони тоҷикӣ. Сӯҳбати оддӣ.",
@@ -41,6 +47,66 @@ _LANG_PROMPTS: dict[str, str] = {
     "fr": "Français parlé. Conversation quotidienne.",
     "es": "Español hablado. Conversación cotidiana.",
 }
+
+_CJK_RE = re.compile(
+    r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]"
+)
+_LATIN_RE = re.compile(r"[A-Za-zÀ-ɏʻʼʹʻ']")
+_CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
+_ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
+
+# Expected primary scripts (uz allows Latin + Cyrillic).
+_LATIN_LANGS = frozenset(
+    {
+        "uz",
+        "en",
+        "tr",
+        "de",
+        "fr",
+        "es",
+        "it",
+        "pt",
+        "nl",
+        "pl",
+        "cs",
+        "sk",
+        "hu",
+        "ro",
+        "sv",
+        "no",
+        "fi",
+        "da",
+        "az",
+        "tk",
+        "id",
+        "ms",
+        "vi",
+        "sw",
+        "tl",
+        "hr",
+        "sl",
+        "sq",
+        "et",
+        "lv",
+        "lt",
+        "is",
+        "ga",
+        "cy",
+        "mt",
+        "af",
+    }
+)
+_CYRILLIC_LANGS = frozenset(
+    {"ru", "uk", "bg", "kk", "ky", "tg", "mn", "sr", "be", "mk"}
+)
+_CJK_LANGS = frozenset({"zh", "ja", "ko"})
+_ARABIC_LANGS = frozenset({"ar", "fa", "ur", "ps"})
+
+_NOT_RECOGNIZED = AppError(
+    message="Qayta gapiring, aniqlolmadik",
+    error_code="SPEECH_NOT_RECOGNIZED",
+    status_code=400,
+)
 
 
 def _iso_lang(language: str | None) -> str | None:
@@ -86,6 +152,56 @@ def _stt_models(settings) -> list[str]:
     return models
 
 
+def _script_matches(text: str, lang: str | None) -> bool:
+    """Reject obvious wrong-script hallucinations (e.g. Uzbek → Japanese)."""
+    if not text or not lang:
+        return bool(text.strip())
+
+    cjk = len(_CJK_RE.findall(text))
+    latin = len(_LATIN_RE.findall(text))
+    cyr = len(_CYRILLIC_RE.findall(text))
+    arab = len(_ARABIC_RE.findall(text))
+    letters = cjk + latin + cyr + arab
+    if letters == 0:
+        return True  # digits / punctuation only — let energy checks handle
+
+    if lang in _CJK_LANGS:
+        return cjk >= max(1, (latin + cyr + arab) // 2)
+
+    if lang in _ARABIC_LANGS:
+        return arab >= max(1, (latin + cyr + cjk) // 2)
+
+    if lang == "uz" or lang in _LATIN_LANGS | _CYRILLIC_LANGS:
+        # Turkic / Latin / Cyrillic: CJK must not dominate.
+        own = latin + cyr
+        if lang in _CYRILLIC_LANGS and lang != "uz":
+            own = cyr + latin  # allow some latin brand names
+        if cjk >= 2 and cjk > own:
+            return False
+        if cjk >= 4 and own == 0:
+            return False
+        return True
+
+    # Unknown lang: only block heavy CJK when no other letters.
+    if cjk >= 4 and (latin + cyr + arab) == 0:
+        return False
+    return True
+
+
+def _accept_text(text: str, lang: str | None) -> str | None:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return None
+    if not _script_matches(cleaned, lang):
+        logger.warning(
+            "STT script mismatch expected=%s sample=%r",
+            lang,
+            cleaned[:120],
+        )
+        return None
+    return cleaned
+
+
 async def transcribe_audio(
     data: bytes,
     *,
@@ -94,25 +210,18 @@ async def transcribe_audio(
     filename: str | None = None,
 ) -> str:
     if not data or len(data) < 256:
-        raise AppError(
-            message="Audioda nutq topilmadi. Yaxshiroq eshitiladigan qilib qayta yozing",
-            error_code="NO_SPEECH_DETECTED",
-            status_code=400,
-        )
+        raise _NOT_RECOGNIZED
 
     settings = get_settings()
     lang = _iso_lang(language)
     ext = _guess_ext(content_type, filename)
     mime = (content_type or "").split(";")[0].strip().lower() or f"audio/{ext}"
     errors: list[str] = []
+    saw_mismatch = False
 
     if settings.openai_api_key:
-        # 1) Forced language (best when caller knows the speaker language).
-        # 2) Auto-detect (helps when forced code mismatches accent / short clips).
+        # Forced language FIRST — auto-detect first caused Uzbek→Japanese.
         attempts: list[str | None] = [lang, None] if lang else [None]
-        # Prefer auto-detect first for weak Deepgram langs — Whisper lock often empties.
-        if lang in _DEEPGRAM_WEAK_LANGS:
-            attempts = [None, lang]
 
         for model in _stt_models(settings):
             for attempt_lang in attempts:
@@ -126,10 +235,16 @@ async def transcribe_audio(
                         model=model,
                         prompt=_LANG_PROMPTS.get(lang or "") or None,
                     )
-                    if text:
-                        return text
+                    accepted = _accept_text(text, lang)
+                    if accepted:
+                        return accepted
+                    if text.strip():
+                        saw_mismatch = True
                 except AppError as exc:
-                    if exc.error_code == "NO_SPEECH_DETECTED":
+                    if exc.error_code in {
+                        "NO_SPEECH_DETECTED",
+                        "SPEECH_NOT_RECOGNIZED",
+                    }:
                         continue
                     if exc.error_code == "STT_MODEL_UNSUPPORTED":
                         logger.info("STT model %s unsupported — trying next", model)
@@ -142,27 +257,31 @@ async def transcribe_audio(
                         exc.error_code,
                     )
 
-    # Deepgram: primary for strong langs; last resort even for weak langs.
-    if settings.deepgram_api_key:
-        dg_lang = None if lang in _DEEPGRAM_WEAK_LANGS else lang
+    # Deepgram: primary for strong langs; avoid auto-detect for weak Turkic.
+    if settings.deepgram_api_key and lang not in _DEEPGRAM_WEAK_LANGS:
         try:
             text = await _deepgram_transcribe(
                 data,
                 content_type=mime,
-                language=dg_lang,
+                language=lang,
                 api_key=settings.deepgram_api_key,
             )
-            if text:
-                return text
+            accepted = _accept_text(text, lang)
+            if accepted:
+                return accepted
+            if text.strip():
+                saw_mismatch = True
         except AppError as exc:
-            if exc.error_code != "NO_SPEECH_DETECTED":
+            if exc.error_code not in {"NO_SPEECH_DETECTED", "SPEECH_NOT_RECOGNIZED"}:
                 errors.append(str(exc.message))
                 logger.warning("Deepgram STT failed (%s)", exc.error_code)
 
     if settings.is_production:
         raise AppError(
-            message="Audioda nutq topilmadi. Yaxshiroq eshitiladigan qilib qayta yozing",
-            error_code="NO_SPEECH_DETECTED",
+            message="Qayta gapiring, aniqlolmadik",
+            error_code="SPEECH_NOT_RECOGNIZED"
+            if saw_mismatch
+            else "NO_SPEECH_DETECTED",
             status_code=400,
             extra={"detail": "; ".join(errors)} if errors else None,
         )
@@ -189,9 +308,8 @@ async def _openai_transcribe(
     }
     if language:
         data_fields["language"] = language
-    if prompt and model.startswith("whisper"):
-        # prompt is supported on whisper-1; newer models may ignore it safely.
-        data_fields["prompt"] = prompt[:200]
+    if prompt and (model.startswith("whisper") or "transcribe" in model):
+        data_fields["prompt"] = prompt[:220]
 
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
@@ -217,7 +335,7 @@ async def _openai_transcribe(
     except httpx.HTTPError as exc:
         logger.exception("OpenAI STT failed model=%s", model)
         raise AppError(
-            message="Nutqni aniqlab bo'lmadi",
+            message="Qayta gapiring, aniqlolmadik",
             error_code="STT_FAILED",
             status_code=502,
         ) from exc
@@ -225,7 +343,7 @@ async def _openai_transcribe(
     text = str(payload.get("text") or "").strip()
     if not text:
         raise AppError(
-            message="Audioda nutq topilmadi",
+            message="Qayta gapiring, aniqlolmadik",
             error_code="NO_SPEECH_DETECTED",
             status_code=400,
         )
@@ -266,7 +384,7 @@ async def _deepgram_transcribe(
     except httpx.HTTPError as exc:
         logger.exception("Deepgram STT failed")
         raise AppError(
-            message="Nutqni aniqlab bo'lmadi",
+            message="Qayta gapiring, aniqlolmadik",
             error_code="STT_FAILED",
             status_code=502,
         ) from exc
@@ -281,7 +399,7 @@ async def _deepgram_transcribe(
     text = str(transcript).strip()
     if not text:
         raise AppError(
-            message="Audioda nutq topilmadi",
+            message="Qayta gapiring, aniqlolmadik",
             error_code="NO_SPEECH_DETECTED",
             status_code=400,
         )
