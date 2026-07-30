@@ -18,24 +18,6 @@ class OpenChat extends FriendsAction {
   OpenChat(this.friend);
 }
 
-/// Qo‘ng‘iroq (hozircha mavjud emas).
-class OpenFriendCall extends FriendsAction {
-  final Friend friend;
-  OpenFriendCall(this.friend);
-}
-
-/// Jonli tarjima (Live Translate) tabiga o‘tish.
-class OpenFriendLive extends FriendsAction {
-  final Friend friend;
-  OpenFriendLive(this.friend);
-}
-
-/// Do‘st mahsulotlarini ochish.
-class OpenFriendProducts extends FriendsAction {
-  final Friend friend;
-  OpenFriendProducts(this.friend);
-}
-
 /// Do‘st profilini ochish.
 class OpenFriendProfile extends FriendsAction {
   final Friend friend;

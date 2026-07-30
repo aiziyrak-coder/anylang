@@ -252,15 +252,75 @@ def _serialize_product(product: Product) -> dict:
         seller_name = biz.company_name
     elif seller:
         seller_name = seller.full_name or ""
+    shipping_countries = [
+        str(c).strip().upper()
+        for c in (product.shipping_countries or [])
+        if str(c).strip()
+    ][:20]
+    attrs = []
+    for a in (product.attributes or [])[:12]:
+        if isinstance(a, dict):
+            k = str(a.get("key") or a.get("name") or "").strip()
+            v = str(a.get("value") or "").strip()
+            if k and v:
+                attrs.append(f"{k}: {v}")
+        else:
+            s = str(a).strip()
+            if s:
+                attrs.append(s)
     return {
         "id": product.id,
         "name": product.name,
         "price": f"{product.price}" if product.price is not None else None,
         "currency": product.currency,
+        "category": product.category,
+        "short_description": (product.short_description or "").strip() or None,
+        "description": ((product.description or "").strip() or None),
+        "moq": (product.moq or "").strip() or None,
+        "shipping_info": (product.shipping_info or "").strip() or None,
+        "shipping_countries": shipping_countries,
+        "attributes": attrs,
         "image_url": _primary_image(product),
         "seller_id": product.seller_id,
         "seller_name": seller_name,
     }
+
+
+def _company_knowledge_pack(biz, *, company_name: str) -> str:
+    """Owner-written + structured business fields for company-mode AnyTrade."""
+    if biz is None:
+        return f"Company knowledge pack:\n- name: {company_name or '-'}\n"
+
+    def _join(items: list | None) -> str:
+        vals = [str(x).strip() for x in (items or []) if str(x).strip()]
+        return ", ".join(vals) if vals else "-"
+
+    lines = [
+        "Company knowledge pack:",
+        f"- name: {company_name or (biz.company_name or '-')}",
+        f"- role: {(biz.business_role or '-')}",
+        f"- country: {(biz.country or '-')}",
+        f"- website: {(biz.website or '-')}",
+        f"- founded_year: {biz.founded_year or '-'}",
+        f"- bio: {(biz.bio or '').strip() or '-'}",
+        f"- description: {(biz.description or '').strip() or '-'}",
+        f"- seo_text: {(biz.seo_text or '').strip() or '-'}",
+        f"- keywords: {_join(biz.keywords)}",
+        f"- moq: {(biz.moq or '').strip() or '-'}",
+        f"- production_capacity: {(biz.production_capacity or '').strip() or '-'}",
+        f"- lead_time: {(biz.lead_time or '').strip() or '-'}",
+        f"- incoterms: {_join(biz.incoterms)}",
+        f"- payment_methods: {_join(biz.payment_methods)}",
+        f"- export_countries: {_join(biz.export_countries)}",
+        f"- certificates: {_join(biz.certificates)}",
+    ]
+    knowledge = (getattr(biz, "ai_knowledge", None) or "").strip()
+    if knowledge:
+        lines.append("- owner_ai_knowledge:")
+        lines.append(knowledge[:8000])
+    else:
+        lines.append("- owner_ai_knowledge: -")
+    return "\n".join(lines)
 
 
 async def _serialize_sellers(
@@ -295,9 +355,24 @@ def _catalog_brief(products: list[dict], sellers: list[dict]) -> str:
     lines = ["Matched products:"]
     for p in products[:6]:
         price = f"{p.get('price') or '?'} {p.get('currency') or ''}".strip()
-        lines.append(
-            f"- #{p['id']} {p['name']} | {price} | seller={p.get('seller_name')}"
-        )
+        bits = [
+            f"#{p['id']} {p['name']}",
+            price,
+            f"seller={p.get('seller_name')}",
+        ]
+        if p.get("moq"):
+            bits.append(f"moq={p['moq']}")
+        if p.get("short_description"):
+            bits.append(f"short={p['short_description'][:160]}")
+        if p.get("description"):
+            bits.append(f"desc={str(p['description'])[:240]}")
+        if p.get("shipping_info"):
+            bits.append(f"shipping={p['shipping_info']}")
+        if p.get("shipping_countries"):
+            bits.append("ships=" + ",".join(p["shipping_countries"][:8]))
+        if p.get("attributes"):
+            bits.append("attrs=" + "; ".join(p["attributes"][:6]))
+        lines.append("- " + " | ".join(bits))
     lines.append("Matched sellers:")
     for s in sellers[:5]:
         lines.append(
@@ -399,6 +474,8 @@ async def reply_trade_assistant(
     loc = _locale_hint(locale)
     company_mode = seller_id is not None
     company_name = ""
+    company_pack = ""
+    biz = None
     if company_mode:
         result = await db.execute(
             select(User)
@@ -416,6 +493,7 @@ async def reply_trade_assistant(
         company_name = (biz.company_name if biz and biz.company_name else None) or (
             seller.full_name or ""
         )
+        company_pack = _company_knowledge_pack(biz, company_name=company_name)
 
     extract = await _openai_json(
         system=(
@@ -448,6 +526,14 @@ async def reply_trade_assistant(
         if company_mode
         else "marketplace sourcing"
     )
+    knowledge_rule = (
+        "- In company mode, use the company knowledge pack AND catalog. "
+        "You may answer from owner_ai_knowledge and structured company fields "
+        "(prices, MOQ, lead time, policies) when present. "
+        "Do not invent prices/specs that are not in the pack or catalog.\n"
+        if company_mode
+        else "- Use ONLY the provided catalog snapshot; do not invent products/sellers/prices.\n"
+    )
     system = (
         "You are AnyTrade — AnyLang's B2B sourcing AI assistant.\n"
         "Goals for every buyer request:\n"
@@ -457,7 +543,7 @@ async def reply_trade_assistant(
         "4) Mention that AnyLang can translate chat replies automatically.\n"
         "5) End with a short actionable summary for the buyer.\n"
         "Rules:\n"
-        "- Use ONLY the provided catalog snapshot; do not invent products/sellers/prices.\n"
+        f"{knowledge_rule}"
         "- If catalog is empty, ask for better specs (material, qty, target price, destination).\n"
         f"- Reply in the user language (locale hint: {loc}).\n"
         "- Plain chat text only, short paragraphs, optional • bullets.\n"
@@ -465,11 +551,13 @@ async def reply_trade_assistant(
         f"Mode: {mode_line}\n"
     )
 
+    pack_block = f"{company_pack}\n\n" if company_pack else ""
     user_block = (
         f"Buyer message:\n{message.strip()}\n\n"
         f"Parsed quantity: {qty}\n"
         f"Parsed category: {category}\n"
         f"Keywords: {', '.join(keywords) or '-'}\n\n"
+        f"{pack_block}"
         f"{catalog}\n"
     )
 
@@ -479,7 +567,7 @@ async def reply_trade_assistant(
         content = (item.content or "").strip()
         if content:
             chat_messages.append({"role": role, "content": content[:3000]})
-    chat_messages.append({"role": "user", "content": user_block[:6000]})
+    chat_messages.append({"role": "user", "content": user_block[:12000]})
 
     settings = get_settings()
     if settings.openai_api_key:

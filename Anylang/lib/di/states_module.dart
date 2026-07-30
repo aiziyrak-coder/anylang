@@ -3,6 +3,7 @@ import '../presentation/screens/add_friend/add_friend_state.dart';
 import '../presentation/screens/create_group/create_group_screen.dart';
 import '../presentation/screens/add_product/add_product_state.dart';
 import '../presentation/screens/edit_business_info/edit_business_info_state.dart';
+import '../presentation/screens/trade_ai_settings/trade_ai_settings_state.dart';
 import '../presentation/screens/friends/friends_state.dart';
 import '../presentation/screens/jonli/jonli_state.dart';
 import '../presentation/screens/login/login_state.dart';
@@ -66,6 +67,7 @@ class StatesModule {
     Get.lazyPut<SettingsState>(() => SettingsState(), fenix: true);
     Get.lazyPut<SubscriptionState>(() => SubscriptionState(), fenix: true);
     Get.lazyPut<EditBusinessInfoState>(() => EditBusinessInfoState(), fenix: true);
+    Get.lazyPut<TradeAiSettingsState>(() => TradeAiSettingsState(), fenix: true);
     Get.lazyPut<AddProductState>(() => AddProductState(), fenix: true);
     Get.lazyPut<SupportChatState>(() => SupportChatState(), fenix: true);
     Get.lazyPut<TradeAssistantState>(() => TradeAssistantState(), fenix: true);

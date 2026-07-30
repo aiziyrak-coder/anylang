@@ -100,6 +100,7 @@ class BusinessOut(BaseModel):
     bio: str | None = None
     description: str | None = None
     seo_text: str | None = None
+    ai_knowledge: str | None = None
     keywords: list[str] = Field(default_factory=list)
     description_i18n: dict[str, str] = Field(default_factory=dict)
     founded_year: int | None = None

@@ -44,8 +44,8 @@ logger = logging.getLogger(__name__)
 def _translation_timeout_seconds() -> float:
     provider = (get_settings().translation_provider or "mock").strip().lower()
     if provider == "openai":
-        # Single-pass OpenAI translate (no proofread round-trip).
-        return 22.0
+        # gpt-4o single-pass — allow a bit more than mini.
+        return 35.0
     if provider == "deepl":
         return 10.0
     return 3.0

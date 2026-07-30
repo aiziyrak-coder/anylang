@@ -1555,5 +1555,14 @@
   "voice_transcript_failed": "Не удалось перевести",
   "voice_upload_failed": "Не удалось загрузить голосовое сообщение",
   "warning": "Внимание",
-  "welcome": "Добро пожаловать"
+  "welcome": "Добро пожаловать",
+  "trade_ai_settings_title": "AnyTrade AI",
+  "trade_ai_settings_for": "@name — AnyTrade AI",
+  "trade_ai_settings_desc": "Подробно опишите компанию, товары, цены, MOQ, доставку и оплату. Когда покупатели спрашивают через AnyTrade AI, ответы берутся из этих данных.",
+  "trade_ai_settings_card_desc": "Обучите AI о компании, товарах и ценах",
+  "trade_ai_settings_field": "База знаний AnyTrade AI",
+  "trade_ai_settings_hint": "Например: Производим хлопковые футболки. MOQ 500 шт. Цена 2.5–4 USD. Срок 15–25 дней. Оплата: T/T 30% предоплата...",
+  "trade_ai_settings_limit": "Максимум 8000 символов",
+  "trade_ai_settings_saved": "База знаний AnyTrade AI сохранена",
+  "trade_ai_settings_load_failed": "Не удалось загрузить настройки AnyTrade AI"
 }

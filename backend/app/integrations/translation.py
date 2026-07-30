@@ -95,21 +95,36 @@ _LANG_ALIASES = {
 }
 
 _LANG_QUALITY = {
-    "uz": "Uzbek Latin (o‘/g‘); native grammar; no Russian calques.",
-    "ru": "Russian: cases/gender/aspect perfect; natural chat.",
-    "en": "English: articles/tense/prepositions perfect; natural chat.",
-    "tr": "Turkish: vowel harmony + agglutination correct.",
-    "ar": "Arabic MSA/natural chat; correct grammar & diacritics when needed.",
-    "zh": "Simplified Chinese; natural phrasing.",
-    "ja": "Natural Japanese; correct particles/politeness.",
-    "ko": "Natural Korean; correct honorifics when implied.",
-    "de": "German: cases/articles correct; natural chat.",
-    "fr": "French: gender/agreement correct; natural chat.",
-    "es": "Spanish: gender/agreement correct; natural chat.",
-    "pt": "Portuguese: natural grammar; consistent variant.",
-    "uk": "Ukrainian: correct cases; natural chat.",
-    "kk": "Kazakh: natural orthography & grammar.",
-    "hi": "Hindi: natural Devanagari grammar.",
+    "uz": (
+        "Uzbek Latin (o‘/g‘, not o'/g'). Sound like a native speaker in chat. "
+        "NEVER calque English/Russian word order. "
+        "Pronouns must keep the SAME subject/object as the source "
+        "(e.g. 'I liked your app' → 'Ilovangiz menga juda yoqdi', "
+        "NOT 'sizga … yoqdi'). "
+        "Use natural idioms: impressed → 'hayratda qoldim' / 'ta’sir qildi', "
+        "NOT literal nonsense like 'ichimga sindi'."
+    ),
+    "ru": (
+        "Natural Russian chat: cases, gender, aspect perfect. "
+        "No English calques; keep who did what to whom exact."
+    ),
+    "en": (
+        "Natural English chat: articles, tense, prepositions perfect. "
+        "Idiomatic; keep subject/object roles exact."
+    ),
+    "tr": "Turkish: vowel harmony + agglutination; natural chat; exact roles.",
+    "ar": "Natural Arabic chat; correct grammar; exact meaning & pronouns.",
+    "zh": "Natural Simplified Chinese; idiomatic; exact who/whom.",
+    "ja": "Natural Japanese; correct particles/politeness; exact roles.",
+    "ko": "Natural Korean; correct honorifics when implied; exact roles.",
+    "de": "Natural German chat; cases/articles correct; exact roles.",
+    "fr": "Natural French chat; gender/agreement correct; exact roles.",
+    "es": "Natural Spanish chat; gender/agreement correct; exact roles.",
+    "pt": "Natural Portuguese; consistent variant; exact roles.",
+    "uk": "Natural Ukrainian; correct cases; exact roles.",
+    "kk": "Natural Kazakh orthography & grammar; exact roles.",
+    "hi": "Natural Hindi (Devanagari); exact roles; no calques.",
+    "ku": "Natural Kurmanji Kurdish; idiomatic; exact subject/object.",
 }
 
 TRANSLATION_DOMAINS = (
@@ -319,10 +334,10 @@ def _cache_put(key: str, value: str) -> None:
 
 
 def _max_output_tokens(text: str) -> int:
-    """Cap completion size tightly — biggest token-cost control."""
-    # ~1 token ≈ 4 chars; allow modest expansion for target language.
-    est = max(48, (len(text) // 3) + 32)
-    return min(est, 600)
+    """Enough room for idiomatic expansion; still capped for cost."""
+    # Some languages expand a lot vs English; don't truncate mid-thought.
+    est = max(96, (len(text) // 2) + 64)
+    return min(est, 900)
 
 
 def _strip_model_wrappers(text: str) -> str:
@@ -413,23 +428,29 @@ async def _openai_chat(
 
 
 def _translate_system(tgt: str, domain: str = "general") -> str:
-    """Ultra-compact system prompt — max quality signal, min tokens."""
+    """Professional chat-translator brief (meaning + grammar first)."""
     quality = _LANG_QUALITY.get(
-        tgt, "Native grammar, spelling, syntax — zero errors."
+        tgt,
+        "Native grammar, spelling, syntax — zero errors; idiomatic chat.",
     )
     dom = normalize_translation_domain(domain)
     domain_line = _DOMAIN_HINTS.get(dom, "")
     parts = [
-        f"Elite chat translator → {_lang_name(tgt)}.",
-        "Output ONLY translation. Exact meaning. Zero grammar/spelling mistakes.",
-        "Keep names,@,#hashtags,URLs,emails,phones,codes,emojis,linebreaks.",
-        "Natural idiomatic chat; no calques; no invent/omit.",
-        "If already target lang or only symbols/names — return unchanged.",
-        quality,
+        f"You are a professional human translator for messenger chat → {_lang_name(tgt)}.",
+        "Think meaning first, then rewrite as a native would actually type in chat.",
+        "OUTPUT RULES:",
+        "1) Return ONLY the translation — no quotes, labels, notes, or markdown.",
+        "2) Preserve exact meaning, tone, and politeness. Do not invent or omit facts.",
+        "3) Keep subject/object/pronoun roles identical to the source (who likes whom, who asks whom).",
+        "4) Prefer natural idioms over word-for-word calques. Never produce awkward literal phrases.",
+        "5) Fix source grammar only if needed for a fluent target; do not change the intended sense.",
+        "6) Keep names, @mentions, #hashtags, URLs, emails, phones, codes, emojis, and line breaks unchanged.",
+        "7) If the text is already in the target language, or only symbols/names, return it unchanged.",
+        f"TARGET QUALITY: {quality}",
     ]
     if domain_line:
         parts.append(domain_line)
-    return " ".join(parts)
+    return "\n".join(parts)
 
 
 async def _translate_openai(
@@ -458,16 +479,21 @@ async def _translate_openai(
 
     src_name = _lang_name(src)
     tgt_name = _lang_name(tgt)
-    # Minimal user payload (biggest prompt-token save after system shrink).
-    user_msg = f"{src_name}→{tgt_name}\n{text}"
+    user_msg = (
+        f"Translate the following chat message from {src_name} into {tgt_name}.\n"
+        "Write as a native speaker would in everyday chat — natural, clear, correct.\n"
+        "Do not translate word-by-word if that sounds wrong.\n\n"
+        f"SOURCE:\n{text}"
+    )
 
     out = await _openai_chat(
         api_key=settings.openai_api_key,
         model=model,
         system=_translate_system(tgt, dom),
         user=user_msg,
-        temperature=0.0,
-        timeout=12.0 if fast else 18.0,
+        # Slight creativity helps idiomatic phrasing; keep low for fidelity.
+        temperature=0.15 if not fast else 0.05,
+        timeout=14.0 if fast else 28.0,
         max_tokens=_max_output_tokens(text),
     )
     if (out or "").strip():

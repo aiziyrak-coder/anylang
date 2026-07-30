@@ -146,6 +146,7 @@ class BusinessProfile(Base, TimestampMixin):
     bio: Mapped[str | None] = mapped_column(String(300), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     seo_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_knowledge: Mapped[str | None] = mapped_column(Text, nullable=True)
     keywords: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     description_i18n: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     founded_year: Mapped[int | None] = mapped_column(Integer, nullable=True)

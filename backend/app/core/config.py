@@ -52,7 +52,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     # Chat auto-translate: fast high-quality model (single-pass, low tokens).
-    openai_translation_model: str = "gpt-4o-mini"
+    # Chat translation quality: gpt-4o; Live/fast path may still use openai_model.
+    openai_translation_model: str = "gpt-4o"
     # Live STT — gpt-4o-mini-transcribe is faster/stronger; falls back to whisper-1.
     openai_stt_model: str = "gpt-4o-mini-transcribe"
     deepgram_api_key: str = ""

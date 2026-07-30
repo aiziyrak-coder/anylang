@@ -264,6 +264,7 @@ async def patch_my_business(
         bio=body.bio,
         description=body.description,
         seo_text=body.seo_text,
+        ai_knowledge=body.ai_knowledge,
         keywords=body.keywords,
         description_i18n=body.description_i18n,
         founded_year=body.founded_year,

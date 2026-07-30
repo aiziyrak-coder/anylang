@@ -1555,5 +1555,14 @@
   "voice_transcript_failed": "Tarjima qilinmadi",
   "voice_upload_failed": "Ovoz yuklanmadi",
   "warning": "Diqqat",
-  "welcome": "Xush kelibsiz"
+  "welcome": "Xush kelibsiz",
+  "trade_ai_settings_title": "AnyTrade AI",
+  "trade_ai_settings_for": "@name — AnyTrade AI",
+  "trade_ai_settings_desc": "Kompaniyangiz, mahsulotlaringiz, narxlar, MOQ, yetkazib berish va to‘lov shartlari haqida batafsil yozing. Xaridorlar AnyTrade AI orqali savol bersa, shu ma’lumotdan javob beriladi.",
+  "trade_ai_settings_card_desc": "AI ga kompaniya, mahsulot va narxlar haqida o‘rgating",
+  "trade_ai_settings_field": "AnyTrade AI bilimi",
+  "trade_ai_settings_hint": "Masalan: Biz paxta futbolka ishlab chiqaramiz. MOQ 500 dona. Narx 2.5–4 USD. Yetkazib berish 15–25 kun. To‘lov: T/T 30% oldindan...",
+  "trade_ai_settings_limit": "Maksimal 8000 belgi",
+  "trade_ai_settings_saved": "AnyTrade AI bilimi saqlandi",
+  "trade_ai_settings_load_failed": "AnyTrade AI sozlamalarini yuklab bo‘lmadi"
 }

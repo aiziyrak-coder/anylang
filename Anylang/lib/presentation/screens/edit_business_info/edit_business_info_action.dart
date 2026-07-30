@@ -76,6 +76,8 @@ class GenerateAiProfile extends EditBusinessInfoAction {
   GenerateAiProfile(this.prompt, {this.companyName = ''});
 }
 
+class OpenTradeAiSettings extends EditBusinessInfoAction {}
+
 class ToggleAiTranslations extends EditBusinessInfoAction {}
 
 class RemoveAiKeyword extends EditBusinessInfoAction {

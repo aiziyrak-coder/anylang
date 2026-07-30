@@ -28,6 +28,7 @@ class BusinessUpdateIn(BaseModel):
     bio: str | None = Field(default=None, max_length=300)
     description: str | None = None
     seo_text: str | None = None
+    ai_knowledge: str | None = Field(default=None, max_length=8000)
     keywords: list[str] | None = None
     description_i18n: dict[str, str] | None = None
     founded_year: int | None = Field(default=None, ge=1800, le=2100)

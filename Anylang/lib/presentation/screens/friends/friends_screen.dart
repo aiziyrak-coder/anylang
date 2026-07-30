@@ -19,9 +19,6 @@ import '../add_friend/add_friend_payload.dart';
 import '../add_friend/add_friend_screen.dart';
 import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
-import '../main/main_state.dart';
-import '../products/product.dart';
-import '../products/product_info_bottom_sheet.dart';
 import '../products/products_state.dart';
 import '../subscription/subscription_screen.dart';
 import '../user_profile/user_profile_payload.dart';
@@ -506,14 +503,6 @@ class FriendsScreen extends Screen<FriendsState, void> {
         state.filterOnline.value = false;
       case OpenChat a:
         await _openChat(a.friend);
-      case OpenFriendCall _:
-        showAppWarning('call_unavailable'.tr);
-      case OpenFriendLive _:
-        if (Get.isRegistered<MainState>()) {
-          Get.find<MainState>().currentTab.value = 3;
-        }
-      case OpenFriendProducts a:
-        await _openProducts(a.friend);
       case OpenFriendProfile a:
         await _openProfile(a.friend);
       case AddFriend _:
@@ -684,38 +673,5 @@ class FriendsScreen extends Screen<FriendsState, void> {
     } finally {
       _openingProfileUserIds.remove(friend.id);
     }
-  }
-
-  Future<void> _openProducts(Friend friend) async {
-    if (!friend.isBusiness && friend.productsCount <= 0) {
-      showAppMessage('user_card_no_products'.tr);
-      return;
-    }
-    final ctx = context;
-    final result = await Get.find<ProductsRepository>().listByUser(
-      friend.id,
-      limit: 40,
-    );
-    if (result.errorOrNull != null) {
-      showAppError(result.errorOrNull);
-      return;
-    }
-    final items = asList(result.dataOrNull)
-        .whereType<Map>()
-        .map((e) => Product.fromApi(Map<String, dynamic>.from(e)))
-        .toList();
-    if (items.isEmpty) {
-      showAppMessage('user_card_no_products'.tr);
-      return;
-    }
-    if (items.length == 1) {
-      await showProductInfoBottomSheet(
-        ctx,
-        items.first,
-        onOpenBusiness: () => _openProfile(friend),
-      );
-      return;
-    }
-    await _openProfile(friend);
   }
 }

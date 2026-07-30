@@ -250,6 +250,8 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                       keyboardType: TextInputType.url,
                     ),
                     SizedBox(height: 20.dp),
+                    _tradeAiSettingsCard(c, sendAction),
+                    SizedBox(height: 16.dp),
                     _aiProfileCard(c, state, sendAction),
                     SizedBox(height: 16.dp),
                     AppTextField(
@@ -671,6 +673,61 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
       description: _descriptionCtrl.text,
       seoText: _seoCtrl.text,
     ));
+  }
+
+  Widget _tradeAiSettingsCard(
+    AppColors c,
+    void Function(MyAction) sendAction,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => sendAction(OpenTradeAiSettings()),
+        borderRadius: BorderRadius.circular(16.dp),
+        child: Ink(
+          padding: EdgeInsets.all(14.dp),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(16.dp),
+            border: Border.all(
+              color: c.accent.withValues(alpha: 0.35),
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.smart_toy_outlined, color: c.accentText, size: 22.dp),
+              SizedBox(width: 12.dp),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'trade_ai_settings_title'.tr,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 4.dp),
+                    Text(
+                      'trade_ai_settings_card_desc'.tr,
+                      style: TextStyle(
+                        color: c.textSecondary,
+                        fontSize: 12.sp,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: c.textFaint, size: 22.dp),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _aiProfileCard(

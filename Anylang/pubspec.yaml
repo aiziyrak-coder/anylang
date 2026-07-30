@@ -1,7 +1,7 @@
 name: anylang
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.83+84
+version: 1.0.84+85
 
 environment:
   sdk: ^3.12.2

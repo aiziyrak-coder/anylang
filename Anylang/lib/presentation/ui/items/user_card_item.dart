@@ -33,13 +33,9 @@ class UserCardItem extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onMessage;
   final VoidCallback? onAdd;
-  final VoidCallback? onCall;
-  final VoidCallback? onLiveTranslate;
-  final VoidCallback? onProducts;
   final VoidCallback? onProfile;
   final bool showMessage;
   final bool showAdd;
-  final bool showQuickActions;
   final String? addLabel;
   final bool addEnabled;
   final int productsCount;
@@ -69,13 +65,9 @@ class UserCardItem extends StatelessWidget {
     this.onTap,
     this.onMessage,
     this.onAdd,
-    this.onCall,
-    this.onLiveTranslate,
-    this.onProducts,
     this.onProfile,
     this.showMessage = true,
     this.showAdd = false,
-    this.showQuickActions = false,
     this.addLabel,
     this.addEnabled = true,
   });
@@ -196,13 +188,7 @@ class UserCardItem extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (showQuickActions && !_danger && !_warn && !verified) ...[
-                  Divider(height: 1, thickness: 1, color: c.surfaceBorder),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(8.dp, 6.dp, 8.dp, 8.dp),
-                    child: _quickActionsRow(c),
-                  ),
-                ] else if (!_danger && !_warn && !verified && (showMessage || showAdd)) ...[
+                if (!_danger && !_warn && !verified && (showMessage || showAdd)) ...[
                   Padding(
                     padding: EdgeInsets.fromLTRB(12.dp, 0, 12.dp, 12.dp),
                     child: Row(
@@ -467,39 +453,6 @@ class UserCardItem extends StatelessWidget {
     );
   }
 
-  Widget _quickActionsRow(AppColors c) {
-    final actions = <(IconData, String, VoidCallback?)>[
-      (Icons.chat_bubble_outline_rounded, 'user_card_action_chat', onMessage),
-      if (onCall != null) (Icons.call_outlined, 'user_card_action_call', onCall),
-      (
-        Icons.mic_none_rounded,
-        'user_card_action_live',
-        onLiveTranslate,
-      ),
-      (
-        Icons.storefront_outlined,
-        'user_card_action_products',
-        onProducts,
-      ),
-      (Icons.person_outline_rounded, 'user_card_action_profile', onProfile),
-    ];
-    return Row(
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) SizedBox(width: 4.dp),
-          Expanded(
-            child: _QuickActionBtn(
-              icon: actions[i].$1,
-              label: actions[i].$2.tr,
-              onTap: actions[i].$3,
-              primary: i == 0,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
   String? _countryLabel(String? code) {
     final raw = (code ?? '').trim().toUpperCase();
     if (raw.isEmpty) return null;
@@ -523,67 +476,6 @@ class UserCardItem extends StatelessWidget {
       }
     } catch (_) {}
     return raw;
-  }
-}
-
-class _QuickActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-  final bool primary;
-
-  const _QuickActionBtn({
-    required this.icon,
-    required this.label,
-    this.onTap,
-    this.primary = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    final radius = BorderRadius.circular(11.dp);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: Ink(
-          padding: EdgeInsets.symmetric(horizontal: 2.dp, vertical: 8.dp),
-          decoration: BoxDecoration(
-            color: primary ? null : c.surface,
-            gradient: primary ? limeButtonGradient : null,
-            borderRadius: radius,
-            border: primary
-                ? null
-                : Border.all(color: c.outline.withValues(alpha: 0.65)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 18.dp,
-                color: primary ? c.onAccent : c.textPrimary,
-              ),
-              SizedBox(height: 3.dp),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: primary ? c.onAccent : c.textPrimary,
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

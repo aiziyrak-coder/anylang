@@ -1555,5 +1555,14 @@
   "voice_transcript_failed": "Nepavyko išversti",
   "voice_upload_failed": "Balsu įkėlimas nepavyko",
   "warning": "Įspėjimas",
-  "welcome": "Sveiki atvykę"
+  "welcome": "Sveiki atvykę",
+  "trade_ai_settings_title": "AnyTrade AI",
+  "trade_ai_settings_for": "@name — AnyTrade AI",
+  "trade_ai_settings_desc": "Write detailed info about your company, products, prices, MOQ, shipping and payment terms. When buyers ask via AnyTrade AI, answers use this knowledge.",
+  "trade_ai_settings_card_desc": "Teach AI about your company, products and prices",
+  "trade_ai_settings_field": "AnyTrade AI knowledge",
+  "trade_ai_settings_hint": "Example: We manufacture cotton T-shirts. MOQ 500 pcs. Price USD 2.5–4. Lead time 15–25 days. Payment: T/T 30% deposit...",
+  "trade_ai_settings_limit": "Maximum 8000 characters",
+  "trade_ai_settings_saved": "AnyTrade AI knowledge saved",
+  "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings"
 }

@@ -57,6 +57,7 @@ def _trade_fields(business: BusinessProfile) -> dict:
 def _ai_profile_fields(business: BusinessProfile) -> dict:
     return {
         "seo_text": business.seo_text,
+        "ai_knowledge": (business.ai_knowledge or "").strip() or None,
         "keywords": list(business.keywords or []),
         "description_i18n": dict(business.description_i18n or {}),
     }
@@ -346,6 +347,7 @@ async def update_business(
     bio: str | None = None,
     description: str | None = None,
     seo_text: str | None = None,
+    ai_knowledge: str | None = None,
     keywords: list[str] | None = None,
     description_i18n: dict[str, str] | None = None,
     founded_year: int | None = None,
@@ -379,6 +381,15 @@ async def update_business(
         business.description = description.strip() or None
     if seo_text is not None:
         business.seo_text = seo_text.strip() or None
+    if ai_knowledge is not None:
+        cleaned_knowledge = ai_knowledge.strip()
+        if len(cleaned_knowledge) > 8000:
+            raise AppError(
+                message="AnyTrade AI bilimi 8000 belgidan oshmasligi kerak",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        business.ai_knowledge = cleaned_knowledge or None
     if keywords is not None:
         business.keywords = _clean_str_list(keywords, max_items=20, max_len=48)
     if description_i18n is not None:

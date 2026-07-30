@@ -11,6 +11,7 @@ import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../trade_ai_settings/trade_ai_settings_screen.dart';
 import 'edit_business_info_action.dart';
 import 'edit_business_info_content.dart';
 import 'edit_business_info_state.dart';
@@ -347,6 +348,8 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
           state.companyName.value = a.companyName.trim();
         }
         await _generateAi(state, a.prompt);
+      case OpenTradeAiSettings _:
+        await navigate(TradeAiSettingsScreen());
       case ToggleAiTranslations _:
         state.showTranslations.value = !state.showTranslations.value;
       case RemoveAiKeyword a:

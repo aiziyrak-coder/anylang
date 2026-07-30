@@ -11,13 +11,7 @@ from app.core.errors import AppError
 from app.core.pagination import normalize_page
 from app.models.chat import Friendship
 from app.models.user import BusinessProfile, User
-from app.services.trust_score import (
-    _score_certificates,
-    _score_complaints,
-    _score_deals,
-    _score_documents,
-    _score_response,
-)
+from app.services.trust_score import compute_trust_score
 
 COOLDOWN_AFTER_DECLINE_HOURS = 24
 EXTENDED_COOLDOWN_DAYS = 7
@@ -46,29 +40,19 @@ def _spoken_languages(user: User) -> list[str]:
     return codes
 
 
-def _lite_trust(user: User, biz: BusinessProfile | None) -> int | None:
-    """Profil Trust Score bilan bir xil formula (javob tezligi/invoices DB'siz).
-
-    Ro‘yxat uchun async reply/invoice o‘rniga neytral default ishlatiladi —
-    shu sababli profil (61%) va tarmoq (25%) farqi yo‘qoladi.
-    """
+async def _trust_percent(
+    db: AsyncSession,
+    user: User,
+    biz: BusinessProfile | None,
+) -> int | None:
+    """Profil / tarmoq kartasi uchun bitta manba — compute_trust_score."""
     if biz is None:
         return None
-    parts = [
-        _score_certificates(list(biz.certificates or [])),
-        # Ma'lumot yo‘q — compute_trust_score bilan bir xil neytral baza
-        _score_response(None, 0),
-        _score_complaints(int(biz.complaints_count or 0)),
-        _score_deals(int(biz.successful_deals or 0), 0),
-        _score_documents(
-            verified_badge=bool(user.verified_badge),
-            documents_verified=bool(biz.documents_verified),
-            factory_verified=bool(biz.factory_verified),
-            inspection_passed=bool(biz.inspection_passed),
-        ),
-    ]
-    total = int(sum(int(p["score"]) for p in parts))
-    return max(0, min(100, total))
+    try:
+        payload = await compute_trust_score(db, user, biz)
+        return int(payload.get("score") or 0)
+    except Exception:
+        return None
 
 
 def _lite_risk(
@@ -114,7 +98,14 @@ def _lite_risk(
 
     return level, scammer
 
-def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> dict:
+
+async def _serialize_friend(
+    db: AsyncSession,
+    user: User,
+    *,
+    friends_since: datetime | None = None,
+    trust_override: int | None = None,
+) -> dict:
     is_business = bool(
         user.subscription and user.subscription.plan == "business" and user.subscription.is_active
     )
@@ -161,7 +152,10 @@ def _serialize_friend(user: User, *, friends_since: datetime | None = None) -> d
         if country and len(country) == 2:
             countries_count = 1
 
-    trust = _lite_trust(user, biz if is_business else None)
+    if trust_override is not None:
+        trust = trust_override
+    else:
+        trust = await _trust_percent(db, user, biz if is_business else None)
     risk_level, is_scammer = _lite_risk(
         user, biz if is_business else None, trust
     )
@@ -432,7 +426,9 @@ async def list_friends(
 
         hub = get_hub()
     for friendship, friend_user in page_rows:
-        data = _serialize_friend(friend_user, friends_since=friendship.accepted_at)
+        data = await _serialize_friend(
+            db, friend_user, friends_since=friendship.accepted_at
+        )
         data["product_categories"] = categories_map.get(friend_user.id, [])
         data["products_count"] = int(products_map.get(friend_user.id, 0))
         if hub is not None and redis is not None:
@@ -599,7 +595,9 @@ async def accept_friend_request(
     return {
         "id": friendship.id,
         "status": "accepted",
-        "friend": _serialize_friend(friend_user, friends_since=friendship.accepted_at),
+        "friend": await _serialize_friend(
+            db, friend_user, friends_since=friendship.accepted_at
+        ),
     }
 
 
@@ -698,7 +696,7 @@ async def list_friend_requests(
         items.append(
             {
                 "id": friendship.id,
-                "user": _serialize_friend(other),
+                "user": await _serialize_friend(db, other),
                 "created_at": friendship.created_at,
                 "status": public_status,
             }
