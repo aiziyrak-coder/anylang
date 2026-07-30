@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../ui/buttons/my_icon_button.dart';
@@ -161,81 +163,148 @@ class _ChatComposerState extends State<ChatComposer> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        if (widget.recording) ..._recordLeading(c) else ..._inputLeading(c),
-        SizedBox(width: 8.dp),
+        if (widget.recording)
+          ..._recordLeading(c)
+        else
+          Expanded(child: _glassInputCapsule(c)),
+        if (widget.recording) ...[
+          SizedBox(width: 8.dp),
+        ] else
+          SizedBox(width: 10.dp),
         _trailing(c),
       ],
     );
   }
 
-  List<Widget> _inputLeading(AppColors c) {
-    return [
-      Opacity(
-        opacity: widget.busy ? 0.45 : 1,
-        child: MyIconButton(
-          onClick: widget.busy ? () {} : widget.onAttach,
-          icon: Icons.add_rounded,
-          iconColor: c.accentText,
-          iconSize: 22.dp,
-          backgroundColor: c.surface,
-          border: Border.all(color: c.surfaceBorder, width: 0.7),
-          borderRadius: 22.dp,
-          padding: EdgeInsets.all(10.dp),
-        ),
-      ),
-      if (widget.onAiSuggest != null) ...[
-        SizedBox(width: 6.dp),
-        Opacity(
-          opacity: widget.aiLoading || widget.busy ? 0.5 : 1,
-          child: MyIconButton(
-            onClick: (widget.aiLoading || widget.busy)
-                ? () {}
-                : widget.onAiSuggest!,
-            icon: widget.aiLoading
-                ? Icons.hourglass_top_rounded
-                : Icons.auto_awesome_rounded,
-            iconColor: c.accentText,
-            iconSize: 20.dp,
-            backgroundColor: c.accentSoft,
-            border: Border.all(
-              color: c.accent.withValues(alpha: 0.35),
-              width: 0.7,
-            ),
-            borderRadius: 22.dp,
-            padding: EdgeInsets.all(10.dp),
-          ),
-        ),
-      ],
-      SizedBox(width: 8.dp),
-      Expanded(
+  /// Birlashtirilgan liquid-glass input: + · AI · matn maydoni.
+  Widget _glassInputCapsule(AppColors c) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26.dp),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
         child: Container(
-          constraints: BoxConstraints(minHeight: 44.dp),
-          padding: EdgeInsets.symmetric(horizontal: 16.dp),
-          alignment: Alignment.center,
+          constraints: BoxConstraints(minHeight: 48.dp),
           decoration: BoxDecoration(
-            color: c.isDark ? const Color(0x99152A42) : const Color(0xCCFFFFFF),
-            border: Border.all(color: c.surfaceBorder, width: 0.7),
-            borderRadius: BorderRadius.circular(22.dp),
-          ),
-          child: TextField(
-            controller: widget.controller,
-            onChanged: widget.onChanged,
-            enabled: !widget.busy,
-            minLines: 1,
-            maxLines: 4,
-            cursorColor: c.accent,
-            style: TextStyle(color: c.textPrimary, fontSize: 15.sp),
-            decoration: InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 11.dp),
-              hintText: 'chat_input_hint'.tr,
-              hintStyle: TextStyle(color: c.textFaint, fontSize: 15.sp),
+            borderRadius: BorderRadius.circular(26.dp),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: c.isDark
+                  ? const [
+                      Color(0x77182A40),
+                      Color(0x66121E2E),
+                    ]
+                  : const [
+                      Color(0xAAFFFFFF),
+                      Color(0x88F4F7FB),
+                    ],
             ),
+            border: Border.all(
+              color: c.isDark
+                  ? const Color(0x55FFFFFF)
+                  : const Color(0x99FFFFFF),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: c.isDark
+                    ? const Color(0x44000000)
+                    : const Color(0x12071526),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(left: 4.dp, bottom: 4.dp, top: 4.dp),
+                child: Opacity(
+                  opacity: widget.busy ? 0.45 : 1,
+                  child: MyIconButton(
+                    onClick: widget.busy ? () {} : widget.onAttach,
+                    icon: Icons.add_rounded,
+                    iconColor: c.isDark
+                        ? const Color(0xFFF4F7FB)
+                        : c.accentText,
+                    iconSize: 22.dp,
+                    backgroundColor: Colors.transparent,
+                    borderRadius: 20.dp,
+                    padding: EdgeInsets.all(8.dp),
+                  ),
+                ),
+              ),
+              if (widget.onAiSuggest != null)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 4.dp, top: 4.dp),
+                  child: Opacity(
+                    opacity: widget.aiLoading || widget.busy ? 0.5 : 1,
+                    child: MyIconButton(
+                      onClick: (widget.aiLoading || widget.busy)
+                          ? () {}
+                          : widget.onAiSuggest!,
+                      icon: widget.aiLoading
+                          ? Icons.hourglass_top_rounded
+                          : Icons.auto_awesome_rounded,
+                      iconColor: c.accent,
+                      iconSize: 20.dp,
+                      backgroundColor: c.accent.withValues(alpha: 0.14),
+                      border: Border.all(
+                        color: c.accent.withValues(alpha: 0.35),
+                        width: 0.7,
+                      ),
+                      borderRadius: 18.dp,
+                      padding: EdgeInsets.all(8.dp),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 4.dp,
+                    right: 14.dp,
+                    top: 2.dp,
+                    bottom: 2.dp,
+                  ),
+                  child: TextField(
+                    controller: widget.controller,
+                    onChanged: widget.onChanged,
+                    enabled: !widget.busy,
+                    minLines: 1,
+                    maxLines: 4,
+                    cursorColor: c.accent,
+                    style: TextStyle(
+                      color: c.isDark
+                          ? const Color(0xFFF4F7FB)
+                          : c.textPrimary,
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w500,
+                      height: 1.35,
+                      letterSpacing: 0.15,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 12.dp),
+                      hintText: 'chat_input_hint'.tr,
+                      hintStyle: TextStyle(
+                        color: c.isDark
+                            ? const Color(0x99B8C5D6)
+                            : c.textFaint,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    ];
+    );
   }
 
   List<Widget> _recordLeading(AppColors c) {

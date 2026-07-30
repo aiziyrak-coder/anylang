@@ -13,6 +13,7 @@ import '../../../data/network/profile_repository.dart';
 import '../../modal/payment_confirm_bottom_sheet.dart';
 import '../../ui/items/plan_card.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/auth_validators.dart';
 import '../../utils/money_format.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -55,10 +56,9 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
   }
 
   String _money(String amount) {
-    final prefix = state.priceCurrencyPrefix.value.trim();
-    final currency = prefix == '\$'
-        ? 'USD'
-        : (prefix.isEmpty ? 'UZS' : prefix.toUpperCase());
+    final currency = state.displayCurrency.value.toUpperCase() == 'UZS'
+        ? 'UZS'
+        : 'USD';
     final cleaned = amount.replaceAll(RegExp(r'[^0-9.\-]'), '');
     if (cleaned.isEmpty) return amount;
     return formatMoneyAmount(cleaned, currency: currency);
@@ -82,6 +82,27 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         final map = asMap(data);
         if (map == null) return;
         unawaited(SessionStore.saveUser(Map<String, dynamic>.from(map)));
+        final country = (map['country']?.toString() ?? '').trim().toUpperCase();
+        if (country.length == 2) {
+          state.userCountry.value = country;
+        } else {
+          final fromSession =
+              (SessionStore.user()?['country']?.toString() ?? '')
+                  .trim()
+                  .toUpperCase();
+          state.userCountry.value =
+              fromSession.length == 2 ? fromSession : null;
+        }
+        // Default pay rail by country (before plans load).
+        if (state.isUzUser) {
+          if (state.payMethod.value != 'visa') {
+            state.payMethod.value = 'click';
+            state.displayCurrency.value = 'UZS';
+          }
+        } else {
+          state.payMethod.value = 'visa';
+          state.displayCurrency.value = 'USD';
+        }
         final isBiz = map['is_business'] == true;
         if (Get.isRegistered<ProductsState>()) {
           Get.find<ProductsState>().isBusiness.value = isBiz;
@@ -116,9 +137,29 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
   Future<void> _loadPlans() async {
     final client = Get.find<NetworkClient>();
     final lang = SessionStore.appLanguage();
+    // Country fallback if /me failed partially.
+    if (state.userCountry.value == null) {
+      final fromSession =
+          (SessionStore.user()?['country']?.toString() ?? '')
+              .trim()
+              .toUpperCase();
+      if (fromSession.length == 2) {
+        state.userCountry.value = fromSession;
+        if (!state.isUzUser) {
+          state.payMethod.value = 'visa';
+          state.displayCurrency.value = 'USD';
+        } else if (state.payMethod.value != 'visa') {
+          state.displayCurrency.value = 'UZS';
+        }
+      }
+    }
+    final currency = state.displayCurrency.value.toUpperCase();
     final result = await client.get(
       api: 'api/v1/subscription/plans',
-      queryParameters: {'language': lang},
+      queryParameters: {
+        'language': lang,
+        'currency': currency,
+      },
     );
     result.when(
       success: (data) {
@@ -126,10 +167,28 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           state.loadError.value = true;
           return;
         }
-        final currency = data['currency']?.toString().trim();
-        if (currency != null && currency.isNotEmpty) {
+        final apiCurrency = data['currency']?.toString().trim().toUpperCase();
+        if (apiCurrency == 'UZS' || apiCurrency == 'USD') {
+          state.displayCurrency.value = apiCurrency!;
+          state.priceCurrencyPrefix.value = apiCurrency;
+        } else if (apiCurrency != null && apiCurrency.isNotEmpty) {
           state.priceCurrencyPrefix.value =
-              currency.length <= 3 ? currency : '\$';
+              apiCurrency.length <= 3 ? apiCurrency : '\$';
+        }
+        final apiCountry =
+            (data['user_country']?.toString() ?? '').trim().toUpperCase();
+        if (apiCountry.length == 2) {
+          state.userCountry.value = apiCountry;
+        }
+        final methods = data['payment_methods'];
+        if (methods is List) {
+          for (final m in methods) {
+            if (m is! Map) continue;
+            final code = m['code']?.toString();
+            final available = m['available'] == true;
+            if (code == 'click') state.clickPayAvailable.value = available;
+            if (code == 'paddle') state.visaPayAvailable.value = available;
+          }
         }
         final taxPct = data['payment_tax_percent'];
         if (taxPct is num) {
@@ -254,6 +313,20 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
       case SelectBillingMonths a:
         state.billingMonths.value = a.months;
         state.promoPreview.value = null;
+      case SelectPayMethod a:
+        final method = a.method.trim().toLowerCase();
+        if (method != 'click' && method != 'visa') return;
+        if (!state.isUzUser && method == 'click') return;
+        if (state.payMethod.value == method) return;
+        state.payMethod.value = method;
+        state.displayCurrency.value = method == 'click' ? 'UZS' : 'USD';
+        state.promoPreview.value = null;
+        state.loading.value = true;
+        try {
+          await _loadPlans();
+        } finally {
+          state.loading.value = false;
+        }
       case RetryLoadPlans _:
         await _loadAll();
       case CheckPendingPayment _:
@@ -458,7 +531,21 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
             ? null
             : state.promoInput.value.trim());
 
-    final provider = 'click';
+    // UZ + Click → so'm; Visa/USD (local yoki xalqaro) → paddle.
+    final useClick = state.isUzUser && state.payMethod.value == 'click';
+    final provider = useClick ? 'click' : 'paddle';
+    if (!useClick && !state.visaPayAvailable.value) {
+      showAppMessage(
+        state.isUzUser
+            ? 'subscription_visa_coming_soon'.tr
+            : 'subscription_card_coming_soon'.tr,
+      );
+      return;
+    }
+    if (useClick && !state.clickPayAvailable.value) {
+      showAppError('subscription_payment_failed'.tr);
+      return;
+    }
     final checkout = await payments.checkoutSubscription(
       plan: plan.code,
       billingCycle: cycle,
@@ -538,6 +625,14 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         }
       },
       failure: (e) async {
+        if (AuthValidators.hasErrorCode(e, 'PAYMENT_PROVIDER_COMING_SOON')) {
+          showAppMessage(
+            state.isUzUser
+                ? 'subscription_visa_coming_soon'.tr
+                : 'subscription_card_coming_soon'.tr,
+          );
+          return;
+        }
         showAppError(e);
       },
     );

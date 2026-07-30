@@ -170,9 +170,12 @@ class ChatAppBar extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: c.textPrimary,
+                              color: c.isDark
+                                  ? const Color(0xFFF4F7FB)
+                                  : c.textPrimary,
                               fontSize: 17.sp,
                               fontWeight: FontWeight.w700,
+                              letterSpacing: 0.15,
                             ),
                           ),
                           SizedBox(height: 2.dp),
@@ -180,8 +183,11 @@ class ChatAppBar extends StatelessWidget {
                             statusText ??
                                 (online ? 'chat_online'.tr : 'chat_offline'.tr),
                             style: TextStyle(
-                              color: c.textSecondary,
+                              color: c.isDark
+                                  ? const Color(0xCCB8C5D6)
+                                  : c.textSecondary,
                               fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],

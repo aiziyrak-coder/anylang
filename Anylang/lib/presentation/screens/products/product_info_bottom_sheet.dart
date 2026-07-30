@@ -1001,215 +1001,304 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
         color: c.surface,
         border: Border(top: BorderSide(color: c.outline)),
       ),
-      child: Row(
-        children: [
-          if (!_isOwner) ...[
-            Material(
-              color: c.surface,
-              borderRadius: radius,
-              child: InkWell(
-                borderRadius: radius,
-                onTap: _favLoading ? null : _toggleFavorite,
-                child: Ink(
-                  decoration: BoxDecoration(
-                    borderRadius: radius,
-                    border: Border.all(color: c.outline),
-                  ),
-                  padding: EdgeInsets.all(15.dp),
-                  child: _fav
-                      ? Icon(Icons.favorite, color: c.accent, size: 22.dp)
-                      : SvgPicture.asset(
-                          'assets/icons/ic_heart.svg',
-                          width: 22.dp,
-                          height: 22.dp,
-                          colorFilter: ColorFilter.mode(
-                            c.textSecondary,
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                ),
-              ),
-            ),
-            SizedBox(width: 12.dp),
-            Expanded(
-              child: RichButton(
-                text: 'product_contact'.tr,
-                onTap: _contactSeller,
-                iconNearText: true,
-                startIcon: SvgPicture.asset(
-                  'assets/icons/ic_contact.svg',
-                  width: 20.dp,
-                  height: 20.dp,
-                ),
-                textColor: c.onAccent,
-                textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
-                padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
-                borderRadius: radius,
-                decoration: BoxDecoration(
-                  gradient: limeButtonGradient,
-                  borderRadius: radius,
-                ),
-              ),
-            ),
-          ] else ...[
-            if (widget.onEdit != null) ...[
-              Expanded(
-                child: Material(
+      child: !_isOwner
+          ? Row(
+              children: [
+                Material(
                   color: c.surface,
                   borderRadius: radius,
                   child: InkWell(
                     borderRadius: radius,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      widget.onEdit!();
-                    },
+                    onTap: _favLoading ? null : _toggleFavorite,
                     child: Ink(
                       decoration: BoxDecoration(
                         borderRadius: radius,
                         border: Border.all(color: c.outline),
                       ),
-                      padding: EdgeInsets.symmetric(vertical: 15.dp),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.edit_rounded,
-                            size: 20.dp,
-                            color: c.textPrimary,
-                          ),
-                          SizedBox(width: 8.dp),
-                          Text(
-                            'my_products_edit'.tr,
-                            style: TextStyle(
-                              color: c.textPrimary,
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.w700,
+                      padding: EdgeInsets.all(15.dp),
+                      child: _fav
+                          ? Icon(Icons.favorite, color: c.accent, size: 22.dp)
+                          : SvgPicture.asset(
+                              'assets/icons/ic_heart.svg',
+                              width: 22.dp,
+                              height: 22.dp,
+                              colorFilter: ColorFilter.mode(
+                                c.textSecondary,
+                                BlendMode.srcIn,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                 ),
-              ),
-              SizedBox(width: 10.dp),
-            ],
-            if (widget.onManage != null) ...[
-              Material(
-                color: c.surface,
-                borderRadius: radius,
-                child: InkWell(
-                  borderRadius: radius,
+                SizedBox(width: 12.dp),
+                Expanded(
+                  child: RichButton(
+                    text: 'product_contact'.tr,
+                    onTap: _contactSeller,
+                    iconNearText: true,
+                    startIcon: SvgPicture.asset(
+                      'assets/icons/ic_contact.svg',
+                      width: 20.dp,
+                      height: 20.dp,
+                    ),
+                    textColor: c.onAccent,
+                    textStyle:
+                        TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 15.dp,
+                      horizontal: 16.dp,
+                    ),
+                    borderRadius: radius,
+                    decoration: BoxDecoration(
+                      gradient: limeButtonGradient,
+                      borderRadius: radius,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : _ownerBottomBar(c, radius),
+    );
+  }
+
+  /// Ega paneli: status (ixtiyoriy) + bir qatorli amallar — tartibli.
+  Widget _ownerBottomBar(AppColors c, BorderRadius radius) {
+    final status = _ownerTopStatusChip(c, radius);
+    final showTopCta = _product.isTop ||
+        _product.topRequestStatus == 'queued' ||
+        _product.status == 'published';
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (status != null) ...[
+          status,
+          SizedBox(height: 10.dp),
+        ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (widget.onEdit != null) ...[
+              Expanded(
+                flex: showTopCta ? 1 : 2,
+                child: _ownerOutlineButton(
+                  c: c,
+                  radius: radius,
                   onTap: () {
                     Navigator.of(context).pop();
-                    widget.onManage!();
+                    widget.onEdit!();
                   },
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      borderRadius: radius,
-                      border: Border.all(color: c.outline),
-                    ),
-                    padding: EdgeInsets.all(15.dp),
-                    child: Icon(
-                      Icons.more_horiz_rounded,
-                      size: 22.dp,
-                      color: c.textPrimary,
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.edit_rounded,
+                        size: 18.dp,
+                        color: c.textPrimary,
+                      ),
+                      SizedBox(width: 6.dp),
+                      Flexible(
+                        child: Text(
+                          'my_products_edit'.tr,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              SizedBox(width: 10.dp),
+              SizedBox(width: 8.dp),
             ],
-            Expanded(flex: 2, child: _ownerTopAction(c, radius)),
+            if (widget.onManage != null) ...[
+              _ownerOutlineButton(
+                c: c,
+                radius: radius,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.onManage!();
+                },
+                child: Icon(
+                  Icons.more_horiz_rounded,
+                  size: 22.dp,
+                  color: c.textPrimary,
+                ),
+                compact: true,
+              ),
+              if (showTopCta) SizedBox(width: 8.dp),
+            ],
+            if (showTopCta)
+              Expanded(
+                flex: 2,
+                child: _ownerTopCta(c, radius),
+              ),
           ],
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _ownerOutlineButton({
+    required AppColors c,
+    required BorderRadius radius,
+    required VoidCallback onTap,
+    required Widget child,
+    bool compact = false,
+  }) {
+    return Material(
+      color: c.surface,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(color: c.outline),
+          ),
+          padding: compact
+              ? EdgeInsets.all(14.dp)
+              : EdgeInsets.symmetric(vertical: 14.dp, horizontal: 10.dp),
+          child: child,
+        ),
       ),
     );
   }
 
-  Widget _ownerTopAction(AppColors c, BorderRadius radius) {
+  /// TOP holati — to‘liq kenglikdagi chip (Row ichida emas).
+  Widget? _ownerTopStatusChip(AppColors c, BorderRadius radius) {
     if (_product.isTop) {
       final left = formatTopCountdown(_product.topSecondsLeft);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(vertical: 12.dp, horizontal: 16.dp),
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              border: Border.all(color: c.outline),
-            ),
-            child: Text(
-              'product_top_active_left'.trParams({'time': left}),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: c.accentText,
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w700,
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: 10.dp, horizontal: 14.dp),
+        decoration: BoxDecoration(
+          color: c.accentSoft,
+          borderRadius: radius,
+          border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.north_rounded, size: 18.dp, color: c.accentText),
+            SizedBox(width: 8.dp),
+            Expanded(
+              child: Text(
+                'product_top_active_left'.trParams({'time': left}),
+                style: TextStyle(
+                  color: c.accentText,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-          SizedBox(height: 10.dp),
-          RichButton(
-            text: 'my_products_boost_extend'.tr,
-            onTap: _topBusy ? () {} : _payForTop,
-            textColor: c.onAccent,
-            textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
-            padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
-            borderRadius: radius,
-            decoration: BoxDecoration(
-              gradient: limeButtonGradient,
-              borderRadius: radius,
-            ),
-          ),
-        ],
+          ],
+        ),
       );
     }
     final status = _product.topRequestStatus;
     if (status == 'queued') {
       return Container(
-        padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+        padding: EdgeInsets.symmetric(vertical: 10.dp, horizontal: 14.dp),
         decoration: BoxDecoration(
+          color: c.accentSoft,
           borderRadius: radius,
-          border: Border.all(color: c.outline),
+          border: Border.all(color: c.accent.withValues(alpha: 0.35)),
         ),
-        child: Text(
-          'my_products_top_queue_pos'.trParams({
-            'pos': '${_product.topQueuePosition ?? '—'}',
-          }),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: c.accentText,
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w700,
-          ),
+        child: Row(
+          children: [
+            Icon(Icons.schedule_rounded, size: 18.dp, color: c.accentText),
+            SizedBox(width: 8.dp),
+            Expanded(
+              child: Text(
+                'my_products_top_queue_pos'.trParams({
+                  'pos': '${_product.topQueuePosition ?? '—'}',
+                }),
+                style: TextStyle(
+                  color: c.accentText,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
     if (_product.status != 'published') {
       return Container(
-        padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+        padding: EdgeInsets.symmetric(vertical: 10.dp, horizontal: 14.dp),
         decoration: BoxDecoration(
           borderRadius: radius,
           border: Border.all(color: c.outline),
         ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 18.dp, color: c.textSecondary),
+            SizedBox(width: 8.dp),
+            Expanded(
+              child: Text(
+                'product_top_publish_first'.tr,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return null;
+  }
+
+  /// Bir qatorli asosiy CTA (Column emas — pastki panel buzilmasin).
+  Widget _ownerTopCta(AppColors c, BorderRadius radius) {
+    if (_product.isTop) {
+      return RichButton(
+        text: 'my_products_boost_extend_short'.tr,
+        onTap: _topBusy ? () {} : _payForTop,
+        textColor: c.onAccent,
+        textStyle: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700),
+        padding: EdgeInsets.symmetric(vertical: 14.dp, horizontal: 12.dp),
+        borderRadius: radius,
+        decoration: BoxDecoration(
+          gradient: limeButtonGradient,
+          borderRadius: radius,
+        ),
+      );
+    }
+    if (_product.topRequestStatus == 'queued') {
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: 14.dp, horizontal: 12.dp),
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(color: c.outline),
+          color: c.surface,
+        ),
+        alignment: Alignment.center,
         child: Text(
-          'product_top_publish_first'.tr,
+          'my_products_top_queued_short'.tr,
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: c.textSecondary,
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w600,
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w700,
           ),
         ),
       );
     }
     return RichButton(
-      text: 'product_request_top'.tr,
+      text: 'product_request_top_short'.tr,
       onTap: _topBusy ? () {} : _payForTop,
       textColor: c.onAccent,
-      textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
-      padding: EdgeInsets.symmetric(vertical: 15.dp, horizontal: 16.dp),
+      textStyle: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700),
+      padding: EdgeInsets.symmetric(vertical: 14.dp, horizontal: 12.dp),
       borderRadius: radius,
       decoration: BoxDecoration(
         gradient: limeButtonGradient,

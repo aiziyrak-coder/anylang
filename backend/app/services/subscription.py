@@ -18,11 +18,11 @@ AppLanguage = Literal["uz_UZ", "ru_RU", "us_US"]
 
 PLAN_ORDER = {"basic": 0, "premium": 1, "business": 2}
 
-# Oyiga baza narx (USD). Uzun muddat — foiz chegirma.
+# Oyiga baza narx (USD). Click → USD_UZS_RATE bilan so‘mga + 2% komissiya.
 PLAN_MONTHLY_BASE: dict[str, Decimal | None] = {
     "basic": None,
-    "premium": Decimal("4.99"),
-    "business": Decimal("19.99"),
+    "premium": Decimal("5.00"),
+    "business": Decimal("15.00"),
 }
 
 # Muddat → umumiy summadan chegirma (ko'proq olsangiz — arzonroq).
@@ -109,32 +109,72 @@ def compute_period_price(plan: str, months: int) -> tuple[Decimal, Decimal, int]
     return total, per_month, savings
 
 
-def period_catalog_for_plan(plan: str) -> list[dict]:
+def resolve_display_currency(
+    *,
+    country: str | None = None,
+    currency: str | None = None,
+) -> str:
+    """Catalog display currency.
+
+    - Explicit `currency` query wins (UZ users switching to USD/Visa).
+    - Registered country UZ → UZS (Click).
+    - Any other country → USD (Visa/Paddle).
+    - Unknown → USD (international default; Click still charges UZS at checkout).
+    """
+    override = (currency or "").strip().upper()
+    if override in {"UZS", "USD"}:
+        return override
+    cc = (country or "").strip().upper()
+    if cc == "UZ":
+        return "UZS"
+    return "USD"
+
+
+def _charge_in_uzs() -> bool:
+    """Legacy helper — prefer resolve_display_currency for catalog."""
+    from app.core.config import get_settings
+    from app.payments.pricing import test_amount_uzs
+
+    if test_amount_uzs() is not None:
+        return True
+    provider = (get_settings().payment_provider or "").strip().lower()
+    return provider in {"click", "multicard"}
+
+
+def period_catalog_for_plan(
+    plan: str,
+    *,
+    currency: str | None = None,
+) -> list[dict]:
     from app.payments.fx import usd_to_uzs
-    from app.payments.pricing import resolve_uzs_charge, test_amount_uzs
+    from app.payments.pricing import resolve_uzs_charge
     from app.payments.tax import PAYMENT_TAX_PERCENT, apply_payment_tax
 
     base = PLAN_MONTHLY_BASE.get(plan)
     if base is None:
         return []
-    flat = test_amount_uzs()
+    display = (currency or ("UZS" if _charge_in_uzs() else "USD")).upper()
+    charge_uzs = display == "UZS"
     out: list[dict] = []
     for months in (1, 3, 6, 12):
         total, per_month, savings = compute_period_price(plan, months)
-        if flat is not None:
-            # Temporary Click onboarding: every period costs the flat UZS amount.
-            _, tax, total_with_tax, _meta = resolve_uzs_charge(usd_to_uzs(total))
+        if charge_uzs:
+            catalog = usd_to_uzs(total)
+            _base, tax, total_with_tax, _meta = resolve_uzs_charge(catalog)
+            # Effective per-month in UZS (after tax / period).
+            per_uzs = (total_with_tax / months).quantize(Decimal("1"))
             out.append(
                 {
                     "months": months,
                     "code": billing_cycle_code(months),
-                    "total": f"{total_with_tax:.0f}",
+                    "total": f"{_base:.0f}",
                     "tax": f"{tax:.0f}",
                     "tax_percent": PAYMENT_TAX_PERCENT if tax > 0 else 0,
                     "total_with_tax": f"{total_with_tax:.0f}",
-                    "per_month": f"{(total_with_tax / months):.0f}",
-                    "savings_percent": None,
+                    "per_month": f"{per_uzs:.0f}",
+                    "savings_percent": savings if savings > 0 else None,
                     "currency": "UZS",
+                    "amount_usd": f"{total:.2f}",
                 }
             )
         else:
@@ -149,6 +189,8 @@ def period_catalog_for_plan(plan: str) -> list[dict]:
                     "total_with_tax": f"{total_with_tax:.2f}",
                     "per_month": f"{per_month:.2f}",
                     "savings_percent": savings if savings > 0 else None,
+                    "currency": "USD",
+                    "amount_usd": f"{total:.2f}",
                 }
             )
     return out
@@ -258,7 +300,13 @@ def _resolve_language(language: str | None) -> str:
     return "uz_UZ"
 
 
-def get_plans(*, language: str | None = None, billing_cycle: str | None = None) -> dict:
+def get_plans(
+    *,
+    language: str | None = None,
+    billing_cycle: str | None = None,
+    country: str | None = None,
+    currency: str | None = None,
+) -> dict:
     lang = _resolve_language(language)
     titles = PLAN_TITLES[lang]
     features_map = FEATURE_TEXTS[lang]
@@ -267,14 +315,13 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
         normalize_billing_months(billing_cycle) if billing_cycle else None
     )
 
-    from app.payments.pricing import test_amount_uzs
     from app.payments.tax import PAYMENT_TAX_PERCENT
 
-    currency = "UZS" if test_amount_uzs() is not None else "USD"
+    display_currency = resolve_display_currency(country=country, currency=currency)
     plans: list[dict[str, Any]] = []
     for code in ("basic", "premium", "business"):
         base = PLAN_MONTHLY_BASE[code]
-        periods = period_catalog_for_plan(code)
+        periods = period_catalog_for_plan(code, currency=display_currency)
         yearly = next((p for p in periods if p["months"] == 12), None)
         monthly = next((p for p in periods if p["months"] == 1), None)
         plan: dict[str, Any] = {
@@ -283,9 +330,9 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
             "is_free": code == "basic",
             "monthly_price": monthly["per_month"] if monthly else None,
             "yearly_price": yearly["per_month"] if yearly else None,
-            "yearly_total": yearly["total"] if yearly else None,
+            "yearly_total": yearly["total_with_tax"] if yearly else (yearly["total"] if yearly else None),
             "savings_percent": yearly["savings_percent"] if yearly else None,
-            "currency": periods[0].get("currency", currency) if periods else currency,
+            "currency": periods[0].get("currency", display_currency) if periods else display_currency,
             "badge": badges.get(code),
             "periods": periods,
             "features": [
@@ -298,14 +345,52 @@ def get_plans(*, language: str | None = None, billing_cycle: str | None = None) 
                 plan["selected_period"] = match
         plans.append(plan)
 
-    return {
+    from app.core.config import get_settings
+    from app.payments.fx import usd_to_uzs
+    from app.payments.paddle import PaddleProvider
+    from decimal import Decimal as _D
+
+    paddle_ok = PaddleProvider().is_configured()
+    # Click is the live UZ rail today; multicard/Visa USD follows when wired.
+    from app.payments.click import ClickProvider
+
+    click_ok = ClickProvider().is_configured()
+    cc = (country or "").strip().upper() or None
+
+    payload: dict[str, Any] = {
         "plans": plans,
+        "currency": display_currency,
         "payment_tax_percent": PAYMENT_TAX_PERCENT,
         "period_options": [
             {"months": m, "code": str(m), "discount_percent": int(float(PERIOD_DISCOUNT[m]) * 100)}
             for m in (1, 3, 6, 12)
         ],
+        "user_country": cc,
+        "default_currency": resolve_display_currency(country=country, currency=None),
+        "payment_methods": [
+            {
+                "code": "click",
+                "currency": "UZS",
+                "available": click_ok,
+                "for_countries": ["UZ"],
+            },
+            {
+                "code": "paddle",
+                "currency": "USD",
+                "available": paddle_ok,
+                "for_countries": None,  # international + UZ Visa path
+            },
+        ],
     }
+    if display_currency == "UZS":
+        try:
+            rate = _D(str(get_settings().usd_uzs_rate).replace(",", "").strip())
+            payload["usd_uzs_rate"] = f"{rate:.0f}"
+            # Hint: 1 USD catalog example after FX (before tax)
+            payload["fx_example_uzs"] = f"{usd_to_uzs(_D('1')):.0f}"
+        except Exception:
+            pass
+    return payload
 
 
 def _cycle_delta(billing_cycle: str) -> timedelta:

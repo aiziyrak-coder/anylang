@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -572,10 +573,81 @@ class ChatContent extends ScreenContent<ChatState> {
               state.searchMatchIndex.value.clamp(0, state.searchMatchIds.length - 1)];
       final messages = state.messages.toList();
       if (messages.isEmpty) {
-        return AppEmptyState(
-          icon: Icons.forum_outlined,
-          title: 'chat_empty'.tr,
-          subtitle: 'chat_empty_hint'.tr,
+        return Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 36.dp),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22.dp),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 28.dp,
+                    vertical: 28.dp,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22.dp),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: c.isDark
+                          ? const [
+                              Color(0x66182A40),
+                              Color(0x44121E2E),
+                            ]
+                          : const [
+                              Color(0xAAFFFFFF),
+                              Color(0x66F4F7FB),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: c.isDark
+                          ? const Color(0x55FFFFFF)
+                          : const Color(0x99FFFFFF),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.forum_outlined,
+                        size: 40.dp,
+                        color: c.isDark
+                            ? const Color(0xCCD4F04A)
+                            : c.accentText,
+                      ),
+                      SizedBox(height: 14.dp),
+                      Text(
+                        'chat_empty'.tr,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: c.isDark
+                              ? const Color(0xFFF4F7FB)
+                              : c.textPrimary,
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      SizedBox(height: 6.dp),
+                      Text(
+                        'chat_empty_hint'.tr,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: c.isDark
+                              ? const Color(0xCCB8C5D6)
+                              : c.textSecondary,
+                          fontSize: 13.sp,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         );
       }
       final items = _buildListItems(messages);
@@ -693,35 +765,35 @@ class ChatContent extends ScreenContent<ChatState> {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 10.dp),
       child: Center(
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 5.dp),
-          decoration: BoxDecoration(
-            color: c.isDark
-                ? const Color(0xCC152A42)
-                : const Color(0xE6FFFFFF),
-            borderRadius: BorderRadius.circular(14.dp),
-            border: Border.all(
-              color: c.isDark
-                  ? const Color(0x22FFFFFF)
-                  : const Color(0x66FFFFFF),
-              width: 0.7,
-            ),
-            boxShadow: [
-              BoxShadow(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14.dp),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 5.dp),
+              decoration: BoxDecoration(
                 color: c.isDark
-                    ? const Color(0x44000000)
-                    : const Color(0x140B1F36),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                    ? const Color(0x66152A42)
+                    : const Color(0x99FFFFFF),
+                borderRadius: BorderRadius.circular(14.dp),
+                border: Border.all(
+                  color: c.isDark
+                      ? const Color(0x44FFFFFF)
+                      : const Color(0x88FFFFFF),
+                  width: 0.8,
+                ),
               ),
-            ],
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: c.textSecondary,
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w600,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: c.isDark
+                      ? const Color(0xFFF4F7FB)
+                      : c.textPrimary,
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
             ),
           ),
         ),

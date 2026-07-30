@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 
-from app.api.deps_auth import CurrentUser
+from app.api.deps_auth import CurrentUser, OptionalCurrentUser
 from app.core.deps import DbSession
 from app.payments.schemas import SubscriptionCheckoutIn, SubscriptionCheckoutOut
 from app.payments.service import create_subscription_checkout
@@ -13,10 +13,23 @@ router = APIRouter()
 
 @router.get("/plans", response_model=PlansOut)
 async def list_plans(
+    current_user: OptionalCurrentUser,
     language: str | None = Query(default=None),
     billing_cycle: str | None = Query(default=None),
+    currency: str | None = Query(
+        default=None,
+        description="UZS | USD override (UZ users can switch to USD for Visa)",
+    ),
 ) -> PlansOut:
-    data = subscription_service.get_plans(language=language, billing_cycle=billing_cycle)
+    country = None
+    if current_user is not None:
+        country = (current_user.country or "").strip().upper() or None
+    data = subscription_service.get_plans(
+        language=language,
+        billing_cycle=billing_cycle,
+        country=country,
+        currency=currency,
+    )
     return PlansOut.model_validate(data)
 
 

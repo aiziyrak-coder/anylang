@@ -34,3 +34,5 @@ class RegisterSubmit extends RegisterAction {
   final String password;
   RegisterSubmit(this.fullName, this.email, this.password);
 }
+
+class GoogleRegister extends RegisterAction {}

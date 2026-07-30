@@ -126,6 +126,55 @@ class SubscriptionContent extends ScreenContent<SubscriptionState> {
                       );
                     }),
                     SizedBox(height: 20.dp),
+                    Obx(() {
+                      // Faqat UZ: Click (so'm) / Visa (USD) tanlovi.
+                      if (!state.isUzUser) {
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: 12.dp),
+                          child: Text(
+                            'subscription_pay_usd_hint'.tr,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: c.textSecondary,
+                              fontSize: 12.sp,
+                            ),
+                          ),
+                        );
+                      }
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 12.dp),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'subscription_pay_method_title'.tr,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: c.textSecondary,
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: 8.dp),
+                            SegmentedToggle<String>(
+                              value: state.payMethod.value,
+                              onChanged: (method) =>
+                                  sendAction(SelectPayMethod(method)),
+                              options: [
+                                SegmentOption(
+                                  value: 'click',
+                                  label: 'subscription_pay_click_uzs'.tr,
+                                ),
+                                SegmentOption(
+                                  value: 'visa',
+                                  label: 'subscription_pay_visa_usd'.tr,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                     Obx(
                       () => SegmentedToggle<int>(
                         value: state.billingMonths.value,

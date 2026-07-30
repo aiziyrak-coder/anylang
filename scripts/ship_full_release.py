@@ -197,7 +197,11 @@ def main() -> int:
     env["PATH"] = r"C:\Users\alocomputers\AppData\Local\flutter\bin;" + env.get("PATH", "")
     env["PUB_CACHE"] = str(Path.home() / "AppData" / "Local" / "Pub" / "Cache")
     sys.path.insert(0, str(ROOT / "scripts"))
-    from flutter_release_build import flutter_release_apk_args, read_maps_key
+    from flutter_release_build import (
+        flutter_release_apk_args,
+        read_google_server_client_id,
+        read_maps_key,
+    )
 
     maps_key = read_maps_key()
     flutter_args = flutter_release_apk_args(
@@ -209,6 +213,13 @@ def main() -> int:
         print("Maps API key: configured")
     else:
         print("WARNING: GOOGLE_MAPS_API_KEY empty — map/places may fail")
+    if read_google_server_client_id():
+        print("Google Sign-In: GOOGLE_SERVER_CLIENT_ID configured")
+    else:
+        print(
+            "WARNING: GOOGLE_SERVER_CLIENT_ID empty — "
+            "Google button disabled in release (set Anylang/.env)"
+        )
     print("Flutter args: obfuscate + split-debug-info enabled")
     subprocess.check_call(
         flutter_args,
@@ -234,7 +245,7 @@ def main() -> int:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
         "package": "com.cradev.anylang",
-        "notes": f"Release {ver}+{build} — Resend email OTP, Click billing return, disposable email guard",
+        "notes": f"Release {ver}+{build} — country pricing, Google signup UI, chat glass, devices polish",
     }
     meta_path = ROOT / "landing" / "download-meta.json"
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

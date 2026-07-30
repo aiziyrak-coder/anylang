@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../ui/buttons/google_sign_in_button.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/gender_selector.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/keyboard_aware_scroll.dart';
+import '../../ui/labeled_divider.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/textfields/birth_date_field.dart';
@@ -152,9 +154,28 @@ class RegisterContent extends ScreenContent<RegisterState> {
               Obx(() => PrimaryButton(
                     text: 'register_title'.tr,
                     isLoading: state.isLoading.value,
-                    onTap: () => sendAction(
-                      RegisterSubmit(_nameCtrl.text, _emailCtrl.text, _passCtrl.text),
-                    ),
+                    enabled: !state.isGoogleLoading.value,
+                    onTap: () {
+                      if (state.isLoading.value || state.isGoogleLoading.value) {
+                        return;
+                      }
+                      sendAction(
+                        RegisterSubmit(
+                          _nameCtrl.text,
+                          _emailCtrl.text,
+                          _passCtrl.text,
+                        ),
+                      );
+                    },
+                  )),
+              SizedBox(height: 18.dp),
+              LabeledDivider(label: 'or'.tr),
+              SizedBox(height: 18.dp),
+              Obx(() => GoogleSignInButton(
+                    textKey: 'google_sign_up',
+                    isLoading: state.isGoogleLoading.value,
+                    enabled: !state.isLoading.value,
+                    onTap: () => sendAction(GoogleRegister()),
                   )),
               SizedBox(height: 18.dp),
               Row(

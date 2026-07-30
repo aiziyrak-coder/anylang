@@ -83,4 +83,18 @@ async def get_current_user(
     return user
 
 
+async def get_optional_current_user(
+    db: DbSession,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User | None:
+    """Bearer bo‘lmasa None; yaroqsiz token ham None (plans ochiq endpoint)."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+    try:
+        return await get_current_user(db, credentials)
+    except AppError:
+        return None
+
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
+OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]

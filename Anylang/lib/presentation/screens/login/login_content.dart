@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../data/network/google_auth_service.dart';
 import '../../ui/app_top_bar.dart';
+import '../../ui/buttons/google_sign_in_button.dart';
 import '../../ui/buttons/primary_button.dart';
-import '../../ui/buttons/rich_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/labeled_divider.dart';
@@ -152,27 +150,11 @@ class LoginContent extends ScreenContent<LoginState> {
               SizedBox(height: 22.dp),
               LabeledDivider(label: 'or'.tr),
               SizedBox(height: 22.dp),
-              Obx(() {
-                final googleOk =
-                    kDebugMode || GoogleAuthService.serverClientId.isNotEmpty;
-                return RichButton(
-                      text: 'google_sign_in'.tr,
+              Obx(() => GoogleSignInButton(
                     isLoading: state.isGoogleLoading.value,
-                    enabled: !state.isLoading.value && googleOk,
+                    enabled: !state.isLoading.value,
                     onTap: () => sendAction(GoogleLogin()),
-                    iconNearText: true,
-                    startIcon: Image.asset('assets/images/ic_google.png', width: 20.dp, height: 20.dp),
-                    textColor: c.textSecondary,
-                    textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
-                    padding: EdgeInsets.symmetric(vertical: 16.dp, horizontal: 16.dp),
-                    borderRadius: BorderRadius.all(Radius.circular(18.dp)),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(18.dp),
-                      border: Border.all(color: c.surfaceBorder),
-                    ),
-                  );
-              }),
+                  )),
               SizedBox(height: 20.dp),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

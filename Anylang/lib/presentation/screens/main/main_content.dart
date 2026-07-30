@@ -20,6 +20,9 @@ import 'main_state.dart';
 class MainContent extends ScreenContent<MainState> {
   /// Lazy tab bodies: faqat ochilgan tablar quriladi (API storm oldini olish).
   final List<Widget?> _tabBodies = List<Widget?>.filled(5, null);
+  PageController? _pageController;
+  bool _pageAnimating = false;
+  Worker? _tabWorker;
 
   Widget _buildTab(int index) {
     return switch (index) {
@@ -42,12 +45,43 @@ class MainContent extends ScreenContent<MainState> {
 
   @override
   void initContent() {
-    // Default tab — xabarlar.
     _ensureTab(0);
+    _pageController = PageController(initialPage: 0);
   }
 
   @override
-  Widget build(BuildContext context, MainState state, FutureOr<void> Function(MyAction action) sendAction) {
+  void uiBuildFinished(MainState state) {
+    _tabWorker?.dispose();
+    _tabWorker = ever<int>(state.currentTab, (index) {
+      final pc = _pageController;
+      if (pc == null || !pc.hasClients) return;
+      final page = pc.page?.round() ?? pc.initialPage;
+      if (page == index) return;
+      _pageAnimating = true;
+      pc
+          .animateToPage(
+            index,
+            duration: const Duration(milliseconds: 380),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() => _pageAnimating = false);
+    });
+  }
+
+  @override
+  void onClose() {
+    _tabWorker?.dispose();
+    _tabWorker = null;
+    _pageController?.dispose();
+    _pageController = null;
+  }
+
+  @override
+  Widget build(
+    BuildContext context,
+    MainState state,
+    FutureOr<void> Function(MyAction action) sendAction,
+  ) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -61,19 +95,23 @@ class MainContent extends ScreenContent<MainState> {
             children: [
               const ConnectionStatusBanner(),
               Expanded(
-                child: Obx(() {
-                  final idx = state.currentTab.value;
-                  _ensureTab(idx);
-                  return IndexedStack(
-                    index: idx,
-                    children: List<Widget>.generate(
-                      5,
-                      (i) => _tabBodies[i] ?? const SizedBox.shrink(),
-                    ),
-                  );
-                }),
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: 5,
+                  physics: const BouncingScrollPhysics(),
+                  onPageChanged: (i) {
+                    _ensureTab(i);
+                    if (_pageAnimating) return;
+                    if (state.currentTab.value != i) {
+                      sendAction(TabSelected(i));
+                    }
+                  },
+                  itemBuilder: (_, i) {
+                    _ensureTab(i);
+                    return _tabBodies[i] ?? const SizedBox.shrink();
+                  },
+                ),
               ),
-              // Pastki navigatsiya bari.
               Obx(() {
                 final messagesBadge = Get.isRegistered<MessagesState>()
                     ? Get.find<MessagesState>()

@@ -17,6 +17,8 @@ class PlanPeriodOut(BaseModel):
     tax_percent: int | None = None
     total_with_tax: str | None = None
     savings_percent: int | None = None
+    currency: str | None = None
+    amount_usd: str | None = None
 
 
 class PeriodOptionOut(BaseModel):
@@ -41,10 +43,23 @@ class PlanOut(BaseModel):
     selected_period: PlanPeriodOut | None = None
 
 
+class PaymentMethodOut(BaseModel):
+    code: str
+    currency: str
+    available: bool = False
+    for_countries: list[str] | None = None
+
+
 class PlansOut(BaseModel):
     plans: list[PlanOut]
+    currency: str = "USD"
     payment_tax_percent: int = 2
     period_options: list[PeriodOptionOut] = Field(default_factory=list)
+    usd_uzs_rate: str | None = None
+    fx_example_uzs: str | None = None
+    user_country: str | None = None
+    default_currency: str | None = None
+    payment_methods: list[PaymentMethodOut] = Field(default_factory=list)
 
 
 class SubscribeIn(BaseModel):

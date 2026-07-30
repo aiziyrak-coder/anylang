@@ -43,6 +43,15 @@ abstract final class AuthValidators {
       'NOT_A_BUSINESS',
       'SUBSCRIPTION_REQUIRED',
       'PREMIUM_REQUIRED',
+      'ACCOUNT_EXISTS_PASSWORD',
+      'ACCOUNT_DELETED',
+      'GOOGLE_ACCOUNT_CONFLICT',
+      'ACCOUNT_NOT_VERIFIED',
+      'INVALID_GOOGLE_TOKEN',
+      'PAYMENT_PROVIDER_COMING_SOON',
+      'SESSION_NOT_FOUND',
+      'SESSION_PROTECT_WEEK',
+      'CANNOT_REVOKE_CURRENT',
     ];
     for (final code in known) {
       if (raw.contains(code)) return code;
@@ -52,6 +61,21 @@ abstract final class AuthValidators {
 
   static bool hasErrorCode(Object? err, String code) =>
       apiErrorCode(err) == code;
+
+  /// Session / devices API xatolari — lokalizatsiya.
+  static String sessionError(Object? err, {String fallbackKey = 'error_generic'}) {
+    final code = apiErrorCode(err);
+    switch (code) {
+      case 'SESSION_NOT_FOUND':
+        return 'devices_error_session_not_found'.tr;
+      case 'SESSION_PROTECT_WEEK':
+        return 'devices_error_protect_week'.tr;
+      case 'CANNOT_REVOKE_CURRENT':
+        return 'devices_error_cannot_revoke_current'.tr;
+      default:
+        return safeError(err, fallbackKey: fallbackKey);
+    }
+  }
 
   /// API / catch xabarlarini foydalanuvchiga xavfsiz ko‘rsatish.
   static String safeError(Object? err, {String fallbackKey = 'unknown_error'}) {

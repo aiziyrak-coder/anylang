@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'theme/colors.dart';
 
-/// Frosted panel — prefers [GlassBar] for full-bleed chrome; kept for chat.
+/// Frosted / liquid glass chrome — chat app bar + composer.
+/// Wallpaper orqadan ko‘rinsin: pastroq alpha + kuchliroq blur.
 class FrostedBar extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -17,7 +18,7 @@ class FrostedBar extends StatelessWidget {
     required this.child,
     this.padding,
     this.border,
-    this.blurSigma = 32,
+    this.blurSigma = 40,
     this.alignment = Alignment.center,
   });
 
@@ -31,32 +32,67 @@ class FrostedBar extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: c.isDark
                   ? const [
-                      Color(0xC8243B55),
-                      Color(0xE6121E2E),
+                      Color(0x99182A40),
+                      Color(0xAA0E1826),
+                      Color(0xB8121E2E),
                     ]
                   : const [
-                      Color(0xF0FFFFFF),
-                      Color(0xE6F1F5FA),
+                      Color(0xCCFFFFFF),
+                      Color(0xB8F4F7FB),
+                      Color(0xD0FFFFFF),
                     ],
             ),
             border: border ??
                 Border(
                   top: BorderSide(
                     color: c.isDark
-                        ? const Color(0x33FFFFFF)
-                        : const Color(0x22FFFFFF),
-                    width: 0.7,
+                        ? const Color(0x40FFFFFF)
+                        : const Color(0x66FFFFFF),
+                    width: 0.8,
                   ),
                 ),
+            boxShadow: [
+              BoxShadow(
+                color: c.isDark
+                    ? const Color(0x55000000)
+                    : const Color(0x14071526),
+                blurRadius: 20,
+                offset: const Offset(0, -6),
+              ),
+            ],
           ),
-          child: Container(
-            alignment: alignment,
-            padding: padding,
-            child: child,
+          child: Stack(
+            children: [
+              // Top liquid highlight line
+              Positioned(
+                left: 24,
+                right: 24,
+                top: 0,
+                height: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        c.isDark
+                            ? const Color(0x55FFFFFF)
+                            : const Color(0xAAFFFFFF),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                alignment: alignment,
+                padding: padding,
+                child: child,
+              ),
+            ],
           ),
         ),
       ),

@@ -23,3 +23,10 @@ class CheckPendingPayment extends SubscriptionAction {}
 class ApplyPromoCode extends SubscriptionAction {}
 
 class ClearPromoCode extends SubscriptionAction {}
+
+/// UZ: Click (UZS) yoki Visa (USD) tanlash.
+class SelectPayMethod extends SubscriptionAction {
+  /// `click` | `visa`
+  final String method;
+  SelectPayMethod(this.method);
+}

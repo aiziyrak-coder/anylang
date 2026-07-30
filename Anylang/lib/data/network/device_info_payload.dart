@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../local/session_store.dart';
 
@@ -34,12 +35,22 @@ class DeviceInfoPayload {
     final id = await SessionStore.ensureDeviceId();
     final type = _deviceType();
     final name = _deviceName(type);
+    String? version;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final v = info.version.trim();
+      final b = info.buildNumber.trim();
+      if (v.isNotEmpty) {
+        version = b.isNotEmpty ? '$v+$b' : v;
+        if (version.length > 32) version = version.substring(0, 32);
+      }
+    } catch (_) {}
     return DeviceInfoPayload(
       deviceId: id,
       deviceName: name,
       deviceType: type,
       platform: _platformLabel(),
-      appVersion: null,
+      appVersion: version,
     );
   }
 
@@ -60,6 +71,9 @@ class DeviceInfoPayload {
       case 'ios':
         return 'iPhone';
       case 'desktop':
+        if (Platform.isWindows) return 'Windows';
+        if (Platform.isMacOS) return 'Mac';
+        if (Platform.isLinux) return 'Linux';
         return 'Desktop';
       case 'web':
         return 'Web';
@@ -68,10 +82,13 @@ class DeviceInfoPayload {
     }
   }
 
+  /// Server `DeviceInfoIn.platform` max 64.
   static String _platformLabel() {
     if (kIsWeb) return 'Web';
     try {
-      return Platform.operatingSystemVersion;
+      final raw = Platform.operatingSystemVersion.trim();
+      if (raw.isEmpty) return Platform.operatingSystem;
+      return raw.length <= 64 ? raw : raw.substring(0, 64);
     } catch (_) {
       return Platform.operatingSystem;
     }

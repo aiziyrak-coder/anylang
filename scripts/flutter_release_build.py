@@ -12,10 +12,28 @@ DEFAULT_FLUTTER = Path(
 DEBUG_INFO_DIR = APP / "build" / "debug-info"
 
 
+def _read_dotenv_key(name: str) -> str:
+    """Read KEY=value from Anylang/.env (optional local secrets)."""
+    env_file = APP / ".env"
+    if not env_file.exists():
+        return ""
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        k, v = s.split("=", 1)
+        if k.strip() == name:
+            return v.strip().strip('"').strip("'")
+    return ""
+
+
 def read_maps_key() -> str:
     env_key = (os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
     if env_key:
         return env_key
+    from_env = _read_dotenv_key("GOOGLE_MAPS_API_KEY")
+    if from_env:
+        return from_env
     props = APP / "android" / "local.properties"
     if props.exists():
         for line in props.read_text(encoding="utf-8").splitlines():
@@ -23,6 +41,14 @@ def read_maps_key() -> str:
             if s.startswith("GOOGLE_MAPS_API_KEY="):
                 return s.split("=", 1)[1].strip()
     return ""
+
+
+def read_google_server_client_id() -> str:
+    """Web OAuth client ID for Google Sign-In idToken (serverClientId)."""
+    env_key = (os.environ.get("GOOGLE_SERVER_CLIENT_ID") or "").strip()
+    if env_key:
+        return env_key
+    return _read_dotenv_key("GOOGLE_SERVER_CLIENT_ID")
 
 
 def flutter_release_apk_args(
@@ -50,4 +76,7 @@ def flutter_release_apk_args(
     maps_key = read_maps_key()
     if maps_key:
         args.append(f"--dart-define=GOOGLE_MAPS_API_KEY={maps_key}")
+    google_client = read_google_server_client_id()
+    if google_client:
+        args.append(f"--dart-define=GOOGLE_SERVER_CLIENT_ID={google_client}")
     return args

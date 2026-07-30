@@ -106,20 +106,96 @@ def create_app() -> FastAPI:
     app.include_router(ws_router)
 
     _billing_html = """<!DOCTYPE html>
-<html lang="uz"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AnyLang</title></head>
+<html lang="uz">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#040b10"/>
+  <title>AnyLang — {title}</title>
+  <style>
+    :root {{
+      --bg: #040b10;
+      --ink: #f4faf6;
+      --muted: #849990;
+      --lime: #b8f25a;
+      --teal: #00c4b8;
+      --navy: #0b1a14;
+      --card: rgba(255,255,255,0.06);
+      --line: rgba(244,250,246,0.12);
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font-family: Figtree, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 500px at 10% -10%, rgba(0,196,184,0.28), transparent 55%),
+        radial-gradient(800px 480px at 100% 0%, rgba(184,242,90,0.2), transparent 50%),
+        linear-gradient(180deg, #06131c 0%, var(--bg) 45%, #02070b 100%);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }}
+    .card {{
+      width: min(440px, 100%);
+      padding: 28px 24px 24px;
+      border-radius: 24px;
+      background: linear-gradient(165deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03));
+      border: 1px solid var(--line);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }}
+    .mark {{
+      width: 56px; height: 56px; margin: 0 auto 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--lime), var(--teal));
+      box-shadow: 0 12px 32px rgba(184,242,90,0.35);
+      display: grid; place-items: center;
+      font-size: 28px; font-weight: 800; color: var(--navy);
+    }}
+    h1 {{
+      margin: 0 0 10px;
+      font-size: clamp(1.35rem, 4vw, 1.7rem);
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+    }}
+    p {{
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.5;
+    }}
+    .btn {{
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 48px; padding: 0 22px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--lime), #d4ff7a 45%, var(--teal));
+      color: var(--navy); font-weight: 800; text-decoration: none;
+      box-shadow: 0 12px 28px rgba(184,242,90,0.35);
+    }}
+    .hint {{ margin-top: 16px; font-size: 0.85rem; color: var(--muted); }}
+  </style>
+</head>
 <body>
-<h1>{title}</h1>
-<p>{body}</p>
-</body></html>"""
+  <main class="card">
+    <div class="mark" aria-hidden="true">{icon}</div>
+    <h1>{title}</h1>
+    <p>{body}</p>
+    <a class="btn" href="anylang://billing/done">{cta}</a>
+    <p class="hint">AnyLang · Click</p>
+  </main>
+</body>
+</html>"""
 
     @app.get("/billing/success", response_class=HTMLResponse)
     async def billing_success() -> HTMLResponse:
         return HTMLResponse(
             _billing_html.format(
+                icon="✓",
                 title="To‘lov qabul qilindi",
-                body="Ilovaga qayting — tarif avtomatik yangilanadi.",
+                body="Rahmat! Ilovaga qayting — tarif avtomatik yangilanadi.",
+                cta="Ilovaga qaytish",
             )
         )
 
@@ -127,8 +203,10 @@ def create_app() -> FastAPI:
     async def billing_cancel() -> HTMLResponse:
         return HTMLResponse(
             _billing_html.format(
+                icon="!",
                 title="To‘lov bekor qilindi",
                 body="Hech narsa yechilmadi. Ilovaga qaytib qayta urinib ko‘ring.",
+                cta="Ilovaga qaytish",
             )
         )
 

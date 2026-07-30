@@ -68,6 +68,38 @@ class DeviceInfoIn(BaseModel):
     platform: str | None = Field(default=None, max_length=64)
     app_version: str | None = Field(default=None, max_length=32)
 
+    @field_validator("platform", mode="before")
+    @classmethod
+    def _clip_platform(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        s = str(value).strip()
+        if not s:
+            return None
+        return s[:64]
+
+    @field_validator("app_version", mode="before")
+    @classmethod
+    def _clip_app_version(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        s = str(value).strip()
+        if not s:
+            return None
+        return s[:32]
+
+    @field_validator("device_name", mode="before")
+    @classmethod
+    def _clip_device_name(cls, value: object) -> str:
+        s = str(value or "").strip() or "Mobile"
+        return s[:120]
+
+    @field_validator("device_type", mode="before")
+    @classmethod
+    def _clip_device_type(cls, value: object) -> str:
+        s = str(value or "").strip() or "mobile"
+        return s[:32]
+
 
 class LoginIn(BaseModel):
     email: EmailStr

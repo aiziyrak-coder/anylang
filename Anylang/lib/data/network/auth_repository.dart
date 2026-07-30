@@ -264,10 +264,13 @@ class AuthRepository {
 
   Future<BaseResult> revokeOtherSessions() {
     final refresh = SessionStore.refreshToken;
+    if (refresh == null || refresh.isEmpty) {
+      return Future.value(Error('Seans topilmadi [SESSION_NOT_FOUND]'));
+    }
     return _client.post(
       api: 'api/v1/auth/sessions/revoke-others',
       data: {'refresh_token': refresh},
-      notify: SnackNotify.all,
+      notify: SnackNotify.none,
     );
   }
 

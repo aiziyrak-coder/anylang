@@ -34,7 +34,7 @@ class DeviceSession {
     final name = (json['device_name']?.toString() ?? '').trim();
     return DeviceSession(
       id: json['id']?.toString() ?? '',
-      deviceName: name.isEmpty ? 'Mobile' : name,
+      deviceName: name,
       deviceType: json['device_type']?.toString() ?? 'mobile',
       platform: json['platform']?.toString(),
       appVersion: json['app_version']?.toString(),
@@ -45,6 +45,13 @@ class DeviceSession {
       sessionStartedAt: parseDt(json['session_started_at']),
       canRevoke: json['can_revoke'] == true,
     );
+  }
+
+  /// UI uchun nom — bo‘sh bo‘lsa lokalizatsiya kaliti.
+  String get displayName {
+    final n = deviceName.trim();
+    if (n.isNotEmpty) return n;
+    return 'device_fallback_mobile';
   }
 
   bool get isPhone {

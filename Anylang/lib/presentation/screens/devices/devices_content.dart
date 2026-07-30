@@ -46,14 +46,23 @@ class DevicesContent extends ScreenContent<DevicesState> {
                 if (err != null &&
                     state.current.value == null &&
                     state.sessions.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.dp),
-                      child: AppEmptyState(
-                        icon: Icons.devices_other_outlined,
-                        title: 'devices_load_failed'.tr,
-                        subtitle: err,
-                      ),
+                  return RefreshIndicator(
+                    color: c.accentText,
+                    onRefresh: () async {
+                      await sendAction(RefreshDevices());
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(height: 80.dp),
+                        AppEmptyState(
+                          icon: Icons.devices_other_outlined,
+                          title: 'devices_load_failed'.tr,
+                          subtitle: err,
+                          actionLabel: 'common_retry'.tr,
+                          onAction: () => sendAction(RefreshDevices()),
+                        ),
+                      ],
                     ),
                   );
                 }
@@ -80,7 +89,13 @@ class DevicesContent extends ScreenContent<DevicesState> {
                         c,
                         children: [
                           if (state.current.value != null)
-                            _sessionTile(c, state.current.value!, sendAction)
+                            _sessionTile(
+                              c,
+                              state.current.value!,
+                              sendAction,
+                              state: state,
+                              isCurrentSection: true,
+                            )
                           else
                             Padding(
                               padding: EdgeInsets.all(16.dp),
@@ -129,6 +144,7 @@ class DevicesContent extends ScreenContent<DevicesState> {
                                 c,
                                 state.sessions[i],
                                 sendAction,
+                                state: state,
                                 showRevoke: true,
                               ),
                             ],
@@ -206,21 +222,46 @@ class DevicesContent extends ScreenContent<DevicesState> {
                   borderRadius: BorderRadius.circular(12.dp),
                 ),
                 alignment: Alignment.center,
-                child: Icon(
-                  Icons.front_hand_outlined,
-                  color: c.danger,
-                  size: 20.dp,
-                ),
+                child: state.busy.value && state.revokingId.value == null
+                    ? SizedBox(
+                        width: 18.dp,
+                        height: 18.dp,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: c.danger,
+                        ),
+                      )
+                    : Icon(
+                        Icons.front_hand_outlined,
+                        color: c.danger,
+                        size: 20.dp,
+                      ),
               ),
               SizedBox(width: 12.dp),
               Expanded(
-                child: Text(
-                  'devices_terminate_others'.tr,
-                  style: TextStyle(
-                    color: enabled ? c.danger : c.textFaint,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'devices_terminate_others'.tr,
+                      style: TextStyle(
+                        color: enabled ? c.danger : c.textFaint,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (!state.canRevokeOthers.value) ...[
+                      SizedBox(height: 2.dp),
+                      Text(
+                        'devices_protected_short'.tr,
+                        style: TextStyle(
+                          color: c.textFaint,
+                          fontSize: 11.sp,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -234,17 +275,24 @@ class DevicesContent extends ScreenContent<DevicesState> {
     AppColors c,
     DeviceSession s,
     void Function(MyAction) sendAction, {
+    required DevicesState state,
     bool showRevoke = false,
+    bool isCurrentSection = false,
   }) {
-    final subtitle = [
+    final nameKey = s.displayName;
+    final name = nameKey == 'device_fallback_mobile' ? nameKey.tr : nameKey;
+    final subtitleParts = <String>[
       if ((s.platform ?? '').trim().isNotEmpty) s.platform!.trim(),
       if ((s.appVersion ?? '').trim().isNotEmpty) 'v${s.appVersion}',
-    ].join(' · ');
-    final activity = s.isOnline
-        ? 'devices_online'.tr
-        : (s.lastActiveAt == null
-            ? ''
-            : formatLastActivity(online: false, lastSeenAt: s.lastActiveAt));
+      if ((s.ipAddress ?? '').trim().isNotEmpty) s.ipAddress!.trim(),
+    ];
+    final subtitle = subtitleParts.join(' · ');
+    final activity = formatLastActivity(
+      online: s.isOnline || isCurrentSection,
+      lastSeenAt: s.lastActiveAt,
+    );
+    final revoking = state.revokingId.value == s.id;
+
     return Padding(
       padding: EdgeInsets.fromLTRB(14.dp, 12.dp, 8.dp, 12.dp),
       child: Row(
@@ -270,19 +318,51 @@ class DevicesContent extends ScreenContent<DevicesState> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  s.deviceName,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (isCurrentSection || s.isCurrent) ...[
+                      SizedBox(width: 8.dp),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 7.dp,
+                          vertical: 2.dp,
+                        ),
+                        decoration: BoxDecoration(
+                          color: c.accentSoft,
+                          borderRadius: BorderRadius.circular(99.dp),
+                          border: Border.all(
+                            color: c.accent.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          'devices_badge_current'.tr,
+                          style: TextStyle(
+                            color: c.accentText,
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 if (subtitle.isNotEmpty) ...[
                   SizedBox(height: 2.dp),
                   Text(
                     subtitle,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: c.textSecondary,
@@ -290,14 +370,24 @@ class DevicesContent extends ScreenContent<DevicesState> {
                     ),
                   ),
                 ],
-                if (activity.isNotEmpty) ...[
+                SizedBox(height: 2.dp),
+                Text(
+                  activity,
+                  style: TextStyle(
+                    color: (s.isOnline || isCurrentSection)
+                        ? c.accentText
+                        : c.textFaint,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (showRevoke && !s.canRevoke) ...[
                   SizedBox(height: 2.dp),
                   Text(
-                    activity,
+                    'devices_protected_short'.tr,
                     style: TextStyle(
-                      color: s.isOnline ? c.accentText : c.textFaint,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w600,
+                      color: c.textFaint,
+                      fontSize: 11.sp,
                     ),
                   ),
                 ],
@@ -305,11 +395,29 @@ class DevicesContent extends ScreenContent<DevicesState> {
             ),
           ),
           if (showRevoke && s.canRevoke)
-            IconButton(
-              tooltip: 'devices_revoke'.tr,
-              onPressed: () => sendAction(RevokeDeviceSession(s)),
-              icon: Icon(Icons.close_rounded, color: c.danger, size: 20.dp),
-            ),
+            revoking
+                ? Padding(
+                    padding: EdgeInsets.all(12.dp),
+                    child: SizedBox(
+                      width: 18.dp,
+                      height: 18.dp,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: c.danger,
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    tooltip: 'devices_revoke'.tr,
+                    onPressed: state.busy.value
+                        ? null
+                        : () => sendAction(RevokeDeviceSession(s)),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: c.danger,
+                      size: 20.dp,
+                    ),
+                  ),
         ],
       ),
     );

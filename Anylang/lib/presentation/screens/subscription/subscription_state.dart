@@ -35,8 +35,19 @@ class SubscriptionState extends GetxController {
   Rxn<PromoPreview> promoPreview = Rxn<PromoPreview>();
   /// Promo preview va checkout uchun tanlangan reja kodi.
   RxnString promoPlanCode = RxnString();
-  /// Serverdan kelgan valyuta belgisi (masalan $, so‘m).
+  /// Serverdan kelgan valyuta belgisi (UZS | USD | $).
   RxString priceCurrencyPrefix = '\$'.obs;
+  /// Ko‘rsatilayotgan valyuta: UZS | USD.
+  RxString displayCurrency = 'USD'.obs;
+  /// Foydalanuvchi mamlakati (ISO-2), masalan UZ.
+  RxnString userCountry = RxnString();
+  /// UZ foydalanuvchi uchun to‘lov usuli: click (so‘m) | visa (USD).
+  RxString payMethod = 'click'.obs;
+  /// Server payment_methods: paddle/click available.
+  RxBool clickPayAvailable = true.obs;
+  RxBool visaPayAvailable = false.obs;
   /// To'lov solig'i foizi (default 2%) — plans API dan keladi.
   RxInt paymentTaxPercent = 2.obs;
+
+  bool get isUzUser => (userCountry.value ?? '').toUpperCase() == 'UZ';
 }

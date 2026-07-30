@@ -1,13 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../data/local/account_store.dart';
 import '../../../data/network/auth_repository.dart';
-import '../../../data/network/google_auth_service.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../ui/my_snackbar.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
+import '../../utils/google_sign_in_flow.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../forgot_password/forgot_password_screen.dart';
@@ -93,7 +92,10 @@ class LoginScreen extends Screen<LoginState, LoginPayload?> {
 
           if (body != null && body['error_code'] == 'ACCOUNT_DELETED') {
             showAppMessage('account_deleted_restore'.tr);
-            navigate(RestoreAccountScreen(), payload: a.email.trim().toLowerCase());
+            navigate(
+              RestoreAccountScreen(),
+              payload: a.email.trim().toLowerCase(),
+            );
             return;
           }
 
@@ -114,46 +116,17 @@ class LoginScreen extends Screen<LoginState, LoginPayload?> {
         navigate(RegisterScreen());
       case GoogleLogin _:
         if (state.isLoading.value || state.isGoogleLoading.value) return;
-        if (GoogleAuthService.serverClientId.isEmpty && !kDebugMode) {
-          showAppMessage('google_coming_soon'.tr);
-          return;
-        }
         state.isGoogleLoading.value = true;
         try {
-          final idToken =
-              await Get.find<GoogleAuthService>().signInForIdToken();
-          if (idToken == null || idToken.isEmpty) {
-            showAppMessage('google_cancelled'.tr);
-            return;
-          }
-          final repo = Get.find<AuthRepository>();
-          final outcome =
-              await repo.loginWithGoogleDetailed(idToken: idToken);
-          final body = outcome.body;
-          if (body != null && body['error_code'] == 'ACCOUNT_NOT_VERIFIED') {
-            final email = (body['email']?.toString() ?? '').trim();
-            if (email.isEmpty) {
-              showAppError('verify_email_missing'.tr);
-              return;
-            }
-            showAppMessage('verify_required'.tr);
-            navigate(
-              VerifyScreen(),
-              payload: VerifyPayload(email: email.toLowerCase()),
-            );
-            return;
-          }
-          await outcome.result.when(
-            success: (_) async {
-              MySnackBar.dismiss();
-              await _enterApp();
+          await runGoogleSignInFlow(
+            onSuccess: _enterApp,
+            onNeedVerify: (email) {
+              navigate(
+                VerifyScreen(),
+                payload: VerifyPayload(email: email),
+              );
             },
-            failure: (err) async => showAppError(
-              AuthValidators.safeError(err, fallbackKey: 'google_failed'),
-            ),
           );
-        } catch (e) {
-          showAppError(AuthValidators.safeError(e, fallbackKey: 'google_failed'));
         } finally {
           state.isGoogleLoading.value = false;
         }

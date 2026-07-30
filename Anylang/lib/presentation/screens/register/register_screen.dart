@@ -10,6 +10,7 @@ import '../../../data/network/auth_repository.dart';
 import '../../../data/network/session_bootstrap.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
+import '../../utils/google_sign_in_flow.dart';
 import '../../utils/legal_urls.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
@@ -99,11 +100,35 @@ class RegisterScreen extends Screen<RegisterState, void> {
         await LegalUrls.openTerms();
       case RegisterSubmit a:
         await _submit(state, a);
+      case GoogleRegister _:
+        await _googleRegister(state);
+    }
+  }
+
+  Future<void> _googleRegister(RegisterState state) async {
+    if (state.isLoading.value || state.isGoogleLoading.value) return;
+    state.formError.value = '';
+    if (!state.termsAccepted.value) {
+      _fail('terms_required'.tr);
+      return;
+    }
+    state.isGoogleLoading.value = true;
+    try {
+      await runGoogleSignInFlow(
+        onSuccess: () async {
+          showAppMessage('register_done'.tr);
+          _goHome();
+        },
+        onNeedVerify: (email) => _goVerify(email, null),
+        onError: _fail,
+      );
+    } finally {
+      state.isGoogleLoading.value = false;
     }
   }
 
   Future<void> _submit(RegisterState state, RegisterSubmit a) async {
-    if (state.isLoading.value) return;
+    if (state.isLoading.value || state.isGoogleLoading.value) return;
     final name = a.fullName.trim();
     final email = a.email.trim().toLowerCase();
     final password = a.password;

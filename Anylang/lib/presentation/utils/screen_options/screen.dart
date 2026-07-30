@@ -72,8 +72,28 @@ abstract class Screen<S extends GetxController, Payload> {
 
       final result = await Navigator.push<R>(
         context,
-        MaterialPageRoute(
-          builder: (context) => screen.build(),
+        PageRouteBuilder<R>(
+          transitionDuration: const Duration(milliseconds: 340),
+          reverseTransitionDuration: const Duration(milliseconds: 280),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              screen.build(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.06, 0),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: child,
+              ),
+            );
+          },
         ),
       );
 
@@ -90,8 +110,22 @@ abstract class Screen<S extends GetxController, Payload> {
       screen.payload = payload;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => screen.build()),
-            (route) => false,
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 380),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              screen.build(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: child,
+            );
+          },
+        ),
+        (route) => false,
       );
     } finally {
       // pushAndRemoveUntil darhol tugaydi (await yo‘q) — lockni ochamiz.

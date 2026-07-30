@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -309,66 +310,78 @@ class ChatMessageItem extends StatelessWidget {
     final showName = showSenderName && !_out && name != null && name.isNotEmpty;
     final nameColor = avatarGradientFor(message.senderId ?? 0).colors.first;
 
+    final fill = _out
+        ? c.accent
+        : (c.isDark ? const Color(0xFF1A3148) : const Color(0xFFFFFFFF));
+    final borderColor = _out
+        ? c.onAccent.withValues(alpha: 0.28)
+        : (c.isDark
+            ? const Color(0x55FFFFFF)
+            : const Color(0x88FFFFFF));
+
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
             color: _out
-                ? const Color(0x330B1F36)
+                ? c.accent.withValues(alpha: 0.22)
                 : (c.isDark
-                    ? const Color(0x66000000)
+                    ? const Color(0x55000000)
                     : const Color(0x140B1F36)),
-            blurRadius: 16,
+            blurRadius: 18,
             offset: const Offset(0, 6),
             spreadRadius: -4,
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
-          padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
-          decoration: BoxDecoration(
-            color: _out
-                ? c.accent
-                : (c.isDark
-                    ? const Color(0xF21A3148)
-                    : const Color(0xFFFFFFFF)),
-            borderRadius: radius,
-            border: _out
-                ? null
-                : Border.all(
-                    color: c.isDark
-                        ? const Color(0x33FFFFFF)
-                        : const Color(0x22071526),
-                    width: 0.7,
-                  ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (showName) ...[
-                GestureDetector(
-                  onTap: onSenderTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: nameColor,
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w700,
-                      height: 1.15,
-                    ),
-                  ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Material(
+            color: Colors.transparent,
+            child: Ink(
+              padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    fill.withValues(alpha: _out ? 0.78 : (c.isDark ? 0.52 : 0.62)),
+                    fill.withValues(alpha: _out ? 0.55 : (c.isDark ? 0.32 : 0.42)),
+                  ],
                 ),
-                SizedBox(height: 4.dp),
-              ],
-              child,
-            ],
+                borderRadius: radius,
+                border: Border.all(color: borderColor, width: 0.9),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (showName) ...[
+                    GestureDetector(
+                      onTap: onSenderTap,
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: nameColor,
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 4.dp),
+                  ],
+                  child,
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -376,10 +389,13 @@ class ChatMessageItem extends StatelessWidget {
   }
 
   Color _primaryText(AppColors c) =>
-      _out ? c.onAccent : c.textPrimary;
+      _out ? c.onAccent : (c.isDark ? const Color(0xFFF4F7FB) : c.textPrimary);
 
-  Color _metaColor(AppColors c) =>
-      _out ? c.onAccent.withValues(alpha: 0.65) : c.textSecondary;
+  Color _metaColor(AppColors c) => _out
+      ? c.onAccent.withValues(alpha: 0.65)
+      : (c.isDark
+          ? const Color(0xCCB8C5D6)
+          : c.textSecondary);
 
   /// Vaqt + (chiquvchi uchun) o'qildi belgisi.
   Widget _meta(AppColors c) {

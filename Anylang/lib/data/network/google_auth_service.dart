@@ -10,7 +10,9 @@ import '../../presentation/utils/app_snackbar.dart';
 /// Google Sign-In → backend `id_token`.
 ///
 /// Production: `--dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>`
-/// Agar client ID yo‘q bo‘lsa — email dialog orqali bootstrap token
+/// yoki `Anylang/.env` dagi `GOOGLE_SERVER_CLIENT_ID` (release build skripti).
+///
+/// Debug: client ID yo‘q bo‘lsa — email dialog orqali bootstrap token
 /// (server `GOOGLE_CLIENT_IDS` bo‘sh bo‘lganda qabul qiladi).
 class GoogleAuthService {
   static const String serverClientId = String.fromEnvironment(
@@ -24,10 +26,15 @@ class GoogleAuthService {
       );
 
   Future<String?> signInForIdToken() async {
-    // Client ID yo‘q — Play Services idToken bermaydi; bootstrap dialog.
+    // Release: faqat real Google — bootstrap yo‘q.
     if (serverClientId.isEmpty) {
-      return _promptBootstrapGoogle();
+      if (kDebugMode) return _promptBootstrapGoogle();
+      return null;
     }
+
+    try {
+      await _client.signOut();
+    } catch (_) {}
 
     try {
       final account = await _client.signIn();
@@ -36,14 +43,20 @@ class GoogleAuthService {
       final idToken = auth.idToken;
       if (idToken != null && idToken.isNotEmpty) return idToken;
 
-      // idToken yo‘q — bootstrap fallback
-      final email = account.email;
-      final name = account.displayName ?? email.split('@').first;
-      return _mintDevIdToken(email: email, name: name, sub: account.id);
+      // idToken yo‘q — faqat debug bootstrap
+      if (kDebugMode) {
+        final email = account.email;
+        final name = account.displayName ?? email.split('@').first;
+        return _mintDevIdToken(email: email, name: name, sub: account.id);
+      }
+      showAppError('google_failed'.tr);
+      return null;
     } catch (e) {
       debugPrint('Google Sign-In failed: $e');
-      final fallback = await _promptBootstrapGoogle();
-      if (fallback != null) return fallback;
+      if (kDebugMode) {
+        final fallback = await _promptBootstrapGoogle();
+        if (fallback != null) return fallback;
+      }
       rethrow;
     }
   }

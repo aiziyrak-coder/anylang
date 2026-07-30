@@ -42,7 +42,7 @@ from app.ws.hub import RedisHub
 logger = logging.getLogger(__name__)
 
 SESSION_PROTECT_DAYS = 7
-ONLINE_WINDOW = timedelta(minutes=5)
+ONLINE_WINDOW = timedelta(minutes=30)
 
 
 def _hash_token(token: str) -> str:
@@ -98,12 +98,18 @@ def _device_fields(
             "session_started_at": _session_started(copy_from),
         }
     device = device or {}
+    platform = device.get("platform")
+    if isinstance(platform, str):
+        platform = platform.strip()[:64] or None
+    app_version = device.get("app_version")
+    if isinstance(app_version, str):
+        app_version = app_version.strip()[:32] or None
     return {
         "device_id": (device.get("device_id") or None),
         "device_name": (device.get("device_name") or "Mobile")[:120],
         "device_type": (device.get("device_type") or "mobile")[:32],
-        "platform": (device.get("platform") or None),
-        "app_version": (device.get("app_version") or None),
+        "platform": platform,
+        "app_version": app_version,
         "ip_address": ip_address,
         "last_active_at": now,
         "session_started_at": now,
@@ -896,6 +902,18 @@ async def list_device_sessions(
     current = await _resolve_current_session(
         db, user_id=user_id, refresh_token=refresh_token
     )
+    # Bu qurilma hozir faol — online holatini yangilash.
+    if current is not None:
+        await db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.family == current.family,
+                RefreshToken.revoked_at.is_(None),
+            )
+            .values(last_active_at=now)
+        )
+        current.last_active_at = now
     sessions = await _active_sessions(db, user_id)
     # Joriy seansni boshqa ro‘yxatdan ajratish.
     others = [s for s in sessions if current is None or s.family != current.family]

@@ -173,6 +173,17 @@ async def create_subscription_checkout(
             status_code=400,
         )
 
+    # Soft gate: USD/Visa path not live yet → clear error (UI shows coming soon).
+    if provider_name == "paddle":
+        from app.payments.paddle import PaddleProvider
+
+        if not PaddleProvider().is_configured():
+            raise AppError(
+                message="Visa/Mastercard to'lovi tez orada",
+                error_code="PAYMENT_PROVIDER_COMING_SOON",
+                status_code=503,
+            )
+
     months = normalize_billing_months(billing_cycle)
     cycle = billing_cycle_code(months)
     amount_usd, _, _ = compute_period_price(plan, months)

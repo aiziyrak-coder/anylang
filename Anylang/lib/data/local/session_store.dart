@@ -101,12 +101,15 @@ class SessionStore {
   /// Qurilma ID — bir marta yaratiladi, loginlarda qayta ishlatiladi.
   static Future<String> ensureDeviceId() async {
     final existing = _box.get(_kDeviceId)?.toString();
-    if (existing != null && existing.length >= 8) return existing;
-    // Local import loopdan qochish — oddiy hex.
+    if (existing != null && existing.length >= 16) return existing;
+    // Secure random (device_info_payload.generateDeviceId bilan bir xil sifat).
     final r = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
-    final id = '${r}a${(r.hashCode & 0xfffffff).toRadixString(16)}';
-    await _box.put(_kDeviceId, id);
-    return id;
+    final mix = (r.hashCode ^ DateTime.now().millisecondsSinceEpoch).toUnsigned(32);
+    final id =
+        '${r.padLeft(12, '0')}${mix.toRadixString(16).padLeft(8, '0')}${DateTime.now().microsecond.toRadixString(16)}';
+    final clipped = id.length > 64 ? id.substring(0, 64) : id;
+    await _box.put(_kDeviceId, clipped);
+    return clipped;
   }
 
   static Future<void> clear() async {

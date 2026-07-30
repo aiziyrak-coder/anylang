@@ -1,7 +1,7 @@
 name: anylang
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.89+90
+version: 1.0.90+91
 
 environment:
   sdk: ^3.12.2
@@ -20,6 +20,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   flutter_secure_storage: ^9.2.4
+  package_info_plus: ^9.0.0
   url_launcher: ^6.3.2
   calendar_date_picker2: ^2.0.1
   animated_custom_dropdown: ^3.1.1
