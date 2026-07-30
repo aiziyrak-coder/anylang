@@ -371,6 +371,8 @@ async def list_messages(
     await _get_chat_for_user(db, chat_id, user.id)
 
     safe_limit = min(max(limit or DEFAULT_MESSAGE_LIMIT, 1), MAX_MESSAGE_LIMIT)
+    # Over-fetch so hide-for-me rows don't empty the page / flip has_more early.
+    fetch_cap = min(max(safe_limit * 3, safe_limit + 1), MAX_MESSAGE_LIMIT)
 
     query = (
         select(Message)
@@ -382,27 +384,37 @@ async def list_messages(
         anchor = await db.get(Message, before_id)
         if anchor is None or anchor.chat_id != chat_id:
             raise AppError(message="Xabar topilmadi", error_code="MESSAGE_NOT_FOUND", status_code=404)
-        query = query.where(Message.id < before_id).order_by(Message.id.desc()).limit(safe_limit + 1)
+        query = query.where(Message.id < before_id).order_by(Message.id.desc()).limit(fetch_cap + 1)
     elif after_id is not None:
         anchor = await db.get(Message, after_id)
         if anchor is None or anchor.chat_id != chat_id:
             raise AppError(message="Xabar topilmadi", error_code="MESSAGE_NOT_FOUND", status_code=404)
-        query = query.where(Message.id > after_id).order_by(Message.id.asc()).limit(safe_limit + 1)
+        query = query.where(Message.id > after_id).order_by(Message.id.asc()).limit(fetch_cap + 1)
     else:
-        query = query.order_by(Message.id.desc()).limit(safe_limit + 1)
+        query = query.order_by(Message.id.desc()).limit(fetch_cap + 1)
 
     result = await db.execute(query)
     rows = list(result.scalars().all())
 
-    has_more = len(rows) > safe_limit
-    if has_more:
-        rows = rows[:safe_limit]
+    raw_has_more = len(rows) > fetch_cap
+    if raw_has_more:
+        rows = rows[:fetch_cap]
 
     if before_id is not None or after_id is None:
         rows.reverse()
 
     hidden = await _hidden_message_ids(db, user.id, [m.id for m in rows])
     visible = [m for m in rows if m.id not in hidden]
+
+    if len(visible) > safe_limit:
+        if after_id is not None:
+            visible = visible[:safe_limit]
+        else:
+            # Keep messages closest to the open end of the window.
+            visible = visible[-safe_limit:]
+        has_more = True
+    else:
+        has_more = raw_has_more
 
     read_ids: set[int] = set()
     if visible:

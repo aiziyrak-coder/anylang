@@ -134,7 +134,7 @@ class _MapBody extends StatelessWidget {
             TileLayer(
               urlTemplate: mapUrl,
               subdomains: mapSubs,
-              userAgentPackageName: 'com.izodev.anylang',
+              userAgentPackageName: 'com.cradev.anylang',
             ),
             Obx(() {
               final selectedCode = state.selected.value?.country;

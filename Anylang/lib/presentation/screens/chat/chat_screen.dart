@@ -120,83 +120,86 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
   }
 
   Future<void> _loadMessages(int chatId, int session) async {
-    final result = await Get.find<ChatRepository>().listMessages(chatId);
-    // Chat / session almashgan bo'lsa — eski javobni yozmang.
-    if (state.sessionId.value != session || state.chatId.value != chatId) {
-      return;
-    }
-    result.when(
-      success: (data) {
-        if (state.sessionId.value != session || state.chatId.value != chatId) {
-          return;
-        }
-        final me = SessionStore.userId();
-        final raw = asList(data)
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
-        unawaited(OfflineChatStore.saveMessages(chatId, raw));
-        final items = raw.map((e) => _fromApi(e, me)).toList();
-        final filled = _fillMissingReplies(items, raw, me);
-        final pendingLocal = _pendingMessagesFromOutbox(chatId);
-        // Faqat shu chatga tegishli live xabarlarni saqlab qolamiz.
-        final liveOnly = state.messages
-            .where((m) => filled.every((f) => f.id != m.id))
-            .where((m) => pendingLocal.every((p) => p.id != m.id))
-            .toList();
-        final merged = [...filled, ...pendingLocal, ...liveOnly]
-          ..sort((a, b) {
-            final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return at.compareTo(bt);
-          });
-        state.messages.assignAll(merged);
-        state.loadError.value = false;
-        if (state.searching.value &&
-            state.searchQuery.value.trim().isNotEmpty) {
-          _recomputeSearchMatches(state);
-        }
-        final pinned = merged.where((m) => m.pinned).toList();
-        state.pinnedMessages.assignAll(pinned);
-        state.pinnedBanner.value = pinned.isNotEmpty ? pinned.last : null;
-        final ids = filled
-            .where((m) => !m.isOutgoing)
-            .map((m) => int.tryParse(m.id))
-            .whereType<int>()
-            .toList();
-        if (ids.isNotEmpty) {
-          unawaited(_markReadSafe(chatId, ids));
-        }
-        if (chatId > 0) {
-          unawaited(_loadPinned(chatId, session));
-        }
-      },
-      failure: (err) {
-        if (state.sessionId.value != session || state.chatId.value != chatId) {
-          return;
-        }
-        final cached = OfflineChatStore.loadMessages(chatId);
-        final pendingLocal = _pendingMessagesFromOutbox(chatId);
-        if (cached.isNotEmpty || pendingLocal.isNotEmpty) {
+    try {
+      final result = await Get.find<ChatRepository>().listMessages(chatId);
+      // Chat / session almashgan bo'lsa — eski javobni yozmang.
+      if (state.sessionId.value != session || state.chatId.value != chatId) {
+        return;
+      }
+      result.when(
+        success: (data) {
+          if (state.sessionId.value != session || state.chatId.value != chatId) {
+            return;
+          }
           final me = SessionStore.userId();
-          final items = cached.map((e) => _fromApi(e, me)).toList();
-          final merged = [...items, ...pendingLocal]
+          final raw = asList(data)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          unawaited(OfflineChatStore.saveMessages(chatId, raw));
+          final items = raw.map((e) => _fromApi(e, me)).toList();
+          final filled = _fillMissingReplies(items, raw, me);
+          final pendingLocal = _pendingMessagesFromOutbox(chatId);
+          // Faqat shu chatga tegishli live xabarlarni saqlab qolamiz.
+          final liveOnly = state.messages
+              .where((m) => filled.every((f) => f.id != m.id))
+              .where((m) => pendingLocal.every((p) => p.id != m.id))
+              .toList();
+          final merged = [...filled, ...pendingLocal, ...liveOnly]
             ..sort((a, b) {
               final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
               final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
               return at.compareTo(bt);
             });
           state.messages.assignAll(merged);
-          return;
-        }
-        state.loadError.value = true;
-        if (!isNetworkFailure(err)) {
-          showAppError(err);
-        }
-      },
-    );
-    if (state.sessionId.value == session && state.chatId.value == chatId) {
-      state.loading.value = false;
+          state.loadError.value = false;
+          if (state.searching.value &&
+              state.searchQuery.value.trim().isNotEmpty) {
+            _recomputeSearchMatches(state);
+          }
+          final pinned = merged.where((m) => m.pinned).toList();
+          state.pinnedMessages.assignAll(pinned);
+          state.pinnedBanner.value = pinned.isNotEmpty ? pinned.last : null;
+          final ids = filled
+              .where((m) => !m.isOutgoing)
+              .map((m) => int.tryParse(m.id))
+              .whereType<int>()
+              .toList();
+          if (ids.isNotEmpty) {
+            unawaited(_markReadSafe(chatId, ids));
+          }
+          if (chatId > 0) {
+            unawaited(_loadPinned(chatId, session));
+          }
+        },
+        failure: (err) {
+          if (state.sessionId.value != session || state.chatId.value != chatId) {
+            return;
+          }
+          final cached = OfflineChatStore.loadMessages(chatId);
+          final pendingLocal = _pendingMessagesFromOutbox(chatId);
+          if (cached.isNotEmpty || pendingLocal.isNotEmpty) {
+            final me = SessionStore.userId();
+            final items = cached.map((e) => _fromApi(e, me)).toList();
+            final merged = [...items, ...pendingLocal]
+              ..sort((a, b) {
+                final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                return at.compareTo(bt);
+              });
+            state.messages.assignAll(merged);
+            return;
+          }
+          state.loadError.value = true;
+          if (!isNetworkFailure(err)) {
+            showAppError(err);
+          }
+        },
+      );
+    } finally {
+      if (state.sessionId.value == session && state.chatId.value == chatId) {
+        state.loading.value = false;
+      }
     }
   }
 
@@ -1094,38 +1097,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     );
     state.messages.add(optimistic);
 
-    if (!online) {
-      await OfflineChatStore.tryEnqueueOutbox({
-        'kind': 'voice',
-        'chat_id': state.chatId.value,
-        'client_message_id': clientId,
-        'file_path': recorded.path,
-        'duration_ms': recorded.duration.inMilliseconds,
-        'samples': WaveformUtils.resampleBars(recorded.samples, 40),
-        'reply_to_id': replyToId,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      _bumpConversationPreview('chat_preview_voice'.tr);
-      _sendTyping(state, isTyping: false);
-      state.sending.value = false;
-      return;
-    }
-    _bumpConversationPreview('chat_preview_voice'.tr);
-
-    final upload = await Get.find<ChatRepository>().uploadMedia(
-      filePath: recorded.path,
-      mediaType: 'voice',
-    );
-    final uploadMap = asMap(upload.dataOrNull);
-    final mediaId = (uploadMap?['id'] as num?)?.toInt();
-    if (mediaId == null) {
-      final err = upload.errorOrNull;
-      if (isNetworkFailure(err)) {
-        final idx = state.messages.indexWhere((m) => m.id == clientId);
-        if (idx >= 0) {
-          state.messages[idx] =
-              state.messages[idx].withStatus(ChatStatus.pending);
-        }
+    try {
+      if (!online) {
         await OfflineChatStore.tryEnqueueOutbox({
           'kind': 'voice',
           'chat_id': state.chatId.value,
@@ -1136,88 +1109,19 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           'reply_to_id': replyToId,
           'created_at': DateTime.now().toIso8601String(),
         });
-        _scheduleOutboxFlush();
-      } else {
-        state.messages.removeWhere((m) => m.id == optimistic.id);
-        if (err != null) {
-          showAppError(err);
-        } else {
-          showAppMessage('voice_upload_failed'.tr);
-        }
+        _bumpConversationPreview('chat_preview_voice'.tr);
+        return;
       }
-      _sendTyping(state, isTyping: false);
-      state.sending.value = false;
-      return;
-    }
+      _bumpConversationPreview('chat_preview_voice'.tr);
 
-    final downsampled = WaveformUtils.resampleBars(recorded.samples, 40);
-    final send = await Get.find<ChatRepository>().sendVoice(
-      chatId: state.chatId.value,
-      clientMessageId: clientId,
-      mediaId: mediaId,
-      meta: {
-        'duration_ms': recorded.duration.inMilliseconds,
-        'samples': downsampled,
-      },
-      replyToId: replyToId,
-    );
-    await send.when(
-      success: (data) async {
-        final map = asMap(data);
-        if (map == null) {
-          final idx = state.messages.indexWhere((m) => m.id == clientId);
-          if (idx >= 0) {
-            state.messages[idx] =
-                state.messages[idx].withStatus(ChatStatus.pending);
-          }
-          await OfflineChatStore.tryEnqueueOutbox({
-            'kind': 'voice',
-            'chat_id': state.chatId.value,
-            'client_message_id': clientId,
-            'file_path': recorded.path,
-            'duration_ms': recorded.duration.inMilliseconds,
-            'samples': downsampled,
-            'reply_to_id': replyToId,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-          _scheduleOutboxFlush();
-          return;
-        }
-        final real = _fromApi(
-          map,
-          SessionStore.userId(),
-          fallbackReply: replyUi,
-        );
-        final merged = ChatMessage.voice(
-          id: real.id,
-          dir: real.dir,
-          time: real.time,
-          createdAt: real.createdAt,
-          duration: optimistic.voiceDuration ?? real.voiceDuration ?? '0:00',
-          durationMs: optimistic.voiceDurationMs ?? real.voiceDurationMs,
-          path: optimistic.voicePath ?? real.voicePath,
-          samples: optimistic.voiceSamples.isNotEmpty
-              ? optimistic.voiceSamples
-              : real.voiceSamples,
-          status: real.status == ChatStatus.pending
-              ? ChatStatus.sent
-              : real.status,
-          reply: real.reply ?? replyUi,
-          senderId: real.senderId,
-          senderName: real.senderName,
-          senderAvatarUrl: real.senderAvatarUrl,
-          text: real.text,
-          textOriginal: real.textOriginal,
-          showingOriginal: real.showingOriginal,
-          transcriptPending: real.transcriptPending,
-          transcriptFailed: real.transcriptFailed,
-        );
-        final idx = state.messages
-            .indexWhere((m) => m.id == clientId || m.id == real.id);
-        if (idx >= 0) state.messages[idx] = merged;
-        await OfflineChatStore.removeOutbox(clientId);
-      },
-      failure: (err) async {
+      final upload = await Get.find<ChatRepository>().uploadMedia(
+        filePath: recorded.path,
+        mediaType: 'voice',
+      );
+      final uploadMap = asMap(upload.dataOrNull);
+      final mediaId = (uploadMap?['id'] as num?)?.toInt();
+      if (mediaId == null) {
+        final err = upload.errorOrNull;
         if (isNetworkFailure(err)) {
           final idx = state.messages.indexWhere((m) => m.id == clientId);
           if (idx >= 0) {
@@ -1230,19 +1134,117 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             'client_message_id': clientId,
             'file_path': recorded.path,
             'duration_ms': recorded.duration.inMilliseconds,
-            'samples': downsampled,
+            'samples': WaveformUtils.resampleBars(recorded.samples, 40),
             'reply_to_id': replyToId,
             'created_at': DateTime.now().toIso8601String(),
           });
           _scheduleOutboxFlush();
         } else {
-          state.messages.removeWhere((m) => m.id == clientId);
-          showAppError(err);
+          state.messages.removeWhere((m) => m.id == optimistic.id);
+          if (err != null) {
+            showAppError(err);
+          } else {
+            showAppMessage('voice_upload_failed'.tr);
+          }
         }
-      },
-    );
-    _sendTyping(state, isTyping: false);
-    state.sending.value = false;
+        return;
+      }
+
+      final downsampled = WaveformUtils.resampleBars(recorded.samples, 40);
+      final send = await Get.find<ChatRepository>().sendVoice(
+        chatId: state.chatId.value,
+        clientMessageId: clientId,
+        mediaId: mediaId,
+        meta: {
+          'duration_ms': recorded.duration.inMilliseconds,
+          'samples': downsampled,
+        },
+        replyToId: replyToId,
+      );
+      await send.when(
+        success: (data) async {
+          final map = asMap(data);
+          if (map == null) {
+            final idx = state.messages.indexWhere((m) => m.id == clientId);
+            if (idx >= 0) {
+              state.messages[idx] =
+                  state.messages[idx].withStatus(ChatStatus.pending);
+            }
+            await OfflineChatStore.tryEnqueueOutbox({
+              'kind': 'voice',
+              'chat_id': state.chatId.value,
+              'client_message_id': clientId,
+              'file_path': recorded.path,
+              'duration_ms': recorded.duration.inMilliseconds,
+              'samples': downsampled,
+              'reply_to_id': replyToId,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+            _scheduleOutboxFlush();
+            return;
+          }
+          final real = _fromApi(
+            map,
+            SessionStore.userId(),
+            fallbackReply: replyUi,
+          );
+          final merged = ChatMessage.voice(
+            id: real.id,
+            dir: real.dir,
+            time: real.time,
+            createdAt: real.createdAt,
+            duration: optimistic.voiceDuration ?? real.voiceDuration ?? '0:00',
+            durationMs: optimistic.voiceDurationMs ?? real.voiceDurationMs,
+            path: optimistic.voicePath ?? real.voicePath,
+            samples: optimistic.voiceSamples.isNotEmpty
+                ? optimistic.voiceSamples
+                : real.voiceSamples,
+            status: real.status == ChatStatus.pending
+                ? ChatStatus.sent
+                : real.status,
+            reply: real.reply ?? replyUi,
+            senderId: real.senderId,
+            senderName: real.senderName,
+            senderAvatarUrl: real.senderAvatarUrl,
+            text: real.text,
+            textOriginal: real.textOriginal,
+            showingOriginal: real.showingOriginal,
+            transcriptPending: real.transcriptPending,
+            transcriptFailed: real.transcriptFailed,
+          );
+          final idx = state.messages
+              .indexWhere((m) => m.id == clientId || m.id == real.id);
+          if (idx >= 0) state.messages[idx] = merged;
+          await OfflineChatStore.removeOutbox(clientId);
+        },
+        failure: (err) async {
+          if (isNetworkFailure(err)) {
+            final idx = state.messages.indexWhere((m) => m.id == clientId);
+            if (idx >= 0) {
+              state.messages[idx] =
+                  state.messages[idx].withStatus(ChatStatus.pending);
+            }
+            await OfflineChatStore.tryEnqueueOutbox({
+              'kind': 'voice',
+              'chat_id': state.chatId.value,
+              'client_message_id': clientId,
+              'file_path': recorded.path,
+              'duration_ms': recorded.duration.inMilliseconds,
+              'samples': downsampled,
+              'reply_to_id': replyToId,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+            _scheduleOutboxFlush();
+          } else {
+            state.messages.removeWhere((m) => m.id == clientId);
+            showAppError(err);
+          }
+        },
+      );
+    } finally {
+      _sendTyping(state, isTyping: false);
+      state.sending.value = false;
+    }
     } finally {
       _finishingRecord = false;
     }
@@ -2088,45 +2090,48 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     state.aiSuggesting.value = true;
     state.aiSuggestTone.value = tone;
     state.aiSuggestMessageId.value = focus?.id;
-    int? messageId;
-    if (focus != null && !focus.isOutgoing) {
-      messageId = int.tryParse(focus.id);
-    } else {
-      for (final m in state.messages.reversed) {
-        if (!m.isOutgoing &&
-            (m.type == ChatMsgType.text ||
-                m.type == ChatMsgType.voice ||
-                m.type == ChatMsgType.video) &&
-            m.displayText.trim().isNotEmpty) {
-          messageId = int.tryParse(m.id);
-          break;
+    try {
+      int? messageId;
+      if (focus != null && !focus.isOutgoing) {
+        messageId = int.tryParse(focus.id);
+      } else {
+        for (final m in state.messages.reversed) {
+          if (!m.isOutgoing &&
+              (m.type == ChatMsgType.text ||
+                  m.type == ChatMsgType.voice ||
+                  m.type == ChatMsgType.video) &&
+              m.displayText.trim().isNotEmpty) {
+            messageId = int.tryParse(m.id);
+            break;
+          }
         }
       }
+      final result = await Get.find<ChatRepository>().suggestReply(
+        state.chatId.value,
+        messageId: messageId,
+        tone: tone,
+      );
+      result.when(
+        success: (data) {
+          final map = asMap(data);
+          final text = map?['text']?.toString().trim() ?? '';
+          if (text.isEmpty) {
+            showAppMessage('chat_ai_empty'.tr);
+            return;
+          }
+          state.input.value = text;
+          if (focus != null && !focus.isOutgoing) {
+            state.replyTo.value = focus;
+          }
+          _toast('chat_ai_ready'.tr);
+        },
+        failure: showAppError,
+      );
+    } finally {
+      state.aiSuggesting.value = false;
+      state.aiSuggestTone.value = null;
+      state.aiSuggestMessageId.value = null;
     }
-    final result = await Get.find<ChatRepository>().suggestReply(
-      state.chatId.value,
-      messageId: messageId,
-      tone: tone,
-    );
-    result.when(
-      success: (data) {
-        final map = asMap(data);
-        final text = map?['text']?.toString().trim() ?? '';
-        if (text.isEmpty) {
-          showAppMessage('chat_ai_empty'.tr);
-          return;
-        }
-        state.input.value = text;
-        if (focus != null && !focus.isOutgoing) {
-          state.replyTo.value = focus;
-        }
-        _toast('chat_ai_ready'.tr);
-      },
-      failure: showAppError,
-    );
-    state.aiSuggesting.value = false;
-    state.aiSuggestTone.value = null;
-    state.aiSuggestMessageId.value = null;
   }
 
   Future<void> _showAiSummary() async {
@@ -2401,52 +2406,8 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
         : true;
     state.messages.add(optimisticRow);
 
-    if (!online) {
-      await OfflineChatStore.tryEnqueueOutbox({
-        'kind': messageType,
-        'chat_id': state.chatId.value,
-        'client_message_id': clientId,
-        'file_path': filePath,
-        'media_type': mediaType,
-        'file_name': optimistic.fileName,
-        'file_size': optimistic.fileSize,
-        'file_ext': optimistic.fileExt,
-        'reply_to_id': replyToId,
-        'extra_meta': extraMeta,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      _bumpConversationPreview(switch (messageType) {
-        'image' => 'chat_preview_photo'.tr,
-        'video' => 'chat_preview_video'.tr,
-        'voice' => 'chat_preview_voice'.tr,
-        _ => 'chat_preview_file'.tr,
-      });
-      _sendTyping(state, isTyping: false);
-      state.sending.value = false;
-      return;
-    }
-    _bumpConversationPreview(switch (messageType) {
-      'image' => 'chat_preview_photo'.tr,
-      'video' => 'chat_preview_video'.tr,
-      'voice' => 'chat_preview_voice'.tr,
-      _ => 'chat_preview_file'.tr,
-    });
-
-    final repo = Get.find<ChatRepository>();
-    final upload = await repo.uploadMedia(
-      filePath: filePath,
-      mediaType: mediaType,
-    );
-    final uploadMap = asMap(upload.dataOrNull);
-    final mediaId = (uploadMap?['id'] as num?)?.toInt();
-    if (mediaId == null) {
-      final err = upload.errorOrNull;
-      if (isNetworkFailure(err)) {
-        final idx = state.messages.indexWhere((m) => m.id == clientId);
-        if (idx >= 0) {
-          state.messages[idx] =
-              state.messages[idx].withStatus(ChatStatus.pending);
-        }
+    try {
+      if (!online) {
         await OfflineChatStore.tryEnqueueOutbox({
           'kind': messageType,
           'chat_id': state.chatId.value,
@@ -2460,84 +2421,30 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           'extra_meta': extraMeta,
           'created_at': DateTime.now().toIso8601String(),
         });
-        _scheduleOutboxFlush();
-      } else {
-        state.messages.removeWhere((m) => m.id == optimisticRow.id);
-        if (err != null) {
-          showAppError(err);
-        } else {
-          showAppMessage('file_upload_failed'.tr);
-        }
+        _bumpConversationPreview(switch (messageType) {
+          'image' => 'chat_preview_photo'.tr,
+          'video' => 'chat_preview_video'.tr,
+          'voice' => 'chat_preview_voice'.tr,
+          _ => 'chat_preview_file'.tr,
+        });
+        return;
       }
-      _sendTyping(state, isTyping: false);
-      state.sending.value = false;
-      return;
-    }
+      _bumpConversationPreview(switch (messageType) {
+        'image' => 'chat_preview_photo'.tr,
+        'video' => 'chat_preview_video'.tr,
+        'voice' => 'chat_preview_voice'.tr,
+        _ => 'chat_preview_file'.tr,
+      });
 
-    final send = await repo.sendMessage(
-      chatId: state.chatId.value,
-      clientMessageId: clientId,
-      type: messageType,
-      mediaId: mediaId,
-      meta: extraMeta,
-      replyToId: replyToId,
-    );
-    await send.when(
-      success: (data) async {
-        final map = asMap(data);
-        if (map == null) {
-          final idx = state.messages.indexWhere((m) => m.id == clientId);
-          if (idx >= 0) {
-            state.messages[idx] =
-                state.messages[idx].withStatus(ChatStatus.pending);
-          }
-          await OfflineChatStore.tryEnqueueOutbox({
-            'kind': messageType,
-            'chat_id': state.chatId.value,
-            'client_message_id': clientId,
-            'file_path': filePath,
-            'media_type': mediaType,
-            'file_name': optimistic.fileName,
-            'file_size': optimistic.fileSize,
-            'file_ext': optimistic.fileExt,
-            'reply_to_id': replyToId,
-            'extra_meta': extraMeta,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-          _scheduleOutboxFlush();
-          return;
-        }
-        final real = _fromApi(
-          map,
-          SessionStore.userId(),
-          fallbackReply: replyUi,
-        );
-        final idx = state.messages.indexWhere((m) => m.id == clientId || m.id == real.id);
-        if (idx >= 0) {
-          // Lokal fayl yo‘li bo‘lsa, tarmoq URL kelguncha saqlaymiz.
-          if (optimisticRow.type == ChatMsgType.image &&
-              (real.imageUrl == null || real.imageUrl!.isEmpty) &&
-              optimisticRow.imageUrl != null) {
-            state.messages[idx] = ChatMessage.image(
-              id: real.id,
-              dir: real.dir,
-              time: real.time,
-              createdAt: real.createdAt,
-              url: optimisticRow.imageUrl,
-              gradient: avatarTealGradient,
-              status: real.status,
-              reply: real.reply ?? replyUi,
-              senderId: real.senderId,
-              senderName: real.senderName,
-              senderAvatarUrl: real.senderAvatarUrl,
-            );
-          } else {
-            state.messages[idx] = real;
-          }
-        }
-        await OfflineChatStore.removeOutbox(clientId);
-      },
-      failure: (err) async {
+      final repo = Get.find<ChatRepository>();
+      final upload = await repo.uploadMedia(
+        filePath: filePath,
+        mediaType: mediaType,
+      );
+      final uploadMap = asMap(upload.dataOrNull);
+      final mediaId = (uploadMap?['id'] as num?)?.toInt();
+      if (mediaId == null) {
+        final err = upload.errorOrNull;
         if (isNetworkFailure(err)) {
           final idx = state.messages.indexWhere((m) => m.id == clientId);
           if (idx >= 0) {
@@ -2558,14 +2465,112 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
             'created_at': DateTime.now().toIso8601String(),
           });
           _scheduleOutboxFlush();
-          return;
+        } else {
+          state.messages.removeWhere((m) => m.id == optimisticRow.id);
+          if (err != null) {
+            showAppError(err);
+          } else {
+            showAppMessage('file_upload_failed'.tr);
+          }
         }
-        state.messages.removeWhere((m) => m.id == clientId);
-        showAppError(err);
-      },
-    );
-    _sendTyping(state, isTyping: false);
-    state.sending.value = false;
+        return;
+      }
+
+      final send = await repo.sendMessage(
+        chatId: state.chatId.value,
+        clientMessageId: clientId,
+        type: messageType,
+        mediaId: mediaId,
+        meta: extraMeta,
+        replyToId: replyToId,
+      );
+      await send.when(
+        success: (data) async {
+          final map = asMap(data);
+          if (map == null) {
+            final idx = state.messages.indexWhere((m) => m.id == clientId);
+            if (idx >= 0) {
+              state.messages[idx] =
+                  state.messages[idx].withStatus(ChatStatus.pending);
+            }
+            await OfflineChatStore.tryEnqueueOutbox({
+              'kind': messageType,
+              'chat_id': state.chatId.value,
+              'client_message_id': clientId,
+              'file_path': filePath,
+              'media_type': mediaType,
+              'file_name': optimistic.fileName,
+              'file_size': optimistic.fileSize,
+              'file_ext': optimistic.fileExt,
+              'reply_to_id': replyToId,
+              'extra_meta': extraMeta,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+            _scheduleOutboxFlush();
+            return;
+          }
+          final real = _fromApi(
+            map,
+            SessionStore.userId(),
+            fallbackReply: replyUi,
+          );
+          final idx = state.messages
+              .indexWhere((m) => m.id == clientId || m.id == real.id);
+          if (idx >= 0) {
+            // Lokal fayl yo‘li bo‘lsa, tarmoq URL kelguncha saqlaymiz.
+            if (optimisticRow.type == ChatMsgType.image &&
+                (real.imageUrl == null || real.imageUrl!.isEmpty) &&
+                optimisticRow.imageUrl != null) {
+              state.messages[idx] = ChatMessage.image(
+                id: real.id,
+                dir: real.dir,
+                time: real.time,
+                createdAt: real.createdAt,
+                url: optimisticRow.imageUrl,
+                gradient: avatarTealGradient,
+                status: real.status,
+                reply: real.reply ?? replyUi,
+                senderId: real.senderId,
+                senderName: real.senderName,
+                senderAvatarUrl: real.senderAvatarUrl,
+              );
+            } else {
+              state.messages[idx] = real;
+            }
+          }
+          await OfflineChatStore.removeOutbox(clientId);
+        },
+        failure: (err) async {
+          if (isNetworkFailure(err)) {
+            final idx = state.messages.indexWhere((m) => m.id == clientId);
+            if (idx >= 0) {
+              state.messages[idx] =
+                  state.messages[idx].withStatus(ChatStatus.pending);
+            }
+            await OfflineChatStore.tryEnqueueOutbox({
+              'kind': messageType,
+              'chat_id': state.chatId.value,
+              'client_message_id': clientId,
+              'file_path': filePath,
+              'media_type': mediaType,
+              'file_name': optimistic.fileName,
+              'file_size': optimistic.fileSize,
+              'file_ext': optimistic.fileExt,
+              'reply_to_id': replyToId,
+              'extra_meta': extraMeta,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+            _scheduleOutboxFlush();
+            return;
+          }
+          state.messages.removeWhere((m) => m.id == clientId);
+          showAppError(err);
+        },
+      );
+    } finally {
+      _sendTyping(state, isTyping: false);
+      state.sending.value = false;
+    }
   }
 
   Future<void> _sendMetaMessage({
@@ -2632,28 +2637,31 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     };
     state.messages.add(pending);
 
-    final send = await Get.find<ChatRepository>().sendMessage(
-      chatId: state.chatId.value,
-      clientMessageId: clientId,
-      type: type,
-      meta: meta,
-      text: text,
-      replyToId: replyToId,
-    );
-    send.when(
-      success: (data) {
-        final map = asMap(data);
-        if (map == null) return;
-        final real = _fromApi(map, SessionStore.userId());
-        final idx = state.messages.indexWhere((m) => m.id == clientId);
-        if (idx >= 0) state.messages[idx] = real;
-      },
-      failure: (err) {
-        state.messages.removeWhere((m) => m.id == clientId);
-        showAppError(err);
-      },
-    );
-    state.sending.value = false;
+    try {
+      final send = await Get.find<ChatRepository>().sendMessage(
+        chatId: state.chatId.value,
+        clientMessageId: clientId,
+        type: type,
+        meta: meta,
+        text: text,
+        replyToId: replyToId,
+      );
+      send.when(
+        success: (data) {
+          final map = asMap(data);
+          if (map == null) return;
+          final real = _fromApi(map, SessionStore.userId());
+          final idx = state.messages.indexWhere((m) => m.id == clientId);
+          if (idx >= 0) state.messages[idx] = real;
+        },
+        failure: (err) {
+          state.messages.removeWhere((m) => m.id == clientId);
+          showAppError(err);
+        },
+      );
+    } finally {
+      state.sending.value = false;
+    }
   }
 
   Future<Product?> _pickProduct() async {

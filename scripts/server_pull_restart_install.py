@@ -100,7 +100,7 @@ def main() -> int:
             "am",
             "start",
             "-n",
-            "com.izodev.anylang/.MainActivity",
+            "com.cradev.anylang/.MainActivity",
         ]
     )
     print("DONE", apk)

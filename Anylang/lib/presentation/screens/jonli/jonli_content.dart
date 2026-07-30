@@ -11,7 +11,6 @@ import '../../ui/buttons/primary_button.dart';
 import '../../ui/items/jonli_transcript_item.dart';
 import '../../ui/language_flag.dart';
 import '../../ui/theme/colors.dart';
-import '../../ui/theme/gradients.dart';
 import '../../ui/waveform_bars.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
@@ -324,8 +323,7 @@ class JonliContent extends ScreenContent<JonliState> {
       final turns = state.turns;
       final empty = turns.isEmpty &&
           state.mode.value == JonliMode.idle &&
-          !state.busy.value &&
-          !state.conversationActive.value;
+          !state.busy.value;
 
       if (empty) {
         return Padding(
@@ -346,25 +344,12 @@ class JonliContent extends ScreenContent<JonliState> {
               ),
               SizedBox(height: 8.dp),
               Text(
-                'jonli_hint_conversation'.tr,
+                'jonli_hint_idle'.tr,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: c.textSecondary,
                   fontSize: 13.sp,
                   height: 1.4,
-                ),
-              ),
-              SizedBox(height: 18.dp),
-              PrimaryButton(
-                text: 'jonli_conversation_start'.tr,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  sendAction(ToggleConversation());
-                },
-                startIcon: Icon(
-                  Icons.mic_rounded,
-                  size: 20.dp,
-                  color: c.onAccent,
                 ),
               ),
               SizedBox(height: 16.dp),
@@ -605,36 +590,25 @@ class JonliContent extends ScreenContent<JonliState> {
     );
   }
 
-  /// Status + speaker pilllar + CTA + bitta waveform — bitta panel.
+  /// Status + ikki hold-to-talk taraf (Siz | Suhbatdosh).
   Widget _sessionPanel(
     AppColors c,
     JonliState state,
     void Function(MyAction) sendAction,
   ) {
     return Obx(() {
-      final active = state.conversationActive.value;
       final busy = state.busy.value;
       final mode = state.mode.value;
-      final nextMe = state.nextIsMe.value;
-      final meHot = mode == JonliMode.me || (mode == JonliMode.idle && nextMe);
-      final otherHot =
-          mode == JonliMode.other || (mode == JonliMode.idle && !nextMe);
       final recording = mode != JonliMode.idle;
-      final waveColor = mode == JonliMode.other ? kSpeakBlue : c.accent;
+      final meHot = mode == JonliMode.me;
+      final otherHot = mode == JonliMode.other;
+      final waveColor = otherHot ? kSpeakBlue : c.accent;
 
-      String status;
-      if (busy) {
-        status = 'jonli_translating'.tr;
-      } else if (mode == JonliMode.me) {
-        status = 'jonli_you_speaking'.tr;
-      } else if (mode == JonliMode.other) {
-        status = 'jonli_other_speaking'.tr;
-      } else if (active) {
-        status =
-            nextMe ? 'jonli_turn_you'.tr : 'jonli_turn_other'.tr;
-      } else {
-        status = 'jonli_hint_conversation'.tr;
-      }
+      final status = busy
+          ? 'jonli_translating'.tr
+          : (recording
+              ? 'jonli_hint_recording'.tr
+              : 'jonli_hint_idle'.tr);
 
       return Container(
         padding: EdgeInsets.fromLTRB(12.dp, 12.dp, 12.dp, 12.dp),
@@ -642,7 +616,7 @@ class JonliContent extends ScreenContent<JonliState> {
           color: c.surface,
           borderRadius: BorderRadius.circular(22.dp),
           border: Border.all(
-            color: active ? c.accent.withValues(alpha: 0.55) : c.outline,
+            color: recording ? waveColor.withValues(alpha: 0.55) : c.outline,
           ),
         ),
         child: Column(
@@ -689,98 +663,35 @@ class JonliContent extends ScreenContent<JonliState> {
             Row(
               children: [
                 Expanded(
-                  child: _speakerPill(
+                  child: _holdSpeakerButton(
                     c,
                     label: 'jonli_you'.tr,
-                    lang: state.myLanguage.value,
-                    hot: meHot && active,
+                    hot: meHot,
+                    enabled: !busy && (!recording || meHot),
                     accent: c.accent,
-                  ),
-                ),
-                SizedBox(width: 8.dp),
-                Material(
-                  color: c.accentSoft,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      sendAction(SwitchConversationTurn());
+                    onDown: () {
+                      HapticFeedback.mediumImpact();
+                      sendAction(HoldSpeakStart(true));
                     },
-                    child: Padding(
-                      padding: EdgeInsets.all(10.dp),
-                      child: Icon(
-                        Icons.sync_alt_rounded,
-                        size: 18.dp,
-                        color: c.accent,
-                      ),
-                    ),
+                    onUp: () => sendAction(StopSpeaking()),
                   ),
                 ),
-                SizedBox(width: 8.dp),
+                SizedBox(width: 10.dp),
                 Expanded(
-                  child: _speakerPill(
+                  child: _holdSpeakerButton(
                     c,
                     label: 'jonli_interlocutor'.tr,
-                    lang: state.otherLanguage.value,
-                    hot: otherHot && active,
+                    hot: otherHot,
+                    enabled: !busy && (!recording || otherHot),
                     accent: kSpeakBlue,
+                    onDown: () {
+                      HapticFeedback.mediumImpact();
+                      sendAction(HoldSpeakStart(false));
+                    },
+                    onUp: () => sendAction(StopSpeaking()),
                   ),
                 ),
               ],
-            ),
-            SizedBox(height: 12.dp),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18.dp),
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  if (!active) {
-                    sendAction(ToggleConversation());
-                  } else if (recording) {
-                    sendAction(StopSpeaking());
-                  } else {
-                    sendAction(ToggleConversation());
-                  }
-                },
-                child: Ink(
-                  height: 56.dp,
-                  decoration: BoxDecoration(
-                    gradient: active ? limeButtonGradient : null,
-                    color: active ? null : c.background,
-                    borderRadius: BorderRadius.circular(18.dp),
-                    border: active ? null : Border.all(color: c.outline),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SvgPicture.asset(
-                        'assets/icons/ic_mic.svg',
-                        width: 22.dp,
-                        height: 22.dp,
-                        colorFilter: ColorFilter.mode(
-                          active ? c.onAccent : c.textPrimary,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                      SizedBox(width: 10.dp),
-                      Text(
-                        !active
-                            ? 'jonli_conversation_start'.tr
-                            : (recording
-                                ? 'jonli_conversation_stop_turn'.tr
-                                : 'jonli_conversation_stop'.tr),
-                        style: TextStyle(
-                          color: active ? c.onAccent : c.textPrimary,
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -788,61 +699,77 @@ class JonliContent extends ScreenContent<JonliState> {
     });
   }
 
-  Widget _speakerPill(
+  Widget _holdSpeakerButton(
     AppColors c, {
     required String label,
-    required LanguageOption lang,
     required bool hot,
+    required bool enabled,
     required Color accent,
+    required VoidCallback onDown,
+    required VoidCallback onUp,
   }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 10.dp),
-      decoration: BoxDecoration(
-        color: hot ? accent.withValues(alpha: 0.14) : c.background,
-        borderRadius: BorderRadius.circular(14.dp),
-        border: Border.all(
-          color: hot ? accent.withValues(alpha: 0.7) : c.outline,
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) {
+        if (!enabled || hot) return;
+        onDown();
+      },
+      onPointerUp: (_) => onUp(),
+      onPointerCancel: (_) => onUp(),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 18.dp),
+        decoration: BoxDecoration(
+          color: hot
+              ? accent.withValues(alpha: 0.18)
+              : (enabled ? c.background : c.background.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(16.dp),
+          border: Border.all(
+            color: hot
+                ? accent
+                : (enabled ? c.outline : c.outline.withValues(alpha: 0.5)),
+            width: hot ? 2 : 1,
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: hot ? accent : c.textSecondary,
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w700,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.mic_rounded,
+              size: 22.dp,
+              color: hot
+                  ? accent
+                  : (enabled ? c.textSecondary : c.textFaint),
             ),
-          ),
-          SizedBox(height: 4.dp),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              LanguageFlag(
-                url: lang.flagUrl,
-                emoji: lang.flagEmoji,
-                width: 16.dp,
-                height: 11.dp,
+            SizedBox(height: 6.dp),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: hot
+                    ? accent
+                    : (enabled ? c.textPrimary : c.textFaint),
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w800,
               ),
-              SizedBox(width: 5.dp),
-              Flexible(
-                child: Text(
-                  lang.nativeName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+            ),
+            SizedBox(height: 2.dp),
+            Text(
+              hot ? 'jonli_holding'.tr : 'jonli_hold_hint'.tr,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: hot ? accent.withValues(alpha: 0.9) : c.textFaint,
+                fontSize: 10.sp,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

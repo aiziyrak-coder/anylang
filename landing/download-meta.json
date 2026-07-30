@@ -1,13 +1,13 @@
 {
-  "version": "1.0.84",
-  "build": 85,
-  "version_full": "1.0.84+85",
+  "version": "1.0.85",
+  "build": 86,
+  "version_full": "1.0.85+86",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.84+85.apk",
-  "size_bytes": 88569488,
+  "versioned_filename": "anylang-1.0.85+86.apk",
+  "size_bytes": 88569476,
   "size_mb": 84.47,
-  "updated_at": "2026-07-30T04:55:48.449140+00:00",
+  "updated_at": "2026-07-30T05:23:32.034776+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
-  "package": "com.izodev.anylang",
-  "notes": "Release 1.0.84+85 — obfuscated + R8 minify + release signing"
+  "package": "com.cradev.anylang",
+  "notes": "Release 1.0.85+86 — obfuscated + R8 minify + release signing"
 }

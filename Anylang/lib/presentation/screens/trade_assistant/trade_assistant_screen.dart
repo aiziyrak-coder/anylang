@@ -104,71 +104,75 @@ class TradeAssistantScreen
       ),
     );
 
-    final locale = SessionStore.preferredLanguage().isNotEmpty
-        ? SessionStore.preferredLanguage()
-        : (Get.locale?.languageCode ?? 'uz');
+    try {
+      final locale = SessionStore.preferredLanguage().isNotEmpty
+          ? SessionStore.preferredLanguage()
+          : (Get.locale?.languageCode ?? 'uz');
 
-    final result = await Get.find<TradeAssistantRepository>().send(
-      message: text,
-      history: history,
-      locale: locale,
-      sellerId: state.sellerId.value,
-    );
+      final result = await Get.find<TradeAssistantRepository>().send(
+        message: text,
+        history: history,
+        locale: locale,
+        sellerId: state.sellerId.value,
+      );
 
-    final idx = state.messages.indexWhere((m) => m.id == pendingId);
-    result.when(
-      success: (data) {
-        final map = asMap(data) ?? {};
-        final reply = (map['reply']?.toString() ?? '').trim();
-        final products = asList(map, 'products')
-            .whereType<Map>()
-            .map((e) => TradeAssistantMatchProduct.fromApi(
-                  Map<String, dynamic>.from(e),
-                ))
-            .where((e) => e.id > 0)
-            .toList();
-        final sellers = asList(map, 'sellers')
-            .whereType<Map>()
-            .map((e) => TradeAssistantMatchSeller.fromApi(
-                  Map<String, dynamic>.from(e),
-                ))
-            .where((e) => e.id > 0)
-            .toList();
-        final questions = <String>[];
-        final rawQ = map['next_questions'];
-        if (rawQ is List) {
-          for (final q in rawQ) {
-            final s = q?.toString().trim() ?? '';
-            if (s.isNotEmpty) questions.add(s);
+      final idx = state.messages.indexWhere((m) => m.id == pendingId);
+      result.when(
+        success: (data) {
+          final map = asMap(data) ?? {};
+          final reply = (map['reply']?.toString() ?? '').trim();
+          final products = asList(map, 'products')
+              .whereType<Map>()
+              .map((e) => TradeAssistantMatchProduct.fromApi(
+                    Map<String, dynamic>.from(e),
+                  ))
+              .where((e) => e.id > 0)
+              .toList();
+          final sellers = asList(map, 'sellers')
+              .whereType<Map>()
+              .map((e) => TradeAssistantMatchSeller.fromApi(
+                    Map<String, dynamic>.from(e),
+                  ))
+              .where((e) => e.id > 0)
+              .toList();
+          final questions = <String>[];
+          final rawQ = map['next_questions'];
+          if (rawQ is List) {
+            for (final q in rawQ) {
+              final s = q?.toString().trim() ?? '';
+              if (s.isNotEmpty) questions.add(s);
+            }
           }
-        }
-        if (idx >= 0) {
-          state.messages[idx] = TradeAssistantMessage(
-            id: pendingId,
-            text: reply.isEmpty ? 'trade_ai_empty'.tr : reply,
-            isOutgoing: false,
-            at: DateTime.now(),
-            products: products,
-            sellers: sellers,
-            nextQuestions: questions,
-          );
-        }
-      },
-      failure: (err) {
-        final msg = AuthValidators.safeError(err, fallbackKey: 'trade_ai_failed');
-        state.error.value = msg;
-        if (idx >= 0) {
-          state.messages[idx] = TradeAssistantMessage(
-            id: pendingId,
-            text: msg,
-            isOutgoing: false,
-            at: DateTime.now(),
-            failed: true,
-          );
-        }
-      },
-    );
-    state.sending.value = false;
+          if (idx >= 0) {
+            state.messages[idx] = TradeAssistantMessage(
+              id: pendingId,
+              text: reply.isEmpty ? 'trade_ai_empty'.tr : reply,
+              isOutgoing: false,
+              at: DateTime.now(),
+              products: products,
+              sellers: sellers,
+              nextQuestions: questions,
+            );
+          }
+        },
+        failure: (err) {
+          final msg =
+              AuthValidators.safeError(err, fallbackKey: 'trade_ai_failed');
+          state.error.value = msg;
+          if (idx >= 0) {
+            state.messages[idx] = TradeAssistantMessage(
+              id: pendingId,
+              text: msg,
+              isOutgoing: false,
+              at: DateTime.now(),
+              failed: true,
+            );
+          }
+        },
+      );
+    } finally {
+      state.sending.value = false;
+    }
   }
 
   Future<void> _openProduct(TradeAssistantMatchProduct match) async {

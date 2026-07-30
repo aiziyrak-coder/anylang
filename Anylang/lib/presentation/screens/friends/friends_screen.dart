@@ -525,7 +525,7 @@ class FriendsScreen extends Screen<FriendsState, void> {
                 onPressed: () => Get.back(result: true),
                 child: Text(
                   'friends_remove'.tr,
-                  style: const TextStyle(color: Color(0xFFB42318)),
+                  style: TextStyle(color: context.appColors.danger),
                 ),
               ),
             ],

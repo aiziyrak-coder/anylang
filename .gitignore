@@ -10,6 +10,17 @@ node_modules/
 scripts/ssh_probe*.py
 scripts/*creds*
 scripts/get_creds.py
+scripts/_*
 **/*CREDENTIALS*
 deploy/.env
 deploy/CREDENTIALS.local.txt
+dist/
+*.aab
+
+# Local scratch / one-off artifacts (never ship)
+_chat_context_menu_ref/
+_screen_*.png
+docs/_*.md
+**/android/build/
+**/build/reports/
+

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from fastapi.responses import Response
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -373,7 +374,21 @@ async def create_turn(
         status="done",
     )
     db.add(turn)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        # Concurrent retry with same client_turn_id — return existing row.
+        raced = await db.execute(
+            select(LiveTurn).where(
+                LiveTurn.session_id == session.id,
+                LiveTurn.client_turn_id == client_turn_id,
+            )
+        )
+        existing_race = raced.scalar_one_or_none()
+        if existing_race is None:
+            raise
+        return _serialize_turn(existing_race)
     await db.refresh(turn)
     return _serialize_turn(turn)
 
@@ -393,10 +408,12 @@ async def list_turns(
     if before_id is not None:
         query = query.where(LiveTurn.id < before_id)
 
-    result = await db.execute(query.order_by(LiveTurn.id.asc()).limit(safe_limit + 1))
+    # Newest page first (desc), then reverse for chronological UI order.
+    # Asc+limit previously skipped the turns just before the cursor.
+    result = await db.execute(query.order_by(LiveTurn.id.desc()).limit(safe_limit + 1))
     turns = list(result.scalars().all())
     has_more = len(turns) > safe_limit
-    items = turns[:safe_limit]
+    items = list(reversed(turns[:safe_limit]))
 
     return {
         "items": [_serialize_turn(turn) for turn in items],
@@ -692,11 +709,32 @@ async def ocr_translate(
             status="done",
         )
         db.add(turn)
-        await db.flush()
-        await db.refresh(turn)
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            raced = await db.execute(
+                select(LiveTurn).where(
+                    LiveTurn.session_id == session.id,
+                    LiveTurn.client_turn_id == resolved_client_id,
+                )
+            )
+            existing_race = raced.scalar_one_or_none()
+            if existing_race is None:
+                raise
+            turn = existing_race
+        else:
+            await db.refresh(turn)
         turn_id = turn.id
         created_at = turn.created_at
         resolved_session_id = session.id
+
+        # Prefer persisted TTS/text from the winning row on race.
+        text_original = turn.text_original or text_original
+        text_translated = turn.text_translated or text_translated
+        audio_tts_url = turn.audio_tts_url or audio_tts_url
+        source = turn.source_language or source
+        target = turn.target_language or target
 
     return {
         "text_original": text_original,

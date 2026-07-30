@@ -17,9 +17,9 @@ val hasReleaseKeystore =
     }
 
 android {
-    namespace = "com.izodev.anylang"
+    namespace = "com.cradev.anylang"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.izodev.anylang"
+        applicationId = "com.cradev.anylang"
         // Google Maps SDK Android: min 24
         minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion

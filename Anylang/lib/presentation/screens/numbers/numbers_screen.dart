@@ -57,9 +57,12 @@ class NumbersScreen extends Screen<NumbersState, void> {
   Future<void> _loadAll() async {
     state.loading.value = true;
     state.error.value = null;
-    await Future.wait([_loadMine(), _loadGroups()]);
-    await _loadCatalog(reset: true);
-    state.loading.value = false;
+    try {
+      await Future.wait([_loadMine(), _loadGroups()]);
+      await _loadCatalog(reset: true);
+    } finally {
+      state.loading.value = false;
+    }
   }
 
   Future<void> _loadMine() async {

@@ -10,6 +10,7 @@ import '../../../data/network/chat_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../../data/network/realtime_sync_service.dart';
 import '../../../data/network/socket_service.dart';
+import '../../ui/theme/colors.dart';
 import '../../ui/theme/theme_controller.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
@@ -220,7 +221,7 @@ class SettingsScreen extends Screen<SettingsState, SettingsPayload> {
                 onPressed: () => Get.back(result: true),
                 child: Text(
                   'settings_delete_account'.tr,
-                  style: const TextStyle(color: Color(0xFFB42318)),
+                  style: TextStyle(color: context.appColors.danger),
                 ),
               ),
             ],

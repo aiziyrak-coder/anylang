@@ -693,8 +693,8 @@
   "jonli_export_failed": "Export failed",
   "jonli_export_pdf": "Export PDF",
   "jonli_export_txt": "Export TXT",
-  "jonli_hint_conversation": "Start conversation — take turns speaking",
-  "jonli_hint_idle": "Press and hold to speak",
+  "jonli_hint_conversation": "Hold the side of whoever is speaking; release to translate",
+  "jonli_hint_idle": "Hold the speaker's side",
   "jonli_hint_recording": "Release to translate",
   "jonli_history_chip": "History",
   "jonli_history_detail": "Conversation details",
@@ -1564,5 +1564,6 @@
   "trade_ai_settings_hint": "Example: We manufacture cotton T-shirts. MOQ 500 pcs. Price USD 2.5–4. Lead time 15–25 days. Payment: T/T 30% deposit...",
   "trade_ai_settings_limit": "Maximum 8000 characters",
   "trade_ai_settings_saved": "AnyTrade AI knowledge saved",
-  "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings"
+  "trade_ai_settings_load_failed": "Could not load AnyTrade AI settings",
+  "jonli_hold_hint": "Hold to talk"
 }

@@ -16,10 +16,8 @@ class ChatWallpaperBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final base = c.isDark ? const Color(0xFF0A0A12) : const Color(0xFFE8E6F6);
-    final ink = c.isDark
-        ? const Color(0xFF7A72B0).withValues(alpha: 0.42)
-        : const Color(0xFF7B6FA3).withValues(alpha: 0.38);
+    final base = c.background;
+    final ink = c.textFaint.withValues(alpha: c.isDark ? 0.32 : 0.28);
 
     return ColoredBox(
       color: base,

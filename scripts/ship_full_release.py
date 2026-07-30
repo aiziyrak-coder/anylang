@@ -233,7 +233,7 @@ def main() -> int:
         "size_mb": round(size / (1024 * 1024), 2),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
-        "package": "com.izodev.anylang",
+        "package": "com.cradev.anylang",
         "notes": f"Release {ver}+{build} — full UI i18n (80 langs), TOP $30/week + paid queue, faster chat translation",
     }
     meta_path = ROOT / "landing" / "download-meta.json"
@@ -284,7 +284,7 @@ def main() -> int:
                 "am",
                 "start",
                 "-n",
-                "com.izodev.anylang/.MainActivity",
+                "com.cradev.anylang/.MainActivity",
             ]
         )
         print("installed on", serial)

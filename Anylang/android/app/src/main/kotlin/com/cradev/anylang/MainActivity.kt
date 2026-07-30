@@ -1,4 +1,4 @@
-package com.izodev.anylang
+package com.cradev.anylang
 
 import io.flutter.embedding.android.FlutterActivity
 

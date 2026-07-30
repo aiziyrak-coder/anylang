@@ -693,8 +693,8 @@
   "jonli_export_failed": "Eksport bo‘lmadi",
   "jonli_export_pdf": "PDF eksport",
   "jonli_export_txt": "TXT eksport",
-  "jonli_hint_conversation": "Suhbatni boshlang — navbat bilan gaplashasiz",
-  "jonli_hint_idle": "Gapirish uchun tugmani bosib turing",
+  "jonli_hint_conversation": "Kim gapirsa — o‘sha tarafni bosib turing; qo‘yib yuborsangiz tarjima qilinadi",
+  "jonli_hint_idle": "Gapiruvchi tarafni bosib turing",
   "jonli_hint_recording": "Qo‘yib yuborsangiz — tarjima qilinadi",
   "jonli_history_chip": "Tarix",
   "jonli_history_detail": "Suhbat tafsiloti",
@@ -1564,5 +1564,6 @@
   "trade_ai_settings_hint": "Masalan: Biz paxta futbolka ishlab chiqaramiz. MOQ 500 dona. Narx 2.5–4 USD. Yetkazib berish 15–25 kun. To‘lov: T/T 30% oldindan...",
   "trade_ai_settings_limit": "Maksimal 8000 belgi",
   "trade_ai_settings_saved": "AnyTrade AI bilimi saqlandi",
-  "trade_ai_settings_load_failed": "AnyTrade AI sozlamalarini yuklab bo‘lmadi"
+  "trade_ai_settings_load_failed": "AnyTrade AI sozlamalarini yuklab bo‘lmadi",
+  "jonli_hold_hint": "Bosib turing"
 }

@@ -48,18 +48,21 @@ class TradeAiSettingsScreen extends Screen<TradeAiSettingsState, void> {
   Future<void> _save(String knowledge) async {
     if (state.saving.value) return;
     state.saving.value = true;
-    final result = await Get.find<ProfileRepository>().updateBusiness({
-      'ai_knowledge': knowledge.trim(),
-    });
-    state.saving.value = false;
-    if (result.errorOrNull != null) {
-      showAppError(result.errorOrNull);
-      return;
+    try {
+      final result = await Get.find<ProfileRepository>().updateBusiness({
+        'ai_knowledge': knowledge.trim(),
+      });
+      if (result.errorOrNull != null) {
+        showAppError(result.errorOrNull);
+        return;
+      }
+      final map = asMap(result.dataOrNull);
+      state.knowledge.value =
+          (map?['ai_knowledge'] as String?) ?? knowledge.trim();
+      showAppMessage('trade_ai_settings_saved'.tr);
+    } finally {
+      state.saving.value = false;
     }
-    final map = asMap(result.dataOrNull);
-    state.knowledge.value =
-        (map?['ai_knowledge'] as String?) ?? knowledge.trim();
-    showAppMessage('trade_ai_settings_saved'.tr);
   }
 
   @override

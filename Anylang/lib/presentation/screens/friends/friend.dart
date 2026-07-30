@@ -105,7 +105,20 @@ class Friend {
       businessRole: role,
       rating: rating,
       reviewsCount: (json['reviews_count'] as num?)?.toInt() ?? 0,
-      trust: (json['trust'] as num?)?.toInt(),
+      trust: () {
+        final direct = (json['trust'] as num?)?.toInt();
+        if (direct != null) return direct;
+        final net = json['networking'];
+        if (net is Map && net['trust'] != null) {
+          return (net['trust'] as num?)?.toInt();
+        }
+        final ts = json['trust_score'];
+        if (ts is Map && ts['score'] != null) {
+          return (ts['score'] as num?)?.toInt();
+        }
+        if (ts is num) return ts.toInt();
+        return (json['trust_percent'] as num?)?.toInt();
+      }(),
       riskLevel: risk,
       isScammer: json['is_scammer'] == true,
       verified: verified,

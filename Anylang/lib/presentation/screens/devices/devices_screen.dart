@@ -51,26 +51,32 @@ class DevicesScreen extends Screen<DevicesState, void> {
       case RevokeDeviceSession a:
         if (!a.session.canRevoke || state.busy.value) return;
         state.busy.value = true;
-        final result =
-            await Get.find<AuthRepository>().revokeSession(a.session.id);
-        state.busy.value = false;
-        if (result.errorOrNull != null) {
-          showAppError(result.errorOrNull);
-          return;
+        try {
+          final result =
+              await Get.find<AuthRepository>().revokeSession(a.session.id);
+          if (result.errorOrNull != null) {
+            showAppError(result.errorOrNull);
+            return;
+          }
+          showAppMessage('devices_revoked'.tr);
+          await _load();
+        } finally {
+          state.busy.value = false;
         }
-        showAppMessage('devices_revoked'.tr);
-        await _load();
       case RevokeOtherDeviceSessions _:
         if (!state.canRevokeOthers.value || state.busy.value) return;
         state.busy.value = true;
-        final result = await Get.find<AuthRepository>().revokeOtherSessions();
-        state.busy.value = false;
-        if (result.errorOrNull != null) {
-          showAppError(result.errorOrNull);
-          return;
+        try {
+          final result = await Get.find<AuthRepository>().revokeOtherSessions();
+          if (result.errorOrNull != null) {
+            showAppError(result.errorOrNull);
+            return;
+          }
+          showAppMessage('devices_others_revoked'.tr);
+          await _load();
+        } finally {
+          state.busy.value = false;
         }
-        showAppMessage('devices_others_revoked'.tr);
-        await _load();
     }
   }
 }

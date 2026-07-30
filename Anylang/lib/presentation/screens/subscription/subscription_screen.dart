@@ -66,9 +66,12 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
   Future<void> _loadAll() async {
     state.loading.value = true;
     state.loadError.value = false;
-    await _refreshMe();
-    await _loadPlans();
-    state.loading.value = false;
+    try {
+      await _refreshMe();
+      await _loadPlans();
+    } finally {
+      state.loading.value = false;
+    }
   }
 
   Future<void> _refreshMe() async {

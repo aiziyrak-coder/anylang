@@ -583,7 +583,8 @@ class ProfileContent extends ScreenContent<ProfileState> {
         : '${(d.rating ?? ins.rating)!.toStringAsFixed(1)}/5';
     final listings = '${d.listingsCount ?? ins.listingsCount}';
     final views = d.viewsCount ?? formatViews(ins.totalViews);
-    final trust = ins.trustPercent ?? d.networkingTrust;
+    final trust =
+        ins.trustPercent ?? d.networkingTrust ?? d.trustScore?.score;
     final grads = [
       profileStatGradientA,
       profileStatGradientB,

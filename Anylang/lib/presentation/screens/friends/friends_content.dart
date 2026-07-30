@@ -656,15 +656,19 @@ class FriendsContent extends ScreenContent<FriendsState> {
               ),
               if (onClear != null) ...[
                 SizedBox(width: 4.dp),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    onClear();
-                  },
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 14.dp,
-                    color: selected ? c.onAccent : c.textFaint,
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onClear();
+                    },
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 14.dp,
+                      color: selected ? c.onAccent : c.textFaint,
+                    ),
                   ),
                 ),
               ],

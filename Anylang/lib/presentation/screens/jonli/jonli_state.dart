@@ -3,41 +3,26 @@ import 'package:get/get.dart';
 import '../select_language/select_language_option.dart';
 import 'jonli_transcript_entry.dart';
 
-/// Jonli muloqot o'rta body holati.
-enum JonliMode {
-  idle,
-  me,
-  other,
-}
+/// Hold-to-talk holati: kimning mikrofoni ochiq.
+enum JonliMode { idle, me, other }
 
+/// Jonli ekranining reaktiv holati (faqat qiymatlar — logika Screen da).
 class JonliState extends GetxController {
-  Rx<JonliMode> mode = JonliMode.idle.obs;
-  Rx<LanguageOption> myLanguage = languageOptions[0].obs;
-  Rx<LanguageOption> otherLanguage = languageOptions[1].obs;
+  final Rx<JonliMode> mode = JonliMode.idle.obs;
+  final Rx<LanguageOption> myLanguage = languageOptions[0].obs;
+  final Rx<LanguageOption> otherLanguage = languageOptions[1].obs;
 
   final RxnInt sessionId = RxnInt();
   final RxBool busy = false.obs;
-
-  /// Conversation Mode — navbat bilan avtomatik mikrofon.
-  final RxBool conversationActive = false.obs;
-  /// Keyingi (yoki joriy) navbat — sizmi.
-  final RxBool nextIsMe = true.obs;
-
-  /// Premium talab qilinganda Live ichida paywall card.
   final RxBool needsPremium = false.obs;
 
-  /// Tab o‘zgarganda (IndexedStack) jonli sessiyani to‘xtatish.
+  /// Tab (IndexedStack) almashganda sessiyani to‘xtatish.
   Future<void> Function()? pauseOnLeaveHandler;
 
-  /// AI ovoz: female | male
   final RxString ttsVoice = 'female'.obs;
-  /// AI ovoz tezligi 0.5–2.0
   final RxDouble ttsSpeed = 1.0.obs;
-
-  /// Sessiya gaplari — har biri vaqt + asl + tarjima.
   final RxList<JonliTranscriptEntry> turns = <JonliTranscriptEntry>[].obs;
 
-  /// Server Live API tillari (langCode).
   final RxSet<String> liveLangCodes = <String>{
     'uz',
     'en',
@@ -48,4 +33,6 @@ class JonliState extends GetxController {
     'tr',
   }.obs;
   final RxBool liveLanguagesLoadFailed = false.obs;
+
+  bool get isRecording => mode.value != JonliMode.idle;
 }

@@ -1,3 +1,5 @@
+import 'package:get/get.dart';
+
 class MarketMapCompany {
   final int id;
   final String companyName;
@@ -18,7 +20,7 @@ class MarketMapCompany {
       id: (json['id'] as num?)?.toInt() ?? 0,
       companyName: (json['company_name'] as String?)?.trim().isNotEmpty == true
           ? (json['company_name'] as String).trim()
-          : 'Company',
+          : 'trade_ai_guest'.tr,
       verified: json['verified'] == true,
       factoryVerified: json['factory_verified'] == true,
       productCount: (json['product_count'] as num?)?.toInt() ?? 0,

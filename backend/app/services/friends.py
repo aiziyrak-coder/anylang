@@ -568,7 +568,11 @@ async def _get_request_for_user(
         raise AppError(message="So'rov topilmadi", error_code="NOT_FOUND", status_code=404)
 
     if friendship.status != "pending":
-        raise AppError(message="So'rov faol emas", error_code="NOT_FOUND", status_code=404)
+        raise AppError(
+            message="So'rov faol emas",
+            error_code="REQUEST_NOT_PENDING",
+            status_code=409,
+        )
 
     return friendship
 

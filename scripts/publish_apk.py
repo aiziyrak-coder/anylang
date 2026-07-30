@@ -99,7 +99,7 @@ def main() -> int:
         "size_mb": round(size / (1024 * 1024), 2),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
-        "package": "com.izodev.anylang",
+        "package": "com.cradev.anylang",
         "notes": f"Release {ver}+{build} — obfuscated + R8 minify + release signing",
     }
     meta_path = ROOT / "landing" / "download-meta.json"

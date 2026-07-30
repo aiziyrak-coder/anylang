@@ -1,0 +1,9 @@
+# Release upload keystore fingerprints (anylang-release.jks)
+# Package: com.cradev.anylang
+# Alias: anylang
+
+SHA1: B4:04:E7:C6:BF:B8:A7:B9:9B:17:88:D2:32:F5:9A:08:4E:B8:E7:C4
+SHA256: 86:A7:1D:7F:D4:A6:38:01:2E:08:65:F3:95:9E:4B:CC:80:CF:E9:79:0A:D1:3E:4B:B2:82:7C:92:28:C3:3D:F2
+
+Add these to Google Cloud Console (Maps API key + OAuth Android client)
+with package name com.cradev.anylang.

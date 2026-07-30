@@ -219,7 +219,7 @@ def main() -> int:
             "am",
             "start",
             "-n",
-            "com.izodev.anylang/.MainActivity",
+            "com.cradev.anylang/.MainActivity",
         ]
     )
     print(f"DONE version={ver} apk={apk}")

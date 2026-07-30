@@ -130,6 +130,7 @@ class ChatContent extends ScreenContent<ChatState> {
     _lastMessageCount = state.messages.length;
     _lastKeyboardInset = 0;
     // Faqat yangi xabar qo'shilganda pastga — status yangilanishida sakramasin.
+    _messagesWorker?.dispose();
     _messagesWorker = ever(state.messages, (list) {
       final keep = list.map((m) => m.id).toSet();
       for (final id in state.pinnedMessages.map((m) => m.id)) {
@@ -153,6 +154,7 @@ class ChatContent extends ScreenContent<ChatState> {
       _lastMessageCount = n;
     });
     // Yuklash tugagach — saqlangan scroll yoki past.
+    _loadingWorker?.dispose();
     _loadingWorker = ever(state.loading, (loading) {
       if (!loading && state.messages.isNotEmpty) {
         _restoreOrJumpBottom(state);
@@ -162,6 +164,7 @@ class ChatContent extends ScreenContent<ChatState> {
       }
     });
     // Yuborish xatosida matnni qaytarish — controller bilan sync.
+    _inputWorker?.dispose();
     _inputWorker = ever(state.input, (v) {
       if (_input.text != v) {
         _input.value = TextEditingValue(

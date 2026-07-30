@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
 import '../../ui/ai_matching.dart';
@@ -34,7 +35,7 @@ class FriendRecommendation {
   factory FriendRecommendation.fromApi(Map<String, dynamic> json) {
     final name = (json['company_name'] as String?)?.trim();
     final safeName =
-        (name == null || name.isEmpty) ? 'Company' : name;
+        (name == null || name.isEmpty) ? 'trade_ai_guest'.tr : name;
     final id = (json['user_id'] as num?)?.toInt() ?? 0;
     return FriendRecommendation(
       userId: id,
@@ -57,7 +58,8 @@ class FriendRecommendation {
     int matchPercent = 0,
     String headline = '',
   }) {
-    final name = company.name.trim().isEmpty ? 'Company' : company.name.trim();
+    final name =
+        company.name.trim().isEmpty ? 'trade_ai_guest'.tr : company.name.trim();
     return FriendRecommendation(
       userId: company.id,
       name: name,

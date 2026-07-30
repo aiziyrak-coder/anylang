@@ -53,7 +53,7 @@ def main() -> None:
     if serial:
         subprocess.check_call([str(ADB), "-s", serial, "install", "-r", str(apk)])
         subprocess.check_call(
-            [str(ADB), "-s", serial, "shell", "am", "start", "-n", "com.izodev.anylang/.MainActivity"]
+            [str(ADB), "-s", serial, "shell", "am", "start", "-n", "com.cradev.anylang/.MainActivity"]
         )
         print("INSTALLED")
     else:
