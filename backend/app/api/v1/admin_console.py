@@ -128,10 +128,15 @@ async def list_subscriptions(
     db: DbSession,
     _admin: ModeratorPlus,
     plan: str | None = None,
+    q: str | None = None,
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
-    return await console.list_subscriptions(db, plan=plan, page=page, limit=limit)
+    return await console.list_subscriptions(
+        db, plan=plan, q=q, page=page, limit=limit, sort=sort, order=order
+    )
 
 
 @router.get("/plan-catalog")
@@ -185,6 +190,8 @@ async def list_chats(
     q: str | None = None,
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
     await write_audit(
         db,
@@ -195,7 +202,7 @@ async def list_chats(
         ip=client_ip(request),
     )
     return await console.list_chats_for_audit(
-        db, user_id=user_id, q=q, page=page, limit=limit
+        db, user_id=user_id, q=q, page=page, limit=limit, sort=sort, order=order
     )
 
 
@@ -220,6 +227,8 @@ async def chat_export(
     admin: SuperAdmin,
     request: Request,
     format: Literal["json", "csv"] = "json",
+    cursor: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=500, ge=1, le=1000),
 ) -> Response:
     from app.db.redis import get_redis
 
@@ -236,7 +245,13 @@ async def chat_export(
         )
 
     filename, media, payload = await console.export_chat(
-        db, chat_id=chat_id, fmt=format, admin=admin, ip=client_ip(request)
+        db,
+        chat_id=chat_id,
+        fmt=format,
+        admin=admin,
+        ip=client_ip(request),
+        cursor=cursor,
+        limit=limit,
     )
     return Response(
         content=payload,
@@ -250,10 +265,15 @@ async def restore_requests(
     db: DbSession,
     _admin: SuperAdmin,
     status: str | None = "pending",
+    q: str | None = None,
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
-    return await console.list_restore_requests(db, status=status, page=page, limit=limit)
+    return await console.list_restore_requests(
+        db, status=status, q=q, page=page, limit=limit, sort=sort, order=order
+    )
 
 
 @router.post("/restore-requests")
@@ -293,8 +313,12 @@ async def audit_logs(
     action: str | None = None,
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
-    return await console.list_audit_logs(db, action=action, page=page, limit=limit)
+    return await console.list_audit_logs(
+        db, action=action, page=page, limit=limit, sort=sort, order=order
+    )
 
 
 @router.post("/maintenance/purge-expired")
@@ -308,6 +332,19 @@ async def purge_expired(db: DbSession, admin: SuperAdmin, request: Request) -> d
         ip=client_ip(request),
     )
     return {"purged": count}
+
+
+@router.get("/maintenance/exact-message-count")
+async def exact_message_count(db: DbSession, admin: SuperAdmin, request: Request) -> dict:
+    total = await console.exact_message_count(db)
+    await write_audit(
+        db,
+        admin=admin,
+        action="maintenance.exact_message_count",
+        meta={"messages_total": total},
+        ip=client_ip(request),
+    )
+    return {"messages_total": total, "approx": False}
 
 
 class PromoCreateBody(BaseModel):
@@ -346,11 +383,19 @@ async def list_promo_codes(
     limit: int = Query(default=50, ge=1, le=100),
     q: str | None = None,
     active_only: bool = False,
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
     from app.services import promo as promo_service
 
     return await promo_service.list_promos(
-        db, page=page, limit=limit, q=q, active_only=active_only
+        db,
+        page=page,
+        limit=limit,
+        q=q,
+        active_only=active_only,
+        sort=sort,
+        order=order,
     )
 
 

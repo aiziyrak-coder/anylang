@@ -63,7 +63,11 @@ async def list_promos(
     limit: int = 50,
     q: str | None = None,
     active_only: bool = False,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict:
+    from app.services.admin_list import apply_sort
+
     query = select(PromoCode)
     if active_only:
         query = query.where(PromoCode.is_active.is_(True))
@@ -73,10 +77,21 @@ async def list_promos(
     total = (
         await db.execute(select(func.count()).select_from(query.subquery()))
     ).scalar_one()
+    order_by = apply_sort(
+        {
+            "id": PromoCode.id,
+            "code": PromoCode.code,
+            "created_at": PromoCode.created_at,
+            "valid_until": PromoCode.valid_until,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     rows = list(
         (
             await db.execute(
-                query.order_by(PromoCode.id.desc())
+                query.order_by(order_by)
                 .offset(max(page - 1, 0) * limit)
                 .limit(limit)
             )

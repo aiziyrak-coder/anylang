@@ -2,10 +2,14 @@
 
 import { Alert } from "@/components/admin/alert";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { DataToolbar } from "@/components/admin/data-toolbar";
 import { EmptyState } from "@/components/admin/empty-state";
+import { ListState } from "@/components/admin/list-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { Pagination } from "@/components/admin/pagination";
+import { SortableTh } from "@/components/admin/sortable-th";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { useAdminList } from "@/hooks/use-admin-list";
 import { ApiError, apiFetch } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -22,14 +26,6 @@ type ProductRow = {
   is_top_pinned: boolean;
   views_count: number;
   created_at: string;
-};
-
-type ListResp = {
-  items: ProductRow[];
-  page: number;
-  limit: number;
-  total: number;
-  has_more: boolean;
 };
 
 type TopRequestRow = {
@@ -70,29 +66,20 @@ function formatCountdown(seconds: number | null | undefined): string {
 }
 
 export default function ProductsPage() {
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<ListResp | null>(null);
+  const list = useAdminList<ProductRow, { status: string }>({
+    queryKey: "admin-products",
+    path: "/api/v1/admin/products",
+    searchParam: "search",
+    defaultSort: "id",
+    initialFilters: { status: "" },
+  });
+
   const [activeTops, setActiveTops] = useState<TopListResp | null>(null);
   const [queuedTops, setQueuedTops] = useState<TopListResp | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [archiveId, setArchiveId] = useState<number | null>(null);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const q = new URLSearchParams({ page: String(page), limit: "50" });
-      if (status) q.set("status", status);
-      if (search.trim()) q.set("search", search.trim());
-      const res = await apiFetch<ListResp>(`/api/v1/admin/products?${q}`);
-      setData(res);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
-    }
-  }, [page, search, status]);
 
   const loadTopLists = useCallback(async () => {
     try {
@@ -108,25 +95,21 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(load, 250);
-    return () => clearTimeout(timer);
-  }, [load]);
-
-  useEffect(() => {
     void loadTopLists();
   }, [loadTopLists]);
 
   async function pinProduct(id: number, pinned: boolean) {
     setBusyId(id);
+    setActionError(null);
     try {
       await apiFetch(`/api/v1/admin/products/${id}/pin`, {
         method: "POST",
         body: JSON.stringify({ pinned }),
       });
       setToast(pinned ? `#${id} ${t("products.pinned")}` : `#${id} pin olib tashlandi`);
-      await Promise.all([load(), loadTopLists()]);
+      await Promise.all([list.refetch(), loadTopLists()]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusyId(null);
     }
@@ -134,14 +117,15 @@ export default function ProductsPage() {
 
   async function archiveProduct(id: number) {
     setBusyId(id);
+    setActionError(null);
     try {
       await apiFetch(`/api/v1/admin/products/${id}/archive`, {
         method: "POST",
       });
       setToast(`#${id} arxivlandi`);
-      await load();
+      await list.refetch();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusyId(null);
       setArchiveId(null);
@@ -154,32 +138,31 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t("products.title")} subtitle={t("products.subtitle")}>
-        <input
-          value={search}
-          onChange={(e) => {
-            setPage(1);
-            setSearch(e.target.value);
+        <DataToolbar
+          search={{
+            value: list.q,
+            onChange: list.setQ,
+            placeholder: t("products.searchPlaceholder"),
           }}
-          placeholder={t("products.searchPlaceholder")}
-          className="rounded-lg border px-3 py-2 text-sm"
+          showClear={list.hasActiveFilters}
+          onClear={list.clearFilters}
+          filters={
+            <select
+              value={list.filters.status}
+              onChange={(e) => list.setFilter("status", e.target.value)}
+              className="rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="">{t("products.statusAll")}</option>
+              <option value="published">published</option>
+              <option value="draft">draft</option>
+              <option value="archived">archived</option>
+            </select>
+          }
         />
-        <select
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            setStatus(e.target.value);
-          }}
-          className="rounded-lg border px-3 py-2 text-sm"
-        >
-          <option value="">{t("products.statusAll")}</option>
-          <option value="published">published</option>
-          <option value="draft">draft</option>
-          <option value="archived">archived</option>
-        </select>
       </PageHeader>
 
       {toast ? <Alert variant="success">{toast}</Alert> : null}
-      {error ? <Alert variant="error">{error}</Alert> : null}
+      {actionError ? <Alert variant="error">{actionError}</Alert> : null}
 
       <div className="rounded-xl border bg-amber-50 px-4 py-3 text-sm text-amber-900">
         {t("products.topPricingHint")} · Slotlar:{" "}
@@ -275,80 +258,112 @@ export default function ProductsPage() {
       </section>
 
       <div className="overflow-hidden rounded-xl border bg-white">
-        <table className="min-w-full text-left text-sm">
-          <thead className="sticky top-0 bg-zinc-50 text-xs uppercase text-zinc-500">
-            <tr>
-              <th className="px-4 py-3">{t("products.colId")}</th>
-              <th className="px-4 py-3">{t("products.colProduct")}</th>
-              <th className="px-4 py-3">{t("products.colSeller")}</th>
-              <th className="px-4 py-3">{t("products.colPrice")}</th>
-              <th className="px-4 py-3">{t("products.colStatus")}</th>
-              <th className="px-4 py-3">{t("products.colPin")}</th>
-              <th className="px-4 py-3">{t("app.actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.items ?? []).map((p) => (
-              <tr key={p.id} className="border-t hover:bg-zinc-50">
-                <td className="px-4 py-3 tabular-nums text-zinc-500">#{p.id}</td>
-                <td className="px-4 py-3">
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-xs text-zinc-500">
-                    {p.category} · {t("products.views")}: {p.views_count}
-                  </div>
-                </td>
-                <td className="px-4 py-3 tabular-nums">{p.seller_id}</td>
-                <td className="px-4 py-3 tabular-nums">
-                  {p.price} {p.currency}
-                </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={p.status} />
-                </td>
-                <td className="px-4 py-3">
-                  {p.is_top_pinned ? (
-                    <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                      TOP
-                    </span>
-                  ) : (
-                    <span className="text-xs text-zinc-400">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busyId === p.id}
-                      onClick={() => pinProduct(p.id, !p.is_top_pinned)}
-                      className={cn(
-                        "rounded border px-2 py-1 text-xs disabled:opacity-40",
-                        p.is_top_pinned && "border-amber-300 text-amber-800",
-                      )}
-                    >
-                      {p.is_top_pinned ? t("products.unpin") : t("products.pin")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyId === p.id}
-                      onClick={() => setArchiveId(p.id)}
-                      className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-40"
-                    >
-                      {t("products.archive")}
-                    </button>
-                  </div>
-                </td>
+        <ListState
+          isLoading={list.isLoading}
+          error={list.error}
+          isEmpty={list.items.length === 0}
+          hasActiveFilters={list.hasActiveFilters}
+          onClearFilters={list.clearFilters}
+          onRetry={() => void list.refetch()}
+        >
+          <table className="min-w-full text-left text-sm">
+            <thead className="sticky top-0 bg-zinc-50 text-xs uppercase text-zinc-500">
+              <tr>
+                <SortableTh
+                  label={t("products.colId")}
+                  sortKey="id"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <SortableTh
+                  label={t("products.colProduct")}
+                  sortKey="name"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <th className="px-4 py-3">{t("products.colSeller")}</th>
+                <SortableTh
+                  label={t("products.colPrice")}
+                  sortKey="price"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <SortableTh
+                  label={t("products.colStatus")}
+                  sortKey="status"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <th className="px-4 py-3">{t("products.colPin")}</th>
+                <th className="px-4 py-3">{t("app.actions")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!data?.items.length ? <EmptyState message={t("app.empty")} /> : null}
-        {data ? (
+            </thead>
+            <tbody>
+              {list.items.map((p) => (
+                <tr key={p.id} className="border-t hover:bg-zinc-50">
+                  <td className="px-4 py-3 tabular-nums text-zinc-500">#{p.id}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-xs text-zinc-500">
+                      {p.category} · {t("products.views")}: {p.views_count}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">{p.seller_id}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {p.price} {p.currency}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={p.status} />
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.is_top_pinned ? (
+                      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        TOP
+                      </span>
+                    ) : (
+                      <span className="text-xs text-zinc-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busyId === p.id}
+                        onClick={() => pinProduct(p.id, !p.is_top_pinned)}
+                        className={cn(
+                          "rounded border px-2 py-1 text-xs disabled:opacity-40",
+                          p.is_top_pinned && "border-amber-300 text-amber-800",
+                        )}
+                      >
+                        {p.is_top_pinned ? t("products.unpin") : t("products.pin")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === p.id}
+                        onClick={() => setArchiveId(p.id)}
+                        className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-40"
+                      >
+                        {t("products.archive")}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           <Pagination
-            page={data.page}
-            total={data.total}
-            hasMore={data.has_more}
-            onPageChange={setPage}
+            page={list.page}
+            total={list.total}
+            hasMore={list.hasMore}
+            onPageChange={list.setPage}
+            limit={list.limit}
+            onLimitChange={list.setLimit}
           />
-        ) : null}
+        </ListState>
       </div>
 
       <ConfirmDialog

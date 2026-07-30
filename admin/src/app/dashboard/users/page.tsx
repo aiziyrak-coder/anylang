@@ -2,15 +2,18 @@
 
 import { Alert } from "@/components/admin/alert";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { DataToolbar } from "@/components/admin/data-toolbar";
 import { Drawer } from "@/components/admin/drawer";
-import { EmptyState } from "@/components/admin/empty-state";
+import { ListState } from "@/components/admin/list-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { Pagination } from "@/components/admin/pagination";
+import { SortableTh } from "@/components/admin/sortable-th";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { useAdminList } from "@/hooks/use-admin-list";
 import { ApiError, apiFetch } from "@/lib/api";
 import { isSuperAdmin } from "@/lib/auth";
 import { formatDate, planLabel, t } from "@/lib/i18n";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 type UserRow = {
   id: number;
@@ -26,14 +29,6 @@ type UserRow = {
   deleted_at: string | null;
   plan?: string;
   created_at: string;
-};
-
-type ListResp = {
-  items: UserRow[];
-  page: number;
-  limit: number;
-  total: number;
-  has_more: boolean;
 };
 
 type PaymentBrief = {
@@ -54,50 +49,41 @@ type Detail = UserRow & {
 type ConfirmState =
   | { type: "softDelete"; id: number }
   | { type: "restore"; id: number }
+  | { type: "assign"; number: string }
+  | { type: "random" }
   | null;
 
 export default function UsersPage() {
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [data, setData] = useState<ListResp | null>(null);
+  const list = useAdminList<UserRow, { status: string; plan: string }>({
+    queryKey: "admin-users",
+    path: "/api/v1/admin/users",
+    searchParam: "search",
+    defaultSort: "id",
+    initialFilters: { status: "all", plan: "" },
+  });
+
   const [detail, setDetail] = useState<Detail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const q = new URLSearchParams({
-        page: String(page),
-        limit: "50",
-        status,
-      });
-      if (search.trim()) q.set("search", search.trim());
-      const res = await apiFetch<ListResp>(`/api/v1/admin/users?${q}`);
-      setData(res);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
-    }
-  }, [page, search, status]);
-
-  useEffect(() => {
-    const timer = setTimeout(load, 250);
-    return () => clearTimeout(timer);
-  }, [load]);
+  const [assignNumber, setAssignNumber] = useState("");
+  const [applyBonus, setApplyBonus] = useState(false);
+  const [forceAssign, setForceAssign] = useState(false);
 
   async function openDetail(id: number) {
     setDetailLoading(true);
     setTempPassword(null);
+    setAssignNumber("");
+    setApplyBonus(false);
+    setForceAssign(false);
     try {
       const d = await apiFetch<Detail>(`/api/v1/admin/users/${id}/detail`);
       setDetail(d);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setDetailLoading(false);
     }
@@ -111,10 +97,10 @@ export default function UsersPage() {
         body: JSON.stringify(body),
       });
       setToast(t("app.success"));
-      await load();
+      await list.refetch();
       if (detail) await openDetail(detail.id);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusy(false);
     }
@@ -139,10 +125,10 @@ export default function UsersPage() {
         body: JSON.stringify(body),
       });
       setToast(t("app.success"));
-      await load();
+      await list.refetch();
       if (detail) await openDetail(detail.id);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusy(false);
     }
@@ -156,10 +142,42 @@ export default function UsersPage() {
         body: body ? JSON.stringify(body) : undefined,
       });
       setToast(t("app.success"));
-      await load();
+      await list.refetch();
       if (detail) await openDetail(detail.id);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
+    } finally {
+      setBusy(false);
+      setConfirm(null);
+    }
+  }
+
+  async function doAssign(number?: string) {
+    if (!detail) return;
+    setBusy(true);
+    try {
+      const res = number
+        ? await apiFetch<{ number: string }>(
+            `/api/v1/admin/users/${detail.id}/assign-number`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                number,
+                apply_bonus: applyBonus,
+                force: forceAssign,
+              }),
+            },
+          )
+        : await apiFetch<{ number: string }>(
+            `/api/v1/admin/users/${detail.id}/assign-random-number?apply_bonus=${applyBonus}`,
+            { method: "POST" },
+          );
+      setToast(t("users.numberAssigned", { number: res.number }));
+      setAssignNumber("");
+      await list.refetch();
+      await openDetail(detail.id);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -175,7 +193,7 @@ export default function UsersPage() {
       );
       setTempPassword(res.temp_password);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusy(false);
     }
@@ -190,80 +208,117 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t("users.title")} subtitle={t("users.subtitle")}>
-        <input
-          value={search}
-          onChange={(e) => {
-            setPage(1);
-            setSearch(e.target.value);
+        <DataToolbar
+          search={{
+            value: list.q,
+            onChange: list.setQ,
+            placeholder: t("users.searchPlaceholder"),
           }}
-          placeholder={t("users.searchPlaceholder")}
-          className="rounded-lg border px-3 py-2 text-sm"
+          showClear={list.hasActiveFilters}
+          onClear={list.clearFilters}
+          filters={
+            <>
+              <select
+                value={list.filters.status}
+                onChange={(e) => list.setFilter("status", e.target.value)}
+                className="rounded-lg border px-3 py-2 text-sm"
+              >
+                <option value="all">{t("users.statusAll")}</option>
+                <option value="active">{t("users.statusActive")}</option>
+                <option value="inactive">{t("users.statusInactive")}</option>
+                <option value="deleted">{t("users.statusDeleted")}</option>
+              </select>
+              <select
+                value={list.filters.plan}
+                onChange={(e) => list.setFilter("plan", e.target.value)}
+                className="rounded-lg border px-3 py-2 text-sm"
+              >
+                <option value="">{t("users.planAll")}</option>
+                <option value="basic">{planLabel("basic")}</option>
+                <option value="premium">{planLabel("premium")}</option>
+                <option value="business">{planLabel("business")}</option>
+              </select>
+            </>
+          }
         />
-        <select
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            setStatus(e.target.value);
-          }}
-          className="rounded-lg border px-3 py-2 text-sm"
-        >
-          <option value="all">{t("users.statusAll")}</option>
-          <option value="active">{t("users.statusActive")}</option>
-          <option value="inactive">{t("users.statusInactive")}</option>
-          <option value="deleted">{t("users.statusDeleted")}</option>
-        </select>
       </PageHeader>
 
       {toast ? <Alert variant="success">{toast}</Alert> : null}
-      {error ? <Alert variant="error">{error}</Alert> : null}
+      {actionError ? <Alert variant="error">{actionError}</Alert> : null}
 
       <div className="overflow-hidden rounded-xl border bg-white">
-        <table className="min-w-full text-left text-sm">
-          <thead className="sticky top-0 bg-zinc-50 text-xs uppercase text-zinc-500">
-            <tr>
-              <th className="px-4 py-3">{t("users.colId")}</th>
-              <th className="px-4 py-3">{t("users.colUser")}</th>
-              <th className="px-4 py-3">{t("users.colNumber")}</th>
-              <th className="px-4 py-3">{t("users.colPlan")}</th>
-              <th className="px-4 py-3">{t("users.colStatus")}</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.items ?? []).map((u) => (
-              <tr key={u.id} className="border-t hover:bg-zinc-50">
-                <td className="px-4 py-3 tabular-nums text-zinc-500">{u.id}</td>
-                <td className="px-4 py-3">
-                  <div className="font-medium">{u.full_name}</div>
-                  <div className="text-xs text-zinc-500">{u.email}</div>
-                </td>
-                <td className="px-4 py-3 font-mono text-xs">{u.number}</td>
-                <td className="px-4 py-3">{u.plan ? planLabel(u.plan) : "—"}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={userStatus(u)} />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => void openDetail(u.id)}
-                    className="text-sm font-medium underline"
-                  >
-                    {t("app.open")}
-                  </button>
-                </td>
+        <ListState
+          isLoading={list.isLoading}
+          error={list.error}
+          isEmpty={list.items.length === 0}
+          hasActiveFilters={list.hasActiveFilters}
+          onClearFilters={list.clearFilters}
+          onRetry={() => void list.refetch()}
+        >
+          <table className="min-w-full text-left text-sm">
+            <thead className="sticky top-0 bg-zinc-50 text-xs uppercase text-zinc-500">
+              <tr>
+                <SortableTh
+                  label={t("users.colId")}
+                  sortKey="id"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <SortableTh
+                  label={t("users.colUser")}
+                  sortKey="full_name"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <SortableTh
+                  label={t("users.colNumber")}
+                  sortKey="number"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <th className="px-4 py-3">{t("users.colPlan")}</th>
+                <th className="px-4 py-3">{t("users.colStatus")}</th>
+                <th className="px-4 py-3" />
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!data?.items.length ? <EmptyState /> : null}
-        {data ? (
+            </thead>
+            <tbody>
+              {list.items.map((u) => (
+                <tr key={u.id} className="border-t hover:bg-zinc-50">
+                  <td className="px-4 py-3 tabular-nums text-zinc-500">{u.id}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{u.full_name}</div>
+                    <div className="text-xs text-zinc-500">{u.email}</div>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">{u.number}</td>
+                  <td className="px-4 py-3">{u.plan ? planLabel(u.plan) : "—"}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={userStatus(u)} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => void openDetail(u.id)}
+                      className="text-sm font-medium underline"
+                    >
+                      {t("app.open")}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           <Pagination
-            page={page}
-            total={data.total}
-            hasMore={data.has_more}
-            onPageChange={setPage}
+            page={list.page}
+            total={list.total}
+            hasMore={list.hasMore}
+            onPageChange={list.setPage}
+            limit={list.limit}
+            onLimitChange={list.setLimit}
           />
-        ) : null}
+        </ListState>
       </div>
 
       <Drawer
@@ -288,32 +343,13 @@ export default function UsersPage() {
                 <dt className="text-zinc-500">{t("users.drawerPlan")}</dt>
                 <dd>{detail.plan ? planLabel(detail.plan) : "—"}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-zinc-500">{t("users.verified")}</dt>
-                <dd>{detail.is_verified ? t("app.yes") : t("app.no")}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-zinc-500">{t("users.badge")}</dt>
-                <dd>{detail.verified_badge ? t("app.yes") : t("app.no")}</dd>
-                <dt className="text-zinc-500">{t("users.factoryVerified")}</dt>
-                <dd>{detail.factory_verified ? t("app.yes") : t("app.no")}</dd>
-                <dt className="text-zinc-500">{t("users.inspectionPassed")}</dt>
-                <dd>{detail.inspection_passed ? t("app.yes") : t("app.no")}</dd>
-                {detail.audit_report_url ? (
-                  <>
-                    <dt className="text-zinc-500">{t("users.auditReport")}</dt>
-                    <dd className="break-all text-xs">
-                      <a
-                        href={detail.audit_report_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline"
-                      >
-                        {t("users.openAudit")}
-                      </a>
-                    </dd>
-                  </>
-                ) : null}
+              <div className="flex justify-between gap-4 flex-wrap">
+                <span className="text-zinc-500">
+                  {t("users.verified")}: {detail.is_verified ? t("app.yes") : t("app.no")}
+                </span>
+                <span className="text-zinc-500">
+                  {t("users.badge")}: {detail.verified_badge ? t("app.yes") : t("app.no")}
+                </span>
               </div>
               {detail.deleted_at ? (
                 <div className="flex justify-between">
@@ -323,6 +359,53 @@ export default function UsersPage() {
               ) : null}
             </dl>
 
+            {!detail.deleted_at ? (
+              <div className="mt-6 rounded-lg border p-3 space-y-3">
+                <h3 className="text-sm font-semibold">{t("users.assignNumber")}</h3>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    value={assignNumber}
+                    onChange={(e) => setAssignNumber(e.target.value.replace(/\D/g, "").slice(0, 7))}
+                    placeholder={t("users.assignNumberPlaceholder")}
+                    className="rounded-lg border px-3 py-2 font-mono text-sm"
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || assignNumber.length !== 7}
+                    onClick={() => setConfirm({ type: "assign", number: assignNumber })}
+                    className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white disabled:opacity-40"
+                  >
+                    {t("users.assignNumberBtn")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setConfirm({ type: "random" })}
+                    className="rounded-lg border px-3 py-2 text-sm"
+                  >
+                    {t("users.assignRandom")}
+                  </button>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-zinc-600">
+                  <input
+                    type="checkbox"
+                    checked={applyBonus}
+                    onChange={(e) => setApplyBonus(e.target.checked)}
+                  />
+                  {t("users.applyBonus")}
+                </label>
+                <label className="flex items-center gap-2 text-xs text-zinc-600">
+                  <input
+                    type="checkbox"
+                    checked={forceAssign}
+                    onChange={(e) => setForceAssign(e.target.checked)}
+                  />
+                  {t("users.forceAssign")}
+                </label>
+              </div>
+            ) : null}
+
             {detail.recent_payments?.length ? (
               <div className="mt-6">
                 <h3 className="text-sm font-semibold">{t("users.recentPayments")}</h3>
@@ -330,7 +413,9 @@ export default function UsersPage() {
                   {detail.recent_payments.map((p) => (
                     <li key={p.id} className="rounded border px-3 py-2 text-xs">
                       <div className="flex justify-between">
-                        <span>#{p.id} · {p.kind}</span>
+                        <span>
+                          #{p.id} · {p.kind}
+                        </span>
                         <StatusBadge status={p.status} />
                       </div>
                       <div className="mt-1 font-medium">
@@ -362,34 +447,6 @@ export default function UsersPage() {
                 >
                   {detail.verified_badge ? t("users.removeBadge") : t("users.grantBadge")}
                 </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    patchUser(detail.id, {
-                      factory_verified: !detail.factory_verified,
-                    })
-                  }
-                  className="rounded-lg border px-3 py-2 text-sm"
-                >
-                  {detail.factory_verified
-                    ? t("users.removeFactoryVerified")
-                    : t("users.grantFactoryVerified")}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    patchUser(detail.id, {
-                      inspection_passed: !detail.inspection_passed,
-                    })
-                  }
-                  className="rounded-lg border px-3 py-2 text-sm"
-                >
-                  {detail.inspection_passed
-                    ? t("users.removeInspection")
-                    : t("users.grantInspection")}
-                </button>
                 <select
                   defaultValue={detail.plan ?? "basic"}
                   disabled={busy}
@@ -416,13 +473,6 @@ export default function UsersPage() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
                   <p className="font-medium">{t("users.tempPassword")}</p>
                   <code className="mt-1 block break-all font-mono text-base">{tempPassword}</code>
-                  <button
-                    type="button"
-                    className="mt-2 text-xs underline"
-                    onClick={() => navigator.clipboard.writeText(tempPassword)}
-                  >
-                    {t("users.copyPassword")}
-                  </button>
                 </div>
               ) : null}
               {isSuperAdmin() && !detail.deleted_at ? (
@@ -453,7 +503,7 @@ export default function UsersPage() {
       <ConfirmDialog
         open={confirm?.type === "softDelete"}
         title={t("users.softDelete")}
-        message={t("users.confirmSoftDelete", { id: confirm?.id ?? 0 })}
+        message={t("users.confirmSoftDelete", { id: confirm?.type === "softDelete" ? confirm.id : 0 })}
         danger
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
@@ -465,13 +515,31 @@ export default function UsersPage() {
       <ConfirmDialog
         open={confirm?.type === "restore"}
         title={t("users.restoreAccount")}
-        message={t("users.confirmRestore", { id: confirm?.id ?? 0 })}
+        message={t("users.confirmRestore", { id: confirm?.type === "restore" ? confirm.id : 0 })}
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
           if (confirm?.type === "restore") {
             void act(`/api/v1/admin/users/${confirm.id}/restore`);
           }
         }}
+      />
+      <ConfirmDialog
+        open={confirm?.type === "assign"}
+        title={t("users.assignNumber")}
+        message={t("users.confirmAssign", {
+          number: confirm?.type === "assign" ? confirm.number : "",
+        })}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          if (confirm?.type === "assign") void doAssign(confirm.number);
+        }}
+      />
+      <ConfirmDialog
+        open={confirm?.type === "random"}
+        title={t("users.assignRandom")}
+        message={t("users.confirmRandom")}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void doAssign()}
       />
     </div>
   );

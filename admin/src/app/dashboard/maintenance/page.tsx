@@ -19,6 +19,7 @@ type Stats = {
   products_archived: number;
   chats_total: number;
   messages_total: number;
+  messages_total_approx?: boolean;
   number_groups_total: number;
 };
 
@@ -28,8 +29,10 @@ export default function MaintenancePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [purging, setPurging] = useState(false);
+  const [counting, setCounting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [purgeResult, setPurgeResult] = useState<number | null>(null);
+  const [exactMessages, setExactMessages] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isSuperAdmin()) router.replace("/dashboard");
@@ -60,6 +63,21 @@ export default function MaintenancePage() {
     }
   }
 
+  async function runExactCount() {
+    setCounting(true);
+    setError(null);
+    try {
+      const res = await apiFetch<{ messages_total: number }>(
+        "/api/v1/admin/maintenance/exact-message-count",
+      );
+      setExactMessages(res.messages_total);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("app.error"));
+    } finally {
+      setCounting(false);
+    }
+  }
+
   if (!isSuperAdmin()) return null;
 
   return (
@@ -73,6 +91,11 @@ export default function MaintenancePage() {
       {error ? <Alert variant="error">{error}</Alert> : null}
       {purgeResult !== null ? (
         <Alert variant="success">{t("maintenance.purgeResult", { count: purgeResult })}</Alert>
+      ) : null}
+      {exactMessages !== null ? (
+        <Alert variant="success">
+          {t("maintenance.messagesExactResult", { count: exactMessages })}
+        </Alert>
       ) : null}
 
       {loading ? (
@@ -94,7 +117,7 @@ export default function MaintenancePage() {
             <StatCard label={t("dashboard.chatsTotal")} value={formatNumber(stats.chats_total)} />
             <StatCard
               label={t("dashboard.messagesTotal")}
-              value={formatNumber(stats.messages_total)}
+              value={`${stats.messages_total_approx ? "≈ " : ""}${formatNumber(stats.messages_total)}`}
             />
             <StatCard
               label={t("maintenance.numberGroups")}
@@ -107,6 +130,19 @@ export default function MaintenancePage() {
           </div>
         </section>
       ) : null}
+
+      <section className="rounded-xl border bg-white p-6">
+        <h2 className="text-lg font-semibold">{t("maintenance.messagesExact")}</h2>
+        <p className="mt-2 text-sm text-zinc-600">{t("maintenance.messagesExactDesc")}</p>
+        <button
+          type="button"
+          disabled={counting}
+          onClick={() => void runExactCount()}
+          className="mt-4 rounded-lg border px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50"
+        >
+          {counting ? t("app.loading") : t("maintenance.messagesExactRun")}
+        </button>
+      </section>
 
       <section className="rounded-xl border bg-white p-6">
         <h2 className="text-lg font-semibold">{t("maintenance.purgeTitle")}</h2>

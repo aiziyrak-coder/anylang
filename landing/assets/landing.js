@@ -483,6 +483,16 @@ setLang(resolveLang());
     requestAnimationFrame(tickGlow);
   }
 
+  // Sticky nav glass on scroll
+  const nav = document.querySelector(".nav");
+  if (nav) {
+    const onScroll = () => {
+      nav.classList.toggle("is-scrolled", window.scrollY > 12);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+  }
+
   // Parallax tilt on demo phone
   const phone = document.getElementById("demo-phone");
   const demoWrap = phone && phone.closest(".hero-demo");
@@ -491,7 +501,7 @@ setLang(resolveLang());
       const r = demoWrap.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width - 0.5;
       const y = (e.clientY - r.top) / r.height - 0.5;
-      phone.style.transform = `rotateY(${x * 14}deg) rotateX(${-y * 10}deg) translateY(-6px)`;
+      phone.style.transform = `rotateY(${-8 + x * 14}deg) rotateX(${4 - y * 10}deg) translateY(-6px)`;
     });
     demoWrap.addEventListener("pointerleave", () => {
       phone.style.transform = "";

@@ -37,6 +37,7 @@ export type AdminStats = {
   products_archived: number;
   chats_total: number;
   messages_total: number;
+  messages_total_approx?: boolean;
   number_groups_total: number;
 };
 

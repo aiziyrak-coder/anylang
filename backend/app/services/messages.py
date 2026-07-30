@@ -690,6 +690,7 @@ async def create_message(
     chat.last_message_id = message.id
     chat.last_message_at = message.created_at
     chat.has_messages = True
+    chat.message_count = int(getattr(chat, "message_count", 0) or 0) + 1
     await db.flush()
 
     # Avval real-time yetkazish (tarjima kutmasdan) — Telegram uslubi.
@@ -1390,6 +1391,8 @@ async def delete_message(
         message.is_deleted = True
         message.deleted_for_everyone = True
         deleted_for_everyone = True
+        if chat.message_count > 0:
+            chat.message_count -= 1
     else:
         hide_result = await db.execute(
             select(MessageHide).where(

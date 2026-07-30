@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Providers } from "@/components/providers";
+import { Suspense } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="uz">
-      <body className="antialiased font-sans">{children}</body>
+      <body className="antialiased font-sans">
+        <Providers>
+          <Suspense fallback={null}>{children}</Suspense>
+        </Providers>
+      </body>
     </html>
   );
 }

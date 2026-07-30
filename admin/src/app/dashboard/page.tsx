@@ -22,6 +22,7 @@ type Overview = {
   payments_by_status: Record<string, number>;
   chats_total: number;
   messages_total: number;
+  messages_total_approx?: boolean;
 };
 
 type Timeseries = {
@@ -146,7 +147,10 @@ export default function DashboardPage() {
             <StatCard label={t("dashboard.subsActive")} value={formatNumber(overview.subscriptions_active)} />
             <StatCard label={t("dashboard.revenue")} value={`$${overview.revenue}`} accent />
             <StatCard label={t("dashboard.chatsTotal")} value={formatNumber(overview.chats_total)} />
-            <StatCard label={t("dashboard.messagesTotal")} value={formatNumber(overview.messages_total)} />
+            <StatCard
+              label={t("dashboard.messagesTotal")}
+              value={`${overview.messages_total_approx ? "≈ " : ""}${formatNumber(overview.messages_total)}`}
+            />
             <StatCard
               label={t("dashboard.plansCount")}
               value={Object.keys(overview.subscriptions_by_plan).length}

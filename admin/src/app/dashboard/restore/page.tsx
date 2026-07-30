@@ -2,9 +2,12 @@
 
 import { Alert } from "@/components/admin/alert";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { EmptyState } from "@/components/admin/empty-state";
+import { DataToolbar } from "@/components/admin/data-toolbar";
+import { ListState } from "@/components/admin/list-state";
 import { PageHeader } from "@/components/admin/page-header";
+import { Pagination } from "@/components/admin/pagination";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { useAdminList } from "@/hooks/use-admin-list";
 import { ApiError, apiFetch } from "@/lib/api";
 import { isSuperAdmin } from "@/lib/auth";
 import { formatDate, t } from "@/lib/i18n";
@@ -25,11 +28,16 @@ type DecideState = { id: number; approve: boolean } | null;
 
 export default function RestorePage() {
   const router = useRouter();
-  const [statusFilter, setStatusFilter] = useState("pending");
-  const [items, setItems] = useState<Req[]>([]);
+  const list = useAdminList<Req, { status: string }>({
+    queryKey: "admin-restore",
+    path: "/api/v1/admin/restore-requests",
+    enabled: isSuperAdmin(),
+    initialFilters: { status: "pending" },
+  });
+
   const [email, setEmail] = useState("");
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [decide, setDecide] = useState<DecideState>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -38,33 +46,18 @@ export default function RestorePage() {
     if (!isSuperAdmin()) router.replace("/dashboard");
   }, [router]);
 
-  async function load() {
-    try {
-      const res = await apiFetch<{ items: Req[] }>(
-        `/api/v1/admin/restore-requests?status=${statusFilter}`,
-        {},
-      );
-      setItems(res.items);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, [statusFilter]);
-
   async function submitDecide(id: number, approve: boolean) {
     setBusy(true);
+    setActionError(null);
     try {
       await apiFetch(`/api/v1/admin/restore-requests/${id}/decide`, {
         method: "POST",
         body: JSON.stringify({ approve }),
       });
       setToast(t("app.success"));
-      await load();
+      await list.refetch();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusy(false);
       setDecide(null);
@@ -74,6 +67,7 @@ export default function RestorePage() {
   async function create() {
     if (!email.trim() || reason.trim().length < 5) return;
     setBusy(true);
+    setActionError(null);
     try {
       await apiFetch("/api/v1/admin/restore-requests", {
         method: "POST",
@@ -82,9 +76,9 @@ export default function RestorePage() {
       setEmail("");
       setReason("");
       setToast(t("app.success"));
-      await load();
+      await list.refetch();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusy(false);
     }
@@ -95,15 +89,26 @@ export default function RestorePage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t("restore.title")} subtitle={t("restore.subtitle")}>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm"
-        >
-          <option value="pending">{t("restore.pending")}</option>
-          <option value="approved">{t("restore.approved")}</option>
-          <option value="rejected">{t("restore.rejected")}</option>
-        </select>
+        <DataToolbar
+          search={{
+            value: list.q,
+            onChange: list.setQ,
+            placeholder: t("app.search"),
+          }}
+          showClear={list.hasActiveFilters}
+          onClear={list.clearFilters}
+          filters={
+            <select
+              value={list.filters.status}
+              onChange={(e) => list.setFilter("status", e.target.value)}
+              className="rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="pending">{t("restore.pending")}</option>
+              <option value="approved">{t("restore.approved")}</option>
+              <option value="rejected">{t("restore.rejected")}</option>
+            </select>
+          }
+        />
       </PageHeader>
 
       <div className="rounded-xl border bg-white p-4">
@@ -133,48 +138,68 @@ export default function RestorePage() {
       </div>
 
       {toast ? <Alert variant="success">{toast}</Alert> : null}
-      {error ? <Alert variant="error">{error}</Alert> : null}
+      {actionError ? <Alert variant="error">{actionError}</Alert> : null}
 
-      <div className="space-y-3">
-        {items.map((r) => (
-          <article key={r.id} className="rounded-xl border bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">{r.email}</p>
-                <p className="text-xs text-zinc-500">
-                  {t("restore.userId")} #{r.user_id} · {r.number} · {formatDate(r.created_at)}
-                </p>
-                <p className="mt-2 text-sm text-zinc-700">{r.reason}</p>
+      <ListState
+        isLoading={list.isLoading}
+        error={list.error}
+        isEmpty={list.items.length === 0}
+        emptyMessage={t("restore.empty")}
+        hasActiveFilters={list.hasActiveFilters}
+        onClearFilters={list.clearFilters}
+        onRetry={() => void list.refetch()}
+      >
+        <div className="space-y-3">
+          {list.items.map((r) => (
+            <article key={r.id} className="rounded-xl border bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{r.email}</p>
+                  <p className="text-xs text-zinc-500">
+                    {t("restore.userId")} #{r.user_id} · {r.number} ·{" "}
+                    {formatDate(r.created_at)}
+                  </p>
+                  <p className="mt-2 text-sm text-zinc-700">{r.reason}</p>
+                </div>
+                <div className="flex gap-2">
+                  {r.status === "pending" ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setDecide({ id: r.id, approve: true })}
+                        className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                      >
+                        {t("restore.approve")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setDecide({ id: r.id, approve: false })}
+                        className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+                      >
+                        {t("restore.reject")}
+                      </button>
+                    </>
+                  ) : (
+                    <StatusBadge status={r.status} />
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2">
-                {r.status === "pending" ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setDecide({ id: r.id, approve: true })}
-                      className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-                    >
-                      {t("restore.approve")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setDecide({ id: r.id, approve: false })}
-                      className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
-                    >
-                      {t("restore.reject")}
-                    </button>
-                  </>
-                ) : (
-                  <StatusBadge status={r.status} />
-                )}
-              </div>
-            </div>
-          </article>
-        ))}
-        {items.length === 0 ? <EmptyState message={t("restore.empty")} /> : null}
-      </div>
+            </article>
+          ))}
+        </div>
+        <div className="overflow-hidden rounded-xl border bg-white">
+          <Pagination
+            page={list.page}
+            total={list.total}
+            hasMore={list.hasMore}
+            onPageChange={list.setPage}
+            limit={list.limit}
+            onLimitChange={list.setLimit}
+          />
+        </div>
+      </ListState>
 
       <ConfirmDialog
         open={decide?.approve === true}

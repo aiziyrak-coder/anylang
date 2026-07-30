@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/assets/landing.css?v=61" />
+  <link rel="stylesheet" href="/assets/landing.css?v=63" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23B8F25A'/%3E%3Cstop offset='1' stop-color='%2300C4B8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='%230B1A14'/%3E%3Cpath d='M16 38c7-14 25-14 32 0' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='22' r='6' fill='%23B8F25A'/%3E%3C/svg%3E" />
 </head>
 <body>
@@ -27,6 +27,7 @@
   <div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
 
   <header class="nav">
+    <div class="nav-inner">
     <a class="logo" href="/" aria-label="AnyLang home">
       <span class="logo-mark" aria-hidden="true"></span>
       <span class="logo-text">AnyLang</span>
@@ -45,65 +46,66 @@
       </div>
       <a class="nav-cta magnet" href="#get" data-i18n="nav_cta">Download</a>
     </div>
+    </div>
   </header>
 
   <main>
     <section class="hero">
-      <div class="hero-stage">
-        <p class="hero-kicker reveal" data-reveal>
-          <span class="kicker-pulse"></span>
-          <span data-i18n="proof_2">Global B2B chat</span>
-        </p>
-        <h1 class="hero-brand reveal" data-reveal>
-          <span class="brand-any">Any</span><span class="brand-lang">Lang</span>
-        </h1>
-        <p class="hero-line reveal" data-reveal data-i18n="hero_line">Speak any language. Do business anywhere.</p>
-        <p class="hero-sub reveal" data-reveal data-i18n="hero_sub">Live translation for global B2B — write or speak in your language; partners read and hear in theirs.</p>
-        <div class="hero-actions reveal" data-reveal id="get">
-          <a
-            id="apk-download"
-            class="btn btn-primary apk-link magnet"
-            href="/download/anylang-latest.apk"
-            download="AnyLang.apk"
-          >
-            <span class="btn-shine" aria-hidden="true"></span>
-            <span class="btn-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M17.6 9.48 19.4 6.3a.5.5 0 0 0-.87-.5l-1.84 3.18A8 8 0 0 0 7.3 8.98L5.47 5.8a.5.5 0 1 0-.87.5l1.8 3.18A7.95 7.95 0 0 0 4 15.5V16a2 2 0 0 0 2 2h1v2.5a1.5 1.5 0 0 0 3 0V18h4v2.5a1.5 1.5 0 0 0 3 0V18h1a2 2 0 0 0 2-2v-.5a7.95 7.95 0 0 0-2.4-5.02ZM8.5 13.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm7 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
-            </span>
-            <span data-i18n="cta_download">Download Android APK</span>
-          </a>
-          <p class="apk-meta" id="apk-meta" data-i18n="apk_meta_fallback">Latest release · until Play Store</p>
-        </div>
-      </div>
-
-      <div class="hero-demo reveal" data-reveal aria-hidden="true">
-        <div class="demo-rings">
-          <span></span><span></span><span></span>
-        </div>
-        <div class="demo-glow"></div>
-        <div class="demo-phone" id="demo-phone">
-          <div class="demo-bar">
-            <span class="demo-dot"></span>
-            <span class="demo-title" data-i18n="demo_chat_title">Trade chat</span>
-            <span class="demo-badge">⇄</span>
+      <div class="hero-bleed" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <div class="hero-stage">
+          <h1 class="hero-brand reveal" data-reveal>
+            <span class="brand-any">Any</span><span class="brand-lang">Lang</span>
+          </h1>
+          <p class="hero-line reveal" data-reveal data-i18n="hero_line">Speak any language. Do business anywhere.</p>
+          <p class="hero-sub reveal" data-reveal data-i18n="hero_sub">Live translation for global B2B — write or speak in your language; partners read and hear in theirs.</p>
+          <div class="hero-actions reveal" data-reveal id="get">
+            <a
+              id="apk-download"
+              class="btn btn-primary apk-link magnet"
+              href="/download/anylang-latest.apk"
+              download="AnyLang.apk"
+            >
+              <span class="btn-shine" aria-hidden="true"></span>
+              <span class="btn-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M17.6 9.48 19.4 6.3a.5.5 0 0 0-.87-.5l-1.84 3.18A8 8 0 0 0 7.3 8.98L5.47 5.8a.5.5 0 1 0-.87.5l1.8 3.18A7.95 7.95 0 0 0 4 15.5V16a2 2 0 0 0 2 2h1v2.5a1.5 1.5 0 0 0 3 0V18h4v2.5a1.5 1.5 0 0 0 3 0V18h1a2 2 0 0 0 2-2v-.5a7.95 7.95 0 0 0-2.4-5.02ZM8.5 13.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm7 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
+              </span>
+              <span data-i18n="cta_download">Download Android APK</span>
+            </a>
+            <p class="apk-meta" id="apk-meta" data-i18n="apk_meta_fallback">Latest release · until Play Store</p>
           </div>
-          <div class="demo-thread" id="demo-thread">
-            <div class="demo-msg out">
-              <span class="demo-src" data-i18n="demo_src_1">You · Uzbek</span>
-              <span class="demo-dst" data-i18n="demo_out_1">Narxni yuboring, iltimos.</span>
+        </div>
+
+        <div class="hero-demo reveal" data-reveal aria-hidden="true">
+          <div class="demo-rings">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="demo-glow"></div>
+          <div class="demo-phone" id="demo-phone">
+            <div class="demo-notch"></div>
+            <div class="demo-bar">
+              <span class="demo-dot"></span>
+              <span class="demo-title" data-i18n="demo_chat_title">Trade chat</span>
+              <span class="demo-badge">⇄</span>
             </div>
-            <div class="demo-msg in">
-              <span class="demo-src" data-i18n="demo_src_2">Partner · English</span>
-              <span class="demo-dst" data-i18n="demo_in_1">Please send the price.</span>
-              <span class="demo-flip" data-i18n="demo_flip">Live translate</span>
-            </div>
-            <div class="demo-msg out delay">
-              <span class="demo-src" data-i18n="demo_src_1">You · Uzbek</span>
-              <span class="demo-dst" data-i18n="demo_out_2">Yetkazib berish 3 kun.</span>
-            </div>
-            <div class="demo-msg in delay2">
-              <span class="demo-src" data-i18n="demo_src_2">Partner · English</span>
-              <span class="demo-dst" data-i18n="demo_in_2">Delivery in 3 days.</span>
+            <div class="demo-thread" id="demo-thread">
+              <div class="demo-msg out">
+                <span class="demo-src" data-i18n="demo_src_1">You · Uzbek</span>
+                <span class="demo-dst" data-i18n="demo_out_1">Narxni yuboring, iltimos.</span>
+              </div>
+              <div class="demo-msg in">
+                <span class="demo-src" data-i18n="demo_src_2">Partner · English</span>
+                <span class="demo-dst" data-i18n="demo_in_1">Please send the price.</span>
+                <span class="demo-flip" data-i18n="demo_flip">Live translate</span>
+              </div>
+              <div class="demo-msg out delay">
+                <span class="demo-src" data-i18n="demo_src_1">You · Uzbek</span>
+                <span class="demo-dst" data-i18n="demo_out_2">Yetkazib berish 3 kun.</span>
+              </div>
+              <div class="demo-msg in delay2">
+                <span class="demo-src" data-i18n="demo_src_2">Partner · English</span>
+                <span class="demo-dst" data-i18n="demo_in_2">Delivery in 3 days.</span>
+              </div>
             </div>
           </div>
         </div>
@@ -258,6 +260,6 @@
     </nav>
   </footer>
 
-  <script src="/assets/landing.js?v=61" defer></script>
+  <script src="/assets/landing.js?v=63" defer></script>
 </body>
 </html>

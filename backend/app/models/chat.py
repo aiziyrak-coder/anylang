@@ -39,6 +39,7 @@ class Chat(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True, index=True
     )
     has_messages: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    message_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     invite_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
     invite_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_super: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

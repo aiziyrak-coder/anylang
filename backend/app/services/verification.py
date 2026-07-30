@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -454,19 +454,74 @@ async def list_admin_verification_requests(
     db: AsyncSession,
     *,
     status: str | None = "pending",
-    limit: int = 50,
-) -> list[dict]:
-    q = (
-        select(BusinessVerificationRequest)
-        .options(selectinload(BusinessVerificationRequest.documents))
-        .order_by(BusinessVerificationRequest.submitted_at.desc().nullslast())
-        .limit(min(limit, 100))
+    q: str | None = None,
+    page: int | None = None,
+    limit: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
+) -> dict:
+    from app.core.pagination import normalize_page
+    from app.services.admin_list import apply_sort
+
+    params = normalize_page(page, limit, default_size=50, max_size=100)
+    query = select(BusinessVerificationRequest).options(
+        selectinload(BusinessVerificationRequest.documents)
     )
     if status and status != "all":
-        q = q.where(BusinessVerificationRequest.status == status)
+        query = query.where(BusinessVerificationRequest.status == status)
     else:
-        q = q.where(BusinessVerificationRequest.status.in_(["pending", "approved", "rejected"]))
-    rows = (await db.execute(q)).scalars().all()
+        query = query.where(
+            BusinessVerificationRequest.status.in_(["pending", "approved", "rejected"])
+        )
+
+    if q and q.strip():
+        term = q.strip()
+        user_ids_q = select(User.id).where(
+            or_(
+                User.email.ilike(f"%{term}%"),
+                User.number.ilike(f"%{term}%"),
+                User.full_name.ilike(f"%{term}%"),
+            )
+        )
+        biz_ids_q = select(BusinessProfile.id).where(
+            BusinessProfile.company_name.ilike(f"%{term}%")
+        )
+        query = query.where(
+            or_(
+                BusinessVerificationRequest.user_id.in_(user_ids_q),
+                BusinessVerificationRequest.business_id.in_(biz_ids_q),
+            )
+        )
+
+    total = int(
+        (await db.execute(select(func.count()).select_from(query.order_by(None).subquery()))).scalar()
+        or 0
+    )
+    order_by = apply_sort(
+        {
+            "id": BusinessVerificationRequest.id,
+            "submitted_at": BusinessVerificationRequest.submitted_at,
+            "status": BusinessVerificationRequest.status,
+        },
+        sort=sort,
+        order=order,
+        default="submitted_at",
+    )
+    # nulls last for submitted_at desc is nicer — use nullslast on desc
+    from sqlalchemy import nulls_last
+
+    if (sort or "submitted_at") == "submitted_at" and (order or "desc").lower() != "asc":
+        order_expr = nulls_last(BusinessVerificationRequest.submitted_at.desc())
+    else:
+        order_expr = order_by
+
+    rows = list(
+        (
+            await db.execute(
+                query.order_by(order_expr).offset(params.offset).limit(params.page_size)
+            )
+        ).scalars().all()
+    )
     out: list[dict] = []
     for req in rows:
         user = await db.get(User, req.user_id)
@@ -494,7 +549,13 @@ async def list_admin_verification_requests(
                 "verified_badge": bool(user.verified_badge) if user else False,
             }
         )
-    return out
+    return {
+        "items": out,
+        "page": params.page,
+        "limit": params.page_size,
+        "total": total,
+        "has_more": params.offset + len(out) < total,
+    }
 
 
 async def decide_verification_request(

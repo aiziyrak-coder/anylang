@@ -1,14 +1,17 @@
 "use client";
 
 import { Alert } from "@/components/admin/alert";
-import { EmptyState } from "@/components/admin/empty-state";
+import { DataToolbar } from "@/components/admin/data-toolbar";
+import { ListState } from "@/components/admin/list-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { Pagination } from "@/components/admin/pagination";
+import { SortableTh } from "@/components/admin/sortable-th";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { Toggle } from "@/components/ui/toggle";
+import { useAdminList } from "@/hooks/use-admin-list";
 import { ApiError, apiFetch } from "@/lib/api";
 import { formatDate, t } from "@/lib/i18n";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 
 type Promo = {
   id: number;
@@ -26,13 +29,6 @@ type Promo = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-};
-
-type ListResp = {
-  items: Promo[];
-  total: number;
-  has_more: boolean;
-  page: number;
 };
 
 type FormState = {
@@ -96,38 +92,18 @@ function formFromPromo(p: Promo): FormState {
 }
 
 export default function PromoCodesPage() {
-  const [items, setItems] = useState<Promo[]>([]);
+  const list = useAdminList<Promo, { active_only: string }>({
+    queryKey: "admin-promo-codes",
+    path: "/api/v1/admin/promo-codes",
+    defaultSort: "id",
+    initialFilters: { active_only: "" },
+  });
+
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ limit: "50", page: String(page) });
-      if (q.trim()) params.set("q", q.trim());
-      const res = await apiFetch<ListResp>(`/api/v1/admin/promo-codes?${params}`);
-      setItems(res.items ?? []);
-      setTotal(res.total ?? 0);
-      setHasMore(res.has_more ?? false);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, [page]);
 
   function resetForm() {
     setForm(emptyForm());
@@ -194,7 +170,7 @@ export default function PromoCodesPage() {
         setSuccess(t("promos.created", { code: payload.code }));
         resetForm();
       }
-      await load();
+      await list.refetch();
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else if (err instanceof Error) setError(err.message);
@@ -211,7 +187,7 @@ export default function PromoCodesPage() {
       await apiFetch(`/api/v1/admin/promo-codes/${p.id}`, { method: "DELETE" });
       setSuccess(t("promos.deleted", { code: p.code }));
       if (editingId === p.id) resetForm();
-      await load();
+      await list.refetch();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("app.error"));
     }
@@ -232,47 +208,63 @@ export default function PromoCodesPage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
-            <h2 className="text-sm font-semibold">{t("promos.existing")}</h2>
-            <div className="ml-auto flex gap-2">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("promos.search")}
-                className="rounded-lg border px-3 py-1.5 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setPage(1);
-                  void load();
-                }}
-                className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white"
-              >
-                {t("app.search")}
-              </button>
-            </div>
+          <div className="border-b px-4 py-3">
+            <h2 className="mb-3 text-sm font-semibold">{t("promos.existing")}</h2>
+            <DataToolbar
+              search={{
+                value: list.q,
+                onChange: list.setQ,
+                placeholder: t("promos.search"),
+              }}
+              showClear={list.hasActiveFilters}
+              onClear={list.clearFilters}
+              filters={
+                <select
+                  value={list.filters.active_only}
+                  onChange={(e) => list.setFilter("active_only", e.target.value)}
+                  className="rounded-lg border px-3 py-2 text-sm"
+                >
+                  <option value="">{t("app.all")}</option>
+                  <option value="true">{t("promos.activeOnly")}</option>
+                </select>
+              }
+            />
           </div>
 
-          {loading ? (
-            <p className="px-4 py-8 text-sm text-zinc-500">{t("app.loading")}</p>
-          ) : items.length === 0 ? (
-            <EmptyState message={t("app.noData")} />
-          ) : (
+          <ListState
+            isLoading={list.isLoading}
+            error={list.error}
+            isEmpty={list.items.length === 0}
+            hasActiveFilters={list.hasActiveFilters}
+            onClearFilters={list.clearFilters}
+            onRetry={() => void list.refetch()}
+          >
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
                   <tr>
-                    <th className="px-4 py-2">{t("promos.colCode")}</th>
+                    <SortableTh
+                      label={t("promos.colCode")}
+                      sortKey="code"
+                      sortBy={list.sort}
+                      sortDir={list.order}
+                      onSort={list.toggleSort}
+                    />
                     <th className="px-4 py-2">{t("promos.colDiscount")}</th>
                     <th className="px-4 py-2">{t("promos.colUses")}</th>
-                    <th className="px-4 py-2">{t("promos.colValid")}</th>
+                    <SortableTh
+                      label={t("promos.colValid")}
+                      sortKey="valid_until"
+                      sortBy={list.sort}
+                      sortDir={list.order}
+                      onSort={list.toggleSort}
+                    />
                     <th className="px-4 py-2">{t("promos.colStatus")}</th>
                     <th className="px-4 py-2">{t("app.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((p) => (
+                  {list.items.map((p) => (
                     <tr key={p.id} className="border-t">
                       <td className="px-4 py-3">
                         <p className="font-semibold">{p.code}</p>
@@ -314,14 +306,15 @@ export default function PromoCodesPage() {
                 </tbody>
               </table>
             </div>
-          )}
-
-          <Pagination
-            page={page}
-            hasMore={hasMore}
-            total={total}
-            onPageChange={setPage}
-          />
+            <Pagination
+              page={list.page}
+              total={list.total}
+              hasMore={list.hasMore}
+              onPageChange={list.setPage}
+              limit={list.limit}
+              onLimitChange={list.setLimit}
+            />
+          </ListState>
         </section>
 
         <section className="rounded-xl border bg-white p-4 shadow-sm">

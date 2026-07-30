@@ -1,14 +1,16 @@
 "use client";
 
 import { Alert } from "@/components/admin/alert";
-import { EmptyState } from "@/components/admin/empty-state";
+import { DataToolbar } from "@/components/admin/data-toolbar";
+import { ListState } from "@/components/admin/list-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { Pagination } from "@/components/admin/pagination";
-import { ApiError, apiFetch } from "@/lib/api";
+import { SortableTh } from "@/components/admin/sortable-th";
+import { useAdminList } from "@/hooks/use-admin-list";
 import { isSuperAdmin } from "@/lib/auth";
 import { auditActionLabel, formatDate, t } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 type Log = {
   id: number;
@@ -21,85 +23,117 @@ type Log = {
   created_at: string;
 };
 
-type ListResp = {
-  items: Log[];
-  total: number;
-  has_more: boolean;
-};
+const KNOWN_ACTIONS = [
+  "",
+  "chat.list",
+  "chat.view_messages",
+  "chat.export",
+  "number.assign",
+  "user.patch",
+  "user.soft_delete",
+  "user.restore",
+  "verification.decide",
+  "restore.decide",
+];
 
 export default function AuditPage() {
   const router = useRouter();
-  const [items, setItems] = useState<Log[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [action, setAction] = useState("");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const list = useAdminList<Log>({
+    queryKey: "admin-audit",
+    path: "/api/v1/admin/audit-logs",
+    searchParam: "action",
+    defaultSort: "id",
+    enabled: isSuperAdmin(),
+  });
 
   useEffect(() => {
     if (!isSuperAdmin()) router.replace("/dashboard");
   }, [router]);
-
-  useEffect(() => {
-    const q = new URLSearchParams({ limit: "50", page: String(page) });
-    if (action) q.set("action", action);
-    apiFetch<ListResp>(`/api/v1/admin/audit-logs?${q}`)
-      .then((r) => {
-        setItems(r.items);
-        setTotal(r.total ?? r.items.length);
-        setHasMore(r.has_more ?? false);
-      })
-      .catch((err) => setError(err instanceof ApiError ? err.message : t("app.error")));
-  }, [action, page]);
 
   if (!isSuperAdmin()) return null;
 
   return (
     <div className="space-y-6">
       <PageHeader title={t("audit.title")} subtitle={t("audit.subtitle")}>
-        <input
-          value={action}
-          onChange={(e) => {
-            setPage(1);
-            setAction(e.target.value);
+        <DataToolbar
+          search={{
+            value: list.q,
+            onChange: list.setQ,
+            placeholder: t("audit.filterAction"),
           }}
-          placeholder={t("audit.filterAction")}
-          className="rounded-lg border px-3 py-2 text-sm"
+          showClear={list.hasActiveFilters}
+          onClear={list.clearFilters}
+          filters={
+            <select
+              value={KNOWN_ACTIONS.includes(list.q) ? list.q : ""}
+              onChange={(e) => list.setQ(e.target.value)}
+              className="rounded-lg border px-3 py-2 text-sm"
+            >
+              {KNOWN_ACTIONS.map((a) => (
+                <option key={a || "all"} value={a}>
+                  {a ? auditActionLabel(a) : t("app.all")}
+                </option>
+              ))}
+            </select>
+          }
         />
       </PageHeader>
 
-      {error ? <Alert variant="error">{error}</Alert> : null}
-
       <div className="overflow-hidden rounded-xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
-            <tr>
-              <th className="px-4 py-3 text-left">{t("audit.colWhen")}</th>
-              <th className="px-4 py-3 text-left">{t("audit.colAdmin")}</th>
-              <th className="px-4 py-3 text-left">{t("audit.colAction")}</th>
-              <th className="px-4 py-3 text-left">{t("audit.colTarget")}</th>
-              <th className="px-4 py-3 text-left">{t("audit.colIp")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((l) => (
-              <tr key={l.id} className="border-t">
-                <td className="px-4 py-2 text-xs text-zinc-500">{formatDate(l.created_at)}</td>
-                <td className="px-4 py-2">#{l.actor_admin_id}</td>
-                <td className="px-4 py-2">
-                  <div className="font-medium">{auditActionLabel(l.action)}</div>
-                  <div className="font-mono text-[10px] text-zinc-400">{l.action}</div>
-                </td>
-                <td className="px-4 py-2 text-xs">
-                  {l.target_type}:{l.target_id}
-                </td>
-                <td className="px-4 py-2 text-xs">{l.ip ?? "—"}</td>
+        <ListState
+          isLoading={list.isLoading}
+          error={list.error}
+          isEmpty={list.items.length === 0}
+          hasActiveFilters={list.hasActiveFilters}
+          onClearFilters={list.clearFilters}
+          onRetry={() => void list.refetch()}
+        >
+          <table className="min-w-full text-sm">
+            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+              <tr>
+                <SortableTh
+                  label={t("audit.colWhen")}
+                  sortKey="created_at"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <th className="px-4 py-3 text-left">{t("audit.colAdmin")}</th>
+                <SortableTh
+                  label={t("audit.colAction")}
+                  sortKey="action"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                />
+                <th className="px-4 py-3 text-left">{t("audit.colTarget")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!items.length ? <EmptyState /> : null}
-        <Pagination page={page} total={total} hasMore={hasMore} onPageChange={setPage} />
+            </thead>
+            <tbody>
+              {list.items.map((row) => (
+                <tr key={row.id} className="border-t">
+                  <td className="px-4 py-2 text-xs text-zinc-500">
+                    {formatDate(row.created_at)}
+                  </td>
+                  <td className="px-4 py-2 tabular-nums">{row.actor_admin_id ?? "—"}</td>
+                  <td className="px-4 py-2">{auditActionLabel(row.action)}</td>
+                  <td className="px-4 py-2 text-xs">
+                    {row.target_type ?? "—"}
+                    {row.target_id ? ` #${row.target_id}` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination
+            page={list.page}
+            total={list.total}
+            hasMore={list.hasMore}
+            onPageChange={list.setPage}
+            limit={list.limit}
+            onLimitChange={list.setLimit}
+          />
+        </ListState>
       </div>
     </div>
   );

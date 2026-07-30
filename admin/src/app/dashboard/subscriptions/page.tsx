@@ -1,10 +1,13 @@
 "use client";
 
 import { Alert } from "@/components/admin/alert";
-import { EmptyState } from "@/components/admin/empty-state";
+import { DataToolbar } from "@/components/admin/data-toolbar";
+import { ListState } from "@/components/admin/list-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { Pagination } from "@/components/admin/pagination";
+import { SortableTh } from "@/components/admin/sortable-th";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { useAdminList } from "@/hooks/use-admin-list";
 import { ApiError, apiFetch } from "@/lib/api";
 import { formatDate, planLabel, t } from "@/lib/i18n";
 import { useEffect, useState } from "react";
@@ -22,13 +25,6 @@ type Row = {
   source?: string;
 };
 
-type ListResp = {
-  items: Row[];
-  total: number;
-  has_more: boolean;
-  page: number;
-};
-
 type PlanFeature = { text: string; included: boolean };
 type PlanCatalog = {
   code: string;
@@ -44,51 +40,29 @@ type PlanCatalog = {
 };
 
 export default function SubscriptionsPage() {
-  const [plan, setPlan] = useState("");
-  const [items, setItems] = useState<Row[]>([]);
+  const list = useAdminList<Row, { plan: string }>({
+    queryKey: "admin-subscriptions",
+    path: "/api/v1/admin/subscriptions",
+    defaultSort: "id",
+    initialFilters: { plan: "" },
+  });
+
   const [catalog, setCatalog] = useState<PlanCatalog[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  async function loadCatalog() {
-    try {
-      const res = await apiFetch<{ plans: PlanCatalog[] }>(
-        "/api/v1/admin/plan-catalog?language=uz_UZ",
-      );
-      setCatalog(res.plans ?? []);
-    } catch {
-      // Catalog is informational; list still works.
-    }
-  }
-
-  async function load() {
-    try {
-      const q = new URLSearchParams({ limit: "50", page: String(page) });
-      if (plan) q.set("plan", plan);
-      const res = await apiFetch<ListResp>(`/api/v1/admin/subscriptions?${q}`);
-      setItems(res.items);
-      setTotal(res.total ?? res.items.length);
-      setHasMore(res.has_more ?? false);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
-    }
-  }
-
   useEffect(() => {
-    void loadCatalog();
+    apiFetch<{ plans: PlanCatalog[] }>("/api/v1/admin/plan-catalog?language=uz_UZ")
+      .then((res) => setCatalog(res.plans ?? []))
+      .catch(() => {
+        // Catalog is informational; list still works.
+      });
   }, []);
-
-  useEffect(() => {
-    void load();
-  }, [plan, page]);
 
   async function patchSub(userId: number, body: object) {
     setBusyId(userId);
-    setError(null);
+    setActionError(null);
     setToast(null);
     try {
       await apiFetch(`/api/v1/admin/subscriptions/${userId}`, {
@@ -96,9 +70,9 @@ export default function SubscriptionsPage() {
         body: JSON.stringify(body),
       });
       setToast(t("app.success"));
-      await load();
+      await list.refetch();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("app.error"));
+      setActionError(err instanceof ApiError ? err.message : t("app.error"));
     } finally {
       setBusyId(null);
     }
@@ -146,23 +120,31 @@ export default function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t("subscriptions.title")} subtitle={t("subscriptions.subtitle")}>
-        <select
-          value={plan}
-          onChange={(e) => {
-            setPage(1);
-            setPlan(e.target.value);
+        <DataToolbar
+          search={{
+            value: list.q,
+            onChange: list.setQ,
+            placeholder: t("users.searchPlaceholder"),
           }}
-          className="rounded-lg border px-3 py-2 text-sm"
-        >
-          <option value="">{t("subscriptions.planAll")}</option>
-          <option value="basic">{planLabel("basic")}</option>
-          <option value="premium">{planLabel("premium")}</option>
-          <option value="business">{planLabel("business")}</option>
-        </select>
+          showClear={list.hasActiveFilters}
+          onClear={list.clearFilters}
+          filters={
+            <select
+              value={list.filters.plan}
+              onChange={(e) => list.setFilter("plan", e.target.value)}
+              className="rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="">{t("subscriptions.planAll")}</option>
+              <option value="basic">{planLabel("basic")}</option>
+              <option value="premium">{planLabel("premium")}</option>
+              <option value="business">{planLabel("business")}</option>
+            </select>
+          }
+        />
       </PageHeader>
 
       {toast ? <Alert variant="success">{toast}</Alert> : null}
-      {error ? <Alert variant="error">{error}</Alert> : null}
+      {actionError ? <Alert variant="error">{actionError}</Alert> : null}
 
       {catalog.length > 0 ? (
         <div className="grid gap-3 md:grid-cols-3">
@@ -204,93 +186,122 @@ export default function SubscriptionsPage() {
       <p className="text-xs text-zinc-500">{t("subscriptions.semanticsHint")}</p>
 
       <div className="overflow-hidden rounded-xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
-            <tr>
-              <th className="px-4 py-3 text-left">{t("subscriptions.colUser")}</th>
-              <th className="px-4 py-3 text-left">{t("subscriptions.colPlan")}</th>
-              <th className="px-4 py-3 text-left">{t("subscriptions.colActive")}</th>
-              <th className="px-4 py-3 text-left">{t("subscriptions.colExpires")}</th>
-              <th className="px-4 py-3 text-left">{t("subscriptions.colAutoRenew")}</th>
-              <th className="px-4 py-3 text-left">{t("app.actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((r) => (
-              <tr key={r.user_id} className="border-t">
-                <td className="px-4 py-2">
-                  <div className="font-medium">{r.full_name}</div>
-                  <div className="text-xs text-zinc-500">
-                    {r.email} · {r.number}
-                    {r.source ? ` · ${r.source}` : ""}
-                  </div>
-                </td>
-                <td className="px-4 py-2">
-                  <select
-                    value={r.plan}
-                    disabled={busyId === r.user_id}
-                    onChange={(e) => grantPlan(r.user_id, e.target.value)}
-                    className="rounded border px-2 py-1 text-xs"
-                  >
-                    <option value="basic">{planLabel("basic")}</option>
-                    <option value="premium">{planLabel("premium")}</option>
-                    <option value="business">{planLabel("business")}</option>
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                  <StatusBadge status={r.is_active ? "active" : "inactive"} />
-                </td>
-                <td className="px-4 py-2 text-xs">{formatDate(r.expires_at)}</td>
-                <td className="px-4 py-2">
-                  <button
-                    type="button"
-                    disabled={busyId === r.user_id}
-                    onClick={() =>
-                      patchSub(r.user_id, { auto_renew: !r.auto_renew })
-                    }
-                    className="rounded border px-2 py-0.5 text-xs"
-                  >
-                    {r.auto_renew ? t("app.yes") : t("app.no")}
-                  </button>
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex flex-wrap gap-1">
+        <ListState
+          isLoading={list.isLoading}
+          error={list.error}
+          isEmpty={list.items.length === 0}
+          hasActiveFilters={list.hasActiveFilters}
+          onClearFilters={list.clearFilters}
+          onRetry={() => void list.refetch()}
+        >
+          <table className="min-w-full text-sm">
+            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+              <tr>
+                <th className="px-4 py-3 text-left">{t("subscriptions.colUser")}</th>
+                <SortableTh
+                  label={t("subscriptions.colPlan")}
+                  sortKey="plan"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                  className="text-left"
+                />
+                <th className="px-4 py-3 text-left">{t("subscriptions.colActive")}</th>
+                <SortableTh
+                  label={t("subscriptions.colExpires")}
+                  sortKey="expires_at"
+                  sortBy={list.sort}
+                  sortDir={list.order}
+                  onSort={list.toggleSort}
+                  className="text-left"
+                />
+                <th className="px-4 py-3 text-left">{t("subscriptions.colAutoRenew")}</th>
+                <th className="px-4 py-3 text-left">{t("app.actions")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.items.map((r) => (
+                <tr key={r.user_id} className="border-t">
+                  <td className="px-4 py-2">
+                    <div className="font-medium">{r.full_name}</div>
+                    <div className="text-xs text-zinc-500">
+                      {r.email} · {r.number}
+                      {r.source ? ` · ${r.source}` : ""}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={r.plan}
+                      disabled={busyId === r.user_id}
+                      onChange={(e) => grantPlan(r.user_id, e.target.value)}
+                      className="rounded border px-2 py-1 text-xs"
+                    >
+                      <option value="basic">{planLabel("basic")}</option>
+                      <option value="premium">{planLabel("premium")}</option>
+                      <option value="business">{planLabel("business")}</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-2">
+                    <StatusBadge status={r.is_active ? "active" : "inactive"} />
+                  </td>
+                  <td className="px-4 py-2 text-xs">{formatDate(r.expires_at)}</td>
+                  <td className="px-4 py-2">
                     <button
                       type="button"
                       disabled={busyId === r.user_id}
-                      onClick={() => extend30(r.user_id, r.expires_at)}
-                      className="rounded border px-2 py-1 text-xs"
+                      onClick={() =>
+                        patchSub(r.user_id, { auto_renew: !r.auto_renew })
+                      }
+                      className="rounded border px-2 py-0.5 text-xs"
                     >
-                      {t("subscriptions.extend30")}
+                      {r.auto_renew ? t("app.yes") : t("app.no")}
                     </button>
-                    {r.auto_renew ? (
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="flex flex-wrap gap-1">
                       <button
                         type="button"
                         disabled={busyId === r.user_id}
-                        onClick={() => stopRenew(r.user_id)}
+                        onClick={() => extend30(r.user_id, r.expires_at)}
                         className="rounded border px-2 py-1 text-xs"
                       >
-                        {t("subscriptions.stopRenew")}
+                        {t("subscriptions.extend30")}
                       </button>
-                    ) : null}
-                    {r.plan !== "basic" ? (
-                      <button
-                        type="button"
-                        disabled={busyId === r.user_id}
-                        onClick={() => revokeNow(r.user_id)}
-                        className="rounded border border-red-200 px-2 py-1 text-xs text-red-700"
-                      >
-                        {t("subscriptions.revokeNow")}
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!items.length ? <EmptyState /> : null}
-        <Pagination page={page} total={total} hasMore={hasMore} onPageChange={setPage} />
+                      {r.auto_renew ? (
+                        <button
+                          type="button"
+                          disabled={busyId === r.user_id}
+                          onClick={() => stopRenew(r.user_id)}
+                          className="rounded border px-2 py-1 text-xs"
+                        >
+                          {t("subscriptions.stopRenew")}
+                        </button>
+                      ) : null}
+                      {r.plan !== "basic" ? (
+                        <button
+                          type="button"
+                          disabled={busyId === r.user_id}
+                          onClick={() => revokeNow(r.user_id)}
+                          className="rounded border border-red-200 px-2 py-1 text-xs text-red-700"
+                        >
+                          {t("subscriptions.revokeNow")}
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination
+            page={list.page}
+            total={list.total}
+            hasMore={list.hasMore}
+            onPageChange={list.setPage}
+            limit={list.limit}
+            onLimitChange={list.setLimit}
+          />
+        </ListState>
       </div>
     </div>
   );

@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.core.errors import AppError
 from app.core.pagination import normalize_page
 from app.core.security import hash_password
-from app.models.chat import Chat, Message
+from app.models.chat import Chat, ChatParticipant, Message
 from app.models.payment import Payment
 from app.models.user import (
     AccountRestoreRequest,
@@ -29,6 +29,30 @@ from app.models.user import (
 from app.services.admin_ops import write_audit
 
 RETENTION_DAYS = 365
+
+
+async def approx_message_count(db: AsyncSession) -> tuple[int, bool]:
+    """Prefer pg_class.reltuples for large tables; fall back to exact COUNT."""
+    from sqlalchemy import text
+
+    try:
+        result = await db.execute(
+            text("SELECT COALESCE(reltuples, 0)::bigint FROM pg_class WHERE relname = 'messages'")
+        )
+        approx = int(result.scalar() or 0)
+        if approx < 10_000:
+            exact = int(
+                (await db.execute(select(func.count()).select_from(Message))).scalar() or 0
+            )
+            return exact, False
+        return max(approx, 0), True
+    except Exception:
+        exact = int((await db.execute(select(func.count()).select_from(Message))).scalar() or 0)
+        return exact, False
+
+
+async def exact_message_count(db: AsyncSession) -> int:
+    return int((await db.execute(select(func.count()).select_from(Message))).scalar() or 0)
 
 
 def _serialize_user_brief(user: User) -> dict[str, Any]:
@@ -69,7 +93,11 @@ async def list_users(
     plan: str | None = None,
     page: int | None = None,
     limit: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict[str, Any]:
+    from app.services.admin_list import apply_sort, smart_user_search
+
     params = normalize_page(page, limit, default_size=50, max_size=100)
     query = select(User).options(
         selectinload(User.subscription),
@@ -86,13 +114,13 @@ async def list_users(
         # all — prefer non-deleted first but allow deleted via filter
         pass
 
-    if search:
-        pattern = f"%{search.strip()}%"
+    if search and search.strip():
         query = query.where(
-            or_(
-                User.full_name.ilike(pattern),
-                User.email.ilike(pattern),
-                User.number.ilike(pattern),
+            smart_user_search(
+                search,
+                number_col=User.number,
+                email_col=User.email,
+                name_col=User.full_name,
             )
         )
 
@@ -104,8 +132,20 @@ async def list_users(
     count_q = select(func.count()).select_from(query.order_by(None).subquery())
     total = int((await db.execute(count_q)).scalar() or 0)
 
+    order_by = apply_sort(
+        {
+            "id": User.id,
+            "created_at": User.created_at,
+            "full_name": User.full_name,
+            "number": User.number,
+            "email": User.email,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     result = await db.execute(
-        query.order_by(User.id.desc()).offset(params.offset).limit(params.page_size)
+        query.order_by(order_by).offset(params.offset).limit(params.page_size)
     )
     users = list(result.scalars().all())
     return {
@@ -375,9 +415,14 @@ async def list_subscriptions(
     db: AsyncSession,
     *,
     plan: str | None = None,
+    q: str | None = None,
     page: int | None = None,
     limit: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict[str, Any]:
+    from app.services.admin_list import apply_sort, smart_user_search
+
     params = normalize_page(page, limit, default_size=50, max_size=100)
     query = (
         select(Subscription, User)
@@ -386,14 +431,34 @@ async def list_subscriptions(
     )
     if plan:
         query = query.where(Subscription.plan == plan)
+    if q and q.strip():
+        query = query.where(
+            smart_user_search(
+                q,
+                number_col=User.number,
+                email_col=User.email,
+                name_col=User.full_name,
+            )
+        )
 
     total = int(
         (await db.execute(select(func.count()).select_from(query.order_by(None).subquery()))).scalar()
         or 0
     )
+    order_by = apply_sort(
+        {
+            "id": Subscription.id,
+            "plan": Subscription.plan,
+            "expires_at": Subscription.expires_at,
+            "created_at": Subscription.created_at,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     rows = (
         await db.execute(
-            query.order_by(Subscription.id.desc()).offset(params.offset).limit(params.page_size)
+            query.order_by(order_by).offset(params.offset).limit(params.page_size)
         )
     ).all()
     items = [
@@ -485,7 +550,7 @@ async def analytics_overview(
     ).all()
 
     chats_total = int((await db.execute(select(func.count()).select_from(Chat))).scalar() or 0)
-    messages_total = int((await db.execute(select(func.count()).select_from(Message))).scalar() or 0)
+    messages_total, messages_approx = await approx_message_count(db)
 
     return {
         "from": d_from.date().isoformat(),
@@ -499,6 +564,7 @@ async def analytics_overview(
         "payments_by_status": {str(s): int(c) for s, c in pay_status},
         "chats_total": chats_total,
         "messages_total": messages_total,
+        "messages_total_approx": messages_approx,
     }
 
 
@@ -580,11 +646,16 @@ async def list_payments_filtered(
     status: str | None = None,
     kind: str | None = None,
     plan: str | None = None,
+    q: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     page: int | None = None,
     limit: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict[str, Any]:
+    from app.services.admin_list import apply_sort
+
     params = normalize_page(page, limit, default_size=50, max_size=100)
     query = select(Payment)
     if status:
@@ -593,6 +664,17 @@ async def list_payments_filtered(
         query = query.where(Payment.kind == kind)
     if plan:
         query = query.where(Payment.plan == plan)
+    if q and q.strip():
+        term = q.strip()
+        if term.isdigit():
+            query = query.where(
+                or_(Payment.user_id == int(term), Payment.number.ilike(f"{term}%"))
+            )
+        else:
+            pattern = f"%{term}%"
+            query = query.where(
+                or_(Payment.number.ilike(pattern), Payment.provider.ilike(pattern))
+            )
     if date_from:
         query = query.where(
             Payment.created_at >= datetime.combine(date_from, datetime.min.time(), tzinfo=UTC)
@@ -606,9 +688,20 @@ async def list_payments_filtered(
         (await db.execute(select(func.count()).select_from(query.order_by(None).subquery()))).scalar()
         or 0
     )
+    order_by = apply_sort(
+        {
+            "id": Payment.id,
+            "created_at": Payment.created_at,
+            "amount": Payment.amount,
+            "status": Payment.status,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     rows = (
         await db.execute(
-            query.order_by(Payment.id.desc()).offset(params.offset).limit(params.page_size)
+            query.order_by(order_by).offset(params.offset).limit(params.page_size)
         )
     ).scalars().all()
     items = [
@@ -659,62 +752,98 @@ async def list_chats_for_audit(
     q: str | None = None,
     page: int | None = None,
     limit: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict[str, Any]:
+    from app.services.admin_list import apply_sort
+
     params = normalize_page(page, limit, default_size=30, max_size=100)
     query = select(Chat)
     if user_id is not None:
-        query = query.where(or_(Chat.user_low_id == user_id, Chat.user_high_id == user_id))
+        query = query.where(
+            or_(
+                Chat.user_low_id == user_id,
+                Chat.user_high_id == user_id,
+                Chat.id.in_(
+                    select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user_id)
+                ),
+            )
+        )
+
+    if q and q.strip():
+        term = q.strip()
+        if term.isdigit():
+            uid = int(term)
+            query = query.where(
+                or_(
+                    Chat.id == uid,
+                    Chat.user_low_id == uid,
+                    Chat.user_high_id == uid,
+                )
+            )
+        else:
+            pattern = f"%{term}%"
+            last_msg = (
+                select(Message.text_original)
+                .where(Message.id == Chat.last_message_id)
+                .correlate(Chat)
+                .scalar_subquery()
+            )
+            query = query.where(
+                or_(
+                    Chat.title.ilike(pattern),
+                    last_msg.ilike(pattern),
+                )
+            )
 
     total = int(
         (await db.execute(select(func.count()).select_from(query.order_by(None).subquery()))).scalar()
         or 0
     )
+    order_by = apply_sort(
+        {
+            "id": Chat.id,
+            "created_at": Chat.created_at,
+            "last_message_at": Chat.last_message_at,
+            "message_count": Chat.message_count,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     chats = list(
         (
             await db.execute(
-                query.order_by(Chat.id.desc()).offset(params.offset).limit(params.page_size)
+                query.order_by(order_by).offset(params.offset).limit(params.page_size)
             )
         ).scalars().all()
     )
 
-    items = []
-    for chat in chats:
-        msg_count = int(
-            (
-                await db.execute(
-                    select(func.count()).select_from(Message).where(Message.chat_id == chat.id)
-                )
-            ).scalar()
-            or 0
-        )
-        last = (
-            await db.execute(
-                select(Message)
-                .where(Message.chat_id == chat.id)
-                .order_by(Message.id.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        preview = None
-        if last and last.text_original:
-            preview = last.text_original[:120]
-        elif q:
-            # optional text search filter — skip if no match when q set
-            pass
-        if q and preview and q.lower() not in preview.lower():
-            # still include chat; message search is approximate via last message
-            pass
-        items.append(
-            {
-                "id": chat.id,
-                "user_low_id": chat.user_low_id,
-                "user_high_id": chat.user_high_id,
-                "message_count": msg_count,
-                "last_message_at": last.created_at if last else chat.last_message_at,
-                "last_preview": preview,
-                "created_at": chat.created_at,
-            }
-        )
+    # Batch-load last message previews (no N+1 counts — use denorm message_count)
+    last_ids = [c.last_message_id for c in chats if c.last_message_id]
+    preview_by_id: dict[int, str | None] = {}
+    if last_ids:
+        rows = (
+            await db.execute(select(Message.id, Message.text_original).where(Message.id.in_(last_ids)))
+        ).all()
+        preview_by_id = {
+            mid: (text[:120] if text else None) for mid, text in rows
+        }
+
+    items = [
+        {
+            "id": chat.id,
+            "user_low_id": chat.user_low_id,
+            "user_high_id": chat.user_high_id,
+            "title": chat.title,
+            "type": chat.type,
+            "message_count": int(getattr(chat, "message_count", 0) or 0),
+            "last_message_at": chat.last_message_at,
+            "last_preview": preview_by_id.get(chat.last_message_id) if chat.last_message_id else None,
+            "created_at": chat.created_at,
+        }
+        for chat in chats
+    ]
 
     return {
         "items": items,
@@ -803,20 +932,64 @@ async def export_chat(
     fmt: Literal["json", "csv"],
     admin: AdminUser,
     ip: str | None = None,
+    cursor: int | None = None,
+    limit: int = 500,
 ) -> tuple[str, str, bytes]:
-    data = await list_chat_messages_stealth(
-        db, chat_id=chat_id, page=1, limit=10000, admin=admin, ip=ip, skip_audit=True
+    """Export chat messages with keyset cursor (avoids broken offset+huge limit)."""
+    chat = await db.get(Chat, chat_id)
+    if chat is None:
+        raise AppError(message="Chat not found", error_code="CHAT_NOT_FOUND", status_code=404)
+
+    page_size = max(1, min(limit, 1000))
+    query = select(Message).where(Message.chat_id == chat_id)
+    if cursor is not None:
+        query = query.where(Message.id > cursor)
+    rows = list(
+        (
+            await db.execute(query.order_by(Message.id.asc()).limit(page_size + 1))
+        ).scalars().all()
     )
-    truncated = bool(data.get("has_more"))
-    data["truncated"] = truncated
-    data["exported_count"] = len(data.get("items") or [])
+    has_more = len(rows) > page_size
+    rows = rows[:page_size]
+    next_cursor = rows[-1].id if rows and has_more else None
+
+    items = [
+        {
+            "id": m.id,
+            "sender_id": m.sender_id,
+            "type": m.type,
+            "text_original": m.text_original,
+            "original_language": m.original_language,
+            "meta": m.meta,
+            "is_deleted": m.is_deleted,
+            "deleted_for_everyone": m.deleted_for_everyone,
+            "created_at": m.created_at,
+        }
+        for m in rows
+    ]
+    data: dict[str, Any] = {
+        "chat_id": chat_id,
+        "user_low_id": chat.user_low_id,
+        "user_high_id": chat.user_high_id,
+        "items": items,
+        "truncated": has_more,
+        "exported_count": len(items),
+        "next_cursor": next_cursor,
+        "has_more": has_more,
+    }
     await write_audit(
         db,
         admin=admin,
         action="chat.export",
         target_type="chat",
         target_id=chat_id,
-        meta={"format": fmt, "truncated": truncated, "exported_count": data["exported_count"]},
+        meta={
+            "format": fmt,
+            "truncated": has_more,
+            "exported_count": len(items),
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+        },
         ip=ip,
     )
     if fmt == "json":
@@ -829,7 +1002,7 @@ async def export_chat(
         fieldnames=["id", "sender_id", "type", "text_original", "created_at", "is_deleted"],
     )
     writer.writeheader()
-    for row in data["items"]:
+    for row in items:
         writer.writerow(
             {
                 "id": row["id"],
@@ -952,23 +1125,45 @@ async def list_restore_requests(
     db: AsyncSession,
     *,
     status: str | None = "pending",
+    q: str | None = None,
     page: int | None = None,
     limit: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict[str, Any]:
+    from app.services.admin_list import apply_sort, smart_text_search
+
     params = normalize_page(page, limit, default_size=50, max_size=100)
     query = select(AccountRestoreRequest)
     if status:
         query = query.where(AccountRestoreRequest.status == status)
+    if q and q.strip():
+        query = query.where(
+            smart_text_search(
+                q,
+                AccountRestoreRequest.email,
+                AccountRestoreRequest.number,
+                AccountRestoreRequest.reason,
+            )
+        )
     total = int(
         (await db.execute(select(func.count()).select_from(query.order_by(None).subquery()))).scalar()
         or 0
     )
+    order_by = apply_sort(
+        {
+            "id": AccountRestoreRequest.id,
+            "created_at": AccountRestoreRequest.created_at,
+            "status": AccountRestoreRequest.status,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     rows = list(
         (
             await db.execute(
-                query.order_by(AccountRestoreRequest.id.desc())
-                .offset(params.offset)
-                .limit(params.page_size)
+                query.order_by(order_by).offset(params.offset).limit(params.page_size)
             )
         ).scalars().all()
     )
@@ -1050,19 +1245,33 @@ async def list_audit_logs(
     action: str | None = None,
     page: int | None = None,
     limit: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict[str, Any]:
+    from app.services.admin_list import apply_sort, audit_action_filter
+
     params = normalize_page(page, limit, default_size=50, max_size=100)
     query = select(AdminAuditLog)
-    if action:
-        query = query.where(AdminAuditLog.action == action)
+    if action and action.strip():
+        query = query.where(audit_action_filter(action, AdminAuditLog.action))
     total = int(
         (await db.execute(select(func.count()).select_from(query.order_by(None).subquery()))).scalar()
         or 0
     )
+    order_by = apply_sort(
+        {
+            "id": AdminAuditLog.id,
+            "created_at": AdminAuditLog.created_at,
+            "action": AdminAuditLog.action,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     rows = list(
         (
             await db.execute(
-                query.order_by(AdminAuditLog.id.desc()).offset(params.offset).limit(params.page_size)
+                query.order_by(order_by).offset(params.offset).limit(params.page_size)
             )
         ).scalars().all()
     )

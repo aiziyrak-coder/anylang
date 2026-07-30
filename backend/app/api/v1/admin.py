@@ -4,13 +4,13 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 
 from app.api.deps_admin import CurrentAdmin
 from app.core.deps import DbSession, RedisClient
 from app.core.errors import AppError
 from app.core.pagination import normalize_page
-from app.models.chat import Chat, Message
+from app.models.chat import Chat
 from app.models.payment import Payment
 from app.models.product import Product
 from app.models.user import BusinessProfile, NumberGroup, Subscription, User
@@ -111,6 +111,7 @@ class AdminStatsOut(BaseModel):
     products_archived: int
     chats_total: int
     messages_total: int
+    messages_total_approx: bool = False
     number_groups_total: int
 
 
@@ -201,21 +202,26 @@ async def admin_list_users(
     db: DbSession,
     _admin: ModeratorPlus,
     search: str | None = Query(default=None),
+    q: str | None = Query(default=None),
     status_filter: str | None = Query(default="all", alias="status"),
     plan: str | None = Query(default=None),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
     from app.services import admin_console as console
 
     st = status_filter if status_filter in {"all", "active", "inactive", "deleted"} else "all"
     return await console.list_users(
         db,
-        search=search,
+        search=search or q,
         status=st,  # type: ignore[arg-type]
         plan=plan,
         page=page,
         limit=limit,
+        sort=sort,
+        order=order,
     )
 
 
@@ -313,6 +319,80 @@ async def admin_patch_user(
     return AdminUserOut.model_validate(_serialize_admin_user(user))
 
 
+class AdminAssignNumberIn(BaseModel):
+    number: str = Field(min_length=7, max_length=16)
+    apply_bonus: bool = False
+    force: bool = False
+
+
+@router.post("/users/{user_id}/assign-number")
+async def admin_assign_number(
+    user_id: int,
+    body: AdminAssignNumberIn,
+    db: DbSession,
+    admin: ModeratorPlus,
+    request: Request,
+) -> dict:
+    user = await db.get(User, user_id)
+    if user is None:
+        raise AppError(message="Foydalanuvchi topilmadi", error_code="USER_NOT_FOUND", status_code=404)
+    if user.deleted_at is not None:
+        raise AppError(
+            message="O'chirilgan akkauntga raqam biriktirib bo'lmaydi",
+            error_code="USER_DELETED",
+            status_code=400,
+        )
+    data = await numbers_service.admin_assign_number(
+        db,
+        user,
+        body.number,
+        apply_bonus=body.apply_bonus,
+        force=body.force,
+    )
+    await write_audit(
+        db,
+        admin=admin,
+        action="number.assign",
+        target_type="user",
+        target_id=user_id,
+        meta={"number": data["number"], "mode": "manual", "force": body.force, "apply_bonus": body.apply_bonus},
+        ip=client_ip(request),
+    )
+    return data
+
+
+@router.post("/users/{user_id}/assign-random-number")
+async def admin_assign_random_number(
+    user_id: int,
+    db: DbSession,
+    admin: ModeratorPlus,
+    request: Request,
+    apply_bonus: bool = Query(default=False),
+) -> dict:
+    user = await db.get(User, user_id)
+    if user is None:
+        raise AppError(message="Foydalanuvchi topilmadi", error_code="USER_NOT_FOUND", status_code=404)
+    if user.deleted_at is not None:
+        raise AppError(
+            message="O'chirilgan akkauntga raqam biriktirib bo'lmaydi",
+            error_code="USER_DELETED",
+            status_code=400,
+        )
+    data = await numbers_service.admin_assign_random_number(
+        db, user, apply_bonus=apply_bonus
+    )
+    await write_audit(
+        db,
+        admin=admin,
+        action="number.assign",
+        target_type="user",
+        target_id=user_id,
+        meta={"number": data["number"], "mode": "random", "apply_bonus": apply_bonus},
+        ip=client_ip(request),
+    )
+    return data
+
+
 @router.get("/number-groups", response_model=list[AdminNumberGroupOut])
 async def admin_list_number_groups(
     db: DbSession,
@@ -402,24 +482,42 @@ async def admin_list_products(
     _admin: ModeratorPlus,
     status_filter: str | None = Query(default=None, alias="status"),
     search: str | None = Query(default=None),
+    q: str | None = Query(default=None),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
+    from app.services.admin_list import apply_sort, smart_text_search
+
     params = normalize_page(page, limit, default_size=50, max_size=100)
     query = select(Product)
     if status_filter in {"draft", "published", "archived"}:
         query = query.where(Product.status == status_filter)
-    if search and search.strip():
-        term = f"%{search.strip()}%"
-        query = query.where(or_(Product.name.ilike(term), Product.category.ilike(term)))
+    term = (search or q or "").strip()
+    if term:
+        query = query.where(smart_text_search(term, Product.name, Product.category))
     total = int(
         (await db.execute(select(func.count()).select_from(query.order_by(None).subquery()))).scalar()
         or 0
     )
+    order_by = apply_sort(
+        {
+            "id": Product.id,
+            "created_at": Product.created_at,
+            "name": Product.name,
+            "price": Product.price,
+            "status": Product.status,
+            "views_count": Product.views_count,
+        },
+        sort=sort,
+        order=order,
+        default="id",
+    )
     rows = list(
         (
             await db.execute(
-                query.order_by(Product.id.desc()).offset(params.offset).limit(params.page_size)
+                query.order_by(order_by).offset(params.offset).limit(params.page_size)
             )
         ).scalars().all()
     )
@@ -622,7 +720,9 @@ async def admin_stats(db: DbSession, _admin: ModeratorPlus) -> AdminStatsOut:
         or 0
     )
     chats_total = int((await db.execute(select(func.count()).select_from(Chat))).scalar() or 0)
-    messages_total = int((await db.execute(select(func.count()).select_from(Message))).scalar() or 0)
+    from app.services.admin_console import approx_message_count
+
+    messages_total, messages_approx = await approx_message_count(db)
     number_groups_total = int(
         (await db.execute(select(func.count()).select_from(NumberGroup))).scalar() or 0
     )
@@ -636,6 +736,7 @@ async def admin_stats(db: DbSession, _admin: ModeratorPlus) -> AdminStatsOut:
             "products_archived": products_archived,
             "chats_total": chats_total,
             "messages_total": messages_total,
+            "messages_total_approx": messages_approx,
             "number_groups_total": number_groups_total,
         }
     )
@@ -665,10 +766,13 @@ async def admin_list_payments(
     status_filter: str | None = Query(default=None, alias="status"),
     kind: str | None = None,
     plan: str | None = None,
+    q: str | None = None,
     date_from: str | None = Query(default=None, alias="from"),
     date_to: str | None = Query(default=None, alias="to"),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
     from datetime import date as date_cls
 
@@ -688,10 +792,13 @@ async def admin_list_payments(
         status=status_filter,
         kind=kind,
         plan=plan,
+        q=q,
         date_from=df,
         date_to=dt,
         page=page,
         limit=limit,
+        sort=sort,
+        order=order,
     )
 
 
@@ -705,14 +812,23 @@ async def admin_list_verification_requests(
     db: DbSession,
     admin: ModeratorPlus,
     status_filter: str | None = Query(default="pending", alias="status"),
+    q: str | None = Query(default=None),
+    page: int | None = Query(default=None, ge=1),
     limit: int = Query(default=50, ge=1, le=100),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
 ) -> dict:
     from app.services import verification as verification_service
 
-    items = await verification_service.list_admin_verification_requests(
-        db, status=status_filter, limit=limit
+    return await verification_service.list_admin_verification_requests(
+        db,
+        status=status_filter,
+        q=q,
+        page=page,
+        limit=limit,
+        sort=sort,
+        order=order,
     )
-    return {"items": items}
 
 
 @router.post("/verification-requests/{request_id}/decide")

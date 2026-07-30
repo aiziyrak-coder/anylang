@@ -401,6 +401,115 @@ async def _release_user_number(db: AsyncSession, user: User) -> None:
         await db.flush()
 
 
+async def admin_assign_number(
+    db: AsyncSession,
+    user: User,
+    number: str,
+    *,
+    apply_bonus: bool = False,
+    force: bool = False,
+) -> dict:
+    """Admin: assign a specific 7-digit number (no purchase / no cooldown)."""
+    number = _validate_number(number)
+    groups = await _load_groups(db)
+    group = classify_number(number, groups)
+    if group is None:
+        raise AppError(message="Raqam noto'g'ri", error_code="NUMBER_INVALID", status_code=400)
+    if not group.is_active:
+        raise AppError(message="Guruh faol emas", error_code="GROUP_INACTIVE", status_code=409)
+
+    now = datetime.now(UTC)
+    result = await db.execute(
+        select(NumberAssignment).where(NumberAssignment.number == number).with_for_update()
+    )
+    assignment = result.scalar_one_or_none()
+
+    if assignment is not None and assignment.user_id is not None and assignment.user_id != user.id:
+        if not force:
+            raise AppError(
+                message="Raqam boshqa foydalanuvchida. force=true bilan majburan o'tkazing.",
+                error_code="NUMBER_TAKEN",
+                status_code=409,
+            )
+        other = await db.get(User, assignment.user_id)
+        if other is not None and other.number == number:
+            await _release_user_number(db, other)
+            assignment = None
+            replacement = await assign_random_standard_number(db, user_id=other.id)
+            other.number = replacement
+            await db.flush()
+        else:
+            assignment.user_id = None
+            await db.flush()
+
+    if (
+        assignment is not None
+        and assignment.reserved_until
+        and assignment.reserved_until > now
+        and assignment.reserved_by_user_id not in (None, user.id)
+        and not force
+    ):
+        raise AppError(message="Raqam band qilingan", error_code="NUMBER_RESERVED", status_code=409)
+
+    await _release_user_number(db, user)
+
+    if assignment is None:
+        assignment = NumberAssignment(number=number, group_id=group.id)
+        db.add(assignment)
+
+    assignment.user_id = user.id
+    assignment.group_id = group.id
+    assignment.purchased_at = now
+    assignment.reserved_until = None
+    assignment.reserved_by_user_id = None
+    user.number = number
+    await db.flush()
+
+    if apply_bonus and group.bonus_plan and group.bonus_duration_months:
+        await apply_bonus_subscription(
+            db,
+            user,
+            bonus_plan=group.bonus_plan,
+            bonus_duration_months=group.bonus_duration_months,
+        )
+
+    return {
+        "number": number,
+        "group": _serialize_group_brief(group),
+        "apply_bonus": apply_bonus,
+        "force": force,
+    }
+
+
+async def admin_assign_random_number(
+    db: AsyncSession,
+    user: User,
+    *,
+    apply_bonus: bool = False,
+) -> dict:
+    """Admin: assign random standard number — no 90-day cooldown."""
+    group = await _ensure_standard_group(db)
+    await _release_user_number(db, user)
+    new_number = await assign_random_standard_number(db, user_id=user.id)
+    user.number = new_number
+    # Do not touch last_number_change_at — admin bypasses cooldown
+    await db.flush()
+
+    if apply_bonus and group.bonus_plan and group.bonus_duration_months:
+        await apply_bonus_subscription(
+            db,
+            user,
+            bonus_plan=group.bonus_plan,
+            bonus_duration_months=group.bonus_duration_months,
+        )
+
+    return {
+        "number": new_number,
+        "group": _serialize_group_brief(group),
+        "apply_bonus": apply_bonus,
+    }
+
+
 async def assign_random_number_for_user(db: AsyncSession, user: User) -> dict:
     now = datetime.now(UTC)
     if user.last_number_change_at is not None:
