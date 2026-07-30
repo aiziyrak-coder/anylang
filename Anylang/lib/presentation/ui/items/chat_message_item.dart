@@ -107,29 +107,7 @@ class ChatMessageItem extends StatelessWidget {
               runSpacing: 4.dp,
               children: [
                 for (final r in message.reactions)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 3.dp),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(12.dp),
-                      border: Border.all(
-                        color: (r['me'] == true)
-                            ? c.accent
-                            : c.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: Text(
-                      reactionDisplayText(
-                        '${r['emoji'] ?? ''}',
-                        count: r['count'],
-                      ),
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w600,
-                        color: c.textPrimary,
-                      ),
-                    ),
-                  ),
+                  _reactionChip(c, r),
               ],
             ),
           ],
@@ -304,6 +282,44 @@ class ChatMessageItem extends StatelessWidget {
         bottomRight: Radius.circular(_out ? 5.dp : 18.dp),
       );
 
+  Widget _reactionChip(AppColors c, Map<String, dynamic> r) {
+    final mine = r['me'] == true;
+    final radius = BorderRadius.circular(12.dp);
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 8.dp, vertical: 3.dp),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            color: (c.isDark ? const Color(0xFF1A3148) : Colors.white)
+                .withValues(alpha: c.isDark ? 0.45 : 0.55),
+            border: Border.all(
+              color: mine
+                  ? c.accent.withValues(alpha: 0.85)
+                  : (c.isDark
+                      ? const Color(0x44FFFFFF)
+                      : const Color(0x66FFFFFF)),
+              width: 0.8,
+            ),
+          ),
+          child: Text(
+            reactionDisplayText(
+              '${r['emoji'] ?? ''}',
+              count: r['count'],
+            ),
+            style: TextStyle(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
+              color: c.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _bubble(AppColors c, Widget child) {
     final radius = _bubbleRadius;
     final name = message.senderName?.trim();
@@ -312,12 +328,14 @@ class ChatMessageItem extends StatelessWidget {
 
     final fill = _out
         ? c.accent
-        : (c.isDark ? const Color(0xFF1A3148) : const Color(0xFFFFFFFF));
+        : (c.isDark ? const Color(0xFF243B55) : const Color(0xFFFFFFFF));
     final borderColor = _out
-        ? c.onAccent.withValues(alpha: 0.28)
+        ? Colors.white.withValues(alpha: c.isDark ? 0.38 : 0.55)
         : (c.isDark
             ? const Color(0x55FFFFFF)
-            : const Color(0x88FFFFFF));
+            : const Color(0x99FFFFFF));
+    final topAlpha = _out ? 0.62 : (c.isDark ? 0.48 : 0.72);
+    final bottomAlpha = _out ? 0.38 : (c.isDark ? 0.28 : 0.48);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -325,60 +343,88 @@ class ChatMessageItem extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: _out
-                ? c.accent.withValues(alpha: 0.22)
+                ? c.accent.withValues(alpha: 0.18)
                 : (c.isDark
-                    ? const Color(0x55000000)
-                    : const Color(0x140B1F36)),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-            spreadRadius: -4,
+                    ? const Color(0x44000000)
+                    : const Color(0x120B1F36)),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -6,
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
           child: Material(
             color: Colors.transparent,
             child: Ink(
-              padding: EdgeInsets.symmetric(horizontal: 12.dp, vertical: 10.dp),
               decoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(color: borderColor, width: 0.9),
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    fill.withValues(alpha: _out ? 0.78 : (c.isDark ? 0.52 : 0.62)),
-                    fill.withValues(alpha: _out ? 0.55 : (c.isDark ? 0.32 : 0.42)),
+                    fill.withValues(alpha: topAlpha),
+                    fill.withValues(alpha: bottomAlpha),
                   ],
                 ),
-                borderRadius: radius,
-                border: Border.all(color: borderColor, width: 0.9),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  if (showName) ...[
-                    GestureDetector(
-                      onTap: onSenderTap,
-                      behavior: HitTestBehavior.opaque,
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: nameColor,
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w700,
-                          height: 1.15,
-                          letterSpacing: 0.1,
+                  // Liquid highlight — yuqori chet
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 1.2,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withValues(
+                              alpha: _out ? 0.55 : (c.isDark ? 0.35 : 0.7),
+                            ),
+                            Colors.white.withValues(alpha: 0),
+                          ],
                         ),
                       ),
                     ),
-                    SizedBox(height: 4.dp),
-                  ],
-                  child,
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.dp,
+                      vertical: 10.dp,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (showName) ...[
+                          GestureDetector(
+                            onTap: onSenderTap,
+                            behavior: HitTestBehavior.opaque,
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: nameColor,
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w700,
+                                height: 1.15,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 4.dp),
+                        ],
+                        child,
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -71,6 +71,19 @@ const LinearGradient profilePageGradientDark = LinearGradient(
   end: Alignment.bottomRight,
 );
 
+/// Chat canvas (rasmsiz) — tiniq, o‘qiladigan fon.
+const LinearGradient chatCanvasGradientLight = LinearGradient(
+  colors: [Color(0xFFF4F7FA), Color(0xFFEEF2F6), Color(0xFFF6F8FA)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const LinearGradient chatCanvasGradientDark = LinearGradient(
+  colors: [Color(0xFF0C1520), Color(0xFF101B28), Color(0xFF0A121C)],
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+);
+
 /// Statistika kartalari — yengil gradientlar.
 const LinearGradient profileStatGradientA = LinearGradient(
   colors: [Color(0x338BC21A), Color(0x225AA8E8)],

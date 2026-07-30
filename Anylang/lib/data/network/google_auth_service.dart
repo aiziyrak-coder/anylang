@@ -2,10 +2,20 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../presentation/utils/app_snackbar.dart';
+
+/// Foydalanuvchi Google oynasini yopdi / bekor qildi.
+class GoogleSignInCancelled implements Exception {}
+
+/// SHA-1 / Android OAuth / Consent sozlanmagan (ApiException 10 va h.k.).
+class GoogleSignInNotConfigured implements Exception {
+  final String messageKey;
+  GoogleSignInNotConfigured([this.messageKey = 'google_android_oauth_missing']);
+}
 
 /// Google Sign-In → backend `id_token`.
 ///
@@ -29,7 +39,7 @@ class GoogleAuthService {
     // Release: faqat real Google — bootstrap yo‘q.
     if (serverClientId.isEmpty) {
       if (kDebugMode) return _promptBootstrapGoogle();
-      return null;
+      throw GoogleSignInNotConfigured('google_coming_soon');
     }
 
     try {
@@ -38,19 +48,37 @@ class GoogleAuthService {
 
     try {
       final account = await _client.signIn();
-      if (account == null) return null;
+      if (account == null) throw GoogleSignInCancelled();
+
       final auth = await account.authentication;
       final idToken = auth.idToken;
       if (idToken != null && idToken.isNotEmpty) return idToken;
 
-      // idToken yo‘q — faqat debug bootstrap
+      // idToken yo‘q — odatda Android OAuth client / SHA-1 yo‘q.
       if (kDebugMode) {
         final email = account.email;
         final name = account.displayName ?? email.split('@').first;
         return _mintDevIdToken(email: email, name: name, sub: account.id);
       }
-      showAppError('google_failed'.tr);
-      return null;
+      throw GoogleSignInNotConfigured();
+    } on GoogleSignInCancelled {
+      rethrow;
+    } on GoogleSignInNotConfigured {
+      rethrow;
+    } on PlatformException catch (e) {
+      debugPrint('Google Sign-In PlatformException: ${e.code} ${e.message}');
+      final blob = '${e.code} ${e.message} ${e.details}'.toLowerCase();
+      if (blob.contains('network_error') || blob.contains('7')) {
+        rethrow;
+      }
+      // 10 = DEVELOPER_ERROR (package/SHA-1), 12500 = generic sign-in fail
+      if (blob.contains('10') ||
+          blob.contains('developer_error') ||
+          blob.contains('12500') ||
+          blob.contains('sign_in_failed')) {
+        throw GoogleSignInNotConfigured();
+      }
+      rethrow;
     } catch (e) {
       debugPrint('Google Sign-In failed: $e');
       if (kDebugMode) {

@@ -585,6 +585,7 @@
   "google_cancelled": "Вход через Google отменён",
   "google_coming_soon": "Google — скоро",
   "google_failed": "Не удалось войти через Google",
+  "google_android_oauth_missing": "Google Android не настроен: создайте Android-клиент в Cloud Console (пакет com.cradev.anylang + release SHA-1).",
   "google_sign_in": "Войти через Google",
   "group_add_members_already_in_group": "Уже в группе",
   "group_add_members_search_hint": "Поиск по имени...",

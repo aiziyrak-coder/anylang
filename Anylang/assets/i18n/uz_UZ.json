@@ -585,6 +585,7 @@
   "google_cancelled": "Google orqali kirish bekor qilindi",
   "google_coming_soon": "Google — tez orada",
   "google_failed": "Google orqali kirib bo‘lmadi",
+  "google_android_oauth_missing": "Google Android sozlanmagan: Cloud Console’da Android mijoz yarating (paket com.cradev.anylang + release SHA-1).",
   "google_sign_in": "Google orqali kirish",
   "group_add_members_already_in_group": "Guruhda",
   "group_add_members_search_hint": "Ism bo‘yicha qidirish...",

@@ -585,6 +585,7 @@
   "google_cancelled": "Google sign-in was cancelled",
   "google_coming_soon": "Google — coming soon",
   "google_failed": "Google sign-in failed",
+  "google_android_oauth_missing": "Google Android not set up: create an Android OAuth client (package com.cradev.anylang + release SHA-1).",
   "google_sign_in": "Sign in with Google",
   "group_add_members_already_in_group": "In group",
   "group_add_members_search_hint": "Search by name...",

@@ -31,7 +31,7 @@ Future<void> runGoogleSignInFlow({
   try {
     final idToken = await Get.find<GoogleAuthService>().signInForIdToken();
     if (idToken == null || idToken.isEmpty) {
-      showAppMessage('google_cancelled'.tr);
+      fail('google_failed'.tr);
       return;
     }
 
@@ -85,6 +85,10 @@ Future<void> runGoogleSignInFlow({
         fail(AuthValidators.safeError(err, fallbackKey: 'google_failed'));
       },
     );
+  } on GoogleSignInCancelled {
+    showAppMessage('google_cancelled'.tr);
+  } on GoogleSignInNotConfigured catch (e) {
+    fail(e.messageKey.tr);
   } catch (e) {
     fail(AuthValidators.safeError(e, fallbackKey: 'google_failed'));
   }
