@@ -1,13 +1,13 @@
 {
-  "version": "1.0.83",
-  "build": 84,
-  "version_full": "1.0.83+84",
+  "version": "1.0.84",
+  "build": 85,
+  "version_full": "1.0.84+85",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.83+84.apk",
-  "size_bytes": 88480124,
-  "size_mb": 84.38,
-  "updated_at": "2026-07-30T04:26:32.820909+00:00",
+  "versioned_filename": "anylang-1.0.84+85.apk",
+  "size_bytes": 88569488,
+  "size_mb": 84.47,
+  "updated_at": "2026-07-30T04:55:48.449140+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.izodev.anylang",
-  "notes": "Release 1.0.83+84 — fix grey-screen crash on languages without Flutter Material localizations (ku/tg/tk/ha/yo/mt/so/ig)"
+  "notes": "Release 1.0.84+85 — obfuscated + R8 minify + release signing"
 }
