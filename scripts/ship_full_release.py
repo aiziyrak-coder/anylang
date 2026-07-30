@@ -234,7 +234,7 @@ def main() -> int:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "download_url": "https://anylang.uz/download/anylang-latest.apk",
         "package": "com.cradev.anylang",
-        "notes": f"Release {ver}+{build} — admin number assign, admin list kit (sort/search/pagination), chat denorm",
+        "notes": f"Release {ver}+{build} — Resend email OTP, Click billing return, disposable email guard",
     }
     meta_path = ROOT / "landing" / "download-meta.json"
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
