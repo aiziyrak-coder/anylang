@@ -32,6 +32,8 @@ import 'product.dart';
 
 /// S11 — mahsulot ma'lumoti bottom sheet. Joriy oyna ustida ochiladi.
 /// `onOpenBusiness` — biznes kartasi bosilganda (sheet yopilib) chaqiriladi.
+/// `onEdit` — egasi «Tahrirlash» bosganda (sheet yopilib) chaqiriladi.
+/// `onManage` — egasi «Boshqarish» (publish/delete/TOP) uchun.
 /// `existingPeerId` + `existingPeerChatId` — shu seller bilan chat allaqachon
 /// orqada ochiq bo‘lsa (masalan chat → profil → mahsulot), yangi ChatScreen
 /// ochilmaydi; `onReturnToExistingChat` chaqiriladi.
@@ -39,6 +41,8 @@ Future<void> showProductInfoBottomSheet(
   BuildContext context,
   Product product, {
   required VoidCallback onOpenBusiness,
+  VoidCallback? onEdit,
+  VoidCallback? onManage,
   int? existingPeerId,
   int? existingPeerChatId,
   VoidCallback? onReturnToExistingChat,
@@ -51,6 +55,8 @@ Future<void> showProductInfoBottomSheet(
     builder: (_) => _ProductInfoSheet(
       product: product,
       onOpenBusiness: onOpenBusiness,
+      onEdit: onEdit,
+      onManage: onManage,
       existingPeerId: existingPeerId,
       existingPeerChatId: existingPeerChatId,
       onReturnToExistingChat: onReturnToExistingChat,
@@ -69,6 +75,8 @@ List<String> _galleryUrls(Product p) {
 class _ProductInfoSheet extends StatefulWidget {
   final Product product;
   final VoidCallback onOpenBusiness;
+  final VoidCallback? onEdit;
+  final VoidCallback? onManage;
   final int? existingPeerId;
   final int? existingPeerChatId;
   final VoidCallback? onReturnToExistingChat;
@@ -76,6 +84,8 @@ class _ProductInfoSheet extends StatefulWidget {
   const _ProductInfoSheet({
     required this.product,
     required this.onOpenBusiness,
+    this.onEdit,
+    this.onManage,
     this.existingPeerId,
     this.existingPeerChatId,
     this.onReturnToExistingChat,
@@ -952,8 +962,77 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
                 ),
               ),
             ),
-          ] else
-            Expanded(child: _ownerTopAction(c, radius)),
+          ] else ...[
+            if (widget.onEdit != null) ...[
+              Expanded(
+                child: Material(
+                  color: c.surface,
+                  borderRadius: radius,
+                  child: InkWell(
+                    borderRadius: radius,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      widget.onEdit!();
+                    },
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        borderRadius: radius,
+                        border: Border.all(color: c.outline),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 15.dp),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 20.dp,
+                            color: c.textPrimary,
+                          ),
+                          SizedBox(width: 8.dp),
+                          Text(
+                            'my_products_edit'.tr,
+                            style: TextStyle(
+                              color: c.textPrimary,
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10.dp),
+            ],
+            if (widget.onManage != null) ...[
+              Material(
+                color: c.surface,
+                borderRadius: radius,
+                child: InkWell(
+                  borderRadius: radius,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    widget.onManage!();
+                  },
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      borderRadius: radius,
+                      border: Border.all(color: c.outline),
+                    ),
+                    padding: EdgeInsets.all(15.dp),
+                    child: Icon(
+                      Icons.more_horiz_rounded,
+                      size: 22.dp,
+                      color: c.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10.dp),
+            ],
+            Expanded(flex: 2, child: _ownerTopAction(c, radius)),
+          ],
         ],
       ),
     );

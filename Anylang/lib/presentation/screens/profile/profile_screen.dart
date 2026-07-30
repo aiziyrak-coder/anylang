@@ -35,9 +35,11 @@ import '../../utils/legal_urls.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../../utils/size_controller.dart';
+import '../add_product/add_product_payload.dart';
 import '../add_product/add_product_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
 import '../main/main_screen.dart';
+import '../products/own_product_actions_sheet.dart';
 import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
 import '../products/products_state.dart';
@@ -371,6 +373,7 @@ class ProfileScreen extends Screen<ProfileState, void> {
         }
         await navigate(AddProductScreen());
         await _load();
+        await _loadListings();
       case SoftRefreshProfile _:
         await _softRefresh();
       case RetryProfileLoad _:
@@ -581,7 +584,93 @@ class ProfileScreen extends Screen<ProfileState, void> {
           onOpenBusiness: () {
             Navigator.of(context).maybePop();
           },
+          onEdit: () => unawaited(_editOwnProduct(product.id)),
+          onManage: () => unawaited(_manageOwnProduct(product)),
         );
+        await _loadListings();
+    }
+  }
+
+  Future<void> _editOwnProduct(int productId) async {
+    if (productId <= 0) return;
+    final isBiz = state.account.value?.isBusiness == true;
+    if (!isBiz) {
+      final goPlans = await showBusinessPlanRequiredDialog();
+      if (!goPlans) return;
+      await navigate(SubscriptionScreen());
+      await _load();
+      if (state.account.value?.isBusiness != true) return;
+    }
+    await navigate(
+      AddProductScreen(),
+      payload: AddProductPayload(editProductId: productId),
+    );
+    await _load();
+    await _loadListings();
+  }
+
+  Future<void> _manageOwnProduct(Product product) async {
+    final action = await showOwnProductActionsSheet(context, product: product);
+    if (action == null) return;
+    switch (action) {
+      case OwnProductAction.edit:
+        await _editOwnProduct(product.id);
+      case OwnProductAction.boostTop:
+        // TOP to‘lov product info ichida; shu yerda qayta ochamiz.
+        await showProductInfoBottomSheet(
+          context,
+          product,
+          onOpenBusiness: () {},
+          onEdit: () => unawaited(_editOwnProduct(product.id)),
+          onManage: () => unawaited(_manageOwnProduct(product)),
+        );
+      case OwnProductAction.publish:
+      case OwnProductAction.unpublish:
+        final status =
+            action == OwnProductAction.publish ? 'published' : 'draft';
+        final result = await Get.find<ProductsRepository>().update(
+          product.id,
+          {'status': status},
+        );
+        if (result.errorOrNull != null) {
+          showAppError(result.errorOrNull);
+          return;
+        }
+        showAppMessage(
+          status == 'published'
+              ? 'my_products_published'.tr
+              : 'my_products_unpublished'.tr,
+        );
+        await _loadListings();
+      case OwnProductAction.delete:
+        final ok = await Get.dialog<bool>(
+              AlertDialog(
+                title: Text('my_products_delete_title'.tr),
+                content: Text('my_products_delete_body'.tr),
+                actions: [
+                  TextButton(
+                    onPressed: () => Get.back(result: false),
+                    child: Text('cancel'.tr),
+                  ),
+                  TextButton(
+                    onPressed: () => Get.back(result: true),
+                    child: Text(
+                      'my_products_delete'.tr,
+                      style: TextStyle(color: context.appColors.danger),
+                    ),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+        if (!ok) return;
+        final result =
+            await Get.find<ProductsRepository>().archive(product.id);
+        if (result.errorOrNull != null) {
+          showAppError(result.errorOrNull);
+          return;
+        }
+        showAppMessage('my_products_deleted'.tr);
         await _loadListings();
     }
   }

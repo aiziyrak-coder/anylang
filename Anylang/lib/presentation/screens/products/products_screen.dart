@@ -907,6 +907,10 @@ class ProductsScreen extends Screen<ProductsState, void> {
         await _refreshBusinessFlag();
       case OpenAddProduct _:
         await _openAddProduct();
+      case EditOwnProduct a:
+        await _openAddProduct(editProductId: a.product.id);
+      case BoostOwnProductTop a:
+        await _boostProductTop(a.product);
       case ShowFavorites _:
         if (state.showingFavorites.value) {
           state.showingFavorites.value = false;
@@ -1058,7 +1062,10 @@ class ProductsScreen extends Screen<ProductsState, void> {
       case ProductsBannerTap a:
         await _applyBanner(a.id);
       case OpenProduct a:
-        showProductInfoBottomSheet(
+        final me = SessionStore.userId();
+        final isOwner =
+            me != null && me > 0 && me == a.product.sellerId;
+        await showProductInfoBottomSheet(
           context,
           a.product,
           onOpenBusiness: () async {
@@ -1077,7 +1084,16 @@ class ProductsScreen extends Screen<ProductsState, void> {
               failure: showAppError,
             );
           },
+          onEdit: isOwner
+              ? () => unawaited(
+                    actionHandler(state, EditOwnProduct(a.product)),
+                  )
+              : null,
+          onManage: isOwner
+              ? () => unawaited(_handleOwnProduct(a.product))
+              : null,
         );
+        if (isOwner) await _load(keepQuery: true);
     }
   }
 }
