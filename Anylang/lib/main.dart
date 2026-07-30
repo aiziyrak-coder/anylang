@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:anylang/presentation/screens/login/login_screen.dart';
@@ -20,6 +19,7 @@ import 'data/network/session_bootstrap.dart';
 import 'di/main_module.dart';
 import 'presentation/ui/theme/app_theme.dart';
 import 'presentation/ui/theme/theme_controller.dart';
+import 'presentation/utils/fallback_localizations.dart';
 import 'presentation/utils/language_localizations.dart';
 import 'presentation/utils/size_controller.dart';
 
@@ -121,11 +121,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       themeMode: Get.find<ThemeController>().mode.value,
       locale: _getLanguage(),
       supportedLocales: LanguageLocalizations.locales,
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      // UI matnlari GetX (80 til). Material/Cupertino framework stringlari
+      // qo‘llab-quvvatlanmagan tillarda en_US ga tushadi — aks holda kulrang crash.
+      localizationsDelegates: appLocalizationDelegates,
       builder: (context, child) {
         SizeController.init(context);
         final isDark = Theme.of(context).brightness == Brightness.dark;
