@@ -159,30 +159,17 @@ async def create_subscription_checkout(
     billing_cycle: str,
     provider: str,
 ) -> dict[str, Any]:
-    provider_name = (provider or "").strip().lower()
-    if provider_name not in {"click", "paddle", "multicard"}:
-        raise AppError(
-            message="provider click, paddle yoki multicard bo'lishi kerak",
-            error_code="INVALID_PROVIDER",
-            status_code=400,
-        )
+    # Temporary product policy: only Click · UZS is live.
+    # Ignore paddle/multicard from older clients so checkout never dead-ends on Visa/Payme.
+    provider_name = (provider or "click").strip().lower()
+    if provider_name != "click":
+        provider_name = "click"
     if plan not in {"premium", "business"}:
         raise AppError(
             message="Pullik tarif tanlang",
             error_code="PAYMENT_INVALID",
             status_code=400,
         )
-
-    # Soft gate: USD/Visa path not live yet → clear error (UI shows coming soon).
-    if provider_name == "paddle":
-        from app.payments.paddle import PaddleProvider
-
-        if not PaddleProvider().is_configured():
-            raise AppError(
-                message="Visa/Mastercard to'lovi tez orada",
-                error_code="PAYMENT_PROVIDER_COMING_SOON",
-                status_code=503,
-            )
 
     months = normalize_billing_months(billing_cycle)
     cycle = billing_cycle_code(months)

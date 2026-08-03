@@ -36,7 +36,7 @@ class PlanOut(BaseModel):
     # Yearly billed total = yearly_price (monthly-equivalent) * 12
     yearly_total: str | None = None
     savings_percent: int | None = None
-    currency: str = "USD"
+    currency: str = "UZS"
     badge: str | None = None
     features: list[PlanFeatureOut]
     periods: list[PlanPeriodOut] = Field(default_factory=list)
@@ -52,7 +52,7 @@ class PaymentMethodOut(BaseModel):
 
 class PlansOut(BaseModel):
     plans: list[PlanOut]
-    currency: str = "USD"
+    currency: str = "UZS"
     payment_tax_percent: int = 2
     period_options: list[PeriodOptionOut] = Field(default_factory=list)
     usd_uzs_rate: str | None = None

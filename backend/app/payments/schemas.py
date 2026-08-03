@@ -15,8 +15,8 @@ class SubscriptionCheckoutIn(BaseModel):
     plan: SubscriptionPlan
     billing_cycle: BillingCycle | None = None
     provider: CheckoutProvider = Field(
-        default="multicard",
-        description="multicard = UZS (card/Payme/Click/Uzum/Visa); click = Click only; paddle = USD",
+        default="click",
+        description="Live: click (UZS). paddle/multicard accepted but remapped to click until wired.",
     )
 
 

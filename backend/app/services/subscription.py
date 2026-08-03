@@ -114,20 +114,12 @@ def resolve_display_currency(
     country: str | None = None,
     currency: str | None = None,
 ) -> str:
-    """Catalog display currency.
+    """Catalog display currency — Click only: always UZS for everyone.
 
-    - Explicit `currency` query wins (UZ users switching to USD/Visa).
-    - Registered country UZ → UZS (Click).
-    - Any other country → USD (Visa/Paddle).
-    - Unknown → USD (international default; Click still charges UZS at checkout).
+    `currency` / `country` kept for API compatibility; ignored until Visa returns.
     """
-    override = (currency or "").strip().upper()
-    if override in {"UZS", "USD"}:
-        return override
-    cc = (country or "").strip().upper()
-    if cc == "UZ":
-        return "UZS"
-    return "USD"
+    _ = country, currency
+    return "UZS"
 
 
 def _charge_in_uzs() -> bool:
@@ -347,11 +339,7 @@ def get_plans(
 
     from app.core.config import get_settings
     from app.payments.fx import usd_to_uzs
-    from app.payments.paddle import PaddleProvider
     from decimal import Decimal as _D
-
-    paddle_ok = PaddleProvider().is_configured()
-    # Click is the live UZ rail today; multicard/Visa USD follows when wired.
     from app.payments.click import ClickProvider
 
     click_ok = ClickProvider().is_configured()
@@ -366,19 +354,13 @@ def get_plans(
             for m in (1, 3, 6, 12)
         ],
         "user_country": cc,
-        "default_currency": resolve_display_currency(country=country, currency=None),
+        "default_currency": "UZS",
         "payment_methods": [
             {
                 "code": "click",
                 "currency": "UZS",
                 "available": click_ok,
-                "for_countries": ["UZ"],
-            },
-            {
-                "code": "paddle",
-                "currency": "USD",
-                "available": paddle_ok,
-                "for_countries": None,  # international + UZ Visa path
+                "for_countries": None,  # hamma uchun
             },
         ],
     }

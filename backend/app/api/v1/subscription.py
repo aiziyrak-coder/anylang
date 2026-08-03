@@ -18,7 +18,7 @@ async def list_plans(
     billing_cycle: str | None = Query(default=None),
     currency: str | None = Query(
         default=None,
-        description="UZS | USD override (UZ users can switch to USD for Visa)",
+        description="Ignored — catalog is always UZS (Click).",
     ),
 ) -> PlansOut:
     country = None
@@ -39,13 +39,13 @@ async def subscription_checkout(
     current_user: CurrentUser,
     db: DbSession,
 ) -> SubscriptionCheckoutOut:
-    """Paid plan entry: create pending Payment + provider checkout_url (Click/Paddle)."""
+    """Paid plan entry: pending Payment + Click checkout_url (UZS)."""
     data = await create_subscription_checkout(
         db,
         current_user,
         plan=body.plan,
         billing_cycle=body.billing_cycle or "monthly",
-        provider=body.provider,
+        provider="click",
     )
     await db.commit()
     return SubscriptionCheckoutOut.model_validate(data)
