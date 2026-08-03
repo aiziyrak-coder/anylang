@@ -1,13 +1,13 @@
 {
-  "version": "1.0.89",
-  "build": 90,
-  "version_full": "1.0.89+90",
+  "version": "1.0.91",
+  "build": 92,
+  "version_full": "1.0.91+92",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.89+90.apk",
-  "size_bytes": 88747704,
-  "size_mb": 84.64,
-  "updated_at": "2026-07-30T09:21:47.730659+00:00",
+  "versioned_filename": "anylang-1.0.91+92.apk",
+  "size_bytes": 89068280,
+  "size_mb": 84.94,
+  "updated_at": "2026-07-30T12:13:31.489098+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.cradev.anylang",
-  "notes": "Release 1.0.89+90 — Resend email OTP, Click billing return, disposable email guard"
+  "notes": "Release 1.0.91+92 — chat glass bubbles, Tarmoq IndexedStack fix, Google Sign-In errors"
 }

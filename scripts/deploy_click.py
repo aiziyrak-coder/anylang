@@ -26,7 +26,7 @@ ENV_KEYS: dict[str, str] = {
     "CLICK_OFD_ITEM_NAME": "AnyLang",
     "CLICK_OFD_INN": "310682057",
     "CLICK_OFD_VAT_PERCENT": "0",
-    "PAYMENT_TEST_AMOUNT_UZS": "1000",
+        "PAYMENT_TEST_AMOUNT_UZS": "",
     "PUBLIC_API_BASE_URL": "https://anylang.uz",
 }
 
