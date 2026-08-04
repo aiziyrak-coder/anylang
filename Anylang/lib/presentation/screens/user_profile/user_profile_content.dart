@@ -22,6 +22,7 @@ import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../ui/verification_cta_button.dart';
 import '../../utils/app_snackbar.dart';
+import '../../utils/payment_method_labels.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -92,6 +93,10 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
                               factoryVerification: d.business
                                   ? d.factoryVerification
                                   : const FactoryVerification(),
+                              onTrustTap: d.business && d.trustScore != null
+                                  ? () =>
+                                      sendAction(OpenUserTrustScoreDetails())
+                                  : null,
                             );
                             if (!carousel.hasAny) {
                               return const SizedBox.shrink();
@@ -558,8 +563,6 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
   bool _hasTrade(UserProfilePayload d) {
     return (d.moq ?? '').isNotEmpty ||
         (d.productionCapacity ?? '').isNotEmpty ||
-        (d.leadTime ?? '').isNotEmpty ||
-        d.incoterms.isNotEmpty ||
         d.paymentMethods.isNotEmpty;
   }
 
@@ -685,19 +688,11 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
           label: 'business_capacity'.tr,
           value: d.productionCapacity!,
         ),
-      if ((d.leadTime ?? '').isNotEmpty)
-        InfoRow(icon: Icons.schedule_outlined, label: 'business_lead_time'.tr, value: d.leadTime!),
-      if (d.incoterms.isNotEmpty)
-        InfoRow(
-          icon: Icons.local_shipping_outlined,
-          label: 'business_incoterms'.tr,
-          value: d.incoterms.join(' · '),
-        ),
       if (d.paymentMethods.isNotEmpty)
         InfoRow(
           icon: Icons.payments_outlined,
           label: 'business_payment_methods'.tr,
-          value: d.paymentMethods.join(' · '),
+          value: formatPaymentMethods(d.paymentMethods),
         ),
     ];
     final children = <Widget>[];

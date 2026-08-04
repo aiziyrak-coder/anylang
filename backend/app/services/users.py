@@ -263,7 +263,11 @@ async def _profile_insights(
     uid = user.id
     now = datetime.now(UTC)
     since = now - timedelta(days=7)
+    prev_since = now - timedelta(days=14)
     day_keys = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
+    prev_day_keys = [
+        (now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(13, 6, -1)
+    ]
     net = networking if networking is not None else await _networking_for(db, user)
 
     followers = int(
@@ -388,6 +392,34 @@ async def _profile_insights(
         or 0
     )
 
+    profile_visits_prev = int(
+        (
+            await db.execute(
+                select(func.count(ProfileView.id)).where(
+                    ProfileView.profile_user_id == uid,
+                    ProfileView.last_viewed_at >= prev_since,
+                    ProfileView.last_viewed_at < since,
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    listing_clicks_prev = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(ProductView)
+                .join(Product, Product.id == ProductView.product_id)
+                .where(
+                    Product.seller_id == uid,
+                    ProductView.day_bucket.in_(prev_day_keys),
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
     views_by_day_raw = (
         await db.execute(
             select(ProductView.day_bucket, func.count())
@@ -401,6 +433,24 @@ async def _profile_insights(
     ).all()
     views_map = {str(d): int(n or 0) for d, n in views_by_day_raw}
     views_series = [{"day": d, "views": views_map.get(d, 0)} for d in day_keys]
+    views_7d = sum(v["views"] for v in views_series)
+
+    views_prev_raw = (
+        await db.execute(
+            select(func.count())
+            .select_from(ProductView)
+            .join(Product, Product.id == ProductView.product_id)
+            .where(
+                Product.seller_id == uid,
+                ProductView.day_bucket.in_(prev_day_keys),
+            )
+        )
+    ).scalar()
+    views_prev = int(views_prev_raw or 0)
+
+    conversion_pct = None
+    if views_7d > 0:
+        conversion_pct = round(100.0 * listing_clicks_7d / views_7d, 1)
 
     rating = None
     if user.business is not None and user.business.rating is not None:
@@ -425,9 +475,13 @@ async def _profile_insights(
         "rating": rating,
         "profile_visits_total": profile_visits_total,
         "analytics_7d": {
-            "views": sum(v["views"] for v in views_series),
+            "views": views_7d,
             "profile_visits": profile_visits_7d,
             "listing_clicks": listing_clicks_7d,
+            "views_prev": views_prev,
+            "profile_visits_prev": profile_visits_prev,
+            "listing_clicks_prev": listing_clicks_prev,
+            "conversion_pct": conversion_pct,
             "views_series": views_series,
         },
     }

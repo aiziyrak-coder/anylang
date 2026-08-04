@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../ui/buttons/primary_button.dart';
 import '../ui/theme/colors.dart';
 import '../ui/trust_score.dart';
 import '../utils/size_controller.dart';
@@ -8,6 +9,8 @@ import '../utils/size_controller.dart';
 Future<void> showTrustScoreBottomSheet(
   BuildContext context, {
   required TrustScore trust,
+  bool showActions = true,
+  void Function(String action)? onAction,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -15,9 +18,11 @@ Future<void> showTrustScoreBottomSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) {
       final c = ctx.appColors;
+      final levelKey = 'trust_level_${trust.level}';
+      final levelLabel = levelKey.tr;
       return Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(ctx).height * 0.78,
+          maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
         ),
         decoration: BoxDecoration(
           color: c.surface,
@@ -54,6 +59,31 @@ Future<void> showTrustScoreBottomSheet(
                         ),
                       ),
                     ),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10.dp,
+                        vertical: 4.dp,
+                      ),
+                      decoration: BoxDecoration(
+                        color: trustLevelColor(c, trust.level)
+                            .withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(99.dp),
+                        border: Border.all(
+                          color: trustLevelColor(c, trust.level)
+                              .withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Text(
+                        levelLabel == levelKey
+                            ? trust.level
+                            : levelLabel,
+                        style: TextStyle(
+                          color: trustLevelColor(c, trust.level),
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 SizedBox(height: 6.dp),
@@ -68,15 +98,35 @@ Future<void> showTrustScoreBottomSheet(
                     ),
                   ),
                 ),
+                if (trust.nextGain > 0) ...[
+                  SizedBox(height: 8.dp),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'trust_score_next_gain'
+                          .trParams({'n': '${trust.nextGain}'}),
+                      style: TextStyle(
+                        color: c.accentText,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
                 SizedBox(height: 16.dp),
                 Flexible(
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: trust.breakdown.length,
-                    separatorBuilder: (_, __) => SizedBox(height: 10.dp),
+                    separatorBuilder: (_, _) => SizedBox(height: 10.dp),
                     itemBuilder: (_, i) {
                       final f = trust.breakdown[i];
-                      return _FactorRow(factor: f, colors: c);
+                      return _FactorRow(
+                        factor: f,
+                        colors: c,
+                        showActions: showActions,
+                        onAction: onAction,
+                      );
                     },
                   ),
                 ),
@@ -173,13 +223,30 @@ class _TrustDot extends StatelessWidget {
 class _FactorRow extends StatelessWidget {
   final TrustFactor factor;
   final AppColors colors;
+  final bool showActions;
+  final void Function(String action)? onAction;
 
-  const _FactorRow({required this.factor, required this.colors});
+  const _FactorRow({
+    required this.factor,
+    required this.colors,
+    required this.showActions,
+    this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = colors;
-    final pct = factor.max <= 0 ? 0.0 : (factor.score / factor.max).clamp(0.0, 1.0);
+    final pct =
+        factor.max <= 0 ? 0.0 : (factor.score / factor.max).clamp(0.0, 1.0);
+    final tipKey = 'trust_tip_${factor.key}';
+    final tip = tipKey.tr;
+    final ctaLabel = _ctaLabel(factor.action);
+    final wantCta = showActions &&
+        onAction != null &&
+        factor.action != 'none' &&
+        factor.action != 'keep_clean' &&
+        !factor.complete;
+
     return Container(
       padding: EdgeInsets.all(12.dp),
       decoration: BoxDecoration(
@@ -229,9 +296,58 @@ class _FactorRow extends StatelessWidget {
               color: c.accent,
             ),
           ),
+          if (!factor.complete && tip != tipKey) ...[
+            SizedBox(height: 8.dp),
+            Text(
+              tip,
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 12.sp,
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (factor.action == 'keep_clean' &&
+              showActions &&
+              (factor.count ?? 0) > 0) ...[
+            SizedBox(height: 8.dp),
+            Text(
+              tip != tipKey ? tip : 'trust_tip_complaints'.tr,
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 12.sp,
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (wantCta && ctaLabel != null) ...[
+            SizedBox(height: 10.dp),
+            PrimaryButton(
+              text: ctaLabel,
+              onTap: () {
+                Navigator.of(context).maybePop();
+                onAction!(factor.action);
+              },
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String? _ctaLabel(String action) {
+    switch (action) {
+      case 'add_certificates':
+        return 'trust_cta_add_certs'.tr;
+      case 'verify_documents':
+        return 'trust_cta_verify'.tr;
+      case 'reply_faster':
+        return 'trust_cta_reply'.tr;
+      case 'send_invoices':
+        return 'trust_cta_invoices'.tr;
+      default:
+        return null;
+    }
   }
 
   String _subtitle(TrustFactor f) {
@@ -253,9 +369,7 @@ class _FactorRow extends StatelessWidget {
         return 'trust_factor_deals_sub'.trParams({'n': '${f.count ?? 0}'});
       case 'verified_documents':
         final ok = f.documentsVerified == true || f.verifiedBadge == true;
-        return ok
-            ? 'trust_factor_docs_ok'.tr
-            : 'trust_factor_docs_pending'.tr;
+        return ok ? 'trust_factor_docs_ok'.tr : 'trust_factor_docs_pending'.tr;
       default:
         return '';
     }

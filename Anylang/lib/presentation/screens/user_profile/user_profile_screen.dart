@@ -9,11 +9,14 @@ import '../../../data/network/friends_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/business_verification_bottom_sheet.dart';
+import '../../modal/trust_score_bottom_sheet.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
+import '../edit_business_info/edit_business_info_screen.dart';
+import '../main/main_state.dart';
 import '../products/product.dart';
 import '../products/product_info_bottom_sheet.dart';
 import '../trade_assistant/trade_assistant_payload.dart';
@@ -230,6 +233,39 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
           );
           state.data = updated;
           state.syncFriendshipFromPayload(updated);
+        }
+      case OpenUserTrustScoreDetails _:
+        final data = state.data;
+        final trust = data?.trustScore;
+        if (data == null || !data.business || trust == null) return;
+        if (!context.mounted) return;
+        final me = SessionStore.userId();
+        final isOwn = me != null && data.id == me;
+        await showTrustScoreBottomSheet(
+          context,
+          trust: trust,
+          showActions: isOwn,
+          onAction: isOwn
+              ? (a) => sendAction(UserTrustImproveAction(a))
+              : null,
+        );
+      case UserTrustImproveAction a:
+        final data = state.data;
+        final me = SessionStore.userId();
+        if (data == null || me == null || data.id != me) return;
+        switch (a.action) {
+          case 'verify_documents':
+            await actionHandler(state, OpenOwnBusinessVerification());
+          case 'add_certificates':
+            await navigate(EditBusinessInfoScreen());
+          case 'reply_faster':
+          case 'send_invoices':
+            if (Get.isRegistered<MainState>()) {
+              Get.find<MainState>().currentTab.value = 0;
+            }
+            popBackNavigate();
+          default:
+            break;
         }
     }
   }

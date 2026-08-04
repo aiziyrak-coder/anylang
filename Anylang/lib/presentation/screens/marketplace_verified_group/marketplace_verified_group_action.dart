@@ -6,4 +6,6 @@ class MarketplaceVerifiedGroupRefresh extends MarketplaceVerifiedGroupAction {}
 
 class MarketplaceVerifiedGroupUploadDocs extends MarketplaceVerifiedGroupAction {}
 
+class MarketplaceVerifiedGroupShowTrust extends MarketplaceVerifiedGroupAction {}
+
 class MarketplaceVerifiedGroupJoin extends MarketplaceVerifiedGroupAction {}

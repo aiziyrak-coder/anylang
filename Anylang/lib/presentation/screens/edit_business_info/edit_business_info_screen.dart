@@ -242,12 +242,6 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
         }
       case RemoveExportCountry a:
         state.exportCountries.remove(a.code);
-      case ToggleIncoterm a:
-        if (state.incoterms.contains(a.code)) {
-          state.incoterms.remove(a.code);
-        } else {
-          state.incoterms.add(a.code);
-        }
       case TogglePaymentMethod a:
         if (state.paymentMethods.contains(a.code)) {
           state.paymentMethods.remove(a.code);
@@ -377,8 +371,8 @@ class EditBusinessInfoScreen extends Screen<EditBusinessInfoState, void> {
             'export_countries': state.exportCountries.toList(),
             'moq': state.moq.value,
             'production_capacity': state.productionCapacity.value,
-            'lead_time': state.leadTime.value,
-            'incoterms': state.incoterms.toList(),
+            'lead_time': '',
+            'incoterms': <String>[],
             'payment_methods': state.paymentMethods.toList(),
             if (state.foundedYear.value != null)
               'founded_year': state.foundedYear.value,

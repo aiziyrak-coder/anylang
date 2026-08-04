@@ -1,10 +1,15 @@
 import 'package:get/get.dart';
+
+import '../products/products_state.dart';
 import 'product_image_draft.dart';
 
 class AddProductState extends GetxController {
   RxList<ProductImageDraft> images = <ProductImageDraft>[].obs;
   RxString currency = 'USD'.obs;
+  /// API category code (masalan `building_materials`).
   RxString category = ''.obs;
+  RxList<ProductCategoryOption> categories = <ProductCategoryOption>[].obs;
+  RxBool categoriesLoading = false.obs;
   RxList<String> shippingCountries = <String>[].obs;
   RxBool isSubmitting = false.obs;
   RxnString productVideoUrl = RxnString();
@@ -25,4 +30,11 @@ class AddProductState extends GetxController {
   final RxInt draftHydrateToken = 0.obs;
 
   bool get isEditing => (editingProductId.value ?? 0) > 0;
+
+  String categoryTitle(String code) {
+    for (final c in categories) {
+      if (c.code == code) return c.title;
+    }
+    return code;
+  }
 }

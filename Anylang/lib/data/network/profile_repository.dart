@@ -166,4 +166,11 @@ class ProfileRepository {
       queryParameters: {'limit': limit},
     );
   }
+
+  Future<BaseResult> listProductLikers({int limit = 50}) {
+    return _client.get(
+      api: 'api/v1/users/me/product-likers',
+      queryParameters: {'limit': limit},
+    );
+  }
 }

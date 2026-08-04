@@ -30,3 +30,12 @@ class OpenCompanyTradeAssistant extends UserProfileAction {}
 
 /// O'z business profilida verifikatsiya.
 class OpenOwnBusinessVerification extends UserProfileAction {}
+
+/// Ishonch foizi breakdown (o'z yoki boshqa).
+class OpenUserTrustScoreDetails extends UserProfileAction {}
+
+/// Trust CTA (faqat o'z profil).
+class UserTrustImproveAction extends UserProfileAction {
+  final String action;
+  UserTrustImproveAction(this.action);
+}

@@ -16,6 +16,7 @@ import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
+import '../../utils/payment_method_labels.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -27,20 +28,6 @@ const List<String> kBusinessRoleCodes = [
   'distributor',
   'retail',
   'service',
-];
-
-const List<String> kIncotermCodes = [
-  'EXW',
-  'FCA',
-  'FAS',
-  'FOB',
-  'CFR',
-  'CIF',
-  'CPT',
-  'CIP',
-  'DAP',
-  'DPU',
-  'DDP',
 ];
 
 const List<String> kPaymentMethodCodes = [
@@ -80,7 +67,6 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
   late final TextEditingController _foundedCtrl;
   late final TextEditingController _moqCtrl;
   late final TextEditingController _capacityCtrl;
-  late final TextEditingController _leadTimeCtrl;
   Worker? _formWorker;
   int _lastEpoch = -1;
 
@@ -117,7 +103,6 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
     _foundedCtrl = TextEditingController();
     _moqCtrl = TextEditingController();
     _capacityCtrl = TextEditingController();
-    _leadTimeCtrl = TextEditingController();
   }
 
   void _applyHydrate(EditBusinessInfoState state) {
@@ -128,7 +113,6 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
     _foundedCtrl.text = state.foundedYear.value?.toString() ?? '';
     _moqCtrl.text = state.moq.value;
     _capacityCtrl.text = state.productionCapacity.value;
-    _leadTimeCtrl.text = state.leadTime.value;
     _lastEpoch = state.formEpoch.value;
   }
 
@@ -151,7 +135,6 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
     _foundedCtrl.dispose();
     _moqCtrl.dispose();
     _capacityCtrl.dispose();
-    _leadTimeCtrl.dispose();
   }
 
   @override
@@ -419,34 +402,6 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                       controller: _capacityCtrl,
                     ),
                     SizedBox(height: 16.dp),
-                    AppTextField(
-                      label: 'business_lead_time'.tr,
-                      hint: 'business_lead_time_hint'.tr,
-                      controller: _leadTimeCtrl,
-                    ),
-                    SizedBox(height: 16.dp),
-                    Text(
-                      'business_incoterms'.tr,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 10.dp),
-                    Obx(() => Wrap(
-                          spacing: 8.dp,
-                          runSpacing: 8.dp,
-                          children: [
-                            for (final code in kIncotermCodes)
-                              _SelectChip(
-                                label: code,
-                                selected: state.incoterms.contains(code),
-                                onTap: () => sendAction(ToggleIncoterm(code)),
-                              ),
-                          ],
-                        )),
-                    SizedBox(height: 16.dp),
                     Text(
                       'business_payment_methods'.tr,
                       style: TextStyle(
@@ -462,7 +417,7 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
                           children: [
                             for (final code in kPaymentMethodCodes)
                               _SelectChip(
-                                label: code,
+                                label: paymentMethodLabel(code),
                                 selected: state.paymentMethods.contains(code),
                                 onTap: () =>
                                     sendAction(TogglePaymentMethod(code)),
@@ -666,7 +621,6 @@ class EditBusinessInfoContent extends ScreenContent<EditBusinessInfoState> {
     }
     state.moq.value = _moqCtrl.text.trim();
     state.productionCapacity.value = _capacityCtrl.text.trim();
-    state.leadTime.value = _leadTimeCtrl.text.trim();
     sendAction(SaveBusinessInfo(
       companyName: _nameCtrl.text,
       website: _websiteCtrl.text,

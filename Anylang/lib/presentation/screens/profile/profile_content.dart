@@ -21,6 +21,7 @@ import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../ui/verification_cta_button.dart';
 import '../../utils/formatters/time_formatter.dart';
+import '../../utils/payment_method_labels.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -114,6 +115,9 @@ class ProfileContent extends ScreenContent<ProfileState> {
                         factoryVerification: d.isBusiness
                             ? d.factoryVerification
                             : const FactoryVerification(),
+                        onTrustTap: d.isBusiness && d.trustScore != null
+                            ? () => sendAction(OpenTrustScoreDetails())
+                            : null,
                       );
                       if (!carousel.hasAny) return const SizedBox.shrink();
                       return Padding(
@@ -135,7 +139,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                     ),
                   ],
                   SizedBox(height: 18.dp),
-                  _statsGrid(c, d),
+                  _statsGrid(c, d, sendAction),
                   SizedBox(height: 18.dp),
                   _activePlanCard(c, d, sendAction),
                   SizedBox(height: 18.dp),
@@ -572,7 +576,11 @@ class ProfileContent extends ScreenContent<ProfileState> {
     );
   }
 
-  Widget _statsGrid(AppColors c, ProfileAccount d) {
+  Widget _statsGrid(
+    AppColors c,
+    ProfileAccount d,
+    FutureOr<void> Function(MyAction action) sendAction,
+  ) {
     final ins = d.insights;
     final rating = (d.rating ?? ins.rating) == null
         ? '—'
@@ -587,28 +595,52 @@ class ProfileContent extends ScreenContent<ProfileState> {
       profileStatGradientC,
       profileStatGradientA,
     ];
+    final trustTap = d.isBusiness && d.trustScore != null
+        ? () => sendAction(OpenTrustScoreDetails())
+        : null;
 
-    final cards = <(IconData, String, String, LinearGradient)>[
-      (Icons.inventory_2_outlined, listings, 'profile_listings_stat'.tr, grads[0]),
-      (Icons.visibility_outlined, views, 'profile_views'.tr, grads[1]),
-      (Icons.star_rounded, rating, 'profile_rating'.tr, grads[2]),
+    final cards = <(IconData, String, String, LinearGradient, VoidCallback?)>[
+      (
+        Icons.inventory_2_outlined,
+        listings,
+        'profile_listings_stat'.tr,
+        grads[0],
+        () => sendAction(OpenProfileListingsStat()),
+      ),
+      (
+        Icons.visibility_outlined,
+        views,
+        'profile_views'.tr,
+        grads[1],
+        () => sendAction(OpenProfileViewsStat()),
+      ),
+      (
+        Icons.star_rounded,
+        rating,
+        'profile_rating'.tr,
+        grads[2],
+        () => sendAction(OpenProfileRatingStat()),
+      ),
       (
         Icons.groups_rounded,
         '${ins.followers}',
         'profile_followers'.tr,
         grads[3],
+        () => sendAction(OpenProfileFollowersStat()),
       ),
       (
         Icons.favorite_rounded,
         '${ins.likes}',
         'profile_likes'.tr,
         grads[0],
+        () => sendAction(OpenProfileLikesStat()),
       ),
       (
         Icons.verified_user_outlined,
         trust == null ? '—' : '$trust%',
         'profile_trust_pct'.tr,
         grads[2],
+        trustTap,
       ),
     ];
 
@@ -624,6 +656,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                   value: cards[i].$2,
                   label: cards[i].$3,
                   gradient: cards[i].$4,
+                  onTap: cards[i].$5,
                   valueColor: cards[i].$1 == Icons.star_rounded &&
                           (d.rating ?? ins.rating) != null
                       ? c.accentText
@@ -638,6 +671,7 @@ class ProfileContent extends ScreenContent<ProfileState> {
                         value: cards[i + 1].$2,
                         label: cards[i + 1].$3,
                         gradient: cards[i + 1].$4,
+                        onTap: cards[i + 1].$5,
                       )
                     : const SizedBox.shrink(),
               ),
@@ -845,8 +879,6 @@ class ProfileContent extends ScreenContent<ProfileState> {
   bool _hasTradeInfo(ProfileAccount d) {
     return (d.moq ?? '').isNotEmpty ||
         (d.productionCapacity ?? '').isNotEmpty ||
-        (d.leadTime ?? '').isNotEmpty ||
-        d.incoterms.isNotEmpty ||
         d.paymentMethods.isNotEmpty;
   }
 
@@ -864,23 +896,11 @@ class ProfileContent extends ScreenContent<ProfileState> {
           label: 'business_capacity'.tr,
           value: d.productionCapacity!,
         ),
-      if ((d.leadTime ?? '').isNotEmpty)
-        InfoRow(
-          icon: Icons.schedule_outlined,
-          label: 'business_lead_time'.tr,
-          value: d.leadTime!,
-        ),
-      if (d.incoterms.isNotEmpty)
-        InfoRow(
-          icon: Icons.local_shipping_outlined,
-          label: 'business_incoterms'.tr,
-          value: d.incoterms.join(' · '),
-        ),
       if (d.paymentMethods.isNotEmpty)
         InfoRow(
           icon: Icons.payments_outlined,
           label: 'business_payment_methods'.tr,
-          value: d.paymentMethods.join(' · '),
+          value: formatPaymentMethods(d.paymentMethods),
         ),
     ];
 

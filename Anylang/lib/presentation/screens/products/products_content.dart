@@ -479,9 +479,6 @@ class ProductsContent extends ScreenContent<ProductsState> {
       parts.add('products_tezkor_ready_stock'.tr);
     }
     if (state.newOnly.value) parts.add('products_tezkor_new'.tr);
-    if (state.freeShippingOnly.value) {
-      parts.add('products_tezkor_free_shipping'.tr);
-    }
     if (state.premiumSellerOnly.value) {
       parts.add('products_tezkor_premium'.tr);
     }

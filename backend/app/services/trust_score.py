@@ -227,6 +227,31 @@ async def _invoice_count(db: AsyncSession, user_id: int) -> int:
     return int(result.scalar() or 0)
 
 
+def _enrich_factor(part: dict) -> dict:
+    """Add gap / action / complete for client CTAs (formula unchanged)."""
+    score = int(part.get("score") or 0)
+    mx = int(part.get("max") or 0)
+    gap = max(0, mx - score)
+    key = str(part.get("key") or "")
+    action = "none"
+    if key == "certificates":
+        action = "add_certificates" if gap > 0 else "none"
+    elif key == "response_speed":
+        action = "reply_faster" if score < 25 else "none"
+    elif key == "complaints":
+        count = int(part.get("count") or 0)
+        action = "keep_clean" if count > 0 else "none"
+    elif key == "successful_deals":
+        action = "send_invoices" if score < 20 else "none"
+    elif key == "verified_documents":
+        action = "verify_documents" if gap > 0 else "none"
+    out = dict(part)
+    out["gap"] = gap
+    out["action"] = action
+    out["complete"] = gap == 0
+    return out
+
+
 async def compute_trust_score(
     db: AsyncSession,
     user: User,
@@ -237,6 +262,7 @@ async def compute_trust_score(
         return {
             "score": 0,
             "level": "low",
+            "next_gain": 0,
             "breakdown": [],
         }
 
@@ -244,21 +270,25 @@ async def compute_trust_score(
     invoices = await _invoice_count(db, user.id)
 
     parts = [
-        _score_certificates(list(biz.certificates or [])),
-        _score_response(avg_min, samples),
-        _score_complaints(int(biz.complaints_count or 0)),
-        _score_deals(int(biz.successful_deals or 0), invoices),
-        _score_documents(
-            verified_badge=bool(user.verified_badge),
-            documents_verified=bool(biz.documents_verified),
-            factory_verified=bool(biz.factory_verified),
-            inspection_passed=bool(biz.inspection_passed),
+        _enrich_factor(_score_certificates(list(biz.certificates or []))),
+        _enrich_factor(_score_response(avg_min, samples)),
+        _enrich_factor(_score_complaints(int(biz.complaints_count or 0))),
+        _enrich_factor(_score_deals(int(biz.successful_deals or 0), invoices)),
+        _enrich_factor(
+            _score_documents(
+                verified_badge=bool(user.verified_badge),
+                documents_verified=bool(biz.documents_verified),
+                factory_verified=bool(biz.factory_verified),
+                inspection_passed=bool(biz.inspection_passed),
+            )
         ),
     ]
     total = int(sum(p["score"] for p in parts))
     total = max(0, min(100, total))
+    next_gain = max((int(p.get("gap") or 0) for p in parts), default=0)
     return {
         "score": total,
         "level": _level(total),
+        "next_gain": next_gain,
         "breakdown": parts,
     }

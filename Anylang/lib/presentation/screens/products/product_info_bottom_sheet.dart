@@ -787,10 +787,7 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
       (_product.factoryVideoUrl ?? '').isNotEmpty ||
       (_product.processVideoUrl ?? '').isNotEmpty;
 
-  bool get _hasTradeInfo =>
-      (_product.moq ?? '').isNotEmpty ||
-      (_product.shippingInfo ?? '').isNotEmpty ||
-      _product.shippingCountries.isNotEmpty;
+  bool get _hasTradeInfo => (_product.moq ?? '').isNotEmpty;
 
   Widget _titlePrice(AppColors c) {
     return Row(
@@ -916,28 +913,12 @@ class _ProductInfoSheetState extends State<_ProductInfoSheet> {
   }
 
   Widget _tradeSection(AppColors c) {
-    final countries = _product.shippingCountries
-        .map(formatCountryName)
-        .where((e) => e.trim().isNotEmpty)
-        .join(', ');
     final rows = <Widget>[
       if ((_product.moq ?? '').isNotEmpty)
         InfoRow(
           icon: Icons.inventory_2_outlined,
           label: 'product_moq'.tr,
           value: _product.moq!,
-        ),
-      if (countries.isNotEmpty)
-        InfoRow(
-          icon: Icons.public_outlined,
-          label: 'product_shipping_countries'.tr,
-          value: countries,
-        ),
-      if ((_product.shippingInfo ?? '').isNotEmpty)
-        InfoRow(
-          icon: Icons.local_shipping_outlined,
-          label: 'product_shipping'.tr,
-          value: _product.shippingInfo!,
         ),
     ];
     final children = <Widget>[];

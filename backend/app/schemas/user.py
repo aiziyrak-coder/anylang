@@ -42,6 +42,9 @@ class TrustFactorOut(BaseModel):
     key: str
     score: int
     max: int
+    gap: int = 0
+    action: str = "none"
+    complete: bool = False
     count: int | None = None
     premium_count: int | None = None
     avg_minutes: float | None = None
@@ -57,6 +60,7 @@ class TrustFactorOut(BaseModel):
 class TrustScoreOut(BaseModel):
     score: int = Field(ge=0, le=100)
     level: str
+    next_gain: int = Field(default=0, ge=0, le=100)
     breakdown: list[TrustFactorOut] = Field(default_factory=list)
 
 

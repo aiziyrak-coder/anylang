@@ -26,11 +26,22 @@ class _MarketAnalyticsSheet extends StatelessWidget {
   IconData _trendIcon(String trend) {
     switch (trend) {
       case 'import_up':
-        return Icons.local_shipping_outlined;
+        return Icons.trending_up_rounded;
       case 'demand_down':
         return Icons.trending_down_rounded;
       default:
         return Icons.trending_up_rounded;
+    }
+  }
+
+  String _trendLabel(String trend) {
+    switch (trend) {
+      case 'import_up':
+        return 'market_analytics_trend_import_up'.tr;
+      case 'demand_down':
+        return 'market_analytics_trend_demand_down'.tr;
+      default:
+        return 'market_analytics_trend_demand_up'.tr;
     }
   }
 
@@ -112,6 +123,7 @@ class _MarketAnalyticsSheet extends StatelessWidget {
                       separatorBuilder: (_, _) => SizedBox(height: 12.dp),
                       itemBuilder: (context, i) {
                         final item = result.items[i];
+                        final conf = (item.confidence * 100).round().clamp(0, 100);
                         return Container(
                           decoration: BoxDecoration(
                             color: c.surface,
@@ -143,28 +155,39 @@ class _MarketAnalyticsSheet extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  if (item.topic.isNotEmpty) ...[
-                                    SizedBox(width: 8.dp),
-                                    ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        maxWidth:
-                                            SizeController.screenWidth * 0.36,
-                                      ),
-                                      child: Text(
-                                        item.topic,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.end,
-                                        style: TextStyle(
-                                          color: c.textSecondary,
-                                          fontSize: 12.sp,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8.dp,
+                                      vertical: 3.dp,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: c.accentSoft,
+                                      borderRadius: BorderRadius.circular(99.dp),
+                                    ),
+                                    child: Text(
+                                      _trendLabel(item.trend),
+                                      style: TextStyle(
+                                        color: c.accent,
+                                        fontSize: 11.sp,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ],
                               ),
+                              if (item.topic.isNotEmpty) ...[
+                                SizedBox(height: 6.dp),
+                                Text(
+                                  item.topic,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: c.textSecondary,
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                               SizedBox(height: 10.dp),
                               Text(
                                 item.message,
@@ -173,6 +196,16 @@ class _MarketAnalyticsSheet extends StatelessWidget {
                                   fontSize: 15.sp,
                                   fontWeight: FontWeight.w600,
                                   height: 1.35,
+                                ),
+                              ),
+                              SizedBox(height: 8.dp),
+                              Text(
+                                'market_analytics_confidence'
+                                    .trParams({'n': '$conf'}),
+                                style: TextStyle(
+                                  color: c.textFaint,
+                                  fontSize: 11.sp,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],

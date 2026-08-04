@@ -85,7 +85,18 @@ class MarketplaceVerifiedGroupContent
                       else
                         _MembersCard(c: c, data: data),
                       SizedBox(height: 18.dp),
-                      _TrustCard(c: c, data: data),
+                      _TrustCard(
+                        c: c,
+                        data: data,
+                        onTap: () {
+                          if (!data.documentsVerified) {
+                            sendAction(MarketplaceVerifiedGroupUploadDocs());
+                            return;
+                          }
+                          // Hujjatlar OK — profil trust sheet (o'z hisob).
+                          sendAction(MarketplaceVerifiedGroupShowTrust());
+                        },
+                      ),
                       SizedBox(height: 20.dp),
                       if (data.canJoin || data.joined)
                         PrimaryButton(
@@ -348,17 +359,19 @@ class _MembersCard extends StatelessWidget {
 class _TrustCard extends StatelessWidget {
   final AppColors c;
   final MarketplaceVerifiedGroupPreview data;
+  final VoidCallback? onTap;
 
-  const _TrustCard({required this.c, required this.data});
+  const _TrustCard({required this.c, required this.data, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final pct = data.trustScore.clamp(0, 100);
-    return Container(
+    final radius = BorderRadius.circular(18.dp);
+    final body = Container(
       padding: EdgeInsets.all(16.dp),
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(18.dp),
+        borderRadius: radius,
         border: Border.all(color: c.surfaceBorder),
       ),
       child: Column(
@@ -420,6 +433,15 @@ class _TrustCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    if (onTap == null) return body;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: body,
       ),
     );
   }

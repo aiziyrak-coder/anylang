@@ -17,6 +17,7 @@ class ProfileBadgesCarousel extends StatelessWidget {
   final bool showTrustedMark;
   final bool showVerifiedPill;
   final FactoryVerification factoryVerification;
+  final VoidCallback? onTrustTap;
 
   const ProfileBadgesCarousel({
     super.key,
@@ -26,6 +27,7 @@ class ProfileBadgesCarousel extends StatelessWidget {
     this.showTrustedMark = false,
     this.showVerifiedPill = false,
     this.factoryVerification = const FactoryVerification(),
+    this.onTrustTap,
   });
 
   bool get hasAny =>
@@ -58,6 +60,7 @@ class ProfileBadgesCarousel extends StatelessWidget {
           c,
           '⭐',
           'networking_trust'.trParams({'n': '${trust!.clamp(0, 100)}'}),
+          onTap: onTrustTap,
         ),
       if (showTrustedMark)
         _iconChip(
@@ -125,12 +128,18 @@ class ProfileBadgesCarousel extends StatelessWidget {
     return '$n';
   }
 
-  Widget _emojiChip(AppColors c, String emoji, String label) {
-    return Container(
+  Widget _emojiChip(
+    AppColors c,
+    String emoji,
+    String label, {
+    VoidCallback? onTap,
+  }) {
+    final radius = BorderRadius.circular(99.dp);
+    final child = Container(
       padding: EdgeInsets.symmetric(horizontal: 10.dp, vertical: 8.dp),
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(99.dp),
+        borderRadius: radius,
         border: Border.all(color: c.surfaceBorder),
       ),
       child: Row(
@@ -147,6 +156,15 @@ class ProfileBadgesCarousel extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    if (onTap == null) return child;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        child: child,
       ),
     );
   }

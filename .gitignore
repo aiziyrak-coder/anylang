@@ -29,3 +29,7 @@ docs/_*.md
 **/android/build/
 **/build/reports/
 
+# Partner login/password lists (never commit)
+docs/outreach/partner_credentials.csv
+**/partner_credentials.csv
+

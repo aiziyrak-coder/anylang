@@ -15,7 +15,6 @@ class BusinessReaction {
 const kBusinessReactions = <BusinessReaction>[
   BusinessReaction(emoji: '✔', labelKey: 'biz_react_confirmed'),
   BusinessReaction(emoji: '📦', labelKey: 'biz_react_ready'),
-  BusinessReaction(emoji: '🚢', labelKey: 'biz_react_shipping'),
   BusinessReaction(emoji: '💵', labelKey: 'biz_react_paid'),
   BusinessReaction(emoji: '🛃', labelKey: 'biz_react_customs'),
 ];

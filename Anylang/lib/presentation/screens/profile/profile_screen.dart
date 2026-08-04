@@ -10,6 +10,7 @@ import '../../../data/local/account_store.dart';
 import '../../../data/local/session_store.dart';
 import '../../../data/network/ai_matching_repository.dart';
 import '../../../data/network/auth_repository.dart';
+import '../../../data/network/friends_repository.dart';
 import '../../../data/network/market_analytics_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
@@ -24,7 +25,11 @@ import '../../modal/edit_bio_bottom_sheet.dart';
 import '../../modal/full_screen_image_dialog.dart';
 import '../../modal/image_picker.dart';
 import '../../modal/market_analytics_bottom_sheet.dart';
+import '../../modal/profile_people_bottom_sheet.dart';
+import '../../modal/profile_people_item.dart';
+import '../../modal/profile_rating_bottom_sheet.dart';
 import '../../modal/sofiya_ai_bottom_sheet.dart';
+import '../../modal/trust_score_bottom_sheet.dart';
 import '../../ui/ai_matching.dart';
 import '../../ui/business_card_links.dart';
 import '../../ui/market_analytics.dart';
@@ -39,6 +44,9 @@ import '../../utils/size_controller.dart';
 import '../add_product/add_product_payload.dart';
 import '../add_product/add_product_screen.dart';
 import '../edit_business_info/edit_business_info_screen.dart';
+import '../friends/friend.dart';
+import '../friends/profile_viewer.dart';
+import '../main/main_state.dart';
 import '../main/main_screen.dart';
 import '../products/own_product_actions_sheet.dart';
 import '../products/product.dart';
@@ -491,6 +499,47 @@ class ProfileScreen extends Screen<ProfileState, void> {
         if (snap != null) {
           await _softRefresh();
         }
+      case OpenTrustScoreDetails _:
+        final acc = state.account.value;
+        final trust = acc?.trustScore;
+        if (trust == null || !context.mounted) return;
+        await showTrustScoreBottomSheet(
+          context,
+          trust: trust,
+          showActions: true,
+          onAction: (a) => sendAction(TrustImproveAction(a)),
+        );
+      case OpenProfileListingsStat _:
+        await actionHandler(state, SeeAllListings());
+      case OpenProfileViewsStat _:
+        await _openProfileViewersSheet();
+      case OpenProfileRatingStat _:
+        final acc = state.account.value;
+        if (acc == null || !context.mounted) return;
+        await showProfileRatingBottomSheet(
+          context,
+          rating: acc.rating ?? acc.insights.rating,
+          reviewsCount: acc.reviewsCount,
+        );
+      case OpenProfileFollowersStat _:
+        await _openProfileFollowersSheet();
+      case OpenProfileLikesStat _:
+        await _openProfileLikersSheet();
+      case TrustImproveAction a:
+        switch (a.action) {
+          case 'verify_documents':
+            await actionHandler(state, OpenBusinessVerification());
+          case 'add_certificates':
+            await actionHandler(state, EditBusinessInfo());
+          case 'reply_faster':
+          case 'send_invoices':
+            if (Get.isRegistered<MainState>()) {
+              Get.find<MainState>().currentTab.value = 0;
+            }
+            // Leave profile nested stack if any — tab switch is enough on Main.
+          default:
+            break;
+        }
       case SeeAllListings _:
         await _loadListings();
         final items = state.account.value?.listings ?? const [];
@@ -682,5 +731,130 @@ class ProfileScreen extends Screen<ProfileState, void> {
         showAppMessage('my_products_deleted'.tr);
         await _loadListings();
     }
+  }
+
+  Future<void> _openPeopleProfile(ProfilePeopleItem item) async {
+    if (item.userId <= 0) return;
+    await navigate(
+      UserProfileScreen(),
+      payload: UserProfilePayload.preview(
+        id: item.userId,
+        name: item.name,
+        initial: item.initial,
+        avatarGradient: item.avatarGradient,
+        avatarUrl: item.avatarUrl,
+        isBusiness: item.isBusiness,
+        country: item.country,
+        role: item.businessRole,
+      ),
+    );
+  }
+
+  Future<void> _openProfileViewersSheet() async {
+    if (!context.mounted) return;
+    await showProfilePeopleBottomSheet(
+      context,
+      title: 'profile_viewers_title'.tr,
+      emptyTitle: 'profile_stat_viewers_empty'.tr,
+      emptySubtitle: 'profile_stat_viewers_empty_hint'.tr,
+      onUnlockPremium: () async {
+        await navigate(SubscriptionScreen());
+      },
+      onOpenUser: _openPeopleProfile,
+      loader: () async {
+        final result =
+            await Get.find<ProfileRepository>().listProfileViewers(limit: 50);
+        return result.when(
+          success: (data) {
+            final map = asMap(data);
+            final locked = map?['locked'] == true;
+            final total = (map?['total_count'] as num?)?.toInt() ?? 0;
+            final items = asList(data)
+                .whereType<Map>()
+                .map(
+                  (e) => ProfilePeopleItem.fromViewer(
+                    ProfileViewer.fromApi(Map<String, dynamic>.from(e)),
+                  ),
+                )
+                .where((e) => e.userId > 0)
+                .toList();
+            return ProfilePeopleLoadResult(
+              locked: locked,
+              totalCount: total,
+              items: items,
+            );
+          },
+          failure: (_) => ProfilePeopleLoadResult.failedResult,
+        );
+      },
+    );
+  }
+
+  Future<void> _openProfileFollowersSheet() async {
+    if (!context.mounted) return;
+    await showProfilePeopleBottomSheet(
+      context,
+      title: 'profile_followers'.tr,
+      emptyTitle: 'friends_empty'.tr,
+      emptySubtitle: 'friends_empty_hint'.tr,
+      onOpenUser: _openPeopleProfile,
+      loader: () async {
+        final result =
+            await Get.find<FriendsRepository>().listFriends(limit: 100);
+        return result.when(
+          success: (data) {
+            final items = asList(data)
+                .whereType<Map>()
+                .map(
+                  (e) => ProfilePeopleItem.fromFriend(
+                    Friend.fromApi(Map<String, dynamic>.from(e)),
+                  ),
+                )
+                .where((e) => e.userId > 0)
+                .toList();
+            return ProfilePeopleLoadResult(
+              totalCount: items.length,
+              items: items,
+            );
+          },
+          failure: (_) => ProfilePeopleLoadResult.failedResult,
+        );
+      },
+    );
+  }
+
+  Future<void> _openProfileLikersSheet() async {
+    if (!context.mounted) return;
+    await showProfilePeopleBottomSheet(
+      context,
+      title: 'profile_likes'.tr,
+      emptyTitle: 'profile_stat_likers_empty'.tr,
+      emptySubtitle: 'profile_stat_likers_empty_hint'.tr,
+      onOpenUser: _openPeopleProfile,
+      loader: () async {
+        final result =
+            await Get.find<ProfileRepository>().listProductLikers(limit: 100);
+        return result.when(
+          success: (data) {
+            final map = asMap(data);
+            final total = (map?['total_count'] as num?)?.toInt() ?? 0;
+            final items = asList(data)
+                .whereType<Map>()
+                .map(
+                  (e) => ProfilePeopleItem.fromLiker(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .where((e) => e.userId > 0)
+                .toList();
+            return ProfilePeopleLoadResult(
+              totalCount: total > 0 ? total : items.length,
+              items: items,
+            );
+          },
+          failure: (_) => ProfilePeopleLoadResult.failedResult,
+        );
+      },
+    );
   }
 }

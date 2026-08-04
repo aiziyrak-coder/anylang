@@ -2,13 +2,18 @@ import 'package:get/get.dart';
 
 import '../../../data/core/mappers.dart';
 import '../../../data/network/marketplace_groups_repository.dart';
+import '../../../data/network/profile_repository.dart';
 import '../../modal/business_verification_bottom_sheet.dart';
+import '../../modal/trust_score_bottom_sheet.dart';
+import '../../ui/trust_score.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
 import '../chat/chat_payload.dart';
 import '../chat/chat_screen.dart';
+import '../edit_business_info/edit_business_info_screen.dart';
+import '../main/main_state.dart';
 import 'marketplace_verified_group_action.dart';
 import 'marketplace_verified_group_content.dart';
 import 'marketplace_verified_group_models.dart';
@@ -174,8 +179,51 @@ class MarketplaceVerifiedGroupScreen
         await _load(fromRefresh: true);
       case MarketplaceVerifiedGroupUploadDocs _:
         await _openDocs();
+      case MarketplaceVerifiedGroupShowTrust _:
+        await _showOwnTrust();
       case MarketplaceVerifiedGroupJoin _:
         await _joinOrOpen();
     }
+  }
+
+  Future<void> _showOwnTrust() async {
+    final result = await Get.find<ProfileRepository>().getMe();
+    final map = asMap(result.dataOrNull);
+    if (map == null) {
+      showAppError(result.errorOrNull ?? 'unknown_error'.tr);
+      return;
+    }
+    final biz = map['business'];
+    TrustScore? trust;
+    if (biz is Map && biz['trust_score'] != null) {
+      trust = TrustScore.fromApi(biz['trust_score']);
+    }
+    if (trust == null || trust.breakdown.isEmpty) {
+      // Fallback — faqat foiz.
+      final pct = state.preview.value?.trustScore ?? 0;
+      trust = TrustScore(score: pct, level: pct >= 75 ? 'good' : 'fair');
+    }
+    if (!context.mounted) return;
+    await showTrustScoreBottomSheet(
+      context,
+      trust: trust,
+      showActions: true,
+      onAction: (a) async {
+        switch (a) {
+          case 'verify_documents':
+            await _openDocs();
+          case 'add_certificates':
+            await navigate(EditBusinessInfoScreen());
+          case 'reply_faster':
+          case 'send_invoices':
+            if (Get.isRegistered<MainState>()) {
+              Get.find<MainState>().currentTab.value = 0;
+            }
+            popBackNavigate();
+          default:
+            break;
+        }
+      },
+    );
   }
 }

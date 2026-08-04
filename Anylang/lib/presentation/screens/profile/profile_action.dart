@@ -111,6 +111,30 @@ class ShowBusinessCardQr extends ProfileAction {}
 /// Business verifikatsiya (hujjatlar → admin).
 class OpenBusinessVerification extends ProfileAction {}
 
+/// Ishonch foizi breakdown sheet.
+class OpenTrustScoreDetails extends ProfileAction {}
+
+/// E’lonlar statistikasi → e’lonlar ro‘yxati.
+class OpenProfileListingsStat extends ProfileAction {}
+
+/// Ko‘rishlar → kimlar profilingizni ko‘rdi.
+class OpenProfileViewsStat extends ProfileAction {}
+
+/// Reyting → batafsil.
+class OpenProfileRatingStat extends ProfileAction {}
+
+/// Kuzatuvchilar → do‘stlar / aloqalar.
+class OpenProfileFollowersStat extends ProfileAction {}
+
+/// Layklar → mahsulotni layk qilganlar.
+class OpenProfileLikesStat extends ProfileAction {}
+
+/// Trust sheet CTA: verify_documents | add_certificates | reply_faster | send_invoices
+class TrustImproveAction extends ProfileAction {
+  final String action;
+  TrustImproveAction(this.action);
+}
+
 /// Sozlamalar bo‘limlari.
 class OpenSettingsLanguage extends ProfileAction {}
 

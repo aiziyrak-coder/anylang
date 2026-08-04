@@ -202,8 +202,151 @@ PRODUCT_CATEGORIES: dict[str, dict[str, str]] = {
         "us_US": "Clothing & accessories",
     },
     "pottery": {"uz_UZ": "Kulolchilik", "ru_RU": "Керамика", "us_US": "Pottery"},
-    "woodwork": {"uz_UZ": "Yog'och buyumlar", "ru_RU": "Изделия из дерева", "us_US": "Woodwork"},
+    "woodwork": {
+        "uz_UZ": "Yog‘och buyumlar",
+        "ru_RU": "Изделия из дерева",
+        "us_US": "Woodwork",
+    },
     "jewelry": {"uz_UZ": "Taqinchoq", "ru_RU": "Украшения", "us_US": "Jewelry"},
+    "agriculture_food": {
+        "uz_UZ": "Qishloq xo‘jaligi va oziq-ovqat",
+        "ru_RU": "Сельское хозяйство и продукты",
+        "us_US": "Agriculture & food",
+    },
+    "animals_pets": {
+        "uz_UZ": "Hayvonlar / pet",
+        "ru_RU": "Животные / pet",
+        "us_US": "Animals & pets",
+    },
+    "apparel_footwear": {
+        "uz_UZ": "Poyabzal",
+        "ru_RU": "Обувь",
+        "us_US": "Footwear",
+    },
+    "auto_parts": {
+        "uz_UZ": "Avto ehtiyot qismlari",
+        "ru_RU": "Автозапчасти",
+        "us_US": "Auto parts",
+    },
+    "beauty_personal_care": {
+        "uz_UZ": "Go‘zallik / shaxsiy gigiyena",
+        "ru_RU": "Красота и уход",
+        "us_US": "Beauty & personal care",
+    },
+    "building_materials": {
+        "uz_UZ": "Qurilish materiallari",
+        "ru_RU": "Стройматериалы",
+        "us_US": "Building materials",
+    },
+    "chemicals": {"uz_UZ": "Kimyo", "ru_RU": "Химия", "us_US": "Chemicals"},
+    "consumer_electronics": {
+        "uz_UZ": "Maishiy elektronika",
+        "ru_RU": "Бытовая электроника",
+        "us_US": "Consumer electronics",
+    },
+    "electrical_equipment": {
+        "uz_UZ": "Elektr jihozlari",
+        "ru_RU": "Электрооборудование",
+        "us_US": "Electrical equipment",
+    },
+    "energy_solar": {
+        "uz_UZ": "Energetika / quyosh",
+        "ru_RU": "Энергетика / солнечная",
+        "us_US": "Energy & solar",
+    },
+    "environment_recycling": {
+        "uz_UZ": "Ekologiya / qayta ishlash",
+        "ru_RU": "Экология / переработка",
+        "us_US": "Environment & recycling",
+    },
+    "fabric_textiles": {
+        "uz_UZ": "Matolar / to‘qimachilik",
+        "ru_RU": "Ткани / текстиль",
+        "us_US": "Fabric & textiles",
+    },
+    "furniture": {"uz_UZ": "Mebel", "ru_RU": "Мебель", "us_US": "Furniture"},
+    "gifts_crafts": {
+        "uz_UZ": "Sovg‘alar / hunarmandchilik",
+        "ru_RU": "Подарки / хендмейд",
+        "us_US": "Gifts & crafts",
+    },
+    "hardware_tools": {
+        "uz_UZ": "Asbob-uskuna",
+        "ru_RU": "Инструменты / hardware",
+        "us_US": "Hardware & tools",
+    },
+    "health_medical": {
+        "uz_UZ": "Tibbiyot / sog‘liq",
+        "ru_RU": "Медицина / здоровье",
+        "us_US": "Health & medical",
+    },
+    "home_garden": {
+        "uz_UZ": "Uy-ro‘zg‘or / bog‘",
+        "ru_RU": "Дом и сад",
+        "us_US": "Home & garden",
+    },
+    "industrial_machinery": {
+        "uz_UZ": "Sanoat uskunalari",
+        "ru_RU": "Промышленное оборудование",
+        "us_US": "Industrial machinery",
+    },
+    "it_software": {
+        "uz_UZ": "IT / dasturiy ta’minot",
+        "ru_RU": "IT / ПО",
+        "us_US": "IT & software",
+    },
+    "lighting": {"uz_UZ": "Yorug‘lik", "ru_RU": "Освещение", "us_US": "Lighting"},
+    "luggage_bags": {
+        "uz_UZ": "Sumka / yuk",
+        "ru_RU": "Сумки / багаж",
+        "us_US": "Luggage & bags",
+    },
+    "metals_minerals": {
+        "uz_UZ": "Metall / mineral",
+        "ru_RU": "Металлы / минералы",
+        "us_US": "Metals & minerals",
+    },
+    "office_school": {
+        "uz_UZ": "Ofis / maktab",
+        "ru_RU": "Офис / школа",
+        "us_US": "Office & school",
+    },
+    "packaging_printing": {
+        "uz_UZ": "Qadoqlash / bosma",
+        "ru_RU": "Упаковка / печать",
+        "us_US": "Packaging & printing",
+    },
+    "plastic_rubber": {
+        "uz_UZ": "Plastmassa / kauchuk",
+        "ru_RU": "Пластик / резина",
+        "us_US": "Plastic & rubber",
+    },
+    "security_protection": {
+        "uz_UZ": "Xavfsizlik",
+        "ru_RU": "Безопасность",
+        "us_US": "Security & protection",
+    },
+    "sports_outdoors": {
+        "uz_UZ": "Sport / outdoor",
+        "ru_RU": "Спорт / outdoor",
+        "us_US": "Sports & outdoors",
+    },
+    "toys_kids": {
+        "uz_UZ": "O‘yinchoq / bolalar",
+        "ru_RU": "Игрушки / дети",
+        "us_US": "Toys & kids",
+    },
+    "transportation": {
+        "uz_UZ": "Transport vositalari",
+        "ru_RU": "Транспорт",
+        "us_US": "Transportation",
+    },
+    "telecom": {"uz_UZ": "Telekom", "ru_RU": "Телеком", "us_US": "Telecom"},
+    "services_b2b": {
+        "uz_UZ": "B2B xizmatlar",
+        "ru_RU": "B2B услуги",
+        "us_US": "B2B services",
+    },
     "other": {"uz_UZ": "Boshqa", "ru_RU": "Другое", "us_US": "Other"},
 }
 

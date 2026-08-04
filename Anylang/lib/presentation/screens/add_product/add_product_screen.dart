@@ -15,6 +15,7 @@ import '../../utils/auth_validators.dart';
 import '../../utils/business_plan_dialog.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen.dart';
+import '../products/products_state.dart';
 import '../subscription/subscription_screen.dart';
 import 'add_product_action.dart';
 import 'add_product_content.dart';
@@ -31,14 +32,6 @@ const List<LinearGradient> _kImageGradientPool = [
   prodMaroonGradient,
 ];
 
-const Map<String, String> _kCategoryCodes = {
-  'add_product_cat_clothing': 'clothing_accessories',
-  'add_product_cat_pottery': 'pottery',
-  'add_product_cat_wood': 'woodwork',
-  'add_product_cat_jewelry': 'jewelry',
-  'add_product_cat_other': 'other',
-};
-
 class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
   AddProductScreen() : super(mobileContent: AddProductContent());
 
@@ -48,12 +41,53 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
     state.shippingCountries.clear();
     state.productVideoUrl.value = null;
     state.videoUploading.value = false;
-    state.category.value = kProductCategoryKeys.first;
+    state.category.value = '';
     state.editingProductId.value = payload?.editProductId;
+    unawaited(_loadCategories());
     final editId = payload?.editProductId;
     if (editId != null && editId > 0) {
       unawaited(_hydrateForEdit(editId));
     }
+  }
+
+  String _uiLanguage() {
+    final loc = Get.locale;
+    if (loc == null) return 'uz_UZ';
+    final lang = loc.languageCode.toLowerCase();
+    if (lang == 'ru') return 'ru_RU';
+    if (lang == 'en') return 'us_US';
+    return 'uz_UZ';
+  }
+
+  Future<void> _loadCategories() async {
+    state.categoriesLoading.value = true;
+    final result = await Get.find<ProductsRepository>().categories(
+      language: _uiLanguage(),
+    );
+    result.when(
+      success: (data) {
+        final items = <ProductCategoryOption>[];
+        for (final e in asList(data)) {
+          if (e is! Map) continue;
+          final code = e['code']?.toString();
+          final title = e['title']?.toString();
+          if (code == null || code.isEmpty || title == null) continue;
+          items.add(ProductCategoryOption(code: code, title: title));
+        }
+        state.categories.assignAll(items);
+        if (state.category.value.isEmpty && items.isNotEmpty && !state.isEditing) {
+          final preferred = items.firstWhere(
+            (c) => c.code != 'other',
+            orElse: () => items.first,
+          );
+          state.category.value = preferred.code;
+        }
+      },
+      failure: (_) {
+        showAppWarning('products_categories_failed'.tr);
+      },
+    );
+    state.categoriesLoading.value = false;
   }
 
   Future<void> _hydrateForEdit(int productId) async {
@@ -79,13 +113,7 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
       state.currency.value = currency;
     }
     final catCode = map['category']?.toString() ?? 'other';
-    final catKey = _kCategoryCodes.entries
-        .firstWhere(
-          (e) => e.value == catCode,
-          orElse: () => const MapEntry('add_product_cat_other', 'other'),
-        )
-        .key;
-    state.category.value = catKey;
+    state.category.value = catCode;
     state.shippingCountries.assignAll(
       (map['shipping_countries'] is List)
           ? (map['shipping_countries'] as List)
@@ -307,7 +335,9 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
         }
         imageIds.add(id);
       }
-      final cat = _kCategoryCodes[state.category.value] ?? 'other';
+      final cat = state.category.value.trim().isEmpty
+          ? 'other'
+          : state.category.value.trim();
       final short = shortDescription.isNotEmpty ? shortDescription : name;
       final detailed =
           detailedDescription.isEmpty ? short : detailedDescription;
@@ -321,12 +351,12 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
         if (imageIds.isNotEmpty) 'image_ids': imageIds,
         if (imageIds.isNotEmpty) 'primary_image_id': imageIds.first,
         'status': status,
-        'shipping_countries': state.shippingCountries.toList(),
+        'shipping_countries': <String>[],
+        'shipping_info': '',
         // Imkoniyatlar olib tashlandi — eski qiymatlarni tozalash.
         'capabilities': <String>[],
       };
       if (moq.isNotEmpty) body['moq'] = moq;
-      if (shippingInfo.isNotEmpty) body['shipping_info'] = shippingInfo;
       if (videoUrl.isNotEmpty) body['video_url'] = videoUrl;
       if (factoryVideoUrl.isNotEmpty) body['factory_video_url'] = factoryVideoUrl;
       if (processVideoUrl.isNotEmpty) body['process_video_url'] = processVideoUrl;

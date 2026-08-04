@@ -166,7 +166,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
         'businessRole': state.businessRole.value,
       'verifiedOnly': state.verifiedOnly.value,
       'readyStock': state.readyStockOnly.value,
-      'freeShipping': state.freeShippingOnly.value,
+      'freeShipping': false,
       'premiumSeller': state.premiumSellerOnly.value,
       'newOnly': state.newOnly.value,
       'sort': sort ?? state.listSort,

@@ -25,7 +25,8 @@ class MarketAnalyticsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final top = result?.items.isNotEmpty == true ? result!.items.first : null;
+    final items = result?.items ?? const <MarketInsight>[];
+    final preview = items.take(3).toList();
 
     return Material(
       color: c.surface,
@@ -103,7 +104,7 @@ class MarketAnalyticsCard extends StatelessWidget {
                       ),
                   ],
                 )
-              else if (top == null)
+              else if (preview.isEmpty)
                 Row(
                   children: [
                     Expanded(
@@ -119,28 +120,34 @@ class MarketAnalyticsCard extends StatelessWidget {
                       ),
                   ],
                 )
-              else
-                Text(
-                  top.message,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
+              else ...[
+                for (var i = 0; i < preview.length; i++) ...[
+                  if (i > 0) SizedBox(height: 8.dp),
+                  Text(
+                    preview[i].message,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
                   ),
-                ),
-              if (!loading && result != null && result!.items.length > 1) ...[
-                SizedBox(height: 8.dp),
-                Text(
-                  'market_analytics_more'.trParams({
-                    'n': '${result!.items.length - 1}',
-                  }),
-                  style: TextStyle(
-                    color: c.accent,
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w700,
+                ],
+                if (items.length > preview.length) ...[
+                  SizedBox(height: 8.dp),
+                  Text(
+                    'market_analytics_more'.trParams({
+                      'n': '${items.length - preview.length}',
+                    }),
+                    style: TextStyle(
+                      color: c.accent,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                ],
               ],
             ],
           ),

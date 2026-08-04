@@ -2,18 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../data/core/mappers.dart';
 import '../../modal/simple_list_picker_bottom_sheet.dart';
 import '../../ui/app_top_bar.dart';
 import '../../ui/buttons/primary_button.dart';
 import '../../ui/buttons/secondary_button.dart';
 import '../../ui/gradient_background.dart';
 import '../../ui/items/media_tile.dart';
-import '../../ui/items/removable_chip.dart';
 import '../../ui/keyboard_aware_scroll.dart';
 import '../../ui/textfields/app_picker_field.dart';
 import '../../ui/textfields/app_text_field.dart';
 import '../../ui/theme/colors.dart';
+import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/screen_options/screen_content.dart';
 import '../../utils/size_controller.dart';
@@ -21,14 +20,6 @@ import 'add_product_action.dart';
 import 'add_product_state.dart';
 
 const List<String> kProductCurrencies = ['USD', 'EUR', 'RUB', 'UZS'];
-
-const List<String> kProductCategoryKeys = [
-  'add_product_cat_clothing',
-  'add_product_cat_pottery',
-  'add_product_cat_wood',
-  'add_product_cat_jewelry',
-  'add_product_cat_other',
-];
 
 /// S18 — Mahsulot qo'shish. Rasmlar, nom, narx/valyuta, kategoriya,
 /// qisqa/batafsil tavsif + Marketplace 2.0 maydonlari + qoralama/e'lon.
@@ -39,7 +30,6 @@ class AddProductContent extends ScreenContent<AddProductState> {
   late final TextEditingController _shortDescCtrl;
   late final TextEditingController _detailedDescCtrl;
   late final TextEditingController _moqCtrl;
-  late final TextEditingController _shippingCtrl;
   late final TextEditingController _videoCtrl;
   late final TextEditingController _factoryVideoCtrl;
   late final TextEditingController _processVideoCtrl;
@@ -52,7 +42,6 @@ class AddProductContent extends ScreenContent<AddProductState> {
     _shortDescCtrl = TextEditingController();
     _detailedDescCtrl = TextEditingController();
     _moqCtrl = TextEditingController();
-    _shippingCtrl = TextEditingController();
     _videoCtrl = TextEditingController();
     _factoryVideoCtrl = TextEditingController();
     _processVideoCtrl = TextEditingController();
@@ -64,7 +53,6 @@ class AddProductContent extends ScreenContent<AddProductState> {
     _shortDescCtrl.text = state.draftShort.value ?? '';
     _detailedDescCtrl.text = state.draftDetailed.value ?? '';
     _moqCtrl.text = state.draftMoq.value ?? '';
-    _shippingCtrl.text = state.draftShipping.value ?? '';
     _factoryVideoCtrl.text = state.draftFactoryVideo.value ?? '';
     _processVideoCtrl.text = state.draftProcessVideo.value ?? '';
     final v = state.productVideoUrl.value;
@@ -90,7 +78,6 @@ class AddProductContent extends ScreenContent<AddProductState> {
     _shortDescCtrl.dispose();
     _detailedDescCtrl.dispose();
     _moqCtrl.dispose();
-    _shippingCtrl.dispose();
     _videoCtrl.dispose();
     _factoryVideoCtrl.dispose();
     _processVideoCtrl.dispose();
@@ -192,7 +179,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
                           hint: 'add_product_category_hint'.tr,
                           value: state.category.value.isEmpty
                               ? null
-                              : state.category.value.tr,
+                              : state.categoryTitle(state.category.value),
                           icon: Icons.keyboard_arrow_down_rounded,
                           onTap: () => _pickCategory(context, state, sendAction),
                         )),
@@ -223,33 +210,6 @@ class AddProductContent extends ScreenContent<AddProductState> {
                       hint: 'business_moq_hint'.tr,
                       controller: _moqCtrl,
                     ),
-                    SizedBox(height: 16.dp),
-                    AppTextField(
-                      label: 'product_shipping'.tr,
-                      hint: 'add_product_shipping_hint'.tr,
-                      controller: _shippingCtrl,
-                    ),
-                    SizedBox(height: 16.dp),
-                    Text(
-                      'product_shipping_countries'.tr,
-                      style: TextStyle(color: c.textPrimary, fontSize: 14.sp, fontWeight: FontWeight.w700),
-                    ),
-                    SizedBox(height: 10.dp),
-                    Obx(() => Wrap(
-                          spacing: 10.dp,
-                          runSpacing: 10.dp,
-                          children: [
-                            RemovableChip.add(
-                              label: 'business_add_export_country'.tr,
-                              onTap: () => sendAction(AddShippingCountryRequested()),
-                            ),
-                            for (final code in state.shippingCountries)
-                              RemovableChip(
-                                label: formatCountryName(code),
-                                onRemove: () => sendAction(RemoveShippingCountry(code)),
-                              ),
-                          ],
-                        )),
                     SizedBox(height: 20.dp),
                     Text(
                       'product_video_15s_title'.tr,
@@ -398,7 +358,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
                               shortDescription: _shortDescCtrl.text,
                               detailedDescription: _detailedDescCtrl.text,
                               moq: _moqCtrl.text,
-                              shippingInfo: _shippingCtrl.text,
+                              shippingInfo: '',
                               videoUrl: _videoCtrl.text,
                               factoryVideoUrl: _factoryVideoCtrl.text,
                               processVideoUrl: _processVideoCtrl.text,
@@ -418,7 +378,7 @@ class AddProductContent extends ScreenContent<AddProductState> {
                                   shortDescription: _shortDescCtrl.text,
                                   detailedDescription: _detailedDescCtrl.text,
                                   moq: _moqCtrl.text,
-                                  shippingInfo: _shippingCtrl.text,
+                                  shippingInfo: '',
                                   videoUrl: _videoCtrl.text,
                                   factoryVideoUrl: _factoryVideoCtrl.text,
                                   processVideoUrl: _processVideoCtrl.text,
@@ -448,15 +408,24 @@ class AddProductContent extends ScreenContent<AddProductState> {
   }
 
   Future<void> _pickCategory(BuildContext context, AddProductState state, void Function(MyAction) sendAction) async {
-    final labels = kProductCategoryKeys.map((k) => k.tr).toList();
+    if (state.categories.isEmpty) {
+      showAppWarning('products_categories_failed'.tr);
+      return;
+    }
+    final labels = state.categories.map((c) => c.title).toList();
+    final selectedTitle = state.category.value.isEmpty
+        ? null
+        : state.categoryTitle(state.category.value);
     final picked = await showSimpleListPickerBottomSheet(
       context,
       title: 'add_product_category'.tr,
       items: labels,
-      selected: state.category.value.isEmpty ? null : state.category.value.tr,
+      selected: selectedTitle,
+      searchable: true,
     );
     if (picked == null) return;
-    final idx = labels.indexOf(picked);
-    if (idx >= 0) sendAction(SelectCategory(kProductCategoryKeys[idx]));
+    final match = state.categories.where((c) => c.title == picked);
+    if (match.isEmpty) return;
+    sendAction(SelectCategory(match.first.code));
   }
 }

@@ -29,11 +29,6 @@ class RemoveExportCountry extends EditBusinessInfoAction {
   RemoveExportCountry(this.code);
 }
 
-class ToggleIncoterm extends EditBusinessInfoAction {
-  final String code;
-  ToggleIncoterm(this.code);
-}
-
 class TogglePaymentMethod extends EditBusinessInfoAction {
   final String code;
   TogglePaymentMethod(this.code);

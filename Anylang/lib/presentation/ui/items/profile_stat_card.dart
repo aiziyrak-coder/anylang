@@ -11,6 +11,7 @@ class ProfileStatCard extends StatelessWidget {
   final IconData? icon;
   final Color? valueColor;
   final LinearGradient? gradient;
+  final VoidCallback? onTap;
 
   const ProfileStatCard({
     super.key,
@@ -19,18 +20,20 @@ class ProfileStatCard extends StatelessWidget {
     this.icon,
     this.valueColor,
     this.gradient,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
     final g = gradient ?? profileStatGradientA;
+    final radius = BorderRadius.circular(16.dp);
 
-    return Container(
+    final child = Container(
       padding: EdgeInsets.symmetric(vertical: 12.dp, horizontal: 8.dp),
       decoration: BoxDecoration(
         gradient: g,
-        borderRadius: BorderRadius.circular(16.dp),
+        borderRadius: radius,
         border: Border.all(color: c.surfaceBorder, width: 0.7),
         boxShadow: c.glassShadow,
       ),
@@ -65,6 +68,16 @@ class ProfileStatCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return child;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: child,
       ),
     );
   }

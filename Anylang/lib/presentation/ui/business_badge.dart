@@ -5,7 +5,7 @@ import '../utils/size_controller.dart';
 import 'theme/colors.dart';
 
 /// Tezkor biznes tipi — avatar yonida.
-enum BusinessBadgeKind { factory_, logistics, trader, company, it }
+enum BusinessBadgeKind { factory_, distributor, trader, company, it }
 
 class BusinessBadgeInfo {
   final BusinessBadgeKind kind;
@@ -49,9 +49,9 @@ BusinessBadgeInfo? resolveBusinessBadge({
       );
     case 'distributor':
       return const BusinessBadgeInfo(
-        kind: BusinessBadgeKind.logistics,
-        emoji: '🚚',
-        labelKey: 'business_badge_logistics',
+        kind: BusinessBadgeKind.distributor,
+        emoji: '📦',
+        labelKey: 'business_badge_distributor',
       );
     case 'retail':
       return const BusinessBadgeInfo(
@@ -74,11 +74,11 @@ BusinessBadgeInfo? resolveBusinessBadge({
       labelKey: 'business_badge_factory',
     );
   }
-  if (_matchesLogistics(blob)) {
+  if (_matchesDistributor(blob)) {
     return const BusinessBadgeInfo(
-      kind: BusinessBadgeKind.logistics,
-      emoji: '🚚',
-      labelKey: 'business_badge_logistics',
+      kind: BusinessBadgeKind.distributor,
+      emoji: '📦',
+      labelKey: 'business_badge_distributor',
     );
   }
   if (_matchesTrader(blob)) {
@@ -131,18 +131,13 @@ bool _matchesFactory(String blob) {
   return keys.any((k) => blob.contains(k));
 }
 
-bool _matchesLogistics(String blob) {
+bool _matchesDistributor(String blob) {
   const keys = [
-    'logistic',
-    'logistics',
     'distributor',
-    'shipping',
-    'freight',
-    'transport',
-    'cargo',
-    'logistika',
-    'логистик',
-    'yetkazib',
+    'wholesale',
+    'distribyutor',
+    'дистриб',
+    'опт',
   ];
   return keys.any((k) => blob.contains(k));
 }
@@ -152,13 +147,11 @@ bool _matchesTrader(String blob) {
     'trader',
     'trading',
     'retail',
-    'wholesale',
     'merchant',
     'savdo',
     'treyder',
     'трейдер',
     'ритейл',
-    'опт',
   ];
   return keys.any((k) => blob.contains(k));
 }

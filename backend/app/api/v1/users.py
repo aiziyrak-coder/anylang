@@ -19,6 +19,7 @@ from app.schemas.business import (
 from app.schemas.common import MessageResponse
 from app.schemas.user import BusinessOut, UserOut
 from app.schemas.profile_views import ProfileViewersOut
+from app.schemas.product_likers import ProductLikersOut
 from app.schemas.nearby import (
     LocationOut,
     LocationSharingIn,
@@ -30,6 +31,7 @@ from app.services import business as business_service
 from app.services import chats as chats_service
 from app.services import company_profile as company_profile_service
 from app.services import nearby as nearby_service
+from app.services import product_likers as product_likers_service
 from app.services import profile_views as profile_views_service
 from app.services import verification as verification_service
 from app.services.admin_ops import client_ip
@@ -473,6 +475,21 @@ async def list_my_profile_viewers(
         limit=limit,
     )
     return ProfileViewersOut.model_validate(data)
+
+
+@router.get("/me/product-likers", response_model=ProductLikersOut)
+async def list_my_product_likers(
+    db: DbSession,
+    current_user: CurrentUser,
+    limit: int = Query(default=50, ge=1, le=100),
+) -> ProductLikersOut:
+    """Mahsulotlaringizni layk qilgan foydalanuvchilar."""
+    data = await product_likers_service.list_product_likers(
+        db,
+        seller_id=current_user.id,
+        limit=limit,
+    )
+    return ProductLikersOut.model_validate(data)
 
 
 @router.get("/{user_id}", response_model=PublicUserProfileOut)

@@ -56,7 +56,6 @@ class _ProductsFiltersSheetState extends State<_ProductsFiltersSheet> {
   bool _trendOnly = false;
   bool _readyStockOnly = false;
   bool _newOnly = false;
-  bool _freeShippingOnly = false;
   bool _premiumSellerOnly = false;
   bool _applying = false;
 
@@ -70,7 +69,6 @@ class _ProductsFiltersSheetState extends State<_ProductsFiltersSheet> {
     _trendOnly = s.trendOnly.value;
     _readyStockOnly = s.readyStockOnly.value;
     _newOnly = s.newOnly.value;
-    _freeShippingOnly = s.freeShippingOnly.value;
     _premiumSellerOnly = s.premiumSellerOnly.value;
   }
 
@@ -81,7 +79,6 @@ class _ProductsFiltersSheetState extends State<_ProductsFiltersSheet> {
       _trendOnly ||
       _readyStockOnly ||
       _newOnly ||
-      _freeShippingOnly ||
       _premiumSellerOnly;
 
   void _clearDraft() {
@@ -92,7 +89,6 @@ class _ProductsFiltersSheetState extends State<_ProductsFiltersSheet> {
       _trendOnly = false;
       _readyStockOnly = false;
       _newOnly = false;
-      _freeShippingOnly = false;
       _premiumSellerOnly = false;
     });
   }
@@ -122,7 +118,7 @@ class _ProductsFiltersSheetState extends State<_ProductsFiltersSheet> {
           trendOnly: _trendOnly,
           readyStockOnly: _readyStockOnly,
           newOnly: _newOnly,
-          freeShippingOnly: _freeShippingOnly,
+          freeShippingOnly: false,
           premiumSellerOnly: _premiumSellerOnly,
         ),
       );
@@ -270,14 +266,6 @@ class _ProductsFiltersSheetState extends State<_ProductsFiltersSheet> {
                             label: 'products_tezkor_new'.tr,
                             selected: _newOnly,
                             onTap: () => setState(() => _newOnly = !_newOnly),
-                          ),
-                          _FilterChip(
-                            c: c,
-                            label: 'products_tezkor_free_shipping'.tr,
-                            selected: _freeShippingOnly,
-                            onTap: () => setState(
-                              () => _freeShippingOnly = !_freeShippingOnly,
-                            ),
                           ),
                           _FilterChip(
                             c: c,
