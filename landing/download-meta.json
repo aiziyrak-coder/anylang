@@ -1,13 +1,13 @@
 {
-  "version": "1.0.93",
-  "build": 94,
-  "version_full": "1.0.93+94",
+  "version": "1.0.94",
+  "build": 95,
+  "version_full": "1.0.94+95",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.93+94.apk",
-  "size_bytes": 89604699,
+  "versioned_filename": "anylang-1.0.94+95.apk",
+  "size_bytes": 89604795,
   "size_mb": 85.45,
-  "updated_at": "2026-08-04T06:46:31.266026+00:00",
+  "updated_at": "2026-08-04T07:37:54.179059+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.cradev.anylang",
-  "notes": "Release 1.0.93+94 — FCM push (chat + friend requests)"
+  "notes": "Release 1.0.94+95 — FCM push (chat + friend requests)"
 }
