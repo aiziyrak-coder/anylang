@@ -12,6 +12,7 @@ import 'package:get/get.dart';
 import '../../data/core/mappers.dart';
 import '../../data/local/session_store.dart';
 import '../../data/network/device_info_payload.dart';
+import '../../data/permissions/app_permissions.dart';
 import '../../presentation/screens/chat/chat_payload.dart';
 import '../../presentation/screens/chat/chat_screen.dart';
 import '../../presentation/screens/main/main_state.dart';
@@ -102,21 +103,22 @@ class PushNotificationService extends GetxService {
     if (!_ready || !SessionStore.hasSession || _syncing) return;
     _syncing = true;
     try {
+      // Android 13+ POST_NOTIFICATIONS — fon/kill rejimida banner uchun majburiy.
+      final notifOk = await AppPermissions.ensureNotificationPermission();
+      if (!notifOk) {
+        debugPrint('push: notification permission denied');
+        return;
+      }
+
       final messaging = FirebaseMessaging.instance;
       final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
+        provisional: false,
       );
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
         return;
-      }
-
-      if (Platform.isAndroid) {
-        // Android 13+ runtime permission.
-        try {
-          await messaging.requestPermission();
-        } catch (_) {}
       }
 
       final token = await messaging.getToken();

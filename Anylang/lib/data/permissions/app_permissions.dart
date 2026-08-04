@@ -7,7 +7,8 @@ import 'package:permission_handler/permission_handler.dart';
 class AppPermissions {
   AppPermissions._();
 
-  static const _kRequestedKey = 'core_permissions_requested_v1';
+  /// v2: bildirishnoma (POST_NOTIFICATIONS) ham so'raladi.
+  static const _kRequestedKey = 'core_permissions_requested_v2';
 
   static Box get _box => Hive.box('user');
 
@@ -16,12 +17,13 @@ class AppPermissions {
 
   static Future<void> markRequested() => _box.put(_kRequestedKey, true);
 
-  /// Mikrofon, kamera, galereya/fayl, GPS.
+  /// Mikrofon, kamera, galereya/fayl, GPS, bildirishnomalar.
   static List<Permission> get required {
     final list = <Permission>[
       Permission.microphone,
       Permission.camera,
       Permission.locationWhenInUse,
+      Permission.notification,
     ];
     if (Platform.isAndroid) {
       list.add(Permission.photos);
@@ -42,11 +44,27 @@ class AppPermissions {
     return false;
   }
 
+  static Future<bool> notificationGranted() async {
+    final s = await Permission.notification.status;
+    return s.isGranted;
+  }
+
+  /// Fon/kill rejimida FCM uchun — har safar MainScreen'da chaqiriladi.
+  static Future<bool> ensureNotificationPermission() async {
+    final status = await Permission.notification.status;
+    if (status.isGranted) return true;
+    if (status.isPermanentlyDenied) return false;
+    final result = await Permission.notification.request();
+    return result.isGranted;
+  }
+
   static Future<bool> allGranted() async {
     final mic = await Permission.microphone.status;
     final cam = await Permission.camera.status;
     final loc = await Permission.locationWhenInUse.status;
+    final notif = await Permission.notification.status;
     if (!mic.isGranted || !cam.isGranted || !loc.isGranted) return false;
+    if (!notif.isGranted) return false;
     return _filesOk();
   }
 

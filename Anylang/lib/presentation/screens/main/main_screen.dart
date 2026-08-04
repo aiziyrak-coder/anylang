@@ -9,6 +9,7 @@ import '../../../data/local/session_store.dart';
 import '../../../data/network/chat_repository.dart';
 import '../../../data/network/friends_repository.dart';
 import '../../../data/network/profile_repository.dart';
+import '../../../data/network/push_notification_service.dart';
 import '../../../data/permissions/app_permissions.dart';
 import '../../modal/account_switcher_bottom_sheet.dart';
 import '../../utils/app_snackbar.dart';
@@ -34,10 +35,17 @@ class MainScreen extends Screen<MainState, void> {
 
   @override
   void initState(void payload) {
-    // Yangilangan ilova: onboarding o'tib ketgan foydalanuvchilar uchun bir marta.
-    if (!AppPermissions.alreadyRequested) {
-      Future.microtask(() => AppPermissions.requestAllRequired());
-    }
+    // Yangilangan ilova: majburiy ruxsatlar + bildirishnoma (fon push uchun).
+    Future.microtask(() async {
+      if (!AppPermissions.alreadyRequested) {
+        await AppPermissions.requestAllRequired();
+      } else {
+        await AppPermissions.ensureNotificationPermission();
+      }
+      if (Get.isRegistered<PushNotificationService>()) {
+        await Get.find<PushNotificationService>().syncToken();
+      }
+    });
     // Tizim tili = tarjima tili — server bilan sync.
     Future.microtask(_syncLanguageToServer);
   }
