@@ -1,13 +1,13 @@
 {
-  "version": "1.0.91",
-  "build": 92,
-  "version_full": "1.0.91+92",
+  "version": "1.0.93",
+  "build": 94,
+  "version_full": "1.0.93+94",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.91+92.apk",
-  "size_bytes": 89068280,
-  "size_mb": 84.94,
-  "updated_at": "2026-07-30T12:13:31.489098+00:00",
+  "versioned_filename": "anylang-1.0.93+94.apk",
+  "size_bytes": 89604699,
+  "size_mb": 85.45,
+  "updated_at": "2026-08-04T06:46:31.266026+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.cradev.anylang",
-  "notes": "Release 1.0.91+92 — chat glass bubbles, Tarmoq IndexedStack fix, Google Sign-In errors"
+  "notes": "Release 1.0.93+94 — FCM push (chat + friend requests)"
 }
