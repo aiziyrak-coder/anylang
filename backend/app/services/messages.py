@@ -740,6 +740,25 @@ async def create_message(
 
     payload = await _publish(message)
 
+    # Offline recipients: FCM push (online + muted skipped inside helper).
+    try:
+        from app.services import push as push_service
+
+        s_name, _ = _sender_public_fields(user)
+        preview = (text or "").strip() if msg_type == "text" else (msg_type or "message")
+        for peer in recipients:
+            await push_service.maybe_enqueue_chat_push(
+                db,
+                redis,
+                recipient_id=peer.id,
+                chat_id=chat_id,
+                sender_name=s_name or user.full_name or "AnyLang",
+                preview=preview,
+                message_id=message.id,
+            )
+    except Exception:  # noqa: BLE001
+        logger.warning("Push enqueue failed for chat %s", chat_id, exc_info=True)
+
     # Tarjima HTTP javobini bloklamasin — BackgroundTasks (chats.send_message).
     # Guruhda har bir a'zo ona tili uchun alohida job (bir xil tillar guruhlanadi).
     if msg_type == "text" and text:

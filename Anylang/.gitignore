@@ -43,6 +43,11 @@ app.*.map.json
 /build/debug-info/
 /android/keystore/
 
+# Firebase (never commit)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+**/firebase_options.dart.bak
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile

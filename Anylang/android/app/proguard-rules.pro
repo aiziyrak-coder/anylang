@@ -13,6 +13,10 @@
 -keep class com.google.android.gms.common.** { *; }
 -dontwarn com.google.android.gms.**
 
+# Firebase Messaging
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+
 # Keep native methods
 -keepclasseswithmembernames class * {
     native <methods>;

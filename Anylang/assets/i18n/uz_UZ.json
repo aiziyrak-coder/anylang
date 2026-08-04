@@ -1595,5 +1595,7 @@
   "devices_error_protect_week": "Yangi qurilma 1 hafta ichida boshqa seanslarni tugata olmaydi.",
   "devices_error_cannot_revoke_current": "Joriy seansni shu yerda tugata olmaysiz — chiqishdan foydalaning.",
   "devices_protected_short": "Himoyalangan (1 hafta)",
-  "devices_badge_current": "JORIY"
+  "devices_badge_current": "JORIY",
+  "push_permission_rationale": "Bildirishnomalar yangi xabarlar va do‘stlik so‘rovlarini o‘z vaqtida yetkazadi.",
+  "push_enabled": "Bildirishnomalar yoqilgan"
 }

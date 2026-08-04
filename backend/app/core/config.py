@@ -123,6 +123,11 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     trusted_hosts: str = ""  # comma-separated; empty = skip TrustedHostMiddleware
 
+    # FCM HTTP v1 — empty credentials → send is no-op (log warning).
+    firebase_project_id: str = ""
+    # JSON string or absolute/relative path to service-account JSON file.
+    firebase_credentials_json: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

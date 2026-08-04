@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
 import '../../data/local/session_store.dart';
+import '../../data/network/push_notification_service.dart';
 import '../../data/network/realtime_sync_service.dart';
 import '../../data/network/socket_service.dart';
 
@@ -15,5 +18,8 @@ Future<void> connectRealtimeIfNeeded() async {
     }
   } catch (_) {
     // Network may be flaky — chat HTTP still works.
+  }
+  if (Get.isRegistered<PushNotificationService>()) {
+    unawaited(Get.find<PushNotificationService>().syncToken());
   }
 }

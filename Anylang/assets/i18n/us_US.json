@@ -1595,5 +1595,7 @@
   "devices_error_protect_week": "A new device can't end other sessions within 1 week.",
   "devices_error_cannot_revoke_current": "You can't end the current session here — use sign out.",
   "devices_protected_short": "Protected (1 week)",
-  "devices_badge_current": "CURRENT"
+  "devices_badge_current": "CURRENT",
+  "push_permission_rationale": "Notifications deliver new messages and friend requests on time.",
+  "push_enabled": "Notifications enabled"
 }

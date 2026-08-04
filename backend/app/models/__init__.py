@@ -20,6 +20,7 @@ from app.models.feed import BusinessFeedPost
 from app.models.language import Language
 from app.models.payment import Payment
 from app.models.promo import PromoCode, PromoRedemption
+from app.models.push_token import PushToken
 from app.models.product import (
     Product,
     ProductFavorite,
@@ -53,6 +54,7 @@ __all__ = [
     "Payment",
     "PromoCode",
     "PromoRedemption",
+    "PushToken",
     "User",
     "RefreshToken",
     "OtpCode",

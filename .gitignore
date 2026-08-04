@@ -14,6 +14,11 @@ scripts/_*
 **/*CREDENTIALS*
 deploy/.env
 deploy/CREDENTIALS.local.txt
+# Firebase / FCM secrets (never commit)
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase-adminsdk*.json
+**/*firebase*credentials*.json
 dist/
 *.aab
 

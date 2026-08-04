@@ -7,6 +7,7 @@ from app.api.v1 import (
     auth,
     chats,
     countries,
+    devices,
     feed,
     friends,
     health,
@@ -28,6 +29,7 @@ api_router.include_router(health.router, tags=["health"])
 api_router.include_router(countries.router, prefix="/countries", tags=["countries"])
 api_router.include_router(languages.router, prefix="/languages", tags=["languages"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(devices.router, prefix="/devices", tags=["devices"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(subscription.router, prefix="/subscription", tags=["subscription"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])

@@ -36,6 +36,7 @@ import '../data/network/connectivity_service.dart';
 import '../data/network/connection_status_service.dart';
 import '../data/network/offline_outbox_service.dart';
 import '../data/local/offline_chat_store.dart';
+import '../data/network/push_notification_service.dart';
 
 class DataModule {
   Future<void> initModule() async {
@@ -152,6 +153,10 @@ class DataModule {
     );
     await Get.putAsync<BusinessCardDeepLinkService>(
       () => BusinessCardDeepLinkService().init(),
+      permanent: true,
+    );
+    await Get.putAsync<PushNotificationService>(
+      () => PushNotificationService().init(),
       permanent: true,
     );
   }

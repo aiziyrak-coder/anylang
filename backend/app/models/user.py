@@ -23,6 +23,7 @@ from app.db.session import Base
 from app.models.base import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.push_token import PushToken
     from app.models.user import FactoryImage
 
 
@@ -69,6 +70,9 @@ class User(Base, TimestampMixin):
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    push_tokens: Mapped[list["PushToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 

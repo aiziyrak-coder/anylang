@@ -1595,5 +1595,7 @@
   "devices_error_protect_week": "Новое устройство не может завершать другие сеансы в течение 1 недели.",
   "devices_error_cannot_revoke_current": "Текущий сеанс здесь завершить нельзя — используйте выход.",
   "devices_protected_short": "Защищено (1 неделя)",
-  "devices_badge_current": "ТЕКУЩЕЕ"
+  "devices_badge_current": "ТЕКУЩЕЕ",
+  "push_permission_rationale": "Уведомления вовремя доставят новые сообщения и заявки в друзья.",
+  "push_enabled": "Уведомления включены"
 }

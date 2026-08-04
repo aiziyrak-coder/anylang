@@ -781,6 +781,17 @@ async def logout(db: AsyncSession, *, user_id: int, refresh_token: str) -> None:
     jti = str(payload.get("jti", ""))
     now = datetime.now(UTC)
 
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.jti == jti,
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked_at.is_(None),
+        )
+    )
+    row = result.scalar_one_or_none()
+    device_id = row.device_id if row is not None else None
+
     await db.execute(
         update(RefreshToken)
         .where(
@@ -791,6 +802,12 @@ async def logout(db: AsyncSession, *, user_id: int, refresh_token: str) -> None:
         )
         .values(revoked_at=now)
     )
+    if device_id:
+        from app.services import push as push_service
+
+        await push_service.revoke_push_tokens_for_device(
+            db, user_id=user_id, device_id=device_id
+        )
 
 
 async def _active_sessions(db: AsyncSession, user_id: int) -> list[RefreshToken]:
@@ -994,6 +1011,12 @@ async def revoke_device_session(
         )
         .values(revoked_at=now)
     )
+    if target.device_id:
+        from app.services import push as push_service
+
+        await push_service.revoke_push_tokens_for_device(
+            db, user_id=user_id, device_id=target.device_id
+        )
     try:
         await RedisHub().publish(
             user_id,
@@ -1023,6 +1046,7 @@ async def revoke_other_device_sessions(
         )
     sessions = await _active_sessions(db, user_id)
     revoked_ids: list[str] = []
+    revoked_device_ids: list[str] = []
     for s in sessions:
         if s.family == current.family:
             continue
@@ -1038,6 +1062,14 @@ async def revoke_other_device_sessions(
             .values(revoked_at=now)
         )
         revoked_ids.append(s.family)
+        if s.device_id:
+            revoked_device_ids.append(s.device_id)
+    if revoked_device_ids:
+        from app.services import push as push_service
+
+        await push_service.revoke_push_tokens_for_devices(
+            db, user_id=user_id, device_ids=revoked_device_ids
+        )
     for sid in revoked_ids:
         try:
             await RedisHub().publish(

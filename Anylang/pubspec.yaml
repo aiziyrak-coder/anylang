@@ -1,7 +1,7 @@
 name: anylang
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.92+93
+version: 1.0.93+94
 
 environment:
   sdk: ^3.12.2
@@ -51,6 +51,9 @@ dependencies:
   google_maps_flutter: ^2.18.0
   flutter_image_compress: ^2.5.1
   camera: ^0.12.0+2
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
+  flutter_local_notifications: ^19.4.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

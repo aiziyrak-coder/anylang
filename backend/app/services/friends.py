@@ -518,6 +518,16 @@ async def send_friend_request(
         friendship.accepted_at = None
         await db.flush()
         await db.refresh(friendship)
+        try:
+            from app.services import push as push_service
+
+            await push_service.enqueue_friend_request_push(
+                target_user_id=target.id,
+                requester_name=user.full_name or user.number or "AnyLang",
+                friendship_id=friendship.id,
+            )
+        except Exception:  # noqa: BLE001
+            pass
         return {
             "id": friendship.id,
             "user_id": target.id,
@@ -544,6 +554,18 @@ async def send_friend_request(
 
     await db.flush()
     await db.refresh(friendship)
+
+    try:
+        from app.services import push as push_service
+
+        await push_service.enqueue_friend_request_push(
+            target_user_id=target.id,
+            requester_name=user.full_name or user.number or "AnyLang",
+            friendship_id=friendship.id,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
     return {
         "id": friendship.id,
         "user_id": target.id,

@@ -13,3 +13,8 @@ key.properties
 **/*.keystore
 **/*.jks
 /keystore/
+
+# Firebase — place google-services.json locally (never commit).
+google-services.json
+app/google-services.json
+

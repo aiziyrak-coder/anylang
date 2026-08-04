@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:get/get.dart';
 
 import '../core/buildNetwork/base_result.dart';
 import '../core/buildNetwork/error.dart';
@@ -8,6 +9,7 @@ import '../core/buildNetwork/utils.dart';
 import '../local/account_store.dart';
 import '../local/session_store.dart';
 import 'device_info_payload.dart';
+import 'push_notification_service.dart';
 
 /// AnyLang auth — email + parol + Google (TZ 3).
 class AuthRepository {
@@ -137,6 +139,11 @@ class AuthRepository {
   }
 
   Future<BaseResult> logout() async {
+    if (Get.isRegistered<PushNotificationService>()) {
+      try {
+        await Get.find<PushNotificationService>().unregister();
+      } catch (_) {}
+    }
     final refresh = SessionStore.refreshToken;
     final result = await _client.post(
       api: 'api/v1/auth/logout',
@@ -293,6 +300,10 @@ class AuthRepository {
       try {
         await AccountStore.syncActiveFromSessionStore();
       } catch (_) {}
+      if (Get.isRegistered<PushNotificationService>()) {
+        // ignore: unawaited_futures
+        Get.find<PushNotificationService>().syncToken();
+      }
     }
   }
 }
