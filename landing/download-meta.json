@@ -1,13 +1,13 @@
 {
-  "version": "1.0.94",
-  "build": 95,
-  "version_full": "1.0.94+95",
+  "version": "1.0.95",
+  "build": 96,
+  "version_full": "1.0.95+96",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.94+95.apk",
-  "size_bytes": 89604795,
-  "size_mb": 85.45,
-  "updated_at": "2026-08-04T07:37:54.179059+00:00",
+  "versioned_filename": "anylang-1.0.95+96.apk",
+  "size_bytes": 89804051,
+  "size_mb": 85.64,
+  "updated_at": "2026-08-04T08:44:03.098895+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.cradev.anylang",
-  "notes": "Release 1.0.94+95 — FCM push (chat + friend requests)"
+  "notes": "Release 1.0.95+96 — marketplace analytics, trust tips, profile stats, trade UX"
 }
