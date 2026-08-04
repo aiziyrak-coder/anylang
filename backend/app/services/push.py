@@ -235,7 +235,7 @@ async def enqueue_push(
     body: str,
     data: dict[str, Any] | None = None,
     collapse_key: str | None = None,
-) -> None:
+) -> bool:
     payload = {
         "user_id": user_id,
         "title": title,
@@ -255,7 +255,7 @@ async def enqueue_push(
         )
     except Exception:
         logger.exception("Failed to enqueue send_push_job user_id=%s", user_id)
-        return
+        return False
 
     try:
         from app.db.redis import get_redis
@@ -264,6 +264,8 @@ async def enqueue_push(
         await redis.publish("push:events", json.dumps(payload, default=str))
     except Exception:
         logger.debug("push:events publish failed", exc_info=True)
+
+    return True
 
 
 async def is_chat_muted_for_user(

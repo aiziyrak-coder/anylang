@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -1369,7 +1370,12 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
     final result = await Get.find<ChatRepository>().markRead(chatId, ids);
     result.when(
       success: (_) {},
-      failure: (err) => debugPrint('markRead failed chat=$chatId: $err'),
+      // Unread badge may lag if mark-read fails.
+      failure: (err) {
+        if (kDebugMode) {
+          debugPrint('markRead failed chat=$chatId: $err');
+        }
+      },
     );
   }
 

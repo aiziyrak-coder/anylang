@@ -37,12 +37,15 @@ class MyDatePickerField extends StatelessWidget {
       // localizations'da yo'q; ambient Localizations ishlatiladi.
       cancelText: 'cancel'.tr,
       confirmText: 'confirm'.tr,
-      timeWidgetBuilder: (_) => _fieldVisual(),
+      timeWidgetBuilder: (_) => Builder(
+        builder: (context) => _fieldVisual(context),
+      ),
       onChange: onChanged,
     );
   }
 
-  Widget _fieldVisual() {
+  Widget _fieldVisual(BuildContext context) {
+    final c = context.appColors;
     return FieldBox(
       label: label,
       child: Row(
@@ -53,7 +56,7 @@ class MyDatePickerField extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15.sp,
                 fontWeight: FontWeight.w500,
-                color: date != null ? textDark : notActiveText,
+                color: date != null ? c.textPrimary : c.textFaint,
               ),
             ),
           ),

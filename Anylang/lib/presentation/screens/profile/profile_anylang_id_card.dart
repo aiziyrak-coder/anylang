@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../ui/business_card_links.dart';
+import '../../ui/theme/colors.dart';
 import '../../ui/theme/gradients.dart';
 import '../../utils/screen_options/my_action.dart';
 import '../../utils/size_controller.dart';
@@ -24,6 +25,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
     final url = userId > 0
         ? BusinessCardLinks.urlFor(userId)
         : (anylangId.isNotEmpty ? anylangId : '');
@@ -48,7 +50,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
           Text(
             'profile_anylang_card_title'.tr,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
+              color: c.surface.withValues(alpha: 0.85),
               fontSize: 12.sp,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
@@ -61,7 +63,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
                 child: Text(
                   anylangId.isEmpty ? '—' : anylangId,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: c.surface,
                     fontSize: 22.sp,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.8,
@@ -71,20 +73,20 @@ class ProfileAnyLangIdCard extends StatelessWidget {
               Container(
                 padding: EdgeInsets.all(8.dp),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: c.surface,
                   borderRadius: BorderRadius.circular(12.dp),
                 ),
                 child: QrImageView(
                   data: url.isEmpty ? '—' : url,
                   size: 72.dp,
-                  backgroundColor: Colors.white,
-                  eyeStyle: const QrEyeStyle(
+                  backgroundColor: c.surface,
+                  eyeStyle: QrEyeStyle(
                     eyeShape: QrEyeShape.square,
-                    color: Color(0xFF071526),
+                    color: c.textPrimary,
                   ),
-                  dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleStyle: QrDataModuleStyle(
                     dataModuleShape: QrDataModuleShape.square,
-                    color: Color(0xFF071526),
+                    color: c.textPrimary,
                   ),
                 ),
               ),
@@ -95,6 +97,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _cardBtn(
+                  c: c,
                   icon: Icons.copy_rounded,
                   label: 'profile_copy'.tr,
                   onTap: () => sendAction(CopyAnyLangId()),
@@ -103,6 +106,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
               SizedBox(width: 10.dp),
               Expanded(
                 child: _cardBtn(
+                  c: c,
                   icon: Icons.ios_share_rounded,
                   label: 'profile_share'.tr,
                   onTap: () => sendAction(ShareProfile()),
@@ -111,6 +115,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
               SizedBox(width: 10.dp),
               Expanded(
                 child: _cardBtn(
+                  c: c,
                   icon: Icons.qr_code_2_rounded,
                   label: 'profile_qr'.tr,
                   onTap: () => sendAction(ShowBusinessCardQr()),
@@ -124,6 +129,7 @@ class ProfileAnyLangIdCard extends StatelessWidget {
   }
 
   Widget _cardBtn({
+    required AppColors c,
     required IconData icon,
     required String label,
     required VoidCallback onTap,
@@ -134,20 +140,20 @@ class ProfileAnyLangIdCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 10.dp),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.18),
+          color: c.surface.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(12.dp),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          border: Border.all(color: c.surface.withValues(alpha: 0.25)),
         ),
         child: Column(
           children: [
-            Icon(icon, color: Colors.white, size: 18.dp),
+            Icon(icon, color: c.surface, size: 18.dp),
             SizedBox(height: 4.dp),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white,
+                color: c.surface,
                 fontSize: 11.sp,
                 fontWeight: FontWeight.w700,
               ),

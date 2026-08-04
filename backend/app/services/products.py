@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -19,6 +20,8 @@ from app.models.user import BusinessProfile, Subscription, User
 from app.schemas.product import ProductCreateIn, ProductUpdateIn
 from app.services.factory_verification import build_factory_verification, build_product_trust_badges
 from app.services.business import _key_from_url
+
+logger = logging.getLogger(__name__)
 
 MAX_IMAGES_PER_PRODUCT = 10
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -485,8 +488,8 @@ async def _favorite_ids(db: AsyncSession, user_id: int, product_ids: list[int]) 
 async def _top_product_ids(db: AsyncSession, *, limit: int = 10) -> list[int]:
     """Faqat boost qilingan (is_top_pinned) mahsulotlar — max 10.
     Yangi e'lon avtomatik Topga tushmasin.
+    Muddati o'tgan pinlarni expire_stale_top_pins (ARQ cron) yechadi.
     """
-    await expire_stale_top_pins(db)
     now = datetime.now(UTC)
     pinned_result = await db.execute(
         select(Product.id)
@@ -607,7 +610,11 @@ async def _attach_images(
                 try:
                     await get_storage().delete_object(key)
                 except Exception:
-                    pass
+                    logger.warning(
+                        "S3 delete failed for product image key=%s",
+                        key,
+                        exc_info=True,
+                    )
             await db.delete(img)
         return
 
@@ -634,7 +641,11 @@ async def _attach_images(
                 try:
                     await get_storage().delete_object(key)
                 except Exception:
-                    pass
+                    logger.warning(
+                        "S3 delete failed for product image key=%s",
+                        key,
+                        exc_info=True,
+                    )
             await db.delete(img)
 
     primary_id = primary_image_id or image_ids[0]
@@ -1425,7 +1436,11 @@ async def delete_product_image(db: AsyncSession, *, user: User, image_id: int) -
         try:
             await get_storage().delete_object(key)
         except Exception:
-            pass
+            logger.warning(
+                "S3 delete failed for product image key=%s",
+                key,
+                exc_info=True,
+            )
     await db.delete(image)
 
 

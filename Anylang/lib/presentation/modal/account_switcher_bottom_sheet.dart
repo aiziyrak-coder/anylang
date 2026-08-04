@@ -204,7 +204,9 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
         try {
           // Serverdan ham chiqish (shu qurilma oilasi).
           await Get.find<AuthRepository>().logoutWithRefresh(refresh);
-        } catch (_) {}
+        } catch (_) {
+          showAppWarning('logout_failed'.tr);
+        }
       }
       await AccountStore.removeSlot(slot.userId);
       if (slot.userId == _activeId) {

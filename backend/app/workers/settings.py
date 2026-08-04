@@ -8,7 +8,7 @@ from arq import cron
 from arq.connections import RedisSettings
 
 from app.core.config import get_settings
-from app.workers.tasks import expire_subscriptions_job
+from app.workers.tasks import expire_stale_top_pins_job, expire_subscriptions_job
 from app.workers.push import send_push_job
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,14 @@ async def purge_expired_accounts_job(_ctx: dict) -> int:
 
 class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
-    functions = [purge_expired_accounts_job, expire_subscriptions_job, send_push_job]
+    functions = [
+        purge_expired_accounts_job,
+        expire_subscriptions_job,
+        expire_stale_top_pins_job,
+        send_push_job,
+    ]
     cron_jobs = [
         cron(purge_expired_accounts_job, hour=3, minute=0, run_at_startup=False),
         cron(expire_subscriptions_job, minute=15, run_at_startup=False),
+        cron(expire_stale_top_pins_job, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}, run_at_startup=True),
     ]

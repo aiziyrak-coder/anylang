@@ -59,16 +59,14 @@ class ClickProvider(PaymentProvider):
     async def create_checkout(self, payment: Payment) -> dict[str, Any]:
         s = self.settings
         if not self.is_configured():
-            if s.is_production:
-                raise AppError(
-                    message="Click to'lov sozlanmagan",
-                    error_code="PAYMENT_UNAVAILABLE",
-                    status_code=503,
-                )
-            logger.warning("CLICK_* credentials empty — returning placeholder checkout URL")
+            raise AppError(
+                message="Click to'lov sozlanmagan",
+                error_code="PAYMENT_UNAVAILABLE",
+                status_code=503,
+            )
         params = {
-            "service_id": s.click_service_id or "TODO_SERVICE_ID",
-            "merchant_id": s.click_merchant_id or "TODO_MERCHANT_ID",
+            "service_id": s.click_service_id,
+            "merchant_id": s.click_merchant_id,
             "amount": amount_str(payment.amount),
             "transaction_param": str(payment.id),
             "return_url": f"{s.public_api_base_url.rstrip('/')}/billing/success",

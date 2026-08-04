@@ -20,22 +20,24 @@ class FieldBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
+    final radius = BorderRadius.circular(16.dp);
     final content = Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 16.dp, vertical: 11.dp),
       decoration: BoxDecoration(
-        color: fieldFill,
-        borderRadius: BorderRadius.circular(16.dp),
+        color: c.surface,
+        borderRadius: radius,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           badge == null
-              ? _label()
+              ? _label(c)
               : Row(
                   children: [
-                    Expanded(child: _label()),
+                    Expanded(child: _label(c)),
                     badge!,
                   ],
                 ),
@@ -46,20 +48,23 @@ class FieldBox extends StatelessWidget {
     );
 
     if (onTap == null) return content;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: content,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: content,
+      ),
     );
   }
 
-  Widget _label() {
+  Widget _label(AppColors c) {
     return Text(
       label,
       style: TextStyle(
         fontSize: 11.sp,
         fontWeight: FontWeight.w500,
-        color: fieldLabel,
+        color: c.textSecondary,
         letterSpacing: 0.2,
       ),
     );

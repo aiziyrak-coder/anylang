@@ -13,9 +13,18 @@ export async function GET() {
     );
   }
 
-  const res = await backendFetch("/api/v1/admin/me", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = await res.json();
+  let res: Response;
+  let data: unknown;
+  try {
+    res = await backendFetch("/api/v1/admin/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    data = await res.json();
+  } catch {
+    return NextResponse.json(
+      { message: "Backend unavailable", error_code: "BAD_GATEWAY" },
+      { status: 502 },
+    );
+  }
   return NextResponse.json(data, { status: res.status });
 }

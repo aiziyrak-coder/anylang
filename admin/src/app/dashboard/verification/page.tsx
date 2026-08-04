@@ -38,14 +38,10 @@ type Req = {
 
 type DecideState = { id: number; approve: boolean } | null;
 
-const DOC_LABELS: Record<string, string> = {
-  business_license: "Guvohnoma / registratsiya",
-  tax_certificate: "STIR / soliq",
-  owner_id: "Rahbar ID",
-  iso_certificate: "ISO / CE / FDA",
-  factory_photo: "Zavod foto",
-  audit_report: "Audit report",
-};
+function docLabel(docType: string): string {
+  const label = t(`verification.doc.${docType}`);
+  return label === `verification.doc.${docType}` ? docType : label;
+}
 
 export default function VerificationPage() {
   const list = useAdminList<Req, { status: string }>({
@@ -154,7 +150,7 @@ export default function VerificationPage() {
                     rel="noreferrer"
                     className="rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800"
                   >
-                    {DOC_LABELS[doc.doc_type] || doc.doc_type}
+                    {docLabel(doc.doc_type)}
                   </a>
                 ))}
               </div>

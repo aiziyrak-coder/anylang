@@ -17,3 +17,15 @@ async def expire_subscriptions_job(_ctx: dict) -> int:
         await db.commit()
     logger.info("Expired %s subscriptions", count)
     return count
+
+
+async def expire_stale_top_pins_job(_ctx: dict) -> int:
+    from app.db.session import get_session_factory
+    from app.services.products import expire_stale_top_pins
+
+    factory = get_session_factory()
+    async with factory() as db:
+        count = await expire_stale_top_pins(db)
+        await db.commit()
+    logger.info("Expired/promoted %s product top pins", count)
+    return count

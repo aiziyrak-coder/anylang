@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -107,7 +108,11 @@ class MessagesScreen extends Screen<MessagesState, void> {
             for (final e in cached) {
               try {
                 items.add(Conversation.fromApi(e));
-              } catch (_) {}
+              } catch (err, st) {
+                if (kDebugMode) {
+                  debugPrint('Conversation.fromApi skipped (offline): $err\n$st');
+                }
+              }
             }
             state.conversations.assignAll(_filterConversations(items, filter));
             return;

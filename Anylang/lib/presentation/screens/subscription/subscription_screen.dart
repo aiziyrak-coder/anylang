@@ -12,6 +12,7 @@ import '../../../data/network/payment_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/payment_confirm_bottom_sheet.dart';
 import '../../ui/items/plan_card.dart';
+import '../../ui/theme/colors.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/auth_validators.dart';
 import '../../utils/money_format.dart';
@@ -389,7 +390,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
             onPressed: () => Get.back(result: true),
             child: Text(
               'subscription_cancel'.tr,
-              style: const TextStyle(color: Color(0xFFB42318)),
+              style: TextStyle(color: context.appColors.danger),
             ),
           ),
         ],

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -535,12 +535,42 @@ async def _friendship_context(
         )
     )
     friendship = result.scalar_one_or_none()
+    return _friendship_tuple(viewer_id, friendship)
+
+
+def _friendship_tuple(
+    viewer_id: int, friendship: Friendship | None
+) -> tuple[str, int | None, bool]:
     if friendship is None or friendship.status not in {"pending", "accepted"}:
         return "none", None, False
     if friendship.status == "accepted":
         return "accepted", friendship.id, False
     is_incoming = friendship.requester_id != viewer_id
     return "pending", friendship.id, is_incoming
+
+
+async def _friendship_context_map(
+    db: AsyncSession, viewer_id: int, target_ids: list[int]
+) -> dict[int, tuple[str, int | None, bool]]:
+    """Batch-load friendship status for many targets (avoids N+1 in search)."""
+    out: dict[int, tuple[str, int | None, bool]] = {
+        tid: ("none", None, False) for tid in target_ids
+    }
+    if not target_ids:
+        return out
+    lows_highs = [(min(viewer_id, tid), max(viewer_id, tid), tid) for tid in target_ids]
+    pairs = {(lo, hi) for lo, hi, _ in lows_highs}
+    result = await db.execute(
+        select(Friendship).where(
+            tuple_(Friendship.user_low_id, Friendship.user_high_id).in_(list(pairs))
+        )
+    )
+    by_pair = {
+        (f.user_low_id, f.user_high_id): f for f in result.scalars().all()
+    }
+    for lo, hi, tid in lows_highs:
+        out[tid] = _friendship_tuple(viewer_id, by_pair.get((lo, hi)))
+    return out
 
 
 async def get_public_profile(
@@ -720,9 +750,14 @@ async def search_users(
         .limit(200)
     )
     candidates = list(result.scalars().all())
+    friendship_map = await _friendship_context_map(
+        db, viewer.id, [u.id for u in candidates]
+    )
     items: list[dict] = []
     for user in candidates:
-        status, request_id, is_incoming = await _friendship_context(db, viewer.id, user.id)
+        status, request_id, is_incoming = friendship_map.get(
+            user.id, ("none", None, False)
+        )
         is_business = user.is_business
         biz = user.business
         display_name = user.full_name

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:anylang/presentation/ui/theme/colors.dart';
 import 'package:anylang/presentation/utils/screen_options/my_action.dart';
 import 'package:anylang/presentation/utils/screen_options/screen_content.dart';
 
@@ -97,7 +98,8 @@ class _ScreenWidgetState extends State<ScreenWidget> {
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      backgroundColor: content.color,
+      backgroundColor:
+          content.color ?? context.appColors.background,
       body: content.build(context, widget.state, widget.sendActionCallback),
     );
   }

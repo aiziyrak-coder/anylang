@@ -102,9 +102,9 @@ export default function DashboardPage() {
           onChange={(e) => setDays(Number(e.target.value))}
           className="rounded-lg border px-3 py-2 text-sm"
         >
-          <option value={7}>7 kun</option>
+          <option value={7}>{t("dashboard.last7")}</option>
           <option value={30}>{t("dashboard.last30")}</option>
-          <option value={90}>90 kun</option>
+          <option value={90}>{t("dashboard.last90")}</option>
         </select>
         <button
           type="button"

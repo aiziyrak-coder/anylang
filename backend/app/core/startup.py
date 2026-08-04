@@ -54,11 +54,40 @@ def validate_settings(settings: Settings) -> None:
                 "Click checkout disabled until credentials are set; "
                 "SHOP API Prepare/Complete still mounted"
             )
-        if settings.payment_provider == "paddle" and not (
-            settings.paddle_api_key and settings.paddle_webhook_secret
-        ):
-            errors.append(
-                "PADDLE_API_KEY / PADDLE_WEBHOOK_SECRET required when PAYMENT_PROVIDER=paddle"
+        if settings.payment_provider == "paddle":
+            if not (settings.paddle_api_key and settings.paddle_webhook_secret):
+                errors.append(
+                    "PADDLE_API_KEY / PADDLE_WEBHOOK_SECRET required when PAYMENT_PROVIDER=paddle"
+                )
+            paddle_prices = (
+                settings.paddle_price_premium_monthly,
+                settings.paddle_price_premium_yearly,
+                settings.paddle_price_business_monthly,
+                settings.paddle_price_business_yearly,
+            )
+            if not all((p or "").strip() for p in paddle_prices):
+                errors.append(
+                    "PADDLE price IDs (premium/business monthly+yearly) required in production "
+                    "when PAYMENT_PROVIDER=paddle"
+                )
+        if settings.payment_provider == "multicard":
+            base = (settings.multicard_base_url or "").lower()
+            has_multicard_creds = bool(
+                (settings.multicard_application_id or "").strip()
+                and (settings.multicard_secret or "").strip()
+                and settings.multicard_store_id
+            )
+            if "dev-mesh" in base and not has_multicard_creds:
+                errors.append(
+                    "MULTICARD_BASE_URL must not use dev-mesh in production unless "
+                    "MULTICARD_APPLICATION_ID / MULTICARD_SECRET / MULTICARD_STORE_ID are set"
+                )
+        if not (settings.firebase_project_id or "").strip() or not (
+            settings.firebase_credentials_json or ""
+        ).strip():
+            logger.warning(
+                "FCM unset — FIREBASE_PROJECT_ID / FIREBASE_CREDENTIALS_JSON not configured; "
+                "push notifications disabled"
             )
         if settings.cors_origins.strip() in ("*", ""):
             errors.append("CORS_ORIGINS must be an explicit allow-list in production")

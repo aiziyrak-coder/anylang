@@ -1,16 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:anylang/presentation/ui/theme/colors.dart';
 import 'package:anylang/presentation/utils/screen_options/my_action.dart';
 
 abstract class ScreenContent<S> {
 
-  final Color color;
+  final Color? color;
 
   bool isKeyboardOpen = false;
 
-  ScreenContent({this.color = mainBackground});
+  ScreenContent({this.color});
 
   Widget build(
     BuildContext context,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../data/local/account_store.dart';
@@ -31,7 +32,11 @@ class LoginScreen extends Screen<LoginState, LoginPayload?> {
   Future<void> _enterApp() async {
     try {
       await AccountStore.syncActiveFromSessionStore();
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('AccountStore sync failed: $e');
+      }
+    }
     await connectRealtimeIfNeeded();
     navigateAndRemoveUntil(MainScreen());
   }

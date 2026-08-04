@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Query, Request
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.deps_auth import CurrentUser
 from app.core.deps import DbSession, RedisClient
+from app.core.errors import AppError
 from app.core.rate_limit import client_ip, enforce_rate_limit
 from app.schemas.support import (
     SupportChatIn,
@@ -87,16 +89,14 @@ async def support_chat(
             session_id=body.session_id,
         )
         return SupportChatOut.model_validate(data)
-    except Exception as exc:
+    except AppError:
+        raise
+    except SQLAlchemyError as exc:
         # Session persistence must not block Sofiya replies (MissingGreenlet / schema).
-        from app.core.errors import AppError
-
-        if isinstance(exc, AppError):
-            raise
         _log.exception("support session chat failed; falling back to stateless: %s", exc)
         try:
             await db.rollback()
-        except Exception:
+        except SQLAlchemyError:
             pass
         reply = await support_service.reply_support(
             message=body.message,
@@ -109,6 +109,13 @@ async def support_chat(
             agent_name=support_service.agent_name(),
             session_id=body.session_id or 0,
         )
+    except Exception as exc:
+        _log.exception("support session chat unexpected error: %s", exc)
+        raise AppError(
+            message="Qo'llab-quvvatlash vaqtincha mavjud emas",
+            error_code="SERVICE_UNAVAILABLE",
+            status_code=503,
+        ) from exc
 
 
 @router.post("/public", response_model=SupportChatOut)

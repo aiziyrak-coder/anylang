@@ -221,7 +221,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok", "service": settings.app_name, "env": settings.app_env}
+        return {"status": "ok", "service": settings.app_name}
 
     @app.get("/ready")
     async def ready() -> JSONResponse:
@@ -255,9 +255,7 @@ def create_app() -> FastAPI:
                     "checks": checks,
                 },
             )
-        return JSONResponse(
-            content={"status": "ready", "checks": checks, "env": settings.app_env}
-        )
+        return JSONResponse(content={"status": "ready", "checks": checks})
 
     @app.get("/metrics/basic")
     async def basic_metrics() -> JSONResponse:

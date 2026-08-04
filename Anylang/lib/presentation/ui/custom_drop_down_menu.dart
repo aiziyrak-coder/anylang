@@ -24,26 +24,26 @@ class CustomDropDownMenu<T> extends StatelessWidget {
     required this.selectedItem,
   });
 
-  CustomDropdownDecoration get _decoration => CustomDropdownDecoration(
-        closedFillColor: fieldFill,
-        expandedFillColor: Colors.white,
+  CustomDropdownDecoration _decoration(AppColors c) => CustomDropdownDecoration(
+        closedFillColor: c.surface,
+        expandedFillColor: c.surface,
         closedBorder: Border.all(color: Colors.transparent),
         closedBorderRadius: BorderRadius.circular(16.dp),
-        expandedBorder: Border.all(color: bluePrimary),
+        expandedBorder: Border.all(color: c.accent),
         expandedBorderRadius: BorderRadius.circular(16.dp),
-        closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: notActiveText, size: 20.dp),
-        expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: bluePrimary, size: 20.dp),
+        closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: c.textFaint, size: 20.dp),
+        expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: c.accent, size: 20.dp),
         listItemStyle: TextStyle(
           fontFamily: 'Fustat',
           fontSize: 15.sp,
           fontWeight: FontWeight.w500,
-          color: textDark,
+          color: c.textPrimary,
         ),
       );
 
   EdgeInsets get _padding => EdgeInsets.symmetric(horizontal: 16.dp, vertical: 11.dp);
 
-  Widget _closed(String value, {required bool isHint}) {
+  Widget _closed(AppColors c, String value, {required bool isHint}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -53,7 +53,7 @@ class CustomDropDownMenu<T> extends StatelessWidget {
           style: TextStyle(
             fontSize: 11.sp,
             fontWeight: FontWeight.w500,
-            color: fieldLabel,
+            color: c.textSecondary,
             letterSpacing: 0.2,
           ),
         ),
@@ -63,7 +63,7 @@ class CustomDropDownMenu<T> extends StatelessWidget {
           style: TextStyle(
             fontSize: 15.sp,
             fontWeight: FontWeight.w500,
-            color: isHint ? notActiveText : textDark,
+            color: isHint ? c.textFaint : c.textPrimary,
           ),
         ),
       ],
@@ -72,6 +72,7 @@ class CustomDropDownMenu<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
     if (showSearch) {
       return CustomDropdown<T>.search(
         items: items,
@@ -79,9 +80,9 @@ class CustomDropDownMenu<T> extends StatelessWidget {
         hintText: hintText,
         searchHintText: '${'search'.tr} :',
         closedHeaderPadding: _padding,
-        decoration: _decoration,
-        headerBuilder: (_, item, _) => _closed(item.toString(), isHint: false),
-        hintBuilder: (_, hint, _) => _closed(hint, isHint: true),
+        decoration: _decoration(c),
+        headerBuilder: (_, item, _) => _closed(c, item.toString(), isHint: false),
+        hintBuilder: (_, hint, _) => _closed(c, hint, isHint: true),
         onChanged: (value) {
           if (value != null) selectedItem(value);
         },
@@ -93,9 +94,9 @@ class CustomDropDownMenu<T> extends StatelessWidget {
       initialItem: initialItem,
       hintText: hintText,
       closedHeaderPadding: _padding,
-      decoration: _decoration,
-      headerBuilder: (_, item, _) => _closed(item.toString(), isHint: false),
-      hintBuilder: (_, hint, _) => _closed(hint, isHint: true),
+      decoration: _decoration(c),
+      headerBuilder: (_, item, _) => _closed(c, item.toString(), isHint: false),
+      hintBuilder: (_, hint, _) => _closed(c, hint, isHint: true),
       onChanged: (value) {
         if (value != null) selectedItem(value);
       },

@@ -20,29 +20,33 @@ class ToggleSwitch extends StatelessWidget {
     const thumbSize = 20.0;
     const inset = 3.0;
 
-    return GestureDetector(
-      onTap: () => onChanged(!value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        width: trackWidth.dp,
-        height: trackHeight.dp,
-        padding: EdgeInsets.all(inset.dp),
-        decoration: BoxDecoration(
-          gradient: value ? limeButtonGradient : null,
-          color: value ? null : c.toggleTrackOff,
-          borderRadius: BorderRadius.circular(99.dp),
-        ),
-        child: AnimatedAlign(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        borderRadius: BorderRadius.circular(99.dp),
+        child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            width: thumbSize.dp,
-            height: thumbSize.dp,
-            decoration: BoxDecoration(
-              color: value ? c.toggleThumbOn : c.toggleThumbOff,
-              shape: BoxShape.circle,
+          width: trackWidth.dp,
+          height: trackHeight.dp,
+          padding: EdgeInsets.all(inset.dp),
+          decoration: BoxDecoration(
+            gradient: value ? limeButtonGradient : null,
+            color: value ? null : c.toggleTrackOff,
+            borderRadius: BorderRadius.circular(99.dp),
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: thumbSize.dp,
+              height: thumbSize.dp,
+              decoration: BoxDecoration(
+                color: value ? c.toggleThumbOn : c.toggleThumbOff,
+                shape: BoxShape.circle,
+              ),
             ),
           ),
         ),

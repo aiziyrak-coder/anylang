@@ -37,6 +37,7 @@ class _PhoneNumberInputState extends State<PhoneNumberInput> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -45,7 +46,7 @@ class _PhoneNumberInputState extends State<PhoneNumberInput> {
           style: TextStyle(
             fontSize: 16.sp,
             fontWeight: FontWeight.w500,
-            color: textDark,
+            color: c.textPrimary,
           ),
         ),
         SizedBox(height: 8.dp),
@@ -55,7 +56,7 @@ class _PhoneNumberInputState extends State<PhoneNumberInput> {
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(12.dp),
             border: Border.all(
-              color: isFocused ? bluePrimary : fieldBorder,
+              color: isFocused ? c.accent : c.surfaceBorder,
               width: 1.5,
             ),
           ),
@@ -67,7 +68,7 @@ class _PhoneNumberInputState extends State<PhoneNumberInput> {
                   "+998",
                   style: TextStyle(
                     fontSize: 18.sp,
-                    color: textDark,
+                    color: c.textPrimary,
                   ),
                 ),
               ),
@@ -75,7 +76,7 @@ class _PhoneNumberInputState extends State<PhoneNumberInput> {
               Container(
                 width: 1,
                 height: double.infinity,
-                color: fieldBorder,
+                color: c.surfaceBorder,
               ),
 
               Expanded(
@@ -88,11 +89,12 @@ class _PhoneNumberInputState extends State<PhoneNumberInput> {
                   ],
                   style: TextStyle(
                     fontSize: 18.sp,
+                    color: c.textPrimary,
                   ),
                   decoration: InputDecoration(
                     hintText: "00 123 - 45 - 67",
                     hintStyle: TextStyle(
-                      color: textMuted,
+                      color: c.textFaint,
                       fontSize: 18.sp,
                     ),
                     border: InputBorder.none,

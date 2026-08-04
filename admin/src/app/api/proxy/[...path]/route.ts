@@ -92,20 +92,29 @@ async function handle(request: NextRequest, params: Promise<{ path: string[] }>)
       ? await request.arrayBuffer()
       : undefined;
 
-  const res = await backendFetch(`${targetPath}${search}`, {
-    method: request.method,
-    body: body ? Buffer.from(body) : undefined,
-    token,
-    headers: {
-      Accept: request.headers.get("accept") ?? "application/json",
-      ...(body
-        ? { "Content-Type": request.headers.get("content-type") ?? "application/json" }
-        : {}),
-    },
-  });
+  let res: Response;
+  let payload: ArrayBuffer;
+  try {
+    res = await backendFetch(`${targetPath}${search}`, {
+      method: request.method,
+      body: body ? Buffer.from(body) : undefined,
+      token,
+      headers: {
+        Accept: request.headers.get("accept") ?? "application/json",
+        ...(body
+          ? { "Content-Type": request.headers.get("content-type") ?? "application/json" }
+          : {}),
+      },
+    });
+    payload = await res.arrayBuffer();
+  } catch {
+    return NextResponse.json(
+      { message: "Backend unavailable", error_code: "BAD_GATEWAY" },
+      { status: 502 },
+    );
+  }
 
   const contentType = res.headers.get("content-type") ?? "application/json";
-  const payload = await res.arrayBuffer();
 
   return new NextResponse(payload, {
     status: res.status,

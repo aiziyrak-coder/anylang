@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     # Preferred production delivery (https://resend.com). If set, SMTP_HOST is unused for OTP.
     resend_api_key: str = ""
     # If delivery is down, still accept register (OTP hashed in DB). Never return OTP in production.
-    smtp_fail_open: bool = True
+    smtp_fail_open: bool = False
     allow_otp_in_response: bool = False
 
     google_client_ids: str = ""
