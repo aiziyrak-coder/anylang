@@ -1,13 +1,13 @@
 {
-  "version": "1.0.95",
-  "build": 96,
-  "version_full": "1.0.95+96",
+  "version": "1.0.96",
+  "build": 97,
+  "version_full": "1.0.96+97",
   "filename": "anylang-latest.apk",
-  "versioned_filename": "anylang-1.0.95+96.apk",
+  "versioned_filename": "anylang-1.0.96+97.apk",
   "size_bytes": 89804051,
   "size_mb": 85.64,
-  "updated_at": "2026-08-04T08:44:03.098895+00:00",
+  "updated_at": "2026-08-04T09:47:57.208270+00:00",
   "download_url": "https://anylang.uz/download/anylang-latest.apk",
   "package": "com.cradev.anylang",
-  "notes": "Release 1.0.95+96 — marketplace analytics, trust tips, profile stats, trade UX"
+  "notes": "Release 1.0.96+97 — audit hardening, dark theme, security & deploy fixes"
 }
