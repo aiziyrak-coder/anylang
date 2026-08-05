@@ -33,15 +33,14 @@ def upgrade() -> None:
         "admin_audit_logs",
         sa.Column("content_hash", sa.String(length=64), nullable=True),
     )
-    op.create_index(
-        "ix_admin_audit_logs_created_at",
-        "admin_audit_logs",
-        ["created_at"],
+    # May already exist from c3d4e5f6a7b8_admin_hardening_indexes on older chain.
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_admin_audit_logs_created_at "
+        "ON admin_audit_logs (created_at)"
     )
-    op.create_index(
-        "ix_admin_audit_logs_ip",
-        "admin_audit_logs",
-        ["ip"],
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_admin_audit_logs_ip "
+        "ON admin_audit_logs (ip)"
     )
 
     # Immutability: block UPDATE/DELETE on audit rows (append-only).
@@ -55,6 +54,7 @@ def upgrade() -> None:
         $$ LANGUAGE plpgsql;
         """
     )
+    op.execute("DROP TRIGGER IF EXISTS trg_admin_audit_logs_immutable ON admin_audit_logs")
     op.execute(
         """
         CREATE TRIGGER trg_admin_audit_logs_immutable
