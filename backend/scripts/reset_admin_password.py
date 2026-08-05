@@ -10,8 +10,8 @@ import sys
 async def main() -> int:
     email = (os.environ.get("RESET_ADMIN_EMAIL") or "").strip().lower()
     password = os.environ.get("RESET_ADMIN_PASSWORD") or ""
-    if not email or len(password) < 12:
-        print("Need RESET_ADMIN_EMAIL and RESET_ADMIN_PASSWORD (>=12)", file=sys.stderr)
+    if not email or len(password) < 8:
+        print("Need RESET_ADMIN_EMAIL and RESET_ADMIN_PASSWORD (>=8)", file=sys.stderr)
         return 2
 
     from app.db.session import get_session_factory

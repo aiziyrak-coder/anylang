@@ -84,9 +84,9 @@ async def upsert_admin(
 ) -> AdminUser:
     """Create or reset an admin account (ops / bootstrap only)."""
     normalized = (email or "").lower().strip()
-    if not normalized or len(password) < 12:
+    if not normalized or len(password) < 8:
         raise AppError(
-            message="Admin email/parol noto'g'ri (parol kamida 12 belgi)",
+            message="Admin email/parol noto'g'ri (parol kamida 8 belgi)",
             error_code="VALIDATION_ERROR",
             status_code=400,
         )
