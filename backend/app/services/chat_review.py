@@ -20,9 +20,116 @@ from app.models.user import AdminUser
 from app.services.admin_ops import write_audit
 
 ACCESS_TTL_SEC = 15 * 60
-CASE_REASONS = {"spam", "harassment", "scam", "pii", "keyword", "other"}
+CASE_REASONS = {
+    "spam",
+    "harassment",
+    "scam",
+    "pii",
+    "keyword",
+    "extremism",
+    "terrorism",
+    "illegal_trade",
+    "other",
+}
 CASE_STATUSES = {"open", "reviewing", "decided"}
 DECISIONS = {"warn", "ban", "dismiss", "none"}
+
+# Operator watchlist — keyword search only (no full inbox scan).
+WATCHLIST_PRESETS: list[dict[str, Any]] = [
+    {
+        "id": "illegal_trade",
+        "reason": "illegal_trade",
+        "label_uz": "Noqonuniy savdo",
+        "label_ru": "Незаконная торговля",
+        "label_en": "Illegal trade",
+        "hint_uz": "Qurol, giyohvand, soxta hujjat — kalit so‘z qidiruvi",
+        "keywords": [
+            "qurol",
+            "patron",
+            "nasha",
+            "koknar",
+            "героин",
+            "наркотик",
+            "оружие",
+            "passport sot",
+            "visa sotaman",
+            "hujjat yasash",
+            "soxta passport",
+        ],
+    },
+    {
+        "id": "extremism",
+        "reason": "extremism",
+        "label_uz": "Diniy ekstremizm",
+        "label_ru": "Религиозный экстремизм",
+        "label_en": "Religious extremism",
+        "hint_uz": "Radikal da’vat / takfir — faqat qidiruv orqali",
+        "keywords": [
+            "jihad",
+            "джихад",
+            "takfir",
+            "такфир",
+            "хилофат",
+            "caliphate",
+            "shahid bo'l",
+        ],
+    },
+    {
+        "id": "terrorism",
+        "reason": "terrorism",
+        "label_uz": "Terrorizm",
+        "label_ru": "Терроризм",
+        "label_en": "Terrorism",
+        "hint_uz": "Portlovchi / hujum rejasi — case ochib tekshiring",
+        "keywords": [
+            "bomba",
+            "bomb",
+            "взрывчат",
+            "теракт",
+            "portlovchi",
+            "terror",
+        ],
+    },
+    {
+        "id": "scam",
+        "reason": "scam",
+        "label_uz": "Firibgarlik",
+        "label_ru": "Мошенничество",
+        "label_en": "Scam",
+        "hint_uz": "Oldindan to‘lov / yolg‘on investitsiya",
+        "keywords": [
+            "karta raqam",
+            "avans yubor",
+            "100% daromad",
+            "крипта китинг",
+            "binance kod",
+        ],
+    },
+]
+
+
+def watchlist_presets() -> dict[str, Any]:
+    return {
+        "mode": "search_or_case_only",
+        "full_scan": False,
+        "notice_uz": "To‘liq chat skan o‘chirilgan. Faqat kalit so‘z qidiruvi yoki case.",
+        "items": WATCHLIST_PRESETS,
+    }
+
+
+def _parse_search_terms(query: str) -> list[str]:
+    raw = (query or "").strip()
+    if not raw:
+        return []
+    parts = re.split(r"[|,]+", raw)
+    terms: list[str] = []
+    for p in parts:
+        t = p.strip()
+        if len(t) >= 2 and t.lower() not in {x.lower() for x in terms}:
+            terms.append(t)
+    if not terms and len(raw) >= 3:
+        terms = [raw]
+    return terms[:12]
 
 # Card: 13–19 digits with optional spaces/dashes (Luhn not required for highlight)
 _CARD_RE = re.compile(r"(?<!\d)(?:\d[ -]*?){13,19}(?!\d)")
@@ -32,7 +139,12 @@ _PHONE_RE = re.compile(
 )
 
 
-def find_pii_spans(text: str | None, *, keyword: str | None = None) -> list[dict[str, Any]]:
+def find_pii_spans(
+    text: str | None,
+    *,
+    keyword: str | None = None,
+    keywords: list[str] | None = None,
+) -> list[dict[str, Any]]:
     if not text:
         return []
     spans: list[dict[str, Any]] = []
@@ -61,9 +173,19 @@ def find_pii_spans(text: str | None, *, keyword: str | None = None) -> list[dict
                     "masked": _mask_phone(digits),
                 }
             )
+    kws = list(keywords or [])
     if keyword and keyword.strip():
-        kw = keyword.strip()
-        for m in re.finditer(re.escape(kw), text, flags=re.IGNORECASE):
+        kws.extend(_parse_search_terms(keyword))
+    seen_kw = set()
+    for kw in kws:
+        k = kw.strip()
+        if len(k) < 2:
+            continue
+        key = k.lower()
+        if key in seen_kw:
+            continue
+        seen_kw.add(key)
+        for m in re.finditer(re.escape(k), text, flags=re.IGNORECASE):
             spans.append(
                 {
                     "type": "keyword",
@@ -306,12 +428,24 @@ async def search_chats(
     admin: AdminUser,
     ip: str | None = None,
     limit: int = 30,
+    category: str | None = None,
 ) -> dict[str, Any]:
     """Keyword search only — no full chat scan."""
     q = (query or "").strip()
-    if len(q) < 3:
+    terms = _parse_search_terms(q)
+    if category:
+        for preset in WATCHLIST_PRESETS:
+            if preset["id"] == category:
+                # Merge preset keywords with free-text terms
+                for kw in preset["keywords"]:
+                    if kw.lower() not in {t.lower() for t in terms}:
+                        terms.append(kw)
+                if not (reason or "").strip():
+                    reason = preset.get("label_uz") or category
+                break
+    if len(terms) == 0 or (len(terms) == 1 and len(terms[0]) < 3 and not terms[0].isdigit()):
         raise AppError(
-            message="Qidiruv kamida 3 belgi",
+            message="Qidiruv kamida 3 belgi (yoki watchlist kategoriyasi)",
             error_code="VALIDATION_ERROR",
             status_code=400,
         )
@@ -323,42 +457,48 @@ async def search_chats(
             status_code=400,
         )
 
-    pattern = f"%{q}%"
-    # Match chats by id / participant OR message text containing keyword (capped)
-    msg_chat_ids = (
-        await db.execute(
-            select(Message.chat_id)
-            .where(Message.text_original.ilike(pattern), Message.is_deleted.is_(False))
-            .group_by(Message.chat_id)
-            .order_by(func.max(Message.id).desc())
-            .limit(limit)
+    # OR match across terms (capped) — never list all chats
+    like_filters = [Message.text_original.ilike(f"%{t}%") for t in terms if not t.isdigit()]
+    msg_chat_ids: list[int] = []
+    if like_filters:
+        msg_chat_ids = list(
+            (
+                await db.execute(
+                    select(Message.chat_id)
+                    .where(or_(*like_filters), Message.is_deleted.is_(False))
+                    .group_by(Message.chat_id)
+                    .order_by(func.max(Message.id).desc())
+                    .limit(limit)
+                )
+            ).scalars().all()
         )
-    ).scalars().all()
 
     chat_ids = list(dict.fromkeys(int(x) for x in msg_chat_ids))
-    if q.isdigit():
-        uid_or_cid = int(q)
-        extra = (
-            await db.execute(
-                select(Chat.id).where(
-                    or_(
-                        Chat.id == uid_or_cid,
-                        Chat.user_low_id == uid_or_cid,
-                        Chat.user_high_id == uid_or_cid,
+    for t in terms:
+        if t.isdigit():
+            uid_or_cid = int(t)
+            extra = (
+                await db.execute(
+                    select(Chat.id)
+                    .where(
+                        or_(
+                            Chat.id == uid_or_cid,
+                            Chat.user_low_id == uid_or_cid,
+                            Chat.user_high_id == uid_or_cid,
+                        )
                     )
-                ).limit(20)
-            )
-        ).scalars().all()
-        for cid in extra:
-            if int(cid) not in chat_ids:
-                chat_ids.append(int(cid))
+                    .limit(20)
+                )
+            ).scalars().all()
+            for cid in extra:
+                if int(cid) not in chat_ids:
+                    chat_ids.append(int(cid))
 
     chats: list[Chat] = []
     if chat_ids:
         chats = list(
             (await db.execute(select(Chat).where(Chat.id.in_(chat_ids)))).scalars().all()
         )
-        # preserve order
         by_id = {c.id: c for c in chats}
         chats = [by_id[i] for i in chat_ids if i in by_id]
 
@@ -368,7 +508,14 @@ async def search_chats(
         action="chat.search",
         target_type=None,
         target_id=None,
-        meta={"query": q[:100], "reason": reason_clean[:200], "hits": len(chats)},
+        meta={
+            "query": q[:100],
+            "terms": terms[:12],
+            "category": category,
+            "reason": reason_clean[:200],
+            "hits": len(chats),
+            "full_scan": False,
+        },
         ip=ip,
     )
 
@@ -390,9 +537,12 @@ async def search_chats(
         )
     return {
         "query": q,
+        "terms": terms,
+        "category": category,
         "reason": reason_clean,
         "items": items,
         "total": len(items),
+        "full_scan": False,
     }
 
 
@@ -405,10 +555,20 @@ async def open_chat_access(
     search_query: str | None,
     admin: AdminUser,
     ip: str | None = None,
+    category: str | None = None,
 ) -> dict[str, Any]:
     chat = await db.get(Chat, chat_id)
     if chat is None:
         raise AppError(message="Chat not found", error_code="CHAT_NOT_FOUND", status_code=404)
+
+    case_reason = "keyword" if search_query else "other"
+    if category:
+        for preset in WATCHLIST_PRESETS:
+            if preset["id"] == category:
+                case_reason = str(preset["reason"])
+                break
+    elif (reason or "").strip().lower() in CASE_REASONS:
+        case_reason = (reason or "").strip().lower()
 
     linked_case_id = case_id
     if case_id is not None:
@@ -433,7 +593,7 @@ async def open_chat_access(
         case = await create_case(
             db,
             chat_id=chat_id,
-            reason="keyword" if search_query else "other",
+            reason=case_reason,
             description=reason,
             source="search" if search_query else "report",
             search_query=search_query,

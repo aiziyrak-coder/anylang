@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 
 const COOKIE = "admin_token";
 const SUPERADMIN_PATHS = [
-  "/dashboard/chats",
   "/dashboard/restore",
   "/dashboard/audit",
   "/dashboard/maintenance",
 ];
+const CHAT_ROLES = new Set(["superadmin", "moderator", "support"]);
 
 function roleFromJwt(token: string): string | null {
   try {
@@ -42,6 +42,9 @@ export function middleware(request: NextRequest) {
       return res;
     }
     if (SUPERADMIN_PATHS.some((p) => path.startsWith(p)) && role !== "superadmin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    if (path.startsWith("/dashboard/chats") && !CHAT_ROLES.has(role)) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }

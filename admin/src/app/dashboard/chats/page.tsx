@@ -6,8 +6,9 @@ import { PageHeader } from "@/components/admin/page-header";
 import { Pagination } from "@/components/admin/pagination";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ApiError, apiFetch, apiFetchBlob } from "@/lib/api";
-import { isSuperAdmin } from "@/lib/auth";
+import { getAdminProfile } from "@/lib/auth";
 import { formatDate, t } from "@/lib/i18n";
+import { can } from "@/lib/rbac";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState, type ReactNode } from "react";
 
@@ -55,7 +56,28 @@ type AccessInfo = {
   reason?: string;
 };
 
+type WatchPreset = {
+  id: string;
+  reason: string;
+  label_uz: string;
+  label_ru: string;
+  label_en: string;
+  hint_uz: string;
+  keywords: string[];
+};
+
 type Tab = "search" | "cases";
+
+const CASE_REASON_OPTIONS = [
+  ["extremism", "chats.reasonExtremism"],
+  ["terrorism", "chats.reasonTerrorism"],
+  ["illegal_trade", "chats.reasonIllegal"],
+  ["scam", "chats.reasonScam"],
+  ["spam", "chats.reasonSpam"],
+  ["harassment", "chats.reasonHarassment"],
+  ["pii", "chats.reasonPii"],
+  ["other", "chats.reasonOther"],
+] as const;
 
 function HighlightedText({ text, highlights }: { text: string; highlights?: Highlight[] }) {
   if (!highlights?.length) {
@@ -120,16 +142,24 @@ export default function ChatsPage() {
 
   const [newCase, setNewCase] = useState({
     chat_id: "",
-    reason: "spam",
+    reason: "illegal_trade",
     description: "",
     reporter_user_id: "",
     reported_user_id: "",
   });
   const [decideNote, setDecideNote] = useState("");
+  const [watchlist, setWatchlist] = useState<WatchPreset[]>([]);
+  const [category, setCategory] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isSuperAdmin()) router.replace("/dashboard");
+    if (!can(getAdminProfile()?.role, "chats")) router.replace("/dashboard");
   }, [router]);
+
+  useEffect(() => {
+    void apiFetch<{ items: WatchPreset[] }>("/api/v1/admin/chats/watchlist")
+      .then((res) => setWatchlist(res.items ?? []))
+      .catch(() => setWatchlist([]));
+  }, []);
 
   const loadCases = useCallback(async () => {
     setCasesLoading(true);
@@ -177,7 +207,11 @@ export default function ChatsPage() {
     try {
       const res = await apiFetch<{ items: ChatHit[] }>("/api/v1/admin/chats/search", {
         method: "POST",
-        body: JSON.stringify({ query, reason: searchReason }),
+        body: JSON.stringify({
+          query,
+          reason: searchReason,
+          category: category || null,
+        }),
       });
       setHits(res.items ?? []);
     } catch (err) {
@@ -205,15 +239,26 @@ export default function ChatsPage() {
           reason,
           case_id: opts?.caseId ?? null,
           search_query: opts?.searchQuery ?? (query || null),
+          category: category || null,
         }),
       });
       setSelected(chatId);
       setCaseId(res.case_id);
       setAccess(res.access);
+      setMsgPage(1);
       await loadMessages(chatId, 1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("app.error"));
     }
+  }
+
+  function applyPreset(p: WatchPreset) {
+    setCategory(p.id);
+    setQuery(p.keywords.join(" | "));
+    setSearchReason(`${p.label_uz} nazorati`);
+    setAccessReason(`${p.label_uz} tekshiruvi`);
+    setNewCase((prev) => ({ ...prev, reason: p.reason }));
+    setTab("search");
   }
 
   async function loadMessages(chatId: number, page = 1) {
@@ -330,13 +375,41 @@ export default function ChatsPage() {
     }
   }
 
-  if (!isSuperAdmin()) return null;
+  if (!can(getAdminProfile()?.role, "chats")) return null;
 
   return (
     <div className="space-y-6">
       <PageHeader title={t("chats.title")} subtitle={t("chats.subtitle")} />
 
-      <p className="text-xs text-amber-800">{t("chats.noScan")}</p>
+      <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+        {t("chats.noScan")}
+      </div>
+
+      {watchlist.length > 0 ? (
+        <div className="space-y-2 rounded-xl border bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-white">
+            {t("chats.watchlistTitle")}
+          </p>
+          <p className="text-xs text-zinc-600 dark:text-zinc-300">{t("chats.watchlistHint")}</p>
+          <div className="flex flex-wrap gap-2">
+            {watchlist.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => applyPreset(p)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                  category === p.id
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-black"
+                    : "border-zinc-300 text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                }`}
+                title={p.hint_uz}
+              >
+                {p.label_uz}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-1 border-b pb-2">
         {(
@@ -454,11 +527,11 @@ export default function ChatsPage() {
                     value={newCase.reason}
                     onChange={(e) => setNewCase({ ...newCase, reason: e.target.value })}
                   >
-                    <option value="spam">spam</option>
-                    <option value="harassment">harassment</option>
-                    <option value="scam">scam</option>
-                    <option value="pii">pii</option>
-                    <option value="other">other</option>
+                    {CASE_REASON_OPTIONS.map(([value, key]) => (
+                      <option key={value} value={value}>
+                        {t(key)}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <textarea

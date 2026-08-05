@@ -40,6 +40,7 @@ const ROLE_PERMS: Record<AdminRole, Permission[]> = {
     "users",
     "verification",
     "applications",
+    "chats",
     "numberGroups",
     "products",
     "reviews",

@@ -600,7 +600,7 @@ async def payment_triage(
 @router.get("/chats")
 async def list_chats(
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
     _user_id: int | None = None,
     _q: str | None = None,
@@ -625,14 +625,16 @@ async def list_chats(
 
 
 class ChatSearchBody(BaseModel):
-    query: str = Field(min_length=3, max_length=200)
+    query: str = Field(default="", max_length=500)
     reason: str = Field(min_length=5, max_length=500)
+    category: str | None = Field(default=None, max_length=64)
 
 
 class ChatAccessBody(BaseModel):
     reason: str = Field(min_length=5, max_length=500)
     case_id: int | None = None
     search_query: str | None = Field(default=None, max_length=255)
+    category: str | None = Field(default=None, max_length=64)
 
 
 class ChatCaseCreateBody(BaseModel):
@@ -661,7 +663,7 @@ class ChatExportBody(BaseModel):
 async def chat_search(
     body: ChatSearchBody,
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
 ) -> dict:
     from app.services import chat_review as review
@@ -670,15 +672,24 @@ async def chat_search(
         db,
         query=body.query,
         reason=body.reason,
+        category=body.category,
         admin=admin,
         ip=client_ip(request),
     )
 
 
+@router.get("/chats/watchlist")
+async def chat_watchlist(_admin: SupportOrModerator) -> dict:
+    """Monitoring presets — keyword search only, never a full inbox dump."""
+    from app.services import chat_review as review
+
+    return review.watchlist_presets()
+
+
 @router.get("/chats/cases")
 async def chat_cases(
     db: DbSession,
-    _admin: SupportPlus,
+    _admin: SupportOrModerator,
     status: str | None = Query(default="open"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=30, ge=1, le=100),
@@ -692,7 +703,7 @@ async def chat_cases(
 async def chat_case_create(
     body: ChatCaseCreateBody,
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
 ) -> dict:
     from app.services import chat_review as review
@@ -716,7 +727,7 @@ async def chat_case_decide(
     case_id: int,
     body: ChatCaseDecideBody,
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
 ) -> dict:
     from app.services import chat_review as review
@@ -736,7 +747,7 @@ async def chat_open_access(
     chat_id: int,
     body: ChatAccessBody,
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
 ) -> dict:
     from app.services import chat_review as review
@@ -747,6 +758,7 @@ async def chat_open_access(
         case_id=body.case_id,
         reason=body.reason,
         search_query=body.search_query,
+        category=body.category,
         admin=admin,
         ip=client_ip(request),
     )
@@ -755,7 +767,7 @@ async def chat_open_access(
 @router.get("/chats/{chat_id}/access")
 async def chat_access_status(
     chat_id: int,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
 ) -> dict:
     from app.services import chat_review as review
 
@@ -769,7 +781,7 @@ async def chat_access_status(
 async def chat_close_access(
     chat_id: int,
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
 ) -> dict:
     from app.services import chat_review as review
@@ -790,7 +802,7 @@ async def chat_close_access(
 async def chat_messages(
     chat_id: int,
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=200),
@@ -807,7 +819,7 @@ async def chat_export(
     chat_id: int,
     body: ChatExportBody,
     db: DbSession,
-    admin: SupportPlus,
+    admin: SupportOrModerator,
     request: Request,
 ) -> Response:
     from app.db.redis import get_redis
