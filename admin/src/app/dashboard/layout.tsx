@@ -294,9 +294,9 @@ export default function DashboardLayout({
   );
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-white">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col bg-zinc-950 text-zinc-100 md:flex">
+      <aside className="hidden w-64 shrink-0 flex-col bg-black text-white md:flex">
         {sidebar}
       </aside>
 
@@ -309,7 +309,7 @@ export default function DashboardLayout({
             aria-label={t("app.close")}
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative flex h-full w-[min(100%,18rem)] flex-col bg-zinc-950 text-zinc-100 shadow-xl">
+          <aside className="relative flex h-full w-[min(100%,18rem)] flex-col bg-black text-white shadow-xl">
             <button
               type="button"
               onClick={() => setMobileOpen(false)}
@@ -324,7 +324,7 @@ export default function DashboardLayout({
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-zinc-200 bg-white/90 px-3 py-2 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:px-6">
+        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-zinc-200 bg-white/90 px-3 py-2 backdrop-blur dark:border-zinc-800 dark:bg-black/95 md:px-6">
           <button
             type="button"
             className="rounded-lg p-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800 md:hidden"

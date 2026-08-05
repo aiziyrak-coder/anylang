@@ -21,14 +21,14 @@ type ThemeCtx = {
 };
 
 const Ctx = createContext<ThemeCtx>({
-  mode: "system",
-  resolved: "light",
+  mode: "dark",
+  resolved: "dark",
   setMode: () => undefined,
 });
 
 function resolve(mode: ThemeMode): "light" | "dark" {
   if (mode === "light" || mode === "dark") return mode;
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -37,12 +37,12 @@ function applyDom(resolved: "light" | "dark") {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>("system");
-  const [resolved, setResolved] = useState<"light" | "dark">("light");
+  const [mode, setModeState] = useState<ThemeMode>("dark");
+  const [resolved, setResolved] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
     const raw = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-    const m = raw === "light" || raw === "dark" || raw === "system" ? raw : "system";
+    const m = raw === "light" || raw === "dark" || raw === "system" ? raw : "dark";
     setModeState(m);
     const r = resolve(m);
     setResolved(r);

@@ -23,17 +23,23 @@ export function StatCard({ label, value, hint, accent, changePct }: Props) {
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white p-4 shadow-sm",
+        "rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900",
         accent && "border-l-4 border-l-[var(--accent)]",
       )}
     >
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{value}</p>
+      <p className="text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-900 dark:text-white">
+        {value}
+      </p>
       {delta ? (
         <p
           className={cn(
             "mt-1 text-xs font-medium tabular-nums",
-            delta.flat ? "text-zinc-400" : delta.up ? "text-emerald-600" : "text-rose-600",
+            delta.flat
+              ? "text-zinc-400"
+              : delta.up
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-rose-600 dark:text-rose-400",
           )}
         >
           {delta.text}

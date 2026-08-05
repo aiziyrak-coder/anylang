@@ -37,7 +37,7 @@ export function DataToolbar({
           onChange={(e) => search.onChange(e.target.value)}
           placeholder={search.placeholder ?? t("app.search")}
           className={cn(
-            "min-w-[200px] flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 sm:max-w-xs",
+            "min-w-[200px] flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-400 sm:max-w-xs",
             search.className,
           )}
           aria-label={t("app.search")}
@@ -48,7 +48,7 @@ export function DataToolbar({
         <button
           type="button"
           onClick={onClear}
-          className="rounded-lg border px-3 py-2 text-sm hover:bg-zinc-50"
+          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
         >
           {t("app.clearFilters")}
         </button>

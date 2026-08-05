@@ -27,7 +27,7 @@ export function Pagination({
   const totalPages = Math.max(1, Math.ceil(total / size) || 1);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm text-zinc-600">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-300">
       <div className="flex flex-wrap items-center gap-3">
         <span>
           {t("app.total")}: {total.toLocaleString("uz-UZ")}
@@ -41,11 +41,11 @@ export function Pagination({
         </span>
         {onLimitChange ? (
           <label className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500">{t("app.pageSize")}</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">{t("app.pageSize")}</span>
             <select
               value={size}
               onChange={(e) => onLimitChange(Number(e.target.value))}
-              className="rounded border px-2 py-1 text-sm"
+              className="rounded border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
             >
               {PAGE_SIZES.map((n) => (
                 <option key={n} value={n}>
@@ -61,7 +61,7 @@ export function Pagination({
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="rounded border px-3 py-1 disabled:opacity-40 hover:bg-zinc-50"
+          className="rounded border border-zinc-200 px-3 py-1 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800"
         >
           {t("app.prev")}
         </button>
@@ -69,7 +69,7 @@ export function Pagination({
           type="button"
           disabled={!hasMore}
           onClick={() => onPageChange(page + 1)}
-          className="rounded border px-3 py-1 disabled:opacity-40 hover:bg-zinc-50"
+          className="rounded border border-zinc-200 px-3 py-1 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800"
         >
           {t("app.next")}
         </button>

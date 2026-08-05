@@ -18,7 +18,7 @@ export default function RootLayout({
       <body className="antialiased font-sans bg-[var(--background)] text-[var(--foreground)]">
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('anylang_admin_theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('anylang_admin_theme');var dark=t==='light'?false:(t==='dark'||t==null)?true:window.matchMedia('(prefers-color-scheme: dark)').matches;if(dark)document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}})();`,
           }}
         />
         <Providers>
