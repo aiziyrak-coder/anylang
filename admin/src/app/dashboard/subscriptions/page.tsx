@@ -492,9 +492,11 @@ export default function SubscriptionsPage() {
               </table>
               <Pagination
                 page={list.page}
-                totalPages={list.totalPages}
                 total={list.total}
+                hasMore={list.hasMore}
                 onPageChange={list.setPage}
+                limit={list.limit}
+                onLimitChange={list.setLimit}
               />
             </ListState>
           </div>
