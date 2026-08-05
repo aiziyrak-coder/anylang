@@ -23,7 +23,7 @@ async def main() -> int:
             db,
             email=email,
             password=password,
-            full_name="AnyLang Operator",
+            full_name=os.environ.get("RESET_ADMIN_NAME") or "Boshqaruvchi",
             role="superadmin",
         )
         await db.commit()

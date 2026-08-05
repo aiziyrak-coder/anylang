@@ -5,7 +5,7 @@ import { LoadingGrid } from "@/components/admin/loading-grid";
 import { PageHeader } from "@/components/admin/page-header";
 import { StatCard } from "@/components/admin/stat-card";
 import { ApiError, apiFetch } from "@/lib/api";
-import { API_BASE } from "@/lib/env";
+import { PUBLIC_API_BASE } from "@/lib/env";
 import { auditActionLabel, formatDate, formatNumber, t } from "@/lib/i18n";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -119,7 +119,7 @@ export default function DashboardPage() {
   }, [load]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/health`, { method: "GET" })
+    fetch(`${PUBLIC_API_BASE}/health`, { method: "GET" })
       .then((r) => setApiOk(r.ok))
       .catch(() => setApiOk(false));
   }, []);

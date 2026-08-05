@@ -1,4 +1,4 @@
-/** Public base path for admin (empty in local dev, `/admin` in production). */
+/** Public base path for admin (empty in local dev, `/boshqaruv` in production). */
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 export function withBase(path: string): string {
