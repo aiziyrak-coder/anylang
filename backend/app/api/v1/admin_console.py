@@ -116,8 +116,14 @@ async def analytics_timeseries(
 async def analytics_command_center(
     db: DbSession,
     _admin: AnyAdminRole,
-    days: Literal[7, 30, 90] = Query(default=30),
+    days: int = Query(default=30, description="7 | 30 | 90"),
 ) -> dict:
+    if days not in (7, 30, 90):
+        raise AppError(
+            message="days must be 7, 30 or 90",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
     return await console.analytics_command_center(db, days=days)
 
 
