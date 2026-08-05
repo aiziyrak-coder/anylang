@@ -16,7 +16,6 @@ from app.models.payment import Payment
 from app.models.user import User
 from app.payments.base import is_paid, amount_str
 from app.payments.click import ClickProvider
-from app.payments.fx import usd_to_uzs
 from app.payments.paddle import PaddleProvider
 from app.payments.tax import PAYMENT_TAX_PERCENT, apply_payment_tax, tax_meta
 from app.services.subscription import (
@@ -173,7 +172,10 @@ async def create_subscription_checkout(
 
     months = normalize_billing_months(billing_cycle)
     cycle = billing_cycle_code(months)
-    amount_usd, _, _ = compute_period_price(plan, months)
+    from app.services.subscription_admin import load_monthly_base
+
+    monthly = await load_monthly_base(db)
+    amount_usd, _, _ = compute_period_price(plan, months, monthly_base=monthly)
 
     settings = get_settings()
     policy = (settings.payment_pending_policy or "cancel_and_recreate").strip().lower()
@@ -199,19 +201,26 @@ async def create_subscription_checkout(
         # Default (ideal): cancel_and_recreate — yangi checkout eski pendingni yopadi.
         await _cancel_pending_for_user(db, user.id, provider=provider_name)
 
+    from app.payments.fx import ensure_cbu_rate, rate_meta, usd_to_uzs
     from app.payments.pricing import resolve_uzs_charge
     from app.payments.tax import PAYMENT_TAX_PERCENT
 
     if provider_name in {"click", "multicard"}:
-        catalog = usd_to_uzs(amount_usd)
+        cbu_rate = await ensure_cbu_rate()
+        catalog = usd_to_uzs(amount_usd, rate=cbu_rate)
         currency = "UZS"
         base_amount, tax_amount, amount, tax_fields = resolve_uzs_charge(catalog)
+        fx_fields = {
+            "amount_usd": f"{amount_usd:.2f}",
+            **rate_meta(),
+        }
     else:
         from app.payments.tax import apply_payment_tax, tax_meta
 
         base_amount, tax_amount, amount = apply_payment_tax(amount_usd)
         tax_fields = tax_meta(base_amount, tax_amount, amount)
         currency = "USD"
+        fx_fields = {"amount_usd": f"{amount_usd:.2f}"}
 
     if amount <= 0:
         raise AppError(
@@ -230,7 +239,7 @@ async def create_subscription_checkout(
         plan=plan,
         billing_cycle=cycle,
         meta={
-            "amount_usd": f"{amount_usd:.2f}",
+            **fx_fields,
             **tax_fields,
         },
         raw_payload={},
@@ -247,5 +256,9 @@ async def create_subscription_checkout(
         "tax_amount": f"{tax_amount}",
         "tax_percent": PAYMENT_TAX_PERCENT,
         "amount": checkout.get("amount") or amount_str(payment.amount),
+        "amount_usd": fx_fields.get("amount_usd"),
+        "usd_uzs_rate": fx_fields.get("usd_uzs_rate"),
+        "fx_source": fx_fields.get("fx_source"),
+        "fx_date": fx_fields.get("fx_date"),
     }
     return checkout

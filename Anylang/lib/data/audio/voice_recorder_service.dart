@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:record/record.dart';
 
+import '../permissions/app_permissions.dart';
 import 'waveform_utils.dart';
 
 class VoiceRecordResult {
@@ -44,11 +45,12 @@ class VoiceRecorderService extends GetxService {
 
   Duration get elapsed => _sw.elapsed;
 
-  Future<bool> ensurePermission() => _recorder.hasPermission();
+  /// permission_handler orqali — record paketi qayta dialog ochmasin.
+  Future<bool> ensurePermission() => AppPermissions.ensureMicrophonePermission();
 
   Future<bool> start() async {
     if (isRecording.value) return true;
-    final granted = await _recorder.hasPermission();
+    final granted = await AppPermissions.ensureMicrophonePermission();
     if (!granted) return false;
 
     final path =

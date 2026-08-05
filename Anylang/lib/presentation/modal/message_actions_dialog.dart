@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import '../screens/chat/chat_message.dart';
@@ -6,6 +7,7 @@ import '../ui/items/chat_message_item.dart';
 import '../ui/theme/colors.dart';
 import '../utils/business_reactions.dart';
 import '../utils/size_controller.dart';
+import 'telegram_action_sheet.dart';
 
 /// Xabar kontekst menyusi natijasi.
 enum MessageMenuAction {
@@ -21,8 +23,16 @@ enum MessageMenuAction {
   profile,
 }
 
+/// Menyudan qaytadigan natija (o‘chirish scope bilan).
+class MessageMenuResult {
+  final MessageMenuAction action;
+  final bool? deleteForEveryone;
+
+  const MessageMenuResult(this.action, {this.deleteForEveryone});
+}
+
 /// Uzoq bosish menyusi: biznes reaksiyalar + amallar.
-Future<MessageMenuAction?> showMessageActionsDialog(
+Future<MessageMenuResult?> showMessageActionsDialog(
   BuildContext context, {
   required ChatMessage message,
   required Rect anchor,
@@ -31,15 +41,12 @@ Future<MessageMenuAction?> showMessageActionsDialog(
   bool showAvatar = false,
   bool showTranslate = false,
   bool canPin = true,
+  bool canDeleteForEveryone = false,
   void Function(String emoji)? onReact,
 }) {
-  return showGeneralDialog<MessageMenuAction>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'chat_menu_original'.tr,
-    barrierColor: Colors.black.withValues(alpha: 0.55),
-    transitionDuration: const Duration(milliseconds: 160),
-    pageBuilder: (ctx, animation, secondaryAnimation) => _MessageActionsOverlay(
+  HapticFeedback.mediumImpact();
+  return Navigator.of(context, rootNavigator: true).push<MessageMenuResult>(
+    _MessageActionsRoute(
       message: message,
       anchor: anchor,
       isGroup: isGroup,
@@ -47,18 +54,13 @@ Future<MessageMenuAction?> showMessageActionsDialog(
       showAvatar: showAvatar,
       showTranslate: showTranslate,
       canPin: canPin,
+      canDeleteForEveryone: canDeleteForEveryone,
       onReact: onReact,
-    ),
-    // Faqat fade — Scale butun overlay'ni markazga siljitib,
-    // bosilgan xabarni joyidan chiqarib yuboradi.
-    transitionBuilder: (ctx, animation, _, child) => FadeTransition(
-      opacity: animation,
-      child: child,
     ),
   );
 }
 
-class _MessageActionsOverlay extends StatelessWidget {
+class _MessageActionsRoute extends PopupRoute<MessageMenuResult> {
   final ChatMessage message;
   final Rect anchor;
   final bool isGroup;
@@ -66,9 +68,10 @@ class _MessageActionsOverlay extends StatelessWidget {
   final bool showAvatar;
   final bool showTranslate;
   final bool canPin;
+  final bool canDeleteForEveryone;
   final void Function(String emoji)? onReact;
 
-  const _MessageActionsOverlay({
+  _MessageActionsRoute({
     required this.message,
     required this.anchor,
     required this.isGroup,
@@ -76,6 +79,79 @@ class _MessageActionsOverlay extends StatelessWidget {
     required this.showAvatar,
     required this.showTranslate,
     required this.canPin,
+    required this.canDeleteForEveryone,
+    this.onReact,
+  });
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  String get barrierLabel => 'chat_menu_original'.tr;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 220);
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 140);
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    return _MessageActionsOverlay(
+      animation: animation,
+      message: message,
+      anchor: anchor,
+      isGroup: isGroup,
+      showSenderName: showSenderName,
+      showAvatar: showAvatar,
+      showTranslate: showTranslate,
+      canPin: canPin,
+      canDeleteForEveryone: canDeleteForEveryone,
+      onReact: onReact,
+    );
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // Overlay o‘zi animation’ni qatlamlab boshqaradi — qo‘shimcha fade yo‘q.
+    return child;
+  }
+}
+
+class _MessageActionsOverlay extends StatelessWidget {
+  final Animation<double> animation;
+  final ChatMessage message;
+  final Rect anchor;
+  final bool isGroup;
+  final bool showSenderName;
+  final bool showAvatar;
+  final bool showTranslate;
+  final bool canPin;
+  final bool canDeleteForEveryone;
+  final void Function(String emoji)? onReact;
+
+  const _MessageActionsOverlay({
+    required this.animation,
+    required this.message,
+    required this.anchor,
+    required this.isGroup,
+    required this.showSenderName,
+    required this.showAvatar,
+    required this.showTranslate,
+    required this.canPin,
+    required this.canDeleteForEveryone,
     this.onReact,
   });
 
@@ -84,19 +160,17 @@ class _MessageActionsOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final screen = MediaQuery.of(context).size;
+    final screen = MediaQuery.sizeOf(context);
     final padding = MediaQuery.paddingOf(context);
     final showReceipt = _out && message.status == ChatStatus.read;
 
-    final showProfile =
-        isGroup && !_out && (message.senderId ?? 0) > 0;
+    final showProfile = isGroup && !_out && (message.senderId ?? 0) > 0;
     const menuWidth = 288.0;
     final rows = 5 +
         (showTranslate ? 1 : 0) +
         (canPin ? 1 : 0) +
         (showProfile ? 1 : 0) +
         (message.type == ChatMsgType.text && _out ? 1 : 0);
-    // Biznes reaksiya bloki ~108dp
     final menuHeight = rows * 44.dp + 118.dp;
     const gap = 10.0;
     const chipHeight = 34.0;
@@ -109,7 +183,8 @@ class _MessageActionsOverlay extends StatelessWidget {
 
     final spaceBelow = bottomSafe - anchor.bottom;
     final spaceAbove = anchor.top - topSafe;
-    final showMenuBelow = spaceBelow >= menuHeight + gap || spaceBelow >= spaceAbove;
+    final showMenuBelow =
+        spaceBelow >= menuHeight + gap || spaceBelow >= spaceAbove;
     final menuTop = showMenuBelow
         ? (anchor.bottom + gap).clamp(topSafe, bottomSafe - menuHeight)
         : (anchor.top - gap - menuHeight).clamp(topSafe, bottomSafe - menuHeight);
@@ -118,32 +193,64 @@ class _MessageActionsOverlay extends StatelessWidget {
     double chipLeft = _out ? anchor.right - 160 : anchor.left;
     chipLeft = chipLeft.clamp(edgeMargin, screen.width - 160 - edgeMargin);
 
-    // Bosilgan item — aniq o'sha joyda (scale yo'q).
     final msgLeft = anchor.left.clamp(0.0, screen.width);
     final msgTop = anchor.top.clamp(0.0, screen.height);
     final msgWidth = anchor.width.clamp(0.0, screen.width - msgLeft);
 
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    final barrierOpacity = Tween<double>(begin: 0, end: 0.55).animate(curved);
+    final menuFade = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.08, 1, curve: Curves.easeOutCubic),
+      reverseCurve: Curves.easeInCubic,
+    );
+    final menuScale = Tween<double>(begin: 0.92, end: 1).animate(
+      CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0.05, 1, curve: Curves.easeOutCubic),
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+    final chipFade = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.15, 1, curve: Curves.easeOut),
+      reverseCurve: Curves.easeIn,
+    );
+
     return Material(
-      color: Colors.transparent,
+      type: MaterialType.transparency,
       child: Stack(
         children: [
+          // Barrier — alohida fade (xabar opacity o‘zgarmaydi → jank kamayadi).
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.pop(context),
+              child: AnimatedBuilder(
+                animation: barrierOpacity,
+                builder: (_, _) => ColoredBox(
+                  color: Colors.black.withValues(alpha: barrierOpacity.value),
+                ),
+              ),
             ),
           ),
           Positioned(
             left: msgLeft,
             top: msgTop,
             width: msgWidth,
-            child: IgnorePointer(
-              child: ChatMessageItem(
-                message: message,
-                onLongPress: () {},
-                isGroup: isGroup,
-                showSenderName: showSenderName,
-                showAvatar: showAvatar,
+            child: RepaintBoundary(
+              child: IgnorePointer(
+                child: ChatMessageItem(
+                  message: message,
+                  onLongPress: () {},
+                  isGroup: isGroup,
+                  showSenderName: showSenderName,
+                  showAvatar: showAvatar,
+                ),
               ),
             ),
           ),
@@ -151,28 +258,32 @@ class _MessageActionsOverlay extends StatelessWidget {
             Positioned(
               left: chipLeft,
               top: chipTop,
-              child: _ReadReceiptChip(time: message.time),
+              child: FadeTransition(
+                opacity: chipFade,
+                child: _ReadReceiptChip(time: message.time),
+              ),
             ),
           Positioned(
             left: menuLeft,
             top: menuTop,
             width: menuWidth,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.96, end: 1),
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOut,
-              builder: (context, scale, child) => Transform.scale(
-                scale: scale,
-                alignment: showMenuBelow ? Alignment.topCenter : Alignment.bottomCenter,
-                child: child,
-              ),
-              child: _MenuCard(
-                c: c,
-                message: message,
-                showTranslate: showTranslate,
-                showProfile: showProfile,
-                canPin: canPin,
-                onReact: onReact,
+            child: FadeTransition(
+              opacity: menuFade,
+              child: ScaleTransition(
+                scale: menuScale,
+                alignment:
+                    showMenuBelow ? Alignment.topCenter : Alignment.bottomCenter,
+                child: RepaintBoundary(
+                  child: _MenuCard(
+                    c: c,
+                    message: message,
+                    showTranslate: showTranslate,
+                    showProfile: showProfile,
+                    canPin: canPin,
+                    canDeleteForEveryone: canDeleteForEveryone,
+                    onReact: onReact,
+                  ),
+                ),
               ),
             ),
           ),
@@ -225,6 +336,7 @@ class _MenuCard extends StatelessWidget {
   final bool showTranslate;
   final bool showProfile;
   final bool canPin;
+  final bool canDeleteForEveryone;
   final void Function(String emoji)? onReact;
 
   const _MenuCard({
@@ -233,6 +345,7 @@ class _MenuCard extends StatelessWidget {
     required this.showTranslate,
     required this.showProfile,
     required this.canPin,
+    required this.canDeleteForEveryone,
     this.onReact,
   });
 
@@ -244,9 +357,9 @@ class _MenuCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16.dp),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: c.isDark ? 0.45 : 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: c.isDark ? 0.35 : 0.14),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -280,7 +393,10 @@ class _MenuCard extends StatelessWidget {
                         child: InkWell(
                           onTap: () {
                             onReact?.call(r.emoji);
-                            Navigator.pop(context, MessageMenuAction.react);
+                            Navigator.pop(
+                              context,
+                              const MessageMenuResult(MessageMenuAction.react),
+                            );
                           },
                           borderRadius: BorderRadius.circular(16.dp),
                           child: Container(
@@ -380,6 +496,39 @@ class _MenuCard extends StatelessWidget {
     );
   }
 
+  Future<void> _onDelete(BuildContext ctx) async {
+    final actions = <TelegramSheetAction>[
+      if (canDeleteForEveryone)
+        TelegramSheetAction(
+          id: 'everyone',
+          label: 'chat_msg_delete_everyone'.tr,
+          danger: true,
+        ),
+      TelegramSheetAction(
+        id: 'me',
+        label: 'chat_msg_delete_me'.tr,
+        danger: true,
+      ),
+    ];
+    final choice = await showTelegramActionSheet(
+      ctx,
+      title: 'chat_msg_delete_title'.tr,
+      body: 'chat_msg_delete_choose'.tr,
+      actions: actions,
+      // Menyuning o‘zi dim qilgan — qo‘shimcha scrim qotish bermasligi uchun.
+      barrierColor: Colors.transparent,
+    );
+    if (!ctx.mounted || choice == null) return;
+    final result = MessageMenuResult(
+      MessageMenuAction.delete,
+      deleteForEveryone: choice == 'everyone',
+    );
+    // Sheet pop bilan bir frame ichida menyuni ham yopamiz (stack tartibi saqlanadi).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (ctx.mounted) Navigator.pop(ctx, result);
+    });
+  }
+
   Widget _row(
     BuildContext ctx,
     MessageMenuAction action,
@@ -391,9 +540,12 @@ class _MenuCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () async {
-          await Future.delayed(const Duration(milliseconds: 120));
-          if (ctx.mounted) Navigator.pop(ctx, action);
+        onTap: () {
+          if (action == MessageMenuAction.delete) {
+            _onDelete(ctx);
+            return;
+          }
+          Navigator.pop(ctx, MessageMenuResult(action));
         },
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 14.dp, vertical: 11.dp),

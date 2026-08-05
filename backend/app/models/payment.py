@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,9 +17,9 @@ class Payment(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)  # subscription | number
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending", index=True)
     # mock | stripe | click | paddle
-    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="mock")
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="mock", index=True)
     provider_transaction_id: Mapped[str | None] = mapped_column(
         String(255), unique=True, nullable=True, index=True
     )
@@ -34,3 +34,16 @@ class Payment(Base, TimestampMixin):
     # Webhook audit trail (Click prepare/complete, Paddle events, …).
     raw_payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Admin ops: refund / chargeback / failed triage
+    refund_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    refunded_by_admin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True
+    )
+    chargeback_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chargeback_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    triage_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    failed_notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

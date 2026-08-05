@@ -236,6 +236,14 @@ async def enqueue_push(
     data: dict[str, Any] | None = None,
     collapse_key: str | None = None,
 ) -> bool:
+    try:
+        from app.services.maintenance_ops import get_feature_flags_cached
+
+        flags = await get_feature_flags_cached()
+        if flags.get("push_enabled") is False:
+            return False
+    except Exception:
+        pass
     payload = {
         "user_id": user_id,
         "title": title,

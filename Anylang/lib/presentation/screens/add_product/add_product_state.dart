@@ -17,6 +17,8 @@ class AddProductState extends GetxController {
 
   /// null = yangi mahsulot; >0 = tahrirlash.
   final RxnInt editingProductId = RxnInt();
+  final RxString moderationNote = ''.obs;
+  final RxString productStatus = ''.obs;
 
   /// Edit hydrate (content TextFieldlarga bir marta yozadi).
   final RxnString draftName = RxnString();

@@ -17,6 +17,7 @@ class Product {
   final bool isFavorited;
   final bool isTop;
   final String status;
+  final String moderationNote;
   final String? topRequestStatus;
   final String? topPinnedUntil;
   final int? topQueuePosition;
@@ -46,6 +47,7 @@ class Product {
     this.isFavorited = false,
     this.isTop = false,
     this.status = 'published',
+    this.moderationNote = '',
     this.topRequestStatus,
     this.topPinnedUntil,
     this.topQueuePosition,
@@ -139,6 +141,7 @@ class Product {
       isFavorited: json['is_favorited'] == true,
       isTop: json['is_top'] == true,
       status: (json['status'] as String?) ?? 'published',
+      moderationNote: (json['moderation_note'] as String?)?.trim() ?? '',
       topRequestStatus: topStatus,
       topPinnedUntil: pinnedUntil,
       topQueuePosition: queuePos,
@@ -166,6 +169,7 @@ class Product {
     bool? isFavorited,
     bool? isTop,
     String? status,
+    String? moderationNote,
     String? topRequestStatus,
     String? topPinnedUntil,
     int? topQueuePosition,
@@ -187,6 +191,7 @@ class Product {
       isFavorited: isFavorited ?? this.isFavorited,
       isTop: isTop ?? this.isTop,
       status: status ?? this.status,
+      moderationNote: moderationNote ?? this.moderationNote,
       topRequestStatus: topRequestStatus ?? this.topRequestStatus,
       topPinnedUntil: topPinnedUntil ?? this.topPinnedUntil,
       topQueuePosition: topQueuePosition ?? this.topQueuePosition,

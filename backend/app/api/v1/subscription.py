@@ -14,21 +14,26 @@ router = APIRouter()
 @router.get("/plans", response_model=PlansOut)
 async def list_plans(
     current_user: OptionalCurrentUser,
+    db: DbSession,
     language: str | None = Query(default=None),
     billing_cycle: str | None = Query(default=None),
     currency: str | None = Query(
         default=None,
-        description="Ignored — catalog is always UZS (Click).",
+        description="Ignored — catalog is always USD; Click charges UZS via CBU FX.",
     ),
 ) -> PlansOut:
+    from app.services import subscription_admin as sub_admin
+
     country = None
     if current_user is not None:
         country = (current_user.country or "").strip().upper() or None
+    monthly = await sub_admin.load_monthly_base(db)
     data = subscription_service.get_plans(
         language=language,
         billing_cycle=billing_cycle,
         country=country,
         currency=currency,
+        monthly_base=monthly,
     )
     return PlansOut.model_validate(data)
 

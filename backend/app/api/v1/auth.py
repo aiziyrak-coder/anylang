@@ -5,6 +5,7 @@ from app.core.deps import DbSession, RedisClient
 from app.core.rate_limit import client_ip, enforce_rate_limit
 from app.schemas.auth import (
     AuthSessionOut,
+    ChangePasswordIn,
     DeviceSessionListOut,
     ForgotIn,
     GoogleIn,
@@ -299,6 +300,21 @@ async def reset_password(
         db,
         email=str(body.email),
         code=body.code,
+        new_password=body.new_password,
+    )
+    return MessageResponse.model_validate(data)
+
+
+@router.post("/password/change", response_model=MessageResponse)
+async def change_password(
+    body: ChangePasswordIn,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> MessageResponse:
+    data = await auth_service.change_password(
+        db,
+        user=current_user,
+        current_password=body.current_password,
         new_password=body.new_password,
     )
     return MessageResponse.model_validate(data)

@@ -16,6 +16,7 @@ from app.api.v1 import (
     market_analytics,
     marketplace_groups,
     numbers,
+    partner_applications,
     payments,
     products,
     subscription,
@@ -40,6 +41,16 @@ api_router.include_router(feed.router, prefix="/feed", tags=["feed"])
 api_router.include_router(friends.router, prefix="/friends", tags=["friends"])
 api_router.include_router(live.router, prefix="/live", tags=["live"])
 api_router.include_router(support.router, prefix="/support", tags=["support"])
+api_router.include_router(
+    partner_applications.router,
+    prefix="/partner-applications",
+    tags=["partner-applications"],
+)
+api_router.include_router(
+    partner_applications.admin_router,
+    prefix="/admin",
+    tags=["partner-applications-admin"],
+)
 api_router.include_router(
     trade_assistant.router, prefix="/trade-assistant", tags=["trade-assistant"]
 )

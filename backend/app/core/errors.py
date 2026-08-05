@@ -40,6 +40,20 @@ def register_exception_handlers(app: FastAPI) -> None:
             exc.error_code,
             exc.message,
         )
+        if exc.status_code >= 500:
+            try:
+                from app.services.maintenance_ops import record_error_event
+
+                await record_error_event(
+                    error_code=exc.error_code,
+                    message=exc.message,
+                    path=str(request.url.path),
+                    method=request.method,
+                    status_code=exc.status_code,
+                    level="error",
+                )
+            except Exception:
+                pass
         return JSONResponse(
             status_code=exc.status_code,
             content=error_body(exc.message, exc.error_code, **exc.extra),
@@ -85,6 +99,20 @@ def register_exception_handlers(app: FastAPI) -> None:
             type(exc).__name__,
             exc,
         )
+        try:
+            from app.services.maintenance_ops import record_error_event
+
+            await record_error_event(
+                error_code="INTERNAL_ERROR",
+                message=f"{type(exc).__name__}: {exc}"[:500],
+                path=str(request.url.path),
+                method=request.method,
+                status_code=500,
+                level="error",
+                meta={"exc_type": type(exc).__name__},
+            )
+        except Exception:
+            pass
         from app.core.config import get_settings
 
         settings = get_settings()

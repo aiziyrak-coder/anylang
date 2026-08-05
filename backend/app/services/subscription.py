@@ -96,9 +96,15 @@ def billing_cycle_code(months: int) -> str:
     return str(months)
 
 
-def compute_period_price(plan: str, months: int) -> tuple[Decimal, Decimal, int]:
+def compute_period_price(
+    plan: str,
+    months: int,
+    *,
+    monthly_base: dict[str, Decimal | None] | None = None,
+) -> tuple[Decimal, Decimal, int]:
     """Returns (total, per_month_effective, savings_percent vs 1 month)."""
-    base = PLAN_MONTHLY_BASE.get(plan)
+    prices = monthly_base or PLAN_MONTHLY_BASE
+    base = prices.get(plan)
     if base is None:
         raise AppError(message="Tarif bepul", error_code="PAYMENT_INVALID", status_code=400)
     months = normalize_billing_months(months)
@@ -114,12 +120,13 @@ def resolve_display_currency(
     country: str | None = None,
     currency: str | None = None,
 ) -> str:
-    """Catalog display currency — Click only: always UZS for everyone.
+    """Catalog display currency — always USD in the app UI.
 
-    `currency` / `country` kept for API compatibility; ignored until Visa returns.
+    Click charges UZS at checkout using CBU FX (`app.payments.fx`).
+    `country` / `currency` kept for API compatibility.
     """
     _ = country, currency
-    return "UZS"
+    return "USD"
 
 
 def _charge_in_uzs() -> bool:
@@ -137,19 +144,23 @@ def period_catalog_for_plan(
     plan: str,
     *,
     currency: str | None = None,
+    monthly_base: dict[str, Decimal | None] | None = None,
 ) -> list[dict]:
     from app.payments.fx import usd_to_uzs
     from app.payments.pricing import resolve_uzs_charge
     from app.payments.tax import PAYMENT_TAX_PERCENT, apply_payment_tax
 
-    base = PLAN_MONTHLY_BASE.get(plan)
+    prices = monthly_base or PLAN_MONTHLY_BASE
+    base = prices.get(plan)
     if base is None:
         return []
     display = (currency or ("UZS" if _charge_in_uzs() else "USD")).upper()
     charge_uzs = display == "UZS"
     out: list[dict] = []
     for months in (1, 3, 6, 12):
-        total, per_month, savings = compute_period_price(plan, months)
+        total, per_month, savings = compute_period_price(
+            plan, months, monthly_base=prices
+        )
         if charge_uzs:
             catalog = usd_to_uzs(total)
             _base, tax, total_with_tax, _meta = resolve_uzs_charge(catalog)
@@ -298,6 +309,7 @@ def get_plans(
     billing_cycle: str | None = None,
     country: str | None = None,
     currency: str | None = None,
+    monthly_base: dict[str, Decimal | None] | None = None,
 ) -> dict:
     lang = _resolve_language(language)
     titles = PLAN_TITLES[lang]
@@ -306,14 +318,17 @@ def get_plans(
     selected_months = (
         normalize_billing_months(billing_cycle) if billing_cycle else None
     )
+    prices = monthly_base or PLAN_MONTHLY_BASE
 
     from app.payments.tax import PAYMENT_TAX_PERCENT
 
     display_currency = resolve_display_currency(country=country, currency=currency)
     plans: list[dict[str, Any]] = []
     for code in ("basic", "premium", "business"):
-        base = PLAN_MONTHLY_BASE[code]
-        periods = period_catalog_for_plan(code, currency=display_currency)
+        base = prices[code]
+        periods = period_catalog_for_plan(
+            code, currency=display_currency, monthly_base=prices
+        )
         yearly = next((p for p in periods if p["months"] == 12), None)
         monthly = next((p for p in periods if p["months"] == 1), None)
         plan: dict[str, Any] = {
@@ -337,10 +352,8 @@ def get_plans(
                 plan["selected_period"] = match
         plans.append(plan)
 
-    from app.core.config import get_settings
-    from app.payments.fx import usd_to_uzs
-    from decimal import Decimal as _D
     from app.payments.click import ClickProvider
+    from app.payments.fx import get_usd_uzs_rate, rate_meta
 
     click_ok = ClickProvider().is_configured()
     cc = (country or "").strip().upper() or None
@@ -354,7 +367,7 @@ def get_plans(
             for m in (1, 3, 6, 12)
         ],
         "user_country": cc,
-        "default_currency": "UZS",
+        "default_currency": "USD",
         "payment_methods": [
             {
                 "code": "click",
@@ -364,14 +377,14 @@ def get_plans(
             },
         ],
     }
-    if display_currency == "UZS":
-        try:
-            rate = _D(str(get_settings().usd_uzs_rate).replace(",", "").strip())
-            payload["usd_uzs_rate"] = f"{rate:.0f}"
-            # Hint: 1 USD catalog example after FX (before tax)
-            payload["fx_example_uzs"] = f"{usd_to_uzs(_D('1')):.0f}"
-        except Exception:
-            pass
+    try:
+        meta = rate_meta()
+        payload["usd_uzs_rate"] = meta["usd_uzs_rate"]
+        payload["fx_source"] = meta.get("fx_source")
+        payload["fx_date"] = meta.get("fx_date")
+        payload["fx_example_uzs"] = f"{get_usd_uzs_rate():.0f}"
+    except Exception:
+        pass
     return payload
 
 

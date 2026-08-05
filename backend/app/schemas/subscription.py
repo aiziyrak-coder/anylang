@@ -57,6 +57,8 @@ class PlansOut(BaseModel):
     period_options: list[PeriodOptionOut] = Field(default_factory=list)
     usd_uzs_rate: str | None = None
     fx_example_uzs: str | None = None
+    fx_source: str | None = None
+    fx_date: str | None = None
     user_country: str | None = None
     default_currency: str | None = None
     payment_methods: list[PaymentMethodOut] = Field(default_factory=list)

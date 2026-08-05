@@ -31,6 +31,23 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    # Long revision ids (e.g. u8v9w0x1y2z3_business_verification) exceed
+    # Alembic's default version_num VARCHAR(32). Widen before migrating.
+    from sqlalchemy import text
+
+    connection.execute(
+        text(
+            "CREATE TABLE IF NOT EXISTS alembic_version ("
+            "version_num VARCHAR(128) NOT NULL PRIMARY KEY)"
+        )
+    )
+    connection.execute(
+        text(
+            "ALTER TABLE alembic_version "
+            "ALTER COLUMN version_num TYPE VARCHAR(128)"
+        )
+    )
+    connection.commit()
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()

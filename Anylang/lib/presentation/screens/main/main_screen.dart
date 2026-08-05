@@ -35,15 +35,20 @@ class MainScreen extends Screen<MainState, void> {
 
   @override
   void initState(void payload) {
-    // Yangilangan ilova: majburiy ruxsatlar + bildirishnoma (fon push uchun).
+    // Majburiy ruxsatlar + bildirishnoma (fon push uchun alohida).
     Future.microtask(() async {
       if (!AppPermissions.alreadyRequested) {
         await AppPermissions.requestAllRequired();
-      } else {
-        await AppPermissions.ensureNotificationPermission();
       }
+      // Har kirishda: berilmagan bo‘lsa bildirishnomani yana so‘raymiz.
+      final notifOk = await AppPermissions.ensureNotificationPermission();
       if (Get.isRegistered<PushNotificationService>()) {
-        await Get.find<PushNotificationService>().syncToken();
+        if (notifOk) {
+          await Get.find<PushNotificationService>().syncToken();
+        } else {
+          // Ruxsat berilmasa ham sync urinadi (iOS provisional / qayta so‘rov).
+          await Get.find<PushNotificationService>().syncToken();
+        }
       }
     });
     // Tizim tili = tarjima tili — server bilan sync.

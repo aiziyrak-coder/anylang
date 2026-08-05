@@ -16,11 +16,17 @@ from app.models.chat import (
     MessageRead,
     MessageTranslation,
 )
+from app.models.chat_review import ChatReviewCase
 from app.models.feed import BusinessFeedPost
 from app.models.language import Language
 from app.models.payment import Payment
+from app.models.plan_settings import PlanCatalogOverride, SubscriptionPolicy
 from app.models.promo import PromoCode, PromoRedemption
 from app.models.push_token import PushToken
+from app.models.partner_application import (
+    PartnerApplication,
+    PartnerApplicationProduct,
+)
 from app.models.product import (
     Product,
     ProductFavorite,
@@ -33,8 +39,11 @@ from app.models.verification import (
     BusinessVerificationDocument,
     BusinessVerificationRequest,
 )
+from app.models.business_review import BusinessReview
+from app.models.system_ops import SystemErrorEvent, SystemFeatureFlag
 from app.models.user import (
     AccountRestoreRequest,
+    AdminActivityAlert,
     AdminAuditLog,
     AdminUser,
     BusinessProfile,
@@ -52,6 +61,8 @@ __all__ = [
     "TimestampMixin",
     "Language",
     "Payment",
+    "PlanCatalogOverride",
+    "SubscriptionPolicy",
     "PromoCode",
     "PromoRedemption",
     "PushToken",
@@ -66,7 +77,10 @@ __all__ = [
     "NumberAssignment",
     "AdminUser",
     "AdminAuditLog",
+    "AdminActivityAlert",
     "AccountRestoreRequest",
+    "PartnerApplication",
+    "PartnerApplicationProduct",
     "Product",
     "ProductImage",
     "ProductFavorite",
@@ -74,6 +88,7 @@ __all__ = [
     "ProductTopRequest",
     "BusinessFeedPost",
     "Chat",
+    "ChatReviewCase",
     "ChatFaq",
     "ChatParticipant",
     "Message",
@@ -90,4 +105,7 @@ __all__ = [
     "SupportMessage",
     "BusinessVerificationRequest",
     "BusinessVerificationDocument",
+    "BusinessReview",
+    "SystemFeatureFlag",
+    "SystemErrorEvent",
 ]

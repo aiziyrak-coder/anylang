@@ -155,6 +155,7 @@ class UserOut(BaseModel):
     profile_completed: bool
     created_at: datetime
     last_number_change_at: datetime | None = None
+    must_change_password: bool = False
 
     subscription: SubscriptionOut
     is_business: bool

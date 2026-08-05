@@ -29,10 +29,24 @@ class Product(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     short_description: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # One-source multilingual catalog (filled on publish / partner approve)
+    name_i18n: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    short_description_i18n: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    description_i18n: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    source_lang: Mapped[str | None] = mapped_column(String(8), nullable=True)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(8), default="USD", nullable=False)
     category: Mapped[str] = mapped_column(String(64), default="other", nullable=False)
+    # draft | pending | published | rejected | archived
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True, nullable=False)
+    moderation_note: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    moderated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    moderated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # AI pre-score (spam / low_quality / prohibited) — admin yakuniy qaror
+    ai_pre_score: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     views_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_top_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Paid boost expiry (None = admin permanent pin, or unset).

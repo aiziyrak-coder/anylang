@@ -19,6 +19,8 @@ Future<bool?> showPaymentConfirmBottomSheet(
   String? amountBeforeTax,
   String? taxAmount,
   int taxPercent = 2,
+  String? amountUsd,
+  String? usdUzsRate,
   String? planLabel,
   String? periodLabel,
   String ctaText = '',
@@ -36,6 +38,8 @@ Future<bool?> showPaymentConfirmBottomSheet(
         amountBeforeTax: amountBeforeTax,
         taxAmount: taxAmount,
         taxPercent: taxPercent,
+        amountUsd: amountUsd,
+        usdUzsRate: usdUzsRate,
         planLabel: planLabel,
         periodLabel: periodLabel,
         ctaText: ctaText.isEmpty ? 'subscription_pay_confirm_cta'.tr : ctaText,
@@ -52,6 +56,8 @@ class _PaymentConfirmSheet extends StatelessWidget {
   final String? amountBeforeTax;
   final String? taxAmount;
   final int taxPercent;
+  final String? amountUsd;
+  final String? usdUzsRate;
   final String? planLabel;
   final String? periodLabel;
   final String ctaText;
@@ -65,6 +71,8 @@ class _PaymentConfirmSheet extends StatelessWidget {
     this.amountBeforeTax,
     this.taxAmount,
     this.taxPercent = 2,
+    this.amountUsd,
+    this.usdUzsRate,
     this.planLabel,
     this.periodLabel,
   });
@@ -80,6 +88,12 @@ class _PaymentConfirmSheet extends StatelessWidget {
         ? null
         : formatMoneyAmount(taxAmount, currency: currency);
     final showTax = baseLabel != null && taxLabel != null;
+    final usdLabel = (amountUsd != null && amountUsd!.trim().isNotEmpty)
+        ? formatMoneyAmount(amountUsd, currency: 'USD')
+        : null;
+    final rateHint = (usdUzsRate != null && usdUzsRate!.trim().isNotEmpty)
+        ? '1 USD ≈ ${formatMoneyAmount(usdUzsRate, currency: 'UZS')}'
+        : null;
 
     return Container(
       constraints: BoxConstraints(
@@ -224,6 +238,30 @@ class _PaymentConfirmSheet extends StatelessWidget {
                       value: totalLabel,
                       emphasize: true,
                     ),
+                    if (usdLabel != null &&
+                        currency.toUpperCase() == 'UZS') ...[
+                      SizedBox(height: 8.dp),
+                      _AmountRow(
+                        label: 'USD',
+                        value: usdLabel,
+                        emphasize: false,
+                      ),
+                    ],
+                    if (rateHint != null &&
+                        currency.toUpperCase() == 'UZS') ...[
+                      SizedBox(height: 6.dp),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          rateHint,
+                          style: TextStyle(
+                            color: c.textFaint,
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -18,7 +18,8 @@ export class ApiError extends Error {
 
 function proxyUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `/api/proxy${normalized}`;
+  // Always under ADMIN_BASE_PATH — never expose /api/proxy at site root.
+  return withBase(`/api/proxy${normalized}`);
 }
 
 async function parseError(res: Response): Promise<ApiError> {
@@ -54,8 +55,17 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return (await res.json()) as T;
 }
 
-export async function apiFetchBlob(path: string): Promise<{ blob: Blob; filename: string }> {
-  const res = await fetch(proxyUrl(path));
+export async function apiFetchBlob(
+  path: string,
+  init: RequestInit = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(proxyUrl(path), {
+    ...init,
+    headers: {
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+  });
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
       window.location.href = withBase("/login");

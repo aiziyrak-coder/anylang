@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delete account — AnyLang</title>
+  <meta name="description" content="Request deletion of your AnyLang account and associated data from the web." />
+  <meta name="theme-color" content="#f6f7f5" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/legal.css?v=2" />
+</head>
+<body>
+  <div class="top">
+    <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;width:min(100% - 2rem,720px);margin-inline:auto;">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>AnyLang</a>
+      <div class="langs" role="group" aria-label="Language">
+        <button type="button" class="lang-btn" data-lang="uz">UZ</button>
+        <button type="button" class="lang-btn" data-lang="ru">RU</button>
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <header class="hero">
+      <h1 data-title>Delete account</h1>
+      <p class="meta" data-meta>Google Play account-deletion page · anylang.uz</p>
+    </header>
+
+    <article class="card">
+      <div class="lang-block" data-lang="uz">
+        <h2>Hisobni o‘chirish</h2>
+        <p>AnyLang hisobingizni ilovasiz, ushbu sahifa orqali o‘chirishingiz mumkin. Email va parolingizni kiriting, tasdiqlang va so‘rovni yuboring.</p>
+        <ul>
+          <li>Hisob <strong>soft-delete</strong> qilinadi: 365 kun ichida tiklash mumkin (ilova yoki <a href="mailto:support@anylang.uz">support@anylang.uz</a>).</li>
+          <li>365 kundan keyin shaxsiy ma’lumotlar tizimdan tozalanadi.</li>
+          <li>Chat/media/biznes ma’lumotlari hisob bilan bog‘liq holda o‘chiriladi yoki anonimlashtiriladi.</li>
+        </ul>
+      </div>
+      <div class="lang-block" data-lang="ru">
+        <h2>Удаление аккаунта</h2>
+        <p>Вы можете удалить аккаунт AnyLang через эту страницу без приложения. Введите email и пароль, подтвердите и отправьте запрос.</p>
+        <ul>
+          <li>Аккаунт будет <strong>мягко удалён</strong>: восстановление возможно в течение 365 дней.</li>
+          <li>После 365 дней персональные данные удаляются из системы.</li>
+          <li>Связанные чаты/медиа/бизнес-данные удаляются или анонимизируются.</li>
+        </ul>
+      </div>
+      <div class="lang-block is-active" data-lang="en">
+        <h2>Delete your AnyLang account</h2>
+        <p>You can delete your AnyLang account from this page without using the mobile app. Enter your email and password, confirm, and submit.</p>
+        <ul>
+          <li>The account is <strong>soft-deleted</strong> and can be restored within <strong>365 days</strong> (via the app or <a href="mailto:support@anylang.uz">support@anylang.uz</a>).</li>
+          <li>After 365 days, personal data is purged from our systems.</li>
+          <li>Related chats, media, and business profile data are deleted or anonymized with the account.</li>
+        </ul>
+      </div>
+
+      <form id="delete-form" class="delete-form" novalidate>
+        <label>
+          <span data-i18n-email>Email</span>
+          <input id="email" name="email" type="email" autocomplete="username" required placeholder="you@example.com" />
+        </label>
+        <label>
+          <span data-i18n-password>Password</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8" />
+        </label>
+        <label class="check">
+          <input id="confirm" name="confirm" type="checkbox" required />
+          <span data-i18n-confirm>I understand this will delete my account and associated data as described above.</span>
+        </label>
+        <button type="submit" class="btn-danger" id="submit-btn" data-i18n-submit>Delete my account</button>
+        <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </article>
+
+    <footer class="foot">
+      <a href="/">Home</a><span class="sep">·</span>
+      <a href="/privacy/">Privacy</a><span class="sep">·</span>
+      <a href="/terms/">Terms</a><span class="sep">·</span>
+      <a href="mailto:support@anylang.uz">support@anylang.uz</a>
+    </footer>
+  </main>
+
+  <script>
+    (function () {
+      const API = "/api/v1";
+      const copy = {
+        uz: {
+          title: "Hisobni o‘chirish",
+          meta: "Google Play hisob o‘chirish sahifasi · anylang.uz",
+          email: "Email",
+          password: "Parol",
+          confirm: "Yuqoridagi tavsif bo‘yicha hisobim va bog‘liq ma’lumotlar o‘chirilishini tushunaman.",
+          submit: "Hisobimni o‘chirish",
+          loading: "Yuborilmoqda…",
+          ok: "Hisob o‘chirildi. 365 kun ichida tiklash mumkin.",
+          needConfirm: "Avval tasdiqlash katagiga belgi qo‘ying.",
+          loginFail: "Login muvaffaqiyatsiz. Email yoki parolni tekshiring.",
+          deleteFail: "O‘chirish amalga oshmadi. Keyinroq qayta urinib ko‘ring yoki support@anylang.uz ga yozing.",
+        },
+        ru: {
+          title: "Удаление аккаунта",
+          meta: "Страница удаления аккаунта для Google Play · anylang.uz",
+          email: "Email",
+          password: "Пароль",
+          confirm: "Я понимаю, что аккаунт и связанные данные будут удалены, как описано выше.",
+          submit: "Удалить мой аккаунт",
+          loading: "Отправка…",
+          ok: "Аккаунт удалён. Восстановление возможно в течение 365 дней.",
+          needConfirm: "Сначала отметьте подтверждение.",
+          loginFail: "Не удалось войти. Проверьте email или пароль.",
+          deleteFail: "Не удалось удалить. Попробуйте позже или напишите на support@anylang.uz.",
+        },
+        en: {
+          title: "Delete account",
+          meta: "Google Play account-deletion page · anylang.uz",
+          email: "Email",
+          password: "Password",
+          confirm: "I understand this will delete my account and associated data as described above.",
+          submit: "Delete my account",
+          loading: "Submitting…",
+          ok: "Account deleted. You can request restore within 365 days.",
+          needConfirm: "Please check the confirmation box first.",
+          loginFail: "Sign-in failed. Check your email or password.",
+          deleteFail: "Deletion failed. Try again later or email support@anylang.uz.",
+        },
+      };
+
+      const stored = localStorage.getItem("anylang_legal_lang");
+      const prefer = stored || (navigator.language || "en").slice(0, 2);
+      let lang = ["uz", "ru", "en"].includes(prefer) ? prefer : "en";
+
+      function t() { return copy[lang] || copy.en; }
+
+      function setLang(next) {
+        lang = next;
+        document.querySelectorAll(".lang-block").forEach((el) => {
+          el.classList.toggle("is-active", el.dataset.lang === lang);
+        });
+        document.querySelectorAll(".lang-btn").forEach((btn) => {
+          btn.classList.toggle("is-active", btn.dataset.lang === lang);
+          btn.setAttribute("aria-pressed", btn.dataset.lang === lang ? "true" : "false");
+        });
+        const c = t();
+        document.title = c.title + " — AnyLang";
+        const h = document.querySelector("[data-title]");
+        if (h) h.textContent = c.title;
+        const m = document.querySelector("[data-meta]");
+        if (m) m.textContent = c.meta;
+        document.querySelector("[data-i18n-email]").textContent = c.email;
+        document.querySelector("[data-i18n-password]").textContent = c.password;
+        document.querySelector("[data-i18n-confirm]").textContent = c.confirm;
+        document.querySelector("[data-i18n-submit]").textContent = c.submit;
+        document.documentElement.lang = lang;
+        localStorage.setItem("anylang_legal_lang", lang);
+      }
+
+      document.querySelectorAll(".lang-btn").forEach((btn) => {
+        btn.addEventListener("click", () => setLang(btn.dataset.lang));
+      });
+      setLang(lang);
+
+      const form = document.getElementById("delete-form");
+      const statusEl = document.getElementById("form-status");
+      const submitBtn = document.getElementById("submit-btn");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const c = t();
+        statusEl.textContent = "";
+        statusEl.className = "form-status";
+        if (!document.getElementById("confirm").checked) {
+          statusEl.textContent = c.needConfirm;
+          statusEl.classList.add("is-error");
+          return;
+        }
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+        submitBtn.disabled = true;
+        submitBtn.textContent = c.loading;
+        try {
+          const loginRes = await fetch(API + "/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email,
+              password,
+              device: {
+                device_id: "web-delete-" + Math.random().toString(36).slice(2, 12),
+                device_name: "Web account deletion",
+                device_type: "web",
+                platform: "web",
+              },
+            }),
+          });
+          const loginData = await loginRes.json().catch(() => ({}));
+          if (!loginRes.ok) {
+            throw new Error(loginData.message || c.loginFail);
+          }
+          const token = loginData.access_token;
+          if (!token) throw new Error(c.loginFail);
+
+          const delRes = await fetch(API + "/users/me", {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + token,
+            },
+            body: JSON.stringify({ reason: "web_delete_account_page" }),
+          });
+          const delData = await delRes.json().catch(() => ({}));
+          if (!delRes.ok) {
+            throw new Error(delData.message || c.deleteFail);
+          }
+          statusEl.textContent = c.ok;
+          statusEl.classList.add("is-ok");
+          form.reset();
+        } catch (err) {
+          statusEl.textContent = err.message || c.deleteFail;
+          statusEl.classList.add("is-error");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = t().submit;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

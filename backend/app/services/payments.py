@@ -36,6 +36,19 @@ def _compute_subscription_amount(plan: str, billing_cycle: str) -> tuple[Decimal
     total, _per_month, _savings = compute_period_price(plan, months)
     return total, months, billing_cycle_code(months)
 
+
+async def _compute_subscription_amount_db(
+    db: AsyncSession, plan: str, billing_cycle: str
+) -> tuple[Decimal, int, str]:
+    from app.services.subscription_admin import load_monthly_base
+
+    months = normalize_billing_months(billing_cycle)
+    monthly = await load_monthly_base(db)
+    total, _per_month, _savings = compute_period_price(
+        plan, months, monthly_base=monthly
+    )
+    return total, months, billing_cycle_code(months)
+
 def _resolve_provider() -> str:
     settings = get_settings()
     if settings.payment_provider == "multicard" or (
@@ -211,7 +224,9 @@ async def create_checkout(
                 error_code="VALIDATION_ERROR",
                 status_code=400,
             )
-        amount, months, cycle_code = _compute_subscription_amount(plan, billing_cycle)
+        amount, months, cycle_code = await _compute_subscription_amount_db(
+            db, plan, billing_cycle
+        )
         billing_cycle = cycle_code
         amount_before = amount
         if promo_code and promo_code.strip():

@@ -456,7 +456,10 @@ async def _get_product_or_404(
             status_code=404,
         )
 
-    if product.status == "draft" and not (allow_owner_draft and is_owner):
+    # draft / pending / rejected — faqat egasi ko'radi
+    if product.status in {"draft", "pending", "rejected"} and not (
+        allow_owner_draft and is_owner
+    ):
         raise AppError(
             message="Mahsulot topilmadi",
             error_code="PRODUCT_NOT_FOUND",
@@ -777,7 +780,10 @@ async def _serialize_product(
     favorite_ids: set[int],
     top_ids: set[int] | None = None,
     force_top: bool | None = None,
+    lang: str | None = None,
 ) -> dict:
+    from app.services.catalog_i18n import pick_i18n
+
     effectively_pinned = is_effectively_top_pinned(product)
     is_top = force_top if force_top is not None else (
         effectively_pinned or (top_ids is not None and product.id in top_ids)
@@ -787,10 +793,16 @@ async def _serialize_product(
         seller.business if seller is not None else None,
         user=seller,
     )
+    name = pick_i18n(getattr(product, "name_i18n", None), product.name, lang)
+    short = pick_i18n(
+        getattr(product, "short_description_i18n", None),
+        product.short_description,
+        lang,
+    )
     return {
         "id": product.id,
-        "name": product.name,
-        "short_description": product.short_description,
+        "name": name,
+        "short_description": short,
         "price": _format_price(product.price),
         "currency": product.currency,
         "primary_image_url": _primary_url(product),
@@ -799,10 +811,13 @@ async def _serialize_product(
         "top_pinned_until": product.top_pinned_until if effectively_pinned else None,
         "is_favorited": product.id in favorite_ids,
         "status": product.status,
+        "moderation_note": (product.moderation_note or "") if product.status == "rejected" else "",
+        "moderated_at": product.moderated_at,
         "seller_id": product.seller_id,
         "created_at": product.created_at,
         "trust_badges": trust,
         "capabilities": _normalize_capabilities(product.capabilities),
+        "source_lang": getattr(product, "source_lang", None),
     }
 
 
@@ -814,11 +829,21 @@ async def _serialize_detail(
     top_ids: set[int] | None = None,
     viewer: User | None = None,
 ) -> dict:
-    base = await _serialize_product(product, favorite_ids=favorite_ids, top_ids=top_ids)
+    from app.integrations.translation import user_preferred_lang
+    from app.services.catalog_i18n import pick_i18n
+
+    lang = user_preferred_lang(viewer) if viewer is not None else None
+    base = await _serialize_product(
+        product, favorite_ids=favorite_ids, top_ids=top_ids, lang=lang
+    )
     marketplace = _effective_marketplace_fields(product, product.seller)
     base.update(
         {
-            "description": product.description,
+            "description": pick_i18n(
+                getattr(product, "description_i18n", None),
+                product.description,
+                lang,
+            ),
             "category": product.category,
             "images": [
                 {
@@ -1151,8 +1176,11 @@ async def list_products(
     top_ids = set(await _top_product_ids(db))
     fav_ids = await _favorite_ids(db, viewer.id, [p.id for p in products])
 
+    from app.integrations.translation import user_preferred_lang
+
+    lang = user_preferred_lang(viewer)
     items = [
-        await _serialize_product(p, favorite_ids=fav_ids, top_ids=top_ids)
+        await _serialize_product(p, favorite_ids=fav_ids, top_ids=top_ids, lang=lang)
         for p in products
     ]
     return {
@@ -1183,8 +1211,13 @@ async def list_top_products(db: AsyncSession, *, viewer: User, limit: int = 10) 
     ordered = [by_id[i] for i in top_ids if i in by_id]
     fav_ids = await _favorite_ids(db, viewer.id, top_ids)
 
+    from app.integrations.translation import user_preferred_lang
+
+    lang = user_preferred_lang(viewer)
     items = [
-        await _serialize_product(p, favorite_ids=fav_ids, force_top=True)
+        await _serialize_product(
+            p, favorite_ids=fav_ids, force_top=True, lang=lang
+        )
         for p in ordered
     ]
     return {"items": items}
@@ -1446,13 +1479,19 @@ async def delete_product_image(db: AsyncSession, *, user: User, image_id: int) -
 
 async def create_product(db: AsyncSession, *, user: User, payload: ProductCreateIn) -> dict:
     await _require_business_account(user)
+    from app.services import product_moderation as product_moderation_service
 
-    if payload.status not in {"draft", "published"}:
+    await product_moderation_service.assert_can_submit_listing(db, user)
+
+    # Mijoz "published" yuborsa — avtomatik e'lon emas, moderatsiya navbati
+    requested = payload.status
+    if requested not in {"draft", "pending", "published"}:
         raise AppError(
-            message="Status qoralama yoki e'lon qilingan bo'lishi kerak",
+            message="Status qoralama yoki moderatsiyaga yuborish bo'lishi kerak",
             error_code="VALIDATION_ERROR",
             status_code=400,
         )
+    effective_status = "pending" if requested in {"published", "pending"} else "draft"
 
     name = payload.name.strip()
     short_description = _normalize_short_description(
@@ -1460,7 +1499,7 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
     )
     description = payload.description.strip()
 
-    if payload.status == "draft":
+    if effective_status == "draft":
         if not name:
             raise AppError(
                 message="Qoralama uchun nom majburiy",
@@ -1487,7 +1526,9 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
         price=payload.price,
         currency=payload.currency,
         category=payload.category,
-        status=payload.status,
+        status=effective_status,
+        moderation_note="",
+        submitted_at=datetime.now(UTC) if effective_status == "pending" else None,
         attributes=[a.model_dump() for a in payload.attributes],
         capabilities=_normalize_capabilities(payload.capabilities),
         video_url=_clean_optional_str(payload.video_url, max_len=512),
@@ -1519,22 +1560,14 @@ async def create_product(db: AsyncSession, *, user: User, payload: ProductCreate
     )
     product = result.scalar_one()
 
-    if product.status == "published":
-        from app.services.feed import create_system_post
+    if effective_status == "pending":
+        await product_moderation_service.apply_ai_pre_score(db, product)
 
-        primary = next(
-            (img.url for img in (product.images or []) if img.is_primary),
-            (product.images[0].url if product.images else None),
-        )
-        await create_system_post(
-            db,
-            user=user,
-            post_type="new_product",
-            title=product.name,
-            body=(product.short_description or product.description or "")[:400],
-            image_url=primary,
-            meta={"product_id": product.id},
-        )
+    if not product.source_lang:
+        from app.integrations.translation import user_preferred_lang
+
+        product.source_lang = user_preferred_lang(user)
+        await db.flush()
 
     fav_ids = await _favorite_ids(db, user.id, [product.id])
     top_ids = set(await _top_product_ids(db))
@@ -1562,6 +1595,8 @@ async def update_product(
             status_code=403,
         )
 
+    from app.services import product_moderation as product_moderation_service
+
     was_published = product.status == "published"
     data = payload.model_dump(exclude_unset=True)
     attributes = data.pop("attributes", None)
@@ -1569,6 +1604,24 @@ async def update_product(
     image_ids = data.pop("image_ids", None)
     primary_image_id = data.pop("primary_image_id", None)
     new_status = data.pop("status", None)
+
+    content_keys = {
+        "name",
+        "short_description",
+        "description",
+        "price",
+        "currency",
+        "category",
+        "video_url",
+        "factory_video_url",
+        "process_video_url",
+        "moq",
+        "shipping_info",
+        "shipping_countries",
+    }
+    content_changed = bool(content_keys & set(data.keys())) or attributes is not None or (
+        image_ids is not None
+    )
 
     for field, value in data.items():
         if field in {
@@ -1599,8 +1652,18 @@ async def update_product(
     if attributes is not None:
         product.attributes = [a.model_dump() if hasattr(a, "model_dump") else a for a in attributes]
 
+    # Mijoz published yuborsa → pending (admin tasdiqlamaguncha e'lon emas)
+    if new_status == "published":
+        new_status = "pending"
+    if new_status == "pending" or (
+        was_published and content_changed and new_status is None
+    ):
+        # E'lon qilingan mahsulot o'zgarsa ham qayta moderatsiya
+        if new_status is None and was_published and content_changed:
+            new_status = "pending"
+
     target_status = new_status or product.status
-    if target_status == "published":
+    if target_status in {"published", "pending"}:
         short_description = product.short_description
         if not short_description.strip():
             short_description = _normalize_short_description(
@@ -1628,13 +1691,31 @@ async def update_product(
         )
 
     if new_status is not None:
-        if new_status not in {"draft", "published", "archived"}:
+        if new_status not in {"draft", "pending", "archived"}:
             raise AppError(
                 message="Status noto'g'ri",
                 error_code="VALIDATION_ERROR",
                 status_code=400,
             )
         product.status = new_status
+        if new_status == "pending":
+            await product_moderation_service.assert_can_submit_listing(db, user)
+            product.moderation_note = ""
+            product.moderated_at = None
+            product.moderated_by = None
+            product.is_top_pinned = False
+            product.top_pinned_until = None
+            product.submitted_at = datetime.now(UTC)
+        elif new_status == "draft":
+            product.is_top_pinned = False
+            product.top_pinned_until = None
+
+    # Content change on published → pending path above may set new_status via target
+    if (new_status == "pending" or product.status == "pending") and (
+        new_status == "pending" or (was_published and content_changed)
+    ):
+        if product.status == "pending" and product.submitted_at is None:
+            product.submitted_at = datetime.now(UTC)
 
     await db.flush()
     result = await db.execute(
@@ -1647,21 +1728,26 @@ async def update_product(
         )
     )
     product = result.scalar_one()
-    if not was_published and product.status == "published":
-        from app.services.feed import create_system_post
+    if product.status == "pending":
+        await product_moderation_service.apply_ai_pre_score(db, product)
+    text_changed = bool(
+        {"name", "short_description", "description"} & set(data.keys())
+    )
+    # Tarjima / feed faqat published holatda (admin approve)
+    if product.status == "published" and (
+        text_changed or not was_published or not (product.name_i18n or {})
+    ):
+        from app.integrations.translation import user_preferred_lang
+        from app.services.catalog_i18n import enqueue_catalog_translate
 
-        primary = next(
-            (img.url for img in (product.images or []) if img.is_primary),
-            (product.images[0].url if product.images else None),
-        )
-        await create_system_post(
-            db,
-            user=user,
-            post_type="new_product",
-            title=product.name,
-            body=(product.short_description or product.description or "")[:400],
-            image_url=primary,
-            meta={"product_id": product.id},
+        if not product.source_lang:
+            product.source_lang = user_preferred_lang(user)
+            await db.flush()
+        await enqueue_catalog_translate(
+            kind="product",
+            entity_id=product.id,
+            source_lang=product.source_lang or "uz",
+            defer_seconds=2,
         )
     fav_ids = await _favorite_ids(db, user.id, [product.id])
     top_ids = set(await _top_product_ids(db))
@@ -1672,6 +1758,122 @@ async def update_product(
         top_ids=top_ids,
         viewer=user,
     )
+
+
+async def moderate_product(
+    db: AsyncSession,
+    *,
+    product_id: int,
+    admin_id: int,
+    approve: bool,
+    admin_note: str | None = None,
+) -> dict:
+    result = await db.execute(
+        select(Product)
+        .where(Product.id == product_id)
+        .options(
+            selectinload(Product.images),
+            selectinload(Product.seller).selectinload(User.subscription),
+            selectinload(Product.seller).selectinload(User.business),
+        )
+    )
+    product = result.scalar_one_or_none()
+    if product is None:
+        raise AppError(
+            message="Mahsulot topilmadi",
+            error_code="PRODUCT_NOT_FOUND",
+            status_code=404,
+        )
+    if product.status not in {"pending", "rejected", "draft", "published"}:
+        raise AppError(
+            message="Bu mahsulotni moderatsiya qilib bo'lmaydi",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+
+    note = (admin_note or "").strip()
+    now = datetime.now(UTC)
+    strike = None
+    from app.services import product_moderation as product_moderation_service
+
+    if approve:
+        _validate_published_payload(
+            name=product.name,
+            short_description=product.short_description,
+            description=product.description,
+            price=product.price,
+            currency=product.currency,
+            category=product.category,
+            image_ids=[img.id for img in product.images],
+            attributes=product.attributes or [],
+        )
+        was_published = product.status == "published"
+        product.status = "published"
+        product.moderation_note = ""
+        product.moderated_at = now
+        product.moderated_by = admin_id
+        await db.flush()
+        if not was_published:
+            from app.services.feed import create_system_post
+
+            primary = next(
+                (img.url for img in (product.images or []) if img.is_primary),
+                (product.images[0].url if product.images else None),
+            )
+            await create_system_post(
+                db,
+                user=product.seller,
+                post_type="new_product",
+                title=product.name,
+                body=(product.short_description or product.description or "")[:400],
+                image_url=primary,
+                meta={"product_id": product.id},
+            )
+        from app.integrations.translation import user_preferred_lang
+        from app.services.catalog_i18n import enqueue_catalog_translate
+
+        if not product.source_lang:
+            product.source_lang = user_preferred_lang(product.seller)
+            await db.flush()
+        await enqueue_catalog_translate(
+            kind="product",
+            entity_id=product.id,
+            source_lang=product.source_lang or "uz",
+            defer_seconds=2,
+        )
+        await product_moderation_service.clear_strike_on_approve(
+            db, seller_id=product.seller_id
+        )
+    else:
+        if len(note) < 3:
+            raise AppError(
+                message="Rad etish sababi majburiy",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            )
+        product.status = "rejected"
+        product.moderation_note = note[:500]
+        product.moderated_at = now
+        product.moderated_by = admin_id
+        product.is_top_pinned = False
+        product.top_pinned_until = None
+        await db.flush()
+        strike = await product_moderation_service.apply_reject_strike(
+            db, seller_id=product.seller_id
+        )
+
+    out = {
+        "id": product.id,
+        "status": product.status,
+        "moderation_note": product.moderation_note or "",
+        "moderated_at": product.moderated_at,
+        "moderated_by": product.moderated_by,
+        "name": product.name,
+        "seller_id": product.seller_id,
+    }
+    if strike is not None:
+        out["seller_strike"] = strike
+    return out
 
 
 async def archive_product(db: AsyncSession, *, user: User, product_id: int) -> None:
@@ -1722,9 +1924,14 @@ async def list_my_products(
         for req in req_rows.scalars().all():
             open_reqs.setdefault(req.product_id, req)
 
+    from app.integrations.translation import user_preferred_lang
+
+    lang = user_preferred_lang(user)
     items = []
     for p in products:
-        row = await _serialize_product(p, favorite_ids=fav_ids, top_ids=top_ids)
+        row = await _serialize_product(
+            p, favorite_ids=fav_ids, top_ids=top_ids, lang=lang
+        )
         req = open_reqs.get(p.id)
         if req is not None:
             row["top_request"] = await _serialize_top_request(db, req, product=p)

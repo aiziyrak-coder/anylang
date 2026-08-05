@@ -54,6 +54,9 @@ class BusinessVerificationDocument(Base, TimestampMixin):
     doc_type: Mapped[str] = mapped_column(String(40), nullable=False)
     url: Mapped[str] = mapped_column(String(512), nullable=False)
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # pending | approved | rejected | resubmit
+    review_status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     request: Mapped[BusinessVerificationRequest] = relationship(
         back_populates="documents"

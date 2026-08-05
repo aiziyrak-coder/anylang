@@ -334,11 +334,12 @@ def _is_available(number: str, assignments: dict[str, NumberAssignment], *, for_
     return True
 
 
-def _serialize_group_brief(group: NumberGroup) -> dict:
+def _serialize_group_brief(group: NumberGroup, *, effective_price: Decimal | None = None) -> dict:
+    price = effective_price if effective_price is not None else group.price
     return {
         "id": group.id,
         "name": group.name,
-        "price": f"{group.price:.2f}",
+        "price": f"{price:.2f}",
         "currency": group.currency,
         "bonus_plan": group.bonus_plan,
         "bonus_duration_months": group.bonus_duration_months,
@@ -558,7 +559,10 @@ async def get_my_number(db: AsyncSession, user: User) -> dict:
 
 
 async def get_groups(db: AsyncSession) -> list[dict]:
+    from app.services.numbers_admin import demand_context_for_groups, effective_group_price
+
     groups = await _load_groups(db)
+    demand = await demand_context_for_groups(db, groups)
     assignments = await _assignment_map(db)
     items: list[dict] = []
     for group in sorted(groups, key=lambda g: -g.priority):
@@ -573,7 +577,19 @@ async def get_groups(db: AsyncSession) -> list[dict]:
                     break
             if count >= 1000:
                 break
-        items.append({**_serialize_group_brief(group), "available_count": count})
+        ctx = demand.get(group.id, {})
+        eff = effective_group_price(
+            group,
+            sold_7d=int(ctx.get("sold_7d") or 0),
+            fill_pct=float(ctx.get("fill_pct") or 0),
+        )
+        items.append(
+            {
+                **_serialize_group_brief(group, effective_price=eff),
+                "available_count": count,
+                "base_price": f"{group.price:.2f}",
+            }
+        )
     return items
 
 
@@ -588,12 +604,23 @@ async def get_catalog(
     sort: str = "price_asc",
     params: PageParams,
 ) -> dict:
+    from app.services.numbers_admin import demand_context_for_groups, effective_group_price
+
     groups = await _load_groups(db)
+    demand = await demand_context_for_groups(db, groups)
     assignments = await _assignment_map(db)
     group_by_id = {g.id: g for g in groups}
 
     if group_id is not None and group_id not in group_by_id:
         raise AppError(message="Guruh topilmadi", error_code="NOT_FOUND", status_code=404)
+
+    def group_eff(g: NumberGroup) -> Decimal:
+        ctx = demand.get(g.id, {})
+        return effective_group_price(
+            g,
+            sold_7d=int(ctx.get("sold_7d") or 0),
+            fill_pct=float(ctx.get("fill_pct") or 0),
+        )
 
     candidates: list[tuple[str, NumberGroup]] = []
     seen: set[str] = set()
@@ -605,9 +632,10 @@ async def get_catalog(
             return
         if not _is_available(num, assignments):
             return
-        if min_price is not None and group.price < min_price:
+        price = group_eff(group)
+        if min_price is not None and price < min_price:
             return
-        if max_price is not None and group.price > max_price:
+        if max_price is not None and price > max_price:
             return
         if has_bonus is True and not group.bonus_plan:
             return
@@ -648,14 +676,18 @@ async def get_catalog(
                 break
 
     if sort == "price_desc":
-        candidates.sort(key=lambda x: (-x[1].price, x[0]))
+        candidates.sort(key=lambda x: (-group_eff(x[1]), x[0]))
     elif sort == "number_asc":
         candidates.sort(key=lambda x: x[0])
     else:
-        candidates.sort(key=lambda x: (x[1].price, x[0]))
+        candidates.sort(key=lambda x: (group_eff(x[1]), x[0]))
 
     items = [
-        {"number": num, "group": _serialize_group_brief(grp), "is_available": True}
+        {
+            "number": num,
+            "group": _serialize_group_brief(grp, effective_price=group_eff(grp)),
+            "is_available": True,
+        }
         for num, grp in candidates
     ]
     page_items, total = paginate_items(items, params)
@@ -772,12 +804,21 @@ async def resolve_number_for_purchase(
     number: str,
 ) -> tuple[str, NumberGroup, Decimal]:
     """Validate a number is available for paid checkout and exclusively reserve it."""
+    from app.services.numbers_admin import demand_context_for_groups, effective_group_price
+
     number = _validate_number(number)
     groups = await _load_groups(db)
     group = classify_number(number, groups)
     if group is None or not group.is_active:
         raise AppError(message="Raqam noto'g'ri", error_code="NUMBER_INVALID", status_code=400)
-    if group.price <= 0:
+
+    ctx = (await demand_context_for_groups(db, [group])).get(group.id, {})
+    price = effective_group_price(
+        group,
+        sold_7d=int(ctx.get("sold_7d") or 0),
+        fill_pct=float(ctx.get("fill_pct") or 0),
+    )
+    if price <= 0:
         raise AppError(
             message="Bepul raqam uchun to'lov talab qilinmaydi",
             error_code="PAYMENT_INVALID",
@@ -786,7 +827,7 @@ async def resolve_number_for_purchase(
 
     # Hold through typical Stripe checkout window
     await reserve_number(db, user, number, minutes=max(RESERVE_MINUTES, 45))
-    return number, group, group.price
+    return number, group, price
 
 
 async def purchase_number(db: AsyncSession, user: User, number: str) -> dict:

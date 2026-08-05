@@ -32,6 +32,10 @@ class SubscriptionCheckoutOut(BaseModel):
     amount_before_tax: str | None = None
     tax_amount: str | None = None
     tax_percent: int | None = None
+    amount_usd: str | None = None
+    usd_uzs_rate: str | None = None
+    fx_source: str | None = None
+    fx_date: str | None = None
 
     @model_validator(mode="after")
     def _sync_id(self) -> Self:

@@ -3,12 +3,12 @@ import 'dart:io';
 import 'package:hive/hive.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-/// O'rnatilgandan keyin (onboarding) majburiy ruxsatlar.
+/// O'rnatilgandan keyin (onboarding / Main) majburiy ruxsatlar.
 class AppPermissions {
   AppPermissions._();
 
-  /// v2: bildirishnoma (POST_NOTIFICATIONS) ham so'raladi.
-  static const _kRequestedKey = 'core_permissions_requested_v2';
+  /// v3: bildirishnoma alohida so‘raladi (OEM batch dialogda yo‘qolmasin).
+  static const _kRequestedKey = 'core_permissions_requested_v3';
 
   static Box get _box => Hive.box('user');
 
@@ -17,13 +17,12 @@ class AppPermissions {
 
   static Future<void> markRequested() => _box.put(_kRequestedKey, true);
 
-  /// Mikrofon, kamera, galereya/fayl, GPS, bildirishnomalar.
-  static List<Permission> get required {
+  /// Mikrofon, kamera, galereya/fayl, GPS — bildirishnoma alohida.
+  static List<Permission> get coreRequired {
     final list = <Permission>[
       Permission.microphone,
       Permission.camera,
       Permission.locationWhenInUse,
-      Permission.notification,
     ];
     if (Platform.isAndroid) {
       list.add(Permission.photos);
@@ -44,12 +43,29 @@ class AppPermissions {
     return false;
   }
 
+  static Future<bool> _requestIfNeeded(Permission permission) async {
+    final status = await permission.status;
+    if (status.isGranted || status.isLimited) return true;
+    if (status.isPermanentlyDenied) return false;
+    final result = await permission.request();
+    return result.isGranted || result.isLimited;
+  }
+
+  /// Faqat kerak bo‘lsa so‘raydi — takroriy dialog yo‘q.
+  static Future<bool> ensureMicrophonePermission() async {
+    return _requestIfNeeded(Permission.microphone);
+  }
+
+  static Future<bool> ensureCameraPermission() async {
+    return _requestIfNeeded(Permission.camera);
+  }
+
   static Future<bool> notificationGranted() async {
     final s = await Permission.notification.status;
     return s.isGranted;
   }
 
-  /// Fon/kill rejimida FCM uchun — har safar MainScreen'da chaqiriladi.
+  /// Fon/kill rejimida FCM banner uchun — berilmagan bo‘lsa so‘raydi.
   static Future<bool> ensureNotificationPermission() async {
     final status = await Permission.notification.status;
     if (status.isGranted) return true;
@@ -68,9 +84,13 @@ class AppPermissions {
     return _filesOk();
   }
 
-  /// Dialoglarni ketma-ket ochadi.
+  /// Ketma-ket so‘raydi; bildirishnoma oxirida alohida (ko‘rinadigan qilib).
   static Future<bool> requestAllRequired() async {
-    await required.request();
+    for (final p in coreRequired) {
+      await _requestIfNeeded(p);
+    }
+    // Bildirishnoma — alohida dialog (Android 13+ POST_NOTIFICATIONS).
+    await ensureNotificationPermission();
     await markRequested();
     return allGranted();
   }

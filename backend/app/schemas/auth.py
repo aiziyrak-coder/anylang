@@ -143,6 +143,16 @@ class ResetIn(BaseModel):
         return _validate_password(value)
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: PasswordStr
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        return _validate_password(value)
+
+
 class LogoutIn(BaseModel):
     refresh_token: str
 

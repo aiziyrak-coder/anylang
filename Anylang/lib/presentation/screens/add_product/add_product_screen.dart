@@ -42,6 +42,8 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
     state.productVideoUrl.value = null;
     state.videoUploading.value = false;
     state.category.value = '';
+    state.moderationNote.value = '';
+    state.productStatus.value = '';
     state.editingProductId.value = payload?.editProductId;
     unawaited(_loadCategories());
     final editId = payload?.editProductId;
@@ -105,6 +107,9 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
     state.draftShipping.value = map['shipping_info']?.toString() ?? '';
     state.draftFactoryVideo.value = map['factory_video_url']?.toString() ?? '';
     state.draftProcessVideo.value = map['process_video_url']?.toString() ?? '';
+    state.productStatus.value = map['status']?.toString() ?? '';
+    state.moderationNote.value =
+        (map['moderation_note'] as String?)?.trim() ?? '';
     final video = map['video_url']?.toString();
     state.productVideoUrl.value =
         (video != null && video.isNotEmpty) ? video : null;
@@ -250,7 +255,7 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
           videoUrl: (state.productVideoUrl.value ?? a.videoUrl).trim(),
           factoryVideoUrl: a.factoryVideoUrl,
           processVideoUrl: a.processVideoUrl,
-          status: 'published',
+          status: 'pending',
         );
     }
   }
@@ -310,7 +315,7 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
         .where((e) => !e.hasLocalFile && (e.imageId ?? 0) > 0)
         .map((e) => e.imageId!)
         .toList();
-    if (paths.isEmpty && existingIds.isEmpty && status == 'published') {
+    if (paths.isEmpty && existingIds.isEmpty && status == 'pending') {
       showAppError('add_product_image_required'.tr);
       return;
     }
@@ -369,9 +374,7 @@ class AddProductScreen extends Screen<AddProductState, AddProductPayload?> {
         showAppMessage(
           status == 'draft'
               ? 'add_product_draft_saved'.tr
-              : (editId != null && editId > 0)
-                  ? 'edit_product_saved'.tr
-                  : 'add_product_published'.tr,
+              : 'product_moderation_submitted'.tr,
         );
         popBackNavigate();
         return;

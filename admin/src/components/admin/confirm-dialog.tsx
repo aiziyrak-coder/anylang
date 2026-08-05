@@ -1,7 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
 type Props = {
   open: boolean;
@@ -12,6 +12,7 @@ type Props = {
   danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  children?: ReactNode;
 };
 
 export function ConfirmDialog({
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   danger,
   onConfirm,
   onCancel,
+  children,
 }: Props) {
   useEffect(() => {
     if (!open) return;
@@ -41,6 +43,7 @@ export function ConfirmDialog({
       <div className="relative w-full max-w-md rounded-xl border bg-white p-5 shadow-xl">
         <h3 className="text-lg font-semibold">{title}</h3>
         <p className="mt-2 text-sm text-zinc-600">{message}</p>
+        {children}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"

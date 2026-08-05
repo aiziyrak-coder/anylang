@@ -20,6 +20,7 @@ from app.schemas.common import MessageResponse
 from app.schemas.user import BusinessOut, UserOut
 from app.schemas.profile_views import ProfileViewersOut
 from app.schemas.product_likers import ProductLikersOut
+from app.schemas.business_review import BusinessReviewCreateIn, BusinessReviewReplyIn
 from app.schemas.nearby import (
     LocationOut,
     LocationSharingIn,
@@ -53,6 +54,9 @@ class PublicRestoreIn(BaseModel):
     email: EmailStr
     number: str | None = Field(default=None, min_length=7, max_length=7)
     reason: str = Field(min_length=5, max_length=2000)
+    claimed_device_id: str | None = Field(default=None, max_length=64)
+    claimed_device_name: str | None = Field(default=None, max_length=120)
+    keep_chats: bool = True
 
 
 @router.get("/me", response_model=UserOut)
@@ -178,6 +182,9 @@ async def public_restore_request(
         email=str(body.email),
         number=body.number,
         reason=body.reason,
+        claimed_device_id=body.claimed_device_id,
+        claimed_device_name=body.claimed_device_name,
+        keep_chats=body.keep_chats,
     )
 
 
@@ -490,6 +497,70 @@ async def list_my_product_likers(
         limit=limit,
     )
     return ProductLikersOut.model_validate(data)
+
+
+@router.get("/{user_id}/reviews")
+async def list_user_reviews(
+    user_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+    page: int | None = Query(default=None, ge=1),
+    limit: int | None = Query(default=None, ge=1, le=50),
+) -> dict:
+    from app.services import business_reviews as reviews_service
+
+    return await reviews_service.list_reviews(
+        db,
+        business_user_id=user_id,
+        viewer=current_user,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.post("/{user_id}/reviews", status_code=status.HTTP_201_CREATED)
+async def create_user_review(
+    user_id: int,
+    body: BusinessReviewCreateIn,
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    from app.core.rate_limit import client_ip
+    from app.services import business_reviews as reviews_service
+
+    return await reviews_service.upsert_review(
+        db,
+        author=current_user,
+        business_user_id=user_id,
+        payload=body,
+        client_ip=client_ip(request),
+    )
+
+
+@router.post("/{user_id}/reviews/{review_id}/reply")
+async def reply_to_user_review(
+    user_id: int,
+    review_id: int,
+    body: BusinessReviewReplyIn,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    """Kompaniya javobi — faqat biznes egasi, moderatsiyadan keyin."""
+    from app.services import business_reviews as reviews_service
+
+    if current_user.id != user_id:
+        raise AppError(
+            message="Faqat o‘z kompaniyangiz otziviga javob bera olasiz",
+            error_code="FORBIDDEN",
+            status_code=403,
+        )
+    return await reviews_service.company_reply_to_review(
+        db,
+        business_owner=current_user,
+        review_id=review_id,
+        reply_text=body.text,
+    )
 
 
 @router.get("/{user_id}", response_model=PublicUserProfileOut)

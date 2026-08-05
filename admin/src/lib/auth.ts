@@ -1,3 +1,5 @@
+import { withBase } from "@/lib/base-path";
+
 const ADMIN_PROFILE_KEY = "anylang_admin_profile";
 const ADMIN_EXPIRES_KEY = "anylang_admin_expires_at";
 
@@ -47,16 +49,26 @@ export function isModeratorPlus(): boolean {
   return role === "superadmin" || role === "moderator";
 }
 
+export function isFinancePlus(): boolean {
+  const role = getAdminProfile()?.role;
+  return role === "superadmin" || role === "finance";
+}
+
+export function isSupportPlus(): boolean {
+  const role = getAdminProfile()?.role;
+  return role === "superadmin" || role === "support";
+}
+
 export async function clearAdminSession(): Promise<void> {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem(ADMIN_PROFILE_KEY);
   sessionStorage.removeItem(ADMIN_EXPIRES_KEY);
-  await fetch("/api/auth/logout", { method: "POST" });
+  await fetch(withBase("/api/auth/logout"), { method: "POST" });
 }
 
 /** Load fresh profile from backend (validates cookie + role). */
 export async function refreshAdminProfile(): Promise<AdminProfile | null> {
-  const res = await fetch("/api/auth/me");
+  const res = await fetch(withBase("/api/auth/me"));
   if (!res.ok) return null;
   const profile = (await res.json()) as AdminProfile;
   setAdminProfile(profile);

@@ -761,7 +761,7 @@ class ProductsScreen extends Screen<ProductsState, void> {
       case OwnProductAction.boostTop:
         await _boostProductTop(product);
       case OwnProductAction.publish:
-        await _setProductStatus(product, 'published');
+        await _setProductStatus(product, 'pending');
       case OwnProductAction.unpublish:
         await _setProductStatus(product, 'draft');
       case OwnProductAction.delete:
@@ -807,8 +807,8 @@ class ProductsScreen extends Screen<ProductsState, void> {
       return;
     }
     showAppMessage(
-      status == 'published'
-          ? 'my_products_published'.tr
+      status == 'pending'
+          ? 'product_moderation_submitted'.tr
           : 'my_products_unpublished'.tr,
     );
     await _loadMyProducts();

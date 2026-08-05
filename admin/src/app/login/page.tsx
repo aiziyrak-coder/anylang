@@ -2,6 +2,7 @@
 
 import { ApiError } from "@/lib/api";
 import { refreshAdminProfile, setAdminProfile, setSessionExpiry } from "@/lib/auth";
+import { withBase } from "@/lib/base-path";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -30,7 +31,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(withBase("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -96,7 +97,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900"
-                placeholder="admin@anylang.com"
+                placeholder="email@example.com"
               />
             </div>
 

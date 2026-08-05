@@ -108,6 +108,36 @@ class AddProductContent extends ScreenContent<AddProductState> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Obx(() {
+                      final note = state.moderationNote.value.trim();
+                      final st = state.productStatus.value;
+                      if (st != 'rejected' || note.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 14.dp),
+                        child: Container(
+                          padding: EdgeInsets.all(12.dp),
+                          decoration: BoxDecoration(
+                            color: kListenRed.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12.dp),
+                            border: Border.all(
+                              color: kListenRed.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Text(
+                            'product_moderation_rejected_reason'.trParams({
+                              'reason': note,
+                            }),
+                            style: TextStyle(
+                              color: kListenRed,
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
                     Text(
                       'add_product_images'.tr,
                       style: TextStyle(color: c.textPrimary, fontSize: 14.sp, fontWeight: FontWeight.w700),
@@ -368,7 +398,9 @@ class AddProductContent extends ScreenContent<AddProductState> {
                         SizedBox(width: 12.dp),
                         Expanded(
                           child: Obx(() => PrimaryButton(
-                                text: 'add_product_publish'.tr,
+                                text: state.productStatus.value == 'rejected'
+                                    ? 'product_moderation_resubmit'.tr
+                                    : 'add_product_publish'.tr,
                                 isLoading: state.isSubmitting.value,
                                 enabled: !state.videoUploading.value,
                                 startIcon: const Icon(Icons.check_rounded, size: 18),

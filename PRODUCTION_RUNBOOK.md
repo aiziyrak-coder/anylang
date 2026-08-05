@@ -14,13 +14,16 @@ This is **not** Kubernetes (ARCHITECTURE.md describes the target; current produc
 | Env | Purpose | Config |
 |-----|---------|--------|
 | `local` | Developer machine | `backend/.env.example` → `backend/.env` + root `docker-compose.yml` |
-| `staging` | Pre-prod (recommended separate host/DB) | `deploy/env.staging.template` |
-| `production` | Live users | `deploy/env.production.template` → `deploy/.env` on server |
+| `development` (DEV) | Same VPS, isolated stack — **test here first** | `deploy/docker-compose.dev.yml` + `.env.dev` → https://dev.anylang.uz |
+| `staging` | Optional separate host | `deploy/env.staging.template` |
+| `production` | Live users / Play release | `deploy/env.production.template` → `deploy/.env` |
 
 Rules:
 - Never mix DBs between envs.
 - `DEBUG=false` and `APP_ENV=production` on live.
 - Secrets only via env files (gitignored). See `deploy/ENV.md`.
+- Full workflow: [`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md).
+- Flutter: debug → DEV API; **release AAB always PROD**.
 
 ---
 

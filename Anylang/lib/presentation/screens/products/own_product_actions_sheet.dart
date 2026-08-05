@@ -40,6 +40,8 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
 }) {
   final c = context.appColors;
   final published = product.status == 'published';
+  final pending = product.status == 'pending';
+  final rejected = product.status == 'rejected';
   final isTop = product.isTop;
   final isQueued = product.isTopQueued;
 
@@ -80,13 +82,37 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
               ),
               SizedBox(height: 4.dp),
               Text(
-                '${product.price} · ${product.views} · ${product.status}',
+                '${product.price} · ${product.views} · ${_statusLabel(product.status)}',
                 style: TextStyle(
                   color: c.textSecondary,
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (rejected && product.moderationNote.isNotEmpty) ...[
+                SizedBox(height: 8.dp),
+                Text(
+                  'product_moderation_rejected_reason'.trParams({
+                    'reason': product.moderationNote,
+                  }),
+                  style: TextStyle(
+                    color: kListenRed,
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (pending) ...[
+                SizedBox(height: 8.dp),
+                Text(
+                  'product_moderation_pending_hint'.tr,
+                  style: TextStyle(
+                    color: c.accentText,
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               if (isTop) ...[
                 SizedBox(height: 8.dp),
                 Text(
@@ -116,10 +142,12 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
               _tile(
                 c,
                 icon: Icons.edit_rounded,
-                label: 'my_products_edit'.tr,
+                label: rejected
+                    ? 'product_moderation_edit_resubmit'.tr
+                    : 'my_products_edit'.tr,
                 onTap: () => Navigator.pop(ctx, OwnProductAction.edit),
               ),
-              if (!isQueued)
+              if (published && !isQueued)
                 _tile(
                   c,
                   icon: Icons.vertical_align_top_rounded,
@@ -141,21 +169,24 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
                   }),
                   onTap: () {},
                 ),
-              _tile(
-                c,
-                icon: published
-                    ? Icons.visibility_off_outlined
-                    : Icons.publish_rounded,
-                label: published
-                    ? 'my_products_unpublish'.tr
-                    : 'my_products_publish'.tr,
-                onTap: () => Navigator.pop(
-                  ctx,
-                  published
-                      ? OwnProductAction.unpublish
-                      : OwnProductAction.publish,
+              if (!pending)
+                _tile(
+                  c,
+                  icon: published
+                      ? Icons.visibility_off_outlined
+                      : Icons.publish_rounded,
+                  label: published
+                      ? 'my_products_unpublish'.tr
+                      : rejected
+                          ? 'product_moderation_resubmit'.tr
+                          : 'my_products_publish'.tr,
+                  onTap: () => Navigator.pop(
+                    ctx,
+                    published
+                        ? OwnProductAction.unpublish
+                        : OwnProductAction.publish,
+                  ),
                 ),
-              ),
               _tile(
                 c,
                 icon: Icons.delete_outline_rounded,
@@ -169,6 +200,23 @@ Future<OwnProductAction?> showOwnProductActionsSheet(
       );
     },
   );
+}
+
+String _statusLabel(String status) {
+  switch (status) {
+    case 'pending':
+      return 'product_status_pending'.tr;
+    case 'rejected':
+      return 'product_status_rejected'.tr;
+    case 'draft':
+      return 'product_status_draft'.tr;
+    case 'archived':
+      return 'product_status_archived'.tr;
+    case 'published':
+      return 'product_status_published'.tr;
+    default:
+      return status;
+  }
 }
 
 Widget _tile(

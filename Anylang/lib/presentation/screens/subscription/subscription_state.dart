@@ -35,10 +35,10 @@ class SubscriptionState extends GetxController {
   Rxn<PromoPreview> promoPreview = Rxn<PromoPreview>();
   /// Promo preview va checkout uchun tanlangan reja kodi.
   RxnString promoPlanCode = RxnString();
-  /// Serverdan kelgan valyuta belgisi — hozir faqat UZS (Click).
-  RxString priceCurrencyPrefix = 'UZS'.obs;
-  /// Ko‘rsatilayotgan valyuta — faqat UZS.
-  RxString displayCurrency = 'UZS'.obs;
+  /// Serverdan kelgan valyuta belgisi — katalog USD.
+  RxString priceCurrencyPrefix = 'USD'.obs;
+  /// Ko‘rsatilayotgan valyuta — katalog USD (Click charge UZS).
+  RxString displayCurrency = 'USD'.obs;
   /// Foydalanuvchi mamlakati (ISO-2), masalan UZ.
   RxnString userCountry = RxnString();
   /// To‘lov usuli — faqat Click (so‘m).

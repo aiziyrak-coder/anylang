@@ -69,7 +69,10 @@ class PushNotificationService extends GetxService {
             const AndroidNotificationChannel(
               _androidChannelId,
               _androidChannelName,
+              description: 'Chat and system alerts',
               importance: Importance.high,
+              playSound: true,
+              enableVibration: true,
             ),
           );
     }
@@ -107,7 +110,7 @@ class PushNotificationService extends GetxService {
       final notifOk = await AppPermissions.ensureNotificationPermission();
       if (!notifOk) {
         debugPrint('push: notification permission denied');
-        return;
+        // Tokenni baribir sinab ko‘ramiz (eski Android / iOS).
       }
 
       final messaging = FirebaseMessaging.instance;
@@ -118,11 +121,15 @@ class PushNotificationService extends GetxService {
         provisional: false,
       );
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        debugPrint('push: FCM authorization denied');
         return;
       }
 
       final token = await messaging.getToken();
-      if (token == null || token.isEmpty) return;
+      if (token == null || token.isEmpty) {
+        debugPrint('push: no FCM token (google-services.json / Firebase?)');
+        return;
+      }
 
       final device = await DeviceInfoPayload.current();
       final platform = _pushPlatform(device.deviceType);

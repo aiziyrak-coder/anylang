@@ -2,8 +2,8 @@
 #
 # | Variable | Required | Environments | Purpose |
 # |---|---|---|---|
-# | APP_ENV | yes | all | `local` \| `staging` \| `production` |
-# | DEBUG | yes | all | Must be `false` outside local |
+# | APP_ENV | yes | all | `local` \| `development` \| `staging` \| `production` |
+# | DEBUG | yes | all | Must be `false` on production |
 # | SECRET_KEY | yes | all | JWT + general HMAC (≥48 chars in prod) |
 # | ADMIN_SECRET_KEY | yes (prod) | staging/prod | Separate admin JWT key |
 # | DATABASE_URL | yes | all | Async Postgres DSN |
@@ -25,7 +25,9 @@
 #
 # Files:
 # - backend/.env.example → local
-# - deploy/env.staging.template → staging host `deploy/.env`
+# - deploy/env.dev.template → same VPS `deploy/.env.dev` (https://dev.anylang.uz)
+# - deploy/env.staging.template → optional separate staging host
 # - deploy/env.production.template → production host `deploy/.env`
 #
-# Never commit real `.env` files. They are gitignored.
+# Workflow: see docs/ENVIRONMENTS.md
+# Never commit real `.env` / `.env.dev` files. They are gitignored.

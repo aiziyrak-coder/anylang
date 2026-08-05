@@ -152,13 +152,14 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://anylang.uz
-        ADMIN_BASE_PATH: /admin
+        # Obscure UI path (not /admin). Must match nginx + deploy/.env ADMIN_BASE_PATH.
+        ADMIN_BASE_PATH: ${ADMIN_BASE_PATH:-/ops-x7k2m9q4n8p3}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: https://anylang.uz
-      ADMIN_BASE_PATH: /admin
-      NEXT_PUBLIC_BASE_PATH: /admin
+      ADMIN_BASE_PATH: ${ADMIN_BASE_PATH:-/ops-x7k2m9q4n8p3}
+      NEXT_PUBLIC_BASE_PATH: ${ADMIN_BASE_PATH:-/ops-x7k2m9q4n8p3}
       ADMIN_PUBLIC_ORIGINS: https://anylang.uz,https://www.anylang.uz
     ports:
       - "127.0.0.1:3105:3000"
@@ -166,7 +167,11 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/admin/login || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:3000$${ADMIN_BASE_PATH:-/ops-x7k2m9q4n8p3}/login || exit 1",
+        ]
       interval: 15s
       timeout: 10s
       retries: 8

@@ -49,7 +49,8 @@ async def seed_admin(db: AsyncSession) -> None:
 
 
 async def login_admin(db: AsyncSession, *, email: str, password: str) -> dict:
-    result = await db.execute(select(AdminUser).where(AdminUser.email == email))
+    normalized = (email or "").lower().strip()
+    result = await db.execute(select(AdminUser).where(AdminUser.email == normalized))
     admin = result.scalar_one_or_none()
 
     if admin is None or not admin.is_active or not verify_password(password, admin.password_hash):
@@ -71,3 +72,40 @@ async def login_admin(db: AsyncSession, *, email: str, password: str) -> dict:
             "role": admin.role,
         },
     }
+
+
+async def upsert_admin(
+    db: AsyncSession,
+    *,
+    email: str,
+    password: str,
+    full_name: str = DEFAULT_ADMIN_NAME,
+    role: str = "superadmin",
+) -> AdminUser:
+    """Create or reset an admin account (ops / bootstrap only)."""
+    normalized = (email or "").lower().strip()
+    if not normalized or len(password) < 12:
+        raise AppError(
+            message="Admin email/parol noto'g'ri (parol kamida 12 belgi)",
+            error_code="VALIDATION_ERROR",
+            status_code=400,
+        )
+    result = await db.execute(select(AdminUser).where(AdminUser.email == normalized))
+    admin = result.scalar_one_or_none()
+    pwd_hash = hash_password(password)
+    if admin is None:
+        admin = AdminUser(
+            email=normalized,
+            password_hash=pwd_hash,
+            full_name=full_name,
+            role=role,
+            is_active=True,
+        )
+        db.add(admin)
+    else:
+        admin.password_hash = pwd_hash
+        admin.full_name = full_name or admin.full_name
+        admin.role = role
+        admin.is_active = True
+    await db.flush()
+    return admin

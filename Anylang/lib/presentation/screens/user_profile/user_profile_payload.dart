@@ -48,6 +48,8 @@ class UserProfilePayload {
   final int networkingConnections;
   final int networkingCountries;
   final int? networkingTrust;
+  final double? rating;
+  final int reviewsCount;
   /// true: ekran ochiladi, to‘liq profil API dan kelguncha shimmer.
   final bool loadFull;
 
@@ -91,6 +93,8 @@ class UserProfilePayload {
     this.networkingConnections = 0,
     this.networkingCountries = 0,
     this.networkingTrust,
+    this.rating,
+    this.reviewsCount = 0,
     this.loadFull = false,
   });
 
@@ -306,6 +310,22 @@ class UserProfilePayload {
           return TrustScore.fromApi(biz!['trust_score']).score;
         }
         return null;
+      }(),
+      rating: () {
+        final top = (json['rating'] as num?)?.toDouble();
+        if (top != null) return top;
+        final stats = biz?['stats'];
+        if (stats is Map) return (stats['rating'] as num?)?.toDouble();
+        return (biz?['rating'] as num?)?.toDouble();
+      }(),
+      reviewsCount: () {
+        final top = (json['reviews_count'] as num?)?.toInt();
+        if (top != null) return top;
+        final stats = biz?['stats'];
+        if (stats is Map) {
+          return (stats['reviews_count'] as num?)?.toInt() ?? 0;
+        }
+        return (biz?['reviews_count'] as num?)?.toInt() ?? 0;
       }(),
     );
   }

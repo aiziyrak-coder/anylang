@@ -52,8 +52,12 @@ class SubscriptionPlan {
   String priceFor(int months) {
     final p = periodFor(months);
     if (p != null) {
-      final v = p.perMonth;
-      return v.startsWith(r'$') ? v : '\$$v';
+      final v = p.perMonth.trim();
+      if (v.isEmpty) return monthlyPrice;
+      if (v.startsWith(r'$') || v.contains('so‘m') || v.contains("so'm")) {
+        return v;
+      }
+      return '\$$v';
     }
     if (months == 12 && yearlyPrice.isNotEmpty) return yearlyPrice;
     return monthlyPrice;
@@ -62,8 +66,12 @@ class SubscriptionPlan {
   String? totalFor(int months) {
     final p = periodFor(months);
     if (p != null) {
-      final t = p.total;
-      return t.startsWith(r'$') ? t : '\$$t';
+      final t = p.total.trim();
+      if (t.isEmpty) return null;
+      if (t.startsWith(r'$') || t.contains('so‘m') || t.contains("so'm")) {
+        return t;
+      }
+      return '\$$t';
     }
     if (months == 12) return yearlyTotal;
     return null;
@@ -71,9 +79,12 @@ class SubscriptionPlan {
 
   String? taxFor(int months) {
     final p = periodFor(months);
-    final t = p?.tax;
+    final t = p?.tax?.trim();
     if (t != null && t.isNotEmpty) {
-      return t.startsWith(r'$') ? t : '\$$t';
+      if (t.startsWith(r'$') || t.contains('so‘m') || t.contains("so'm")) {
+        return t;
+      }
+      return '\$$t';
     }
     final baseRaw = _numeric(p?.total);
     if (baseRaw == null) return null;
@@ -83,9 +94,12 @@ class SubscriptionPlan {
 
   String? totalWithTaxFor(int months) {
     final p = periodFor(months);
-    final t = p?.totalWithTax;
+    final t = p?.totalWithTax?.trim();
     if (t != null && t.isNotEmpty) {
-      return t.startsWith(r'$') ? t : '\$$t';
+      if (t.startsWith(r'$') || t.contains('so‘m') || t.contains("so'm")) {
+        return t;
+      }
+      return '\$$t';
     }
     final baseRaw = _numeric(p?.total);
     if (baseRaw == null) return null;

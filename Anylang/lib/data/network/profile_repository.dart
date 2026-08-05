@@ -173,4 +173,38 @@ class ProfileRepository {
       queryParameters: {'limit': limit},
     );
   }
+
+  Future<BaseResult> listCompanyReviews(int userId, {int page = 1, int limit = 20}) {
+    return _client.get(
+      api: 'api/v1/users/$userId/reviews',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+  }
+
+  Future<BaseResult> submitCompanyReview(
+    int userId, {
+    required int rating,
+    required String text,
+  }) {
+    return _client.post(
+      api: 'api/v1/users/$userId/reviews',
+      data: {
+        'rating': rating,
+        'text': text,
+      },
+      notify: SnackNotify.none,
+    );
+  }
+
+  Future<BaseResult> replyCompanyReview(
+    int userId,
+    int reviewId, {
+    required String text,
+  }) {
+    return _client.post(
+      api: 'api/v1/users/$userId/reviews/$reviewId/reply',
+      data: {'text': text},
+      notify: SnackNotify.none,
+    );
+  }
 }

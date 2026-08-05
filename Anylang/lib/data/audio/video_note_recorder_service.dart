@@ -4,7 +4,8 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:permission_handler/permission_handler.dart';
+
+import '../permissions/app_permissions.dart';
 
 /// Telegram uslubidagi dumaloq video-note yozish (kamera).
 class VideoNoteRecorderService extends GetxService {
@@ -24,9 +25,9 @@ class VideoNoteRecorderService extends GetxService {
   CameraController? get controller => _controller;
 
   Future<bool> prepare({bool preferFront = true}) async {
-    final cam = await Permission.camera.request();
-    final mic = await Permission.microphone.request();
-    if (!cam.isGranted || !mic.isGranted) return false;
+    final cam = await AppPermissions.ensureCameraPermission();
+    final mic = await AppPermissions.ensureMicrophonePermission();
+    if (!cam || !mic) return false;
 
     try {
       _cameras = await availableCameras();

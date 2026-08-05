@@ -27,6 +27,7 @@ import '../../modal/image_picker.dart';
 import '../../modal/market_analytics_bottom_sheet.dart';
 import '../../modal/profile_people_bottom_sheet.dart';
 import '../../modal/profile_people_item.dart';
+import '../../modal/company_reviews_bottom_sheet.dart';
 import '../../modal/profile_rating_bottom_sheet.dart';
 import '../../modal/sofiya_ai_bottom_sheet.dart';
 import '../../modal/trust_score_bottom_sheet.dart';
@@ -516,11 +517,23 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case OpenProfileRatingStat _:
         final acc = state.account.value;
         if (acc == null || !context.mounted) return;
-        await showProfileRatingBottomSheet(
-          context,
-          rating: acc.rating ?? acc.insights.rating,
-          reviewsCount: acc.reviewsCount,
-        );
+        if (acc.isBusiness && acc.id > 0) {
+          await showCompanyReviewsBottomSheet(
+            context,
+            businessUserId: acc.id,
+            companyName: acc.name,
+            rating: acc.rating ?? acc.insights.rating,
+            reviewsCount: acc.reviewsCount,
+            canWrite: false,
+            canReply: true,
+          );
+        } else {
+          await showProfileRatingBottomSheet(
+            context,
+            rating: acc.rating ?? acc.insights.rating,
+            reviewsCount: acc.reviewsCount,
+          );
+        }
       case OpenProfileFollowersStat _:
         await _openProfileFollowersSheet();
       case OpenProfileLikesStat _:
@@ -685,7 +698,7 @@ class ProfileScreen extends Screen<ProfileState, void> {
       case OwnProductAction.publish:
       case OwnProductAction.unpublish:
         final status =
-            action == OwnProductAction.publish ? 'published' : 'draft';
+            action == OwnProductAction.publish ? 'pending' : 'draft';
         final result = await Get.find<ProductsRepository>().update(
           product.id,
           {'status': status},
@@ -695,8 +708,8 @@ class ProfileScreen extends Screen<ProfileState, void> {
           return;
         }
         showAppMessage(
-          status == 'published'
-              ? 'my_products_published'.tr
+          status == 'pending'
+              ? 'product_moderation_submitted'.tr
               : 'my_products_unpublished'.tr,
         );
         await _loadListings();

@@ -279,7 +279,7 @@ async def cancel_top_request(
 async def list_my_products(
     db: DbSession,
     current_user: CurrentUser,
-    status: str | None = Query(default=None, pattern="^(draft|published|archived)$"),
+    status: str | None = Query(default=None, pattern="^(draft|pending|published|rejected|archived)$"),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=50),
 ) -> ProductListOut:

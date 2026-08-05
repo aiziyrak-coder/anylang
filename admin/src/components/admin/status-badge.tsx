@@ -7,14 +7,23 @@ const tone: Record<string, string> = {
   approved: "bg-emerald-100 text-emerald-800",
   published: "bg-emerald-100 text-emerald-800",
   pending: "bg-amber-100 text-amber-800",
+  review: "bg-sky-100 text-sky-800",
   inactive: "bg-zinc-200 text-zinc-700",
   deleted: "bg-red-100 text-red-800",
   banned: "bg-red-100 text-red-800",
   failed: "bg-red-100 text-red-800",
   rejected: "bg-red-100 text-red-800",
   needs_refund: "bg-orange-100 text-orange-800",
+  needs_resubmit: "bg-amber-100 text-amber-900",
   draft: "bg-zinc-100 text-zinc-600",
   archived: "bg-zinc-200 text-zinc-600",
+  paused: "bg-amber-100 text-amber-900",
+  expired: "bg-orange-100 text-orange-800",
+  refunded: "bg-violet-100 text-violet-800",
+  chargeback: "bg-red-100 text-red-900",
+  cancelled: "bg-zinc-200 text-zinc-600",
+  reviewing: "bg-sky-100 text-sky-800",
+  hidden: "bg-amber-100 text-amber-900",
 };
 
 export function StatusBadge({ status }: { status: string }) {

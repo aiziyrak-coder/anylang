@@ -37,6 +37,7 @@ const nextConfig: NextConfig = {
           "form-action 'self'",
         ].join("; "),
       },
+      { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
     ];
 
     if (isProd) {

@@ -440,6 +440,19 @@ class UserProfileContent extends ScreenContent<UserProfileState> {
             border: Border.all(color: c.accent.withValues(alpha: 0.45), width: 0.7),
           ),
         ],
+        if (d.business && showFriend) ...[
+          SizedBox(width: 10.dp),
+          MyIconButton(
+            onClick: () => sendAction(WriteCompanyReview()),
+            icon: Icons.rate_review_rounded,
+            iconColor: c.accentText,
+            iconSize: 20.dp,
+            backgroundColor: c.accentSoft,
+            borderRadius: 14.dp,
+            padding: EdgeInsets.all(14.dp),
+            border: Border.all(color: c.accent.withValues(alpha: 0.45), width: 0.7),
+          ),
+        ],
         if (d.business && (d.website ?? '').trim().isNotEmpty) ...[
           SizedBox(width: 10.dp),
           MyIconButton(

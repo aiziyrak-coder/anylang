@@ -67,6 +67,8 @@ const I18N = {
     close_soon: "Google Play & App Store — coming soon",
     footer_tag: "Speak any language. Do business anywhere.",
     footer_privacy: "Privacy Policy",
+    footer_delete: "Delete account",
+    footer_partner: "Partner apply",
     footer_terms: "Public Offer",
   },
   uz: {
@@ -133,6 +135,8 @@ const I18N = {
     footer_tag:
       "Har qanday tilda gaplashing. Dunyoning istalgan nuqtasida biznes qiling.",
     footer_privacy: "Maxfiylik siyosati",
+    footer_delete: "Hisobni o‘chirish",
+    footer_partner: "Hamkor anketa",
     footer_terms: "Ommaviy oferta",
   },
   ru: {
@@ -195,6 +199,8 @@ const I18N = {
     close_soon: "Google Play и App Store — скоро",
     footer_tag: "Говорите на любом языке. Ведите бизнес где угодно.",
     footer_privacy: "Политика конфиденциальности",
+    footer_delete: "Удалить аккаунт",
+    footer_partner: "Анкета партнёра",
     footer_terms: "Публичная оферта",
   },
 };

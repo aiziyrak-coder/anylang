@@ -512,15 +512,19 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
           canPin: !state.isGroup.value ||
               state.myRole == 'owner' ||
               state.myRole == 'admin',
+          canDeleteForEveryone: _canDeleteMessageForEveryone(msg),
           onReact: (emoji) => reactedEmoji = emoji,
         );
-        switch (chosen) {
+        switch (chosen?.action) {
           case MessageMenuAction.reply:
             sendAction(StartReply(msg));
           case MessageMenuAction.copy:
             sendAction(CopyMessage(msg));
           case MessageMenuAction.delete:
-            await _deleteMessageFlow(msg);
+            await _performDelete(
+              msg,
+              forEveryone: chosen?.deleteForEveryone ?? false,
+            );
           case MessageMenuAction.translate:
             final idx = state.messages.indexWhere((m) => m.id == msg.id);
             if (idx >= 0) {
@@ -1677,31 +1681,6 @@ class ChatScreen extends Screen<ChatState, ChatPayload> {
       ),
     );
     messages.conversations.assignAll(list);
-  }
-
-  Future<void> _deleteMessageFlow(ChatMessage msg) async {
-    final canEveryone = _canDeleteMessageForEveryone(msg);
-    final actions = <TelegramSheetAction>[
-      if (canEveryone)
-        TelegramSheetAction(
-          id: 'everyone',
-          label: 'chat_msg_delete_everyone'.tr,
-          danger: true,
-        ),
-      TelegramSheetAction(
-        id: 'me',
-        label: 'chat_msg_delete_me'.tr,
-        danger: true,
-      ),
-    ];
-    final choice = await showTelegramActionSheet(
-      context,
-      title: 'chat_msg_delete_title'.tr,
-      body: 'chat_msg_delete_choose'.tr,
-      actions: actions,
-    );
-    if (choice == null) return;
-    await _performDelete(msg, forEveryone: choice == 'everyone');
   }
 
   Future<void> _deleteSelectedMessages() async {

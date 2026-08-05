@@ -7,6 +7,7 @@ import 'package:anylang/presentation/screens/login/login_state.dart';
 import 'package:anylang/presentation/screens/main/main_screen.dart';
 import 'package:anylang/presentation/screens/select_language/select_language_screen.dart';
 import 'package:anylang/presentation/ui/my_snackbar.dart';
+import 'data/audio/message_alert_sound_service.dart';
 import 'data/core/buildNetwork/api_config.dart';
 import 'data/core/buildNetwork/api_service.dart';
 import 'data/core/buildNetwork/token_refresher.dart';
@@ -107,6 +108,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (Get.isRegistered<OfflineOutboxService>()) {
         Get.find<OfflineOutboxService>().flush();
       }
+      // Catch-up xabarlar bitta signalga yig‘ilsin.
+      if (Get.isRegistered<MessageAlertSoundService>()) {
+        Get.find<MessageAlertSoundService>().markBurstWindow();
+      }
     }
   }
 
@@ -138,9 +143,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               isDark ? Brightness.light : Brightness.dark,
           systemNavigationBarContrastEnforced: false,
         );
+        Widget content = child ?? const SizedBox.shrink();
+        // Dev API ga ulangan build — ekranda eslatma (prod release'da yo'q).
+        if (kIsDevApi) {
+          content = Banner(
+            message: 'DEV',
+            location: BannerLocation.topEnd,
+            color: const Color(0xFFE65100),
+            child: content,
+          );
+        }
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: overlay,
-          child: child ?? const SizedBox.shrink(),
+          child: content,
         );
       },
       home: const _BootstrapHome(),

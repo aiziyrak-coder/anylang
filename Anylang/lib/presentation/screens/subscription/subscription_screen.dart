@@ -56,12 +56,6 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
     super.dispose();
   }
 
-  String _money(String amount) {
-    final cleaned = amount.replaceAll(RegExp(r'[^0-9.\-]'), '');
-    if (cleaned.isEmpty) return amount;
-    return formatMoneyAmount(cleaned, currency: 'UZS');
-  }
-
   Future<void> _loadAll() async {
     state.loading.value = true;
     state.loadError.value = false;
@@ -91,10 +85,10 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           state.userCountry.value =
               fromSession.length == 2 ? fromSession : null;
         }
-        // Click · so‘m — hamma uchun.
+        // Katalog USD; Click to‘lovda so‘m (CBU).
         state.payMethod.value = 'click';
-        state.displayCurrency.value = 'UZS';
-        state.priceCurrencyPrefix.value = 'UZS';
+        state.displayCurrency.value = 'USD';
+        state.priceCurrencyPrefix.value = 'USD';
         final isBiz = map['is_business'] == true;
         if (Get.isRegistered<ProductsState>()) {
           Get.find<ProductsState>().isBusiness.value = isBiz;
@@ -140,12 +134,12 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
       }
     }
     state.payMethod.value = 'click';
-    state.displayCurrency.value = 'UZS';
+    state.displayCurrency.value = 'USD';
     final result = await client.get(
       api: 'api/v1/subscription/plans',
       queryParameters: {
         'language': lang,
-        'currency': 'UZS',
+        'currency': 'USD',
       },
     );
     result.when(
@@ -154,13 +148,11 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           state.loadError.value = true;
           return;
         }
-        final apiCurrency = data['currency']?.toString().trim().toUpperCase();
-        // Catalog always UZS (Click); ignore leftover USD from old servers.
-        state.displayCurrency.value = 'UZS';
-        state.priceCurrencyPrefix.value =
-            (apiCurrency == 'UZS' || apiCurrency == null || apiCurrency.isEmpty)
-                ? 'UZS'
-                : (apiCurrency.length <= 3 ? apiCurrency : 'UZS');
+        final apiCurrency =
+            (data['currency']?.toString() ?? 'USD').trim().toUpperCase();
+        state.displayCurrency.value =
+            apiCurrency == 'UZS' ? 'UZS' : 'USD';
+        state.priceCurrencyPrefix.value = state.displayCurrency.value;
         final apiCountry =
             (data['user_country']?.toString() ?? '').trim().toUpperCase();
         if (apiCountry.length == 2) {
@@ -208,8 +200,13 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           final yearly = raw['yearly_price']?.toString();
           final yearlyTotal = raw['yearly_total']?.toString();
           final savings = raw['savings_percent'];
-          String price(String? v) =>
-              v == null || v.isEmpty ? '' : _money(v.replaceAll('\$', ''));
+          final cur = state.displayCurrency.value;
+          String price(String? v) {
+            if (v == null || v.isEmpty) return '';
+            final cleaned = v.replaceAll(RegExp(r'[^0-9.\-]'), '');
+            if (cleaned.isEmpty) return v;
+            return formatMoneyAmount(cleaned, currency: cur);
+          }
           final code = raw['code']?.toString() ?? '';
           final isCurrent = currentCode != null &&
               currentCode == code.toLowerCase();
@@ -299,9 +296,9 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
         state.billingMonths.value = a.months;
         state.promoPreview.value = null;
       case SelectPayMethod _:
-        // Visa o‘chirilgan — faqat Click · so‘m.
+        // Visa o‘chirilgan — faqat Click (katalog USD, charge UZS).
         state.payMethod.value = 'click';
-        state.displayCurrency.value = 'UZS';
+        state.displayCurrency.value = 'USD';
       case RetryLoadPlans _:
         await _loadAll();
       case CheckPendingPayment _:
@@ -419,7 +416,7 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
   }
 
   Future<void> _selectPlan(SubscriptionPlan plan) async {
-    if (state.checkoutInFlight.value || state.awaitingPayment.value) return;
+    if (state.checkoutInFlight.value) return;
     state.checkoutInFlight.value = true;
     try {
       await _selectPlanBody(plan);
@@ -549,6 +546,8 @@ class SubscriptionScreen extends Screen<SubscriptionState, void> {
           amountBeforeTax: beforeTax,
           taxAmount: taxAmount,
           taxPercent: taxPct,
+          amountUsd: data['amount_usd']?.toString(),
+          usdUzsRate: data['usd_uzs_rate']?.toString(),
           planLabel: plan.title,
           periodLabel: periodKey.tr,
           ctaText: 'subscription_pay_confirm_cta'.tr,

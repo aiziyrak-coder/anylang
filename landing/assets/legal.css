@@ -143,3 +143,58 @@ a:hover { text-decoration: underline; }
 .foot a { color: var(--muted); }
 .foot a:hover { color: var(--text); }
 .sep { opacity: 0.4; }
+
+.delete-form {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 0.9rem;
+}
+.delete-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.delete-form input[type="email"],
+.delete-form input[type="password"] {
+  font: inherit;
+  font-weight: 500;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--bg);
+  color: var(--text);
+}
+.delete-form label.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.delete-form label.check input {
+  margin-top: 0.2rem;
+}
+.btn-danger {
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  background: #b42318;
+  cursor: pointer;
+}
+.btn-danger:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.form-status {
+  margin: 0;
+  min-height: 1.25rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+.form-status.is-ok { color: #1f7a3a; font-weight: 600; }
+.form-status.is-error { color: #b42318; font-weight: 600; }

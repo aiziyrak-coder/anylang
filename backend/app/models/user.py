@@ -62,6 +62,13 @@ class User(Base, TimestampMixin):
     scheduled_purge_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     # Bir qurilmada qo'shimcha hisob slotlari ($10 / dona, biznes bazasiga qo'shiladi).
     extra_account_slots: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Tiklashdan keyin majburiy parol almashtirish.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Mahsulot moderatsiya: 3 rad → e'lon cheklovi
+    product_reject_strikes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    listing_restricted_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
     subscription: Mapped[Subscription | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
@@ -198,6 +205,8 @@ class NumberGroup(Base, TimestampMixin):
     bonus_duration_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Demand-based dynamic pricing (multipliers on base `price`)
+    pricing_rules: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
 
 class NumberAssignment(Base, TimestampMixin):
@@ -221,7 +230,9 @@ class AdminUser(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    role: Mapped[str] = mapped_column(String(32), default="moderator", nullable=False)  # superadmin|moderator|support
+    role: Mapped[str] = mapped_column(
+        String(32), default="moderator", nullable=False
+    )  # superadmin|moderator|support|finance
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
@@ -237,6 +248,29 @@ class AdminAuditLog(Base, TimestampMixin):
     target_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Diff + integrity (append-only table; DB trigger blocks UPDATE/DELETE)
+    before_state: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    after_state: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class AdminActivityAlert(Base, TimestampMixin):
+    __tablename__ = "admin_activity_alerts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    alert_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False, default="medium")
+    actor_admin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    detail: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    sample_log_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="open", index=True)
+    acked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acked_by_admin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 class AccountRestoreRequest(Base, TimestampMixin):
@@ -257,6 +291,23 @@ class AccountRestoreRequest(Base, TimestampMixin):
     )
     decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Identity verify checklist
+    email_otp_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    number_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    device_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    claimed_device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    claimed_device_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Risk: boshqa odam tiklamoqchimi?
+    risk_impersonation: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    risk_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Partial restore
+    keep_chats: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sla_hours: Mapped[int] = mapped_column(Integer, default=24, nullable=False)
+    last_status_notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    identity_meta: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
 class ProfileView(Base, TimestampMixin):
     """Who viewed a profile — unique viewer per profile; last_viewed_at updates."""

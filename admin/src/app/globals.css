@@ -10,6 +10,14 @@
   --border: #e5e5e0;
 }
 
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --accent: #c8f542;
+  --surface: #18181b;
+  --border: #27272a;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);

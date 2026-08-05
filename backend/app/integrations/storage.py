@@ -53,6 +53,12 @@ class StorageClient:
             logger.error("S3 upload failed for key=%s: %s", key, exc)
             raise
 
+    async def head_bucket(self) -> None:
+        """Latency / connectivity probe for MinIO/S3."""
+        settings = self._settings
+        async with self._session.client(**self._client_kwargs()) as s3:
+            await s3.head_bucket(Bucket=settings.s3_bucket)
+
     async def delete_object(self, key: str) -> None:
         settings = self._settings
         try:

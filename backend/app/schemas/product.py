@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-ProductStatus = Literal["draft", "published", "archived"]
+ProductStatus = Literal["draft", "pending", "published", "rejected", "archived"]
 ProductSort = Literal["newest", "price_asc", "price_desc", "most_viewed"]
 ProductCurrency = Literal["USD", "EUR", "RUB", "UZS"]
 ProductCategory = Literal[
@@ -79,6 +79,8 @@ class ProductOut(BaseModel):
     is_top: bool
     is_favorited: bool
     status: ProductStatus
+    moderation_note: str = ""
+    moderated_at: datetime | None = None
     seller_id: int
     created_at: datetime
     trust_badges: ProductTrustBadgesOut | None = None
@@ -193,6 +195,11 @@ class ProductTopRequestListOut(BaseModel):
 
 class AdminTopRequestReviewIn(BaseModel):
     admin_note: str = Field(default="", max_length=300)
+
+
+class AdminProductModerationIn(BaseModel):
+    approve: bool
+    admin_note: str | None = Field(default=None, max_length=500)
 
 
 class ProductCreateIn(BaseModel):

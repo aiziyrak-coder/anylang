@@ -46,9 +46,12 @@ export type NumberGroup = {
   name: string;
   patterns: string[];
   price: string;
+  effective_price?: string;
   currency: string;
   bonus_plan: string | null;
   bonus_duration_months: number | null;
   priority: number;
   is_active: boolean;
+  pricing_rules?: Record<string, unknown>;
+  capacity_est?: number | null;
 };

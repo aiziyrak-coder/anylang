@@ -439,6 +439,17 @@ async def update_business(
         business.payment_methods = _clean_str_list(payment_methods, max_items=12, max_len=40)
 
     await db.flush()
+    # Description edited without ready i18n map → auto-translate for all langs
+    if description is not None and description_i18n is None and (business.description or "").strip():
+        from app.integrations.translation import user_preferred_lang
+        from app.services.catalog_i18n import enqueue_catalog_translate
+
+        await enqueue_catalog_translate(
+            kind="business",
+            entity_id=user.id,
+            source_lang=user_preferred_lang(user),
+            defer_seconds=2,
+        )
     return await serialize_business(db, user)
 
 

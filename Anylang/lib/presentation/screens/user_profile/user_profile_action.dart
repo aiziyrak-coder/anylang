@@ -39,3 +39,9 @@ class UserTrustImproveAction extends UserProfileAction {
   final String action;
   UserTrustImproveAction(this.action);
 }
+
+/// Kompaniya otzivlari / reyting.
+class OpenCompanyReviews extends UserProfileAction {}
+
+/// Otziv yozish (boshqa biznes).
+class WriteCompanyReview extends UserProfileAction {}

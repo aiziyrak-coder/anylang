@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Biznes anketa — AnyLang</title>
+  <meta name="description" content="AnyLang partner biznes anketa — kompaniya va mahsulotlaringizni to‘ldiring." />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#f4f6f3" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/partner-apply/partner-apply.css?v=4" />
+</head>
+<body>
+  <div class="top">
+    <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;width:min(100% - 2rem,760px);margin-inline:auto;">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>AnyLang</a>
+      <div class="langs" role="group" aria-label="Language">
+        <button type="button" class="lang-btn" data-lang="uz">UZ</button>
+        <button type="button" class="lang-btn" data-lang="ru">RU</button>
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <header class="hero">
+      <h1 data-i18n="title">Biznes anketa</h1>
+      <p class="meta" data-i18n="subtitle">Hamkorlar uchun — login yarating, biznes va mahsulotlarni to‘ldiring, yuboring. Admin tasdiqlagach akkount ochiladi.</p>
+      <p class="meta" style="margin-top:.55rem" data-i18n="auto_translate_note">Bitta tilda to‘ldiring — AnyLang mahsulot va biznes matnlarini barcha tillarga avtomatik tarjima qiladi.</p>
+    </header>
+
+    <ol class="steps" id="steps">
+      <li data-step-label="0" class="is-active">1. Kirish</li>
+      <li data-step-label="1">2. Biznes</li>
+      <li data-step-label="2">3. Mahsulotlar</li>
+      <li data-step-label="3">4. Yuborish</li>
+    </ol>
+
+    <div id="form-root">
+      <!-- Step 0: credentials -->
+      <section class="card panel is-active" data-panel="0">
+        <h2 data-i18n="s1_title">Kirish ma’lumotlari</h2>
+        <p class="hint" data-i18n="s1_hint">Shu email va parol bilan keyin ilovaga kirasiz. Email tasdiqlash shart emas.</p>
+        <div class="grid two">
+          <label class="field"><span data-i18n="contact_name">Ism / aloqa shaxsi</span><input id="contact_name" autocomplete="name" required /></label>
+          <label class="field"><span data-i18n="phone">Telefon</span><input id="phone" type="tel" autocomplete="tel" placeholder="+998…" /></label>
+          <label class="field"><span data-i18n="email">Email (kirish uchun)</span><input id="email" type="email" autocomplete="username" required /></label>
+          <label class="field"><span data-i18n="email_check">Email holati</span><input id="email_status" readonly tabindex="-1" /></label>
+          <label class="field"><span data-i18n="password">Parol</span><input id="password" type="password" autocomplete="new-password" minlength="8" required /></label>
+          <label class="field"><span data-i18n="password2">Parolni takrorlang</span><input id="password2" type="password" autocomplete="new-password" minlength="8" required /></label>
+        </div>
+        <p class="hint" style="margin-top:.75rem" data-i18n="pass_hint">Kamida 8 belgi, harf va raqam bo‘lishi shart.</p>
+        <div class="nav-row">
+          <span></span>
+          <button type="button" class="btn btn-primary" data-next data-i18n="next">Keyingi</button>
+        </div>
+      </section>
+
+      <!-- Step 1: business -->
+      <section class="card panel" data-panel="1">
+        <h2 data-i18n="s2_title">Biznes haqida</h2>
+        <p class="hint" data-i18n="s2_hint">Kompaniya ma’lumotlari, logo, zavod rasmlari va video.</p>
+        <div class="grid two">
+          <label class="field"><span data-i18n="company">Kompaniya nomi</span><input id="company_name" required /></label>
+          <label class="field"><span data-i18n="country">Davlat (ISO)</span><input id="country" maxlength="2" placeholder="UZ" required /></label>
+          <label class="field">
+            <span data-i18n="role">Biznes turi</span>
+            <select id="business_role">
+              <option value="manufacturer" data-i18n-opt="role_manufacturer">Ishlab chiqaruvchi</option>
+              <option value="distributor" data-i18n-opt="role_distributor">Distribyutor</option>
+              <option value="retail" data-i18n-opt="role_retail">Chakana savdo</option>
+              <option value="service" data-i18n-opt="role_service">Xizmat ko‘rsatish</option>
+            </select>
+          </label>
+          <label class="field"><span data-i18n="website">Veb-sayt</span><input id="website" type="url" placeholder="https://" data-ph="ph_website" /></label>
+          <label class="field"><span data-i18n="founded">Tashkil topgan yil</span><input id="founded_year" type="number" min="1800" max="2100" data-ph="ph_founded" /></label>
+          <label class="field"><span data-i18n="moq">Minimal buyurtma (MOQ)</span><input id="moq" data-ph="ph_moq" /></label>
+          <label class="field"><span data-i18n="capacity">Ishlab chiqarish quvvati</span><input id="production_capacity" data-ph="ph_capacity" /></label>
+          <label class="field"><span data-i18n="lead">Yetkazish muddati</span><input id="lead_time" placeholder="7–14 kun" data-ph="ph_lead" /></label>
+        </div>
+        <div class="grid" style="margin-top:.85rem">
+          <label class="field"><span data-i18n="bio">Qisqa bio</span><textarea id="bio" maxlength="300"></textarea></label>
+          <label class="field"><span data-i18n="description">To‘liq tavsif</span><textarea id="description"></textarea></label>
+        </div>
+        <div class="chip-block" style="margin-top:1rem">
+          <p class="chip-label" data-i18n="export">Eksport davlatlari</p>
+          <p class="chip-hint" data-i18n="export_hint">Keraklilarini bosing (bir nechtasini tanlash mumkin)</p>
+          <div class="chip-wrap" id="export_countries_wrap" role="group" aria-label="Eksport davlatlari"></div>
+        </div>
+        <div class="chip-block" style="margin-top:1rem">
+          <p class="chip-label" data-i18n="certs">Sertifikatlar</p>
+          <p class="chip-hint" data-i18n="certs_hint">Mavjud sertifikatlarni belgilang</p>
+          <div class="chip-wrap" id="certificates_wrap" role="group" aria-label="Sertifikatlar"></div>
+        </div>
+
+        <div class="upload-box" style="margin-top:1rem">
+          <p data-i18n="logo_hint">Kompaniya logotipi (JPG/PNG, max 5MB)</p>
+          <div class="upload-actions">
+            <label class="btn-file"><input type="file" accept="image/*" id="logo_file" /><span data-i18n="pick_image">Rasm tanlash</span></label>
+          </div>
+          <div class="thumbs" id="logo_thumbs"></div>
+        </div>
+
+        <div class="upload-box" style="margin-top:.75rem">
+          <p data-i18n="factory_img_hint">Zavod / ombor rasmlari (bir nechta)</p>
+          <div class="upload-actions">
+            <label class="btn-file"><input type="file" accept="image/*" id="factory_images" multiple /><span data-i18n="pick_images">Rasmlar</span></label>
+          </div>
+          <div class="thumbs" id="factory_thumbs"></div>
+        </div>
+
+        <div class="upload-box" style="margin-top:.75rem">
+          <p data-i18n="factory_vid_hint">Zavod videosi (MP4/MOV, max 25MB)</p>
+          <div class="upload-actions">
+            <label class="btn-file"><input type="file" accept="video/*" id="factory_video" /><span data-i18n="pick_video">Video</span></label>
+          </div>
+          <div class="thumbs" id="factory_video_thumbs"></div>
+        </div>
+
+        <div class="nav-row">
+          <button type="button" class="btn btn-ghost" data-prev data-i18n="back">Orqaga</button>
+          <button type="button" class="btn btn-primary" data-next data-i18n="next">Keyingi</button>
+        </div>
+      </section>
+
+      <!-- Step 2: products -->
+      <section class="card panel" data-panel="2">
+        <h2 data-i18n="s3_title">Mahsulotlar</h2>
+        <p class="hint" data-i18n="s3_hint">Nechta mahsulotingiz bo‘lsa — hammasini qo‘shing. Narx, rasm va video.</p>
+        <div id="products"></div>
+        <button type="button" class="btn btn-ghost" id="add_product" data-i18n="add_product">+ Mahsulot qo‘shish</button>
+        <div class="nav-row">
+          <button type="button" class="btn btn-ghost" data-prev data-i18n="back">Orqaga</button>
+          <button type="button" class="btn btn-primary" data-next data-i18n="next">Keyingi</button>
+        </div>
+      </section>
+
+      <!-- Step 3: review -->
+      <section class="card panel" data-panel="3">
+        <h2 data-i18n="s4_title">Tekshirish va yuborish</h2>
+        <p class="hint" data-i18n="s4_hint">Ma’lumotlar to‘g‘riligini ko‘rib chiqing. Yuborgach admin tasdiqlaydi.</p>
+        <div id="review"></div>
+        <div class="nav-row">
+          <button type="button" class="btn btn-ghost" data-prev data-i18n="back">Orqaga</button>
+          <button type="button" class="btn btn-danger" id="submit_btn" data-i18n="submit">Anketani yuborish</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="card success-box" id="success" style="display:none">
+      <h2 data-i18n="ok_title">Anketa yuborildi</h2>
+      <p data-i18n="ok_text">Admin tekshirib tasdiqlagach, kiritgan email/parolingiz bilan AnyLang ilovasiga kira olasiz.</p>
+      <a class="btn btn-primary" href="/" data-i18n="home">Bosh sahifa</a>
+    </div>
+
+    <p class="status" id="status" role="status"></p>
+
+    <footer class="foot">
+      <a href="/">Bosh sahifa</a><span class="sep">·</span>
+      <a href="/privacy/">Maxfiylik</a><span class="sep">·</span>
+      <a href="mailto:support@anylang.uz">support@anylang.uz</a>
+    </footer>
+  </main>
+
+  <script src="/partner-apply/partner-apply.js?v=4"></script>
+</body>
+</html>

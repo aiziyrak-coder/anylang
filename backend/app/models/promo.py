@@ -43,6 +43,19 @@ class PromoCode(Base, TimestampMixin):
     valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # Campaign / targeting (admin constructor)
+    campaign_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    variant: Mapped[str | None] = mapped_column(String(8), nullable=True)  # A | B
+    # standard | campaign | referral | influencer
+    code_type: Mapped[str] = mapped_column(String(32), nullable=False, default="standard", index=True)
+    # all | new_users
+    segment: Mapped[str] = mapped_column(String(32), nullable=False, default="all")
+    new_user_max_age_days: Mapped[int] = mapped_column(Integer, nullable=False, default=7)
+    allowed_countries: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    allowed_languages: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    influencer_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_paused: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
 
 class PromoRedemption(Base, TimestampMixin):
     __tablename__ = "promo_redemptions"

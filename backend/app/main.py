@@ -44,6 +44,63 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class FeatureFlagsMiddleware(BaseHTTPMiddleware):
+    """Maintenance mode + region_off (X-Client-Country)."""
+
+    _ALLOW_PREFIXES = (
+        "/health",
+        "/ready",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/payment/",
+        "/billing/",
+    )
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        path = request.url.path or ""
+        # Always allow admin + health + billing
+        if path.startswith(self._ALLOW_PREFIXES) or "/admin" in path:
+            return await call_next(request)
+
+        try:
+            from app.services.maintenance_ops import get_feature_flags_cached
+
+            flags = await get_feature_flags_cached()
+        except Exception:
+            return await call_next(request)
+
+        if flags.get("maintenance_mode"):
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "message": "Texnik xizmat — ilova vaqtincha yopiq",
+                    "error_code": "MAINTENANCE_MODE",
+                },
+            )
+
+        region_off = flags.get("region_off") or []
+        if region_off:
+            country = (
+                request.headers.get("x-client-country")
+                or request.headers.get("cf-ipcountry")
+                or ""
+            ).strip().upper()
+            if country and country in {str(r).upper() for r in region_off}:
+                return JSONResponse(
+                    status_code=status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS
+                    if hasattr(status, "HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS")
+                    else 451,
+                    content={
+                        "message": "Bu region hozircha o‘chirilgan",
+                        "error_code": "REGION_OFF",
+                        "country": country,
+                    },
+                )
+
+        return await call_next(request)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -93,6 +150,7 @@ def create_app() -> FastAPI:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_host_list)
 
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(FeatureFlagsMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,

@@ -9,6 +9,7 @@ import '../../../data/network/friends_repository.dart';
 import '../../../data/network/products_repository.dart';
 import '../../../data/network/profile_repository.dart';
 import '../../modal/business_verification_bottom_sheet.dart';
+import '../../modal/company_reviews_bottom_sheet.dart';
 import '../../modal/trust_score_bottom_sheet.dart';
 import '../../utils/app_snackbar.dart';
 import '../../utils/screen_options/my_action.dart';
@@ -267,6 +268,23 @@ class UserProfileScreen extends Screen<UserProfileState, UserProfilePayload> {
           default:
             break;
         }
+      case OpenCompanyReviews _:
+      case WriteCompanyReview _:
+        final data = state.data;
+        if (data == null || !data.business || data.id <= 0) return;
+        if (!context.mounted) return;
+        final me = SessionStore.userId();
+        final canWrite = me != null && me != data.id;
+        final canReply = me != null && me == data.id;
+        await showCompanyReviewsBottomSheet(
+          context,
+          businessUserId: data.id,
+          companyName: data.name,
+          rating: data.rating,
+          reviewsCount: data.reviewsCount,
+          canWrite: canWrite,
+          canReply: canReply,
+        );
     }
   }
 

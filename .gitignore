@@ -13,6 +13,8 @@ scripts/get_creds.py
 scripts/_*
 **/*CREDENTIALS*
 deploy/.env
+deploy/.env.local
+deploy/.env.dev
 deploy/CREDENTIALS.local.txt
 # Firebase / FCM secrets (never commit)
 **/google-services.json

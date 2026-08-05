@@ -25,11 +25,13 @@ export async function POST(request: Request) {
   }
 
   const jar = await cookies();
+  const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").trim() || "/";
   jar.set(COOKIE, data.access_token as string, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    path: "/",
+    // Cookie only for the obscure admin path — not the whole site.
+    path: basePath,
     maxAge: (data.expires_in as number) ?? 28800,
   });
 

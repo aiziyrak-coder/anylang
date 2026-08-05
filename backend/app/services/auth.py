@@ -1154,6 +1154,7 @@ async def reset_password(
         raise AppError(message="Foydalanuvchi topilmadi", error_code="NOT_FOUND", status_code=404)
 
     user.password_hash = hash_password(new_password)
+    user.must_change_password = False
     now = datetime.now(UTC)
     await db.execute(
         update(RefreshToken)
@@ -1162,4 +1163,29 @@ async def reset_password(
     )
     await db.flush()
 
+    return {"message": "Parol muvaffaqiyatli yangilandi"}
+
+
+async def change_password(
+    db: AsyncSession,
+    *,
+    user: User,
+    current_password: str,
+    new_password: str,
+) -> dict[str, str]:
+    if not user.password_hash or not verify_password(current_password, user.password_hash):
+        raise AppError(
+            message="Joriy parol noto‘g‘ri",
+            error_code="INVALID_PASSWORD",
+            status_code=400,
+        )
+    user.password_hash = hash_password(new_password)
+    user.must_change_password = False
+    now = datetime.now(UTC)
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
+    await db.flush()
     return {"message": "Parol muvaffaqiyatli yangilandi"}

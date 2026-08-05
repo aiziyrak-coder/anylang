@@ -234,6 +234,7 @@ async def serialize_user(
         "profile_completed": user.profile_completed,
         "created_at": user.created_at,
         "last_number_change_at": user.last_number_change_at,
+        "must_change_password": bool(getattr(user, "must_change_password", False)),
         "subscription": _serialize_subscription(subscription),
         "is_business": is_business,
         "business": business_payload,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -25,26 +27,43 @@ Future<String?> showTelegramActionSheet(
   String? body,
   required List<TelegramSheetAction> actions,
   String? cancelLabel,
+  Color? barrierColor,
 }) {
   final cancel = cancelLabel ?? 'common_cancel'.tr;
-  return showModalBottomSheet<String>(
+  final completer = Completer<String?>();
+
+  void completeOnce(String? value) {
+    if (!completer.isCompleted) completer.complete(value);
+  }
+
+  showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    useRootNavigator: false,
+    barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.45),
+    sheetAnimationStyle: const AnimationStyle(
+      duration: Duration(milliseconds: 280),
+      reverseDuration: Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ),
     builder: (ctx) {
       final c = ctx.appColors;
       final sheetBg = c.isDark ? const Color(0xFF152A42) : Colors.white;
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(12.dp, 0, 12.dp, 12.dp),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: double.infinity,
+      final bottomInset = MediaQuery.viewPaddingOf(ctx).bottom;
+      return Padding(
+        padding: EdgeInsets.fromLTRB(12.dp, 0, 12.dp, 12.dp + bottomInset),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: sheetBg,
+              elevation: 0,
+              borderRadius: BorderRadius.circular(16.dp),
+              clipBehavior: Clip.antiAlias,
+              child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: sheetBg,
                   borderRadius: BorderRadius.circular(16.dp),
                   border: Border.all(color: c.outline.withValues(alpha: 0.35)),
                 ),
@@ -90,46 +109,59 @@ Future<String?> showTelegramActionSheet(
                         label: actions[i].label,
                         danger: actions[i].danger,
                         primary: actions[i].primary,
-                        onTap: () => Navigator.pop(ctx, actions[i].id),
+                        onTap: () {
+                          completeOnce(actions[i].id);
+                          Navigator.pop(ctx);
+                        },
                       ),
                     ],
                   ],
                 ),
               ),
-              SizedBox(height: 8.dp),
-              Material(
-                color: sheetBg,
+            ),
+            SizedBox(height: 8.dp),
+            Material(
+              color: sheetBg,
+              borderRadius: BorderRadius.circular(16.dp),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () {
+                  completeOnce(null);
+                  Navigator.pop(ctx);
+                },
                 borderRadius: BorderRadius.circular(16.dp),
-                child: InkWell(
-                  onTap: () => Navigator.pop(ctx),
-                  borderRadius: BorderRadius.circular(16.dp),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 15.dp),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16.dp),
-                      border: Border.all(
-                        color: c.outline.withValues(alpha: 0.35),
-                      ),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16.dp),
+                    border: Border.all(
+                      color: c.outline.withValues(alpha: 0.35),
                     ),
-                    child: Text(
-                      cancel,
-                      style: TextStyle(
-                        color: c.accentText,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w700,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 15.dp),
+                      child: Text(
+                        cancel,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: c.accentText,
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     },
-  );
+  ).whenComplete(() => completeOnce(null));
+
+  return completer.future;
 }
 
 class _ActionTile extends StatelessWidget {
